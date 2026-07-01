@@ -24,4 +24,10 @@ public enum AppDirectories {
         try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
         return directory
     }
+
+    public static func lockDirectory(fileManager: FileManager = .default) throws -> URL {
+        let directory = try applicationSupportDirectory(fileManager: fileManager).appendingPathComponent("Locks", isDirectory: true)
+        try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory
+    }
 }

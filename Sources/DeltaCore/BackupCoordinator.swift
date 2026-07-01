@@ -9,6 +9,7 @@ public final class BackupCoordinator: @unchecked Sendable {
     private let scheduleEvaluator: ScheduleEvaluator
     private let bookmarkStore: SecurityScopedBookmarkStore
     private let powerStateProvider: PowerStateProvider
+    private let lockManager: any RepositoryLocking
 
     public init(
         database: DeltaDatabase,
@@ -18,7 +19,8 @@ public final class BackupCoordinator: @unchecked Sendable {
         availabilityChecker: RepositoryAvailabilityChecker = RepositoryAvailabilityChecker(),
         scheduleEvaluator: ScheduleEvaluator = ScheduleEvaluator(),
         bookmarkStore: SecurityScopedBookmarkStore = SecurityScopedBookmarkStore(),
-        powerStateProvider: PowerStateProvider = PowerStateProvider()
+        powerStateProvider: PowerStateProvider = PowerStateProvider(),
+        lockManager: any RepositoryLocking = RepositoryJobLockManager()
     ) {
         self.database = database
         self.commandBuilder = commandBuilder
@@ -28,6 +30,7 @@ public final class BackupCoordinator: @unchecked Sendable {
         self.scheduleEvaluator = scheduleEvaluator
         self.bookmarkStore = bookmarkStore
         self.powerStateProvider = powerStateProvider
+        self.lockManager = lockManager
     }
 
     @discardableResult
@@ -46,7 +49,7 @@ public final class BackupCoordinator: @unchecked Sendable {
                 kind: .backup,
                 status: .failed,
                 finishedAt: Date(),
-                message: "Repository destination is not available."
+                message: "Destination is not available."
             )
             try database.saveJobRun(run)
             return run
@@ -70,6 +73,11 @@ public final class BackupCoordinator: @unchecked Sendable {
 
     @discardableResult
     public func refreshSnapshots(repository: BackupRepository) throws -> [ResticSnapshot] {
+        guard let lock = try lockManager.acquire(repositoryID: repository.id) else {
+            throw BackupCoordinatorError.destinationBusy
+        }
+        defer { withExtendedLifetime(lock) {} }
+
         let result = try runner.run(try commandBuilder.snapshots(repository: repository))
         guard result.status == .succeeded || result.status == .warning else {
             throw BackupCoordinatorError.resticFailed(result.standardError)
@@ -140,6 +148,21 @@ public final class BackupCoordinator: @unchecked Sendable {
         kind: JobKind,
         makeCommand: () throws -> ResticCommand
     ) throws -> JobRun {
+        guard let lock = try lockManager.acquire(repositoryID: repositoryID) else {
+            let job = JobRun(
+                profileID: profileID,
+                repositoryID: repositoryID,
+                kind: kind,
+                status: .failed,
+                finishedAt: Date(),
+                message: BackupCoordinatorError.destinationBusy.localizedDescription
+            )
+            try database.saveJobRun(job)
+            try database.appendEvent(EventLog(level: .warning, message: "\(kind.displayName) skipped because the destination is busy."))
+            return job
+        }
+        defer { withExtendedLifetime(lock) {} }
+
         var job = JobRun(profileID: profileID, repositoryID: repositoryID, kind: kind, status: .running)
         try database.saveJobRun(job)
 
@@ -150,17 +173,19 @@ public final class BackupCoordinator: @unchecked Sendable {
         job.exitCode = result.exitCode
         job.message = result.userFacingMessage
         try database.saveJobRun(job)
-        try database.appendEvent(EventLog(level: result.status == .failed ? .error : .info, message: "\(kind.rawValue) finished with status \(result.status.rawValue)."))
+        try database.appendEvent(EventLog(level: result.status == .failed ? .error : .info, message: "\(kind.displayName) finished with status \(result.status.rawValue)."))
         return job
     }
 }
 
 public enum BackupCoordinatorError: Error, LocalizedError {
     case resticFailed(String)
+    case destinationBusy
 
     public var errorDescription: String? {
         switch self {
         case let .resticFailed(message): "restic failed: \(message)"
+        case .destinationBusy: "Destination is busy with another backup, restore, or maintenance job."
         }
     }
 }

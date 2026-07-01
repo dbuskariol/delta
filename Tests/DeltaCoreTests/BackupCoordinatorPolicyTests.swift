@@ -35,6 +35,35 @@ final class BackupCoordinatorPolicyTests: XCTestCase {
         XCTAssertEqual(jobs.filter { $0.kind == .check }.count, 1)
     }
 
+    func testDestinationLockPreventsOverlappingJobsAcrossCoordinators() throws {
+        let fixture = try Fixture()
+        let heldLock = try XCTUnwrap(fixture.lockManager.acquire(repositoryID: fixture.repository.id))
+        let runner = MockResticRunner(results: [.success])
+        let coordinator = fixture.makeCoordinator(runner: runner)
+        let profile = fixture.profile()
+
+        let job = try coordinator.runBackup(profile: profile, repository: fixture.repository)
+
+        withExtendedLifetime(heldLock) {
+            XCTAssertEqual(job.status, .failed)
+            XCTAssertEqual(job.message, "Destination is busy with another backup, restore, or maintenance job.")
+            XCTAssertTrue(runner.commands.isEmpty)
+        }
+    }
+
+    func testDestinationLockIsReleasedAfterJobCompletes() throws {
+        let fixture = try Fixture()
+        let firstRunner = MockResticRunner(results: [.success])
+        let secondRunner = MockResticRunner(results: [.success])
+        let profile = fixture.profile()
+
+        _ = try fixture.makeCoordinator(runner: firstRunner).runBackup(profile: profile, repository: fixture.repository)
+        _ = try fixture.makeCoordinator(runner: secondRunner).runBackup(profile: profile, repository: fixture.repository)
+
+        XCTAssertEqual(firstRunner.commands.count, 1)
+        XCTAssertEqual(secondRunner.commands.count, 1)
+    }
+
     func testMockedResticFailuresProduceUserFacingJobMessages() throws {
         let cases: [(String, ResticRunResult, JobStatus, ResticFailureKind, String)] = [
             (
@@ -124,6 +153,8 @@ private struct Fixture {
     let root: URL
     let source: URL
     let destination: URL
+    let lockDirectory: URL
+    let lockManager: RepositoryJobLockManager
     let database: DeltaDatabase
     let repository: BackupRepository
 
@@ -132,6 +163,9 @@ private struct Fixture {
             .appendingPathComponent("delta-tests-\(UUID().uuidString)", isDirectory: true)
         source = root.appendingPathComponent("source", isDirectory: true)
         destination = root.appendingPathComponent("destination", isDirectory: true)
+        let lockDirectoryURL = root.appendingPathComponent("locks", isDirectory: true)
+        lockDirectory = lockDirectoryURL
+        lockManager = RepositoryJobLockManager(lockDirectoryProvider: { lockDirectoryURL })
         try FileManager.default.createDirectory(at: source, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
         database = try DeltaDatabase(url: root.appendingPathComponent("Delta.sqlite"))
@@ -163,7 +197,8 @@ private struct Fixture {
                 secretBridgeURL: URL(fileURLWithPath: "/usr/bin/false")
             ),
             runner: runner,
-            powerStateProvider: PowerStateProvider(currentPowerState: { powerState })
+            powerStateProvider: PowerStateProvider(currentPowerState: { powerState }),
+            lockManager: lockManager
         )
     }
 }
