@@ -1,0 +1,1541 @@
+import DeltaCore
+import SwiftUI
+
+struct ContentView: View {
+    @EnvironmentObject private var model: DeltaAppModel
+
+    var body: some View {
+        NavigationSplitView {
+            VStack(spacing: 0) {
+                List(DeltaAppModel.Section.allCases, selection: $model.selectedSection) { section in
+                    Label(section.rawValue, systemImage: section.symbol)
+                        .font(.system(size: 13, weight: .medium))
+                        .tag(section)
+                        .padding(.vertical, 2)
+                }
+                .scrollContentBackground(.hidden)
+
+                SidebarStatusView(isWorking: model.isWorking)
+            }
+            .navigationSplitViewColumnWidth(min: 220, ideal: 248, max: 280)
+        } detail: {
+            switch model.selectedSection {
+            case .dashboard:
+                DashboardView()
+            case .backups:
+                BackupsView()
+            case .repositories:
+                RepositoriesView()
+            case .restore:
+                RestoreView()
+            case .activity:
+                ActivityView()
+            case .settings:
+                SettingsView()
+            }
+        }
+        .background(DeltaTheme.background)
+        .alert("Delta", isPresented: alertBinding) {
+            Button("OK") {
+                model.alertMessage = nil
+            }
+        } message: {
+            Text(model.alertMessage ?? "")
+        }
+    }
+
+    private var alertBinding: Binding<Bool> {
+        Binding(
+            get: { model.alertMessage != nil },
+            set: { isPresented in
+                if !isPresented {
+                    model.alertMessage = nil
+                }
+            }
+        )
+    }
+}
+
+struct DashboardView: View {
+    @EnvironmentObject private var model: DeltaAppModel
+
+    var body: some View {
+        PageScaffold(
+            title: "Dashboard",
+            subtitle: "Encrypted, deduplicated backup operations",
+            actions: {
+                Button {
+                    model.runDueBackups()
+                } label: {
+                    Label("Run due", systemImage: "play.fill")
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(model.profiles.isEmpty || model.isWorking)
+            }
+        ) {
+            LazyVGrid(columns: DeltaTheme.statColumns, spacing: 12) {
+                StatPanel(title: "Profiles", value: "\(model.profiles.count)", symbol: "externaldrive.badge.plus")
+                StatPanel(title: "Destinations", value: "\(model.repositories.count)", symbol: "externaldrive.connected.to.line.below")
+                StatPanel(title: "Restore Points", value: "\(model.snapshots.count)", symbol: "clock.arrow.circlepath")
+                StatPanel(title: "Recent Jobs", value: "\(model.jobs.count)", symbol: "waveform.path.ecg")
+            }
+
+            Card {
+                HStack(alignment: .top, spacing: 14) {
+                    StatusIcon(symbol: "lock.shield", color: model.fullDiskAccessStatus.hasLikelyFullDiskAccess ? .green : .orange)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Readiness")
+                            .font(.headline)
+                        Text(model.fullDiskAccessStatus.hasLikelyFullDiskAccess ? "Full Disk Access looks available for protected locations." : "Full Disk Access has not been confirmed. Full-volume backups may miss protected data.")
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    StateBadge(
+                        text: model.isWorking ? "Running" : (model.fullDiskAccessStatus.hasLikelyFullDiskAccess ? "Ready" : "Needs Access"),
+                        color: model.isWorking ? .blue : (model.fullDiskAccessStatus.hasLikelyFullDiskAccess ? .green : .orange)
+                    )
+                }
+            }
+
+            SectionHeader(title: "Backup Profiles")
+            if model.profiles.isEmpty {
+                EmptyStateView(
+                    symbol: "externaldrive.badge.plus",
+                    title: "No backup profiles",
+                    message: "Create a backup profile after adding a storage destination."
+                )
+            } else {
+                VStack(spacing: 10) {
+                    ForEach(model.profiles) { profile in
+                        ProfileRow(profile: profile)
+                    }
+                }
+            }
+        }
+    }
+}
+
+struct BackupsView: View {
+    @EnvironmentObject private var model: DeltaAppModel
+    @State private var isPresentingProfileSheet = false
+
+    var body: some View {
+        PageScaffold(
+            title: "Backups",
+            subtitle: "Sources, schedules, and retention",
+            actions: {
+                Button {
+                    isPresentingProfileSheet = true
+                } label: {
+                    Label("New profile", systemImage: "plus")
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(model.repositories.isEmpty)
+            }
+        ) {
+            if model.repositories.isEmpty {
+                EmptyStateView(
+                    symbol: "shippingbox",
+                    title: "Create a destination first",
+                    message: "Backups need a local drive, mounted network drive, or cloud destination."
+                )
+            } else if model.profiles.isEmpty {
+                EmptyStateView(
+                    symbol: "externaldrive.badge.plus",
+                    title: "No profiles yet",
+                    message: "Create a profile for a full volume or selected folders."
+                )
+            } else {
+                VStack(spacing: 10) {
+                    ForEach(model.profiles) { profile in
+                        ProfileRow(profile: profile)
+                    }
+                }
+            }
+        }
+        .sheet(isPresented: $isPresentingProfileSheet) {
+            ProfileEditorView()
+                .environmentObject(model)
+                .frame(width: 760, height: 680)
+        }
+    }
+}
+
+struct RepositoriesView: View {
+    @EnvironmentObject private var model: DeltaAppModel
+    @State private var isPresentingRepositorySheet = false
+
+    var body: some View {
+        PageScaffold(
+            title: "Destinations",
+            subtitle: "Where encrypted backups are stored",
+            actions: {
+                Button {
+                    isPresentingRepositorySheet = true
+                } label: {
+                    Label("New destination", systemImage: "plus")
+                }
+                .buttonStyle(.borderedProminent)
+            }
+        ) {
+            if model.repositories.isEmpty {
+                EmptyStateView(
+                    symbol: "shippingbox",
+                    title: "No destinations",
+                    message: "Add a drive, NAS path, or cloud location to store encrypted restore points."
+                )
+            } else {
+                VStack(spacing: 10) {
+                    ForEach(model.repositories) { repository in
+                        RepositoryRow(repository: repository)
+                    }
+                }
+            }
+        }
+        .sheet(isPresented: $isPresentingRepositorySheet) {
+            RepositoryEditorView()
+                .environmentObject(model)
+                .frame(width: 720)
+        }
+    }
+}
+
+struct RestoreView: View {
+    @EnvironmentObject private var model: DeltaAppModel
+    @State private var repositoryID: UUID?
+    @State private var snapshotID = ""
+    @State private var selectedPaths = ""
+    @State private var destinationPath = ""
+    @State private var restoreOriginalPaths = false
+    @State private var conflictPolicy: RestoreConflictPolicy = .ifChanged
+    @State private var dryRun = true
+    @State private var verify = true
+    @State private var preRestoreProfileID: UUID?
+    @State private var acknowledgedInPlaceRestore = false
+
+    var body: some View {
+        PageScaffold(
+            title: "Restore",
+            subtitle: "Recover complete restore points or specific paths",
+            actions: {
+                Button {
+                    if let repository = selectedRepository {
+                        model.refreshSnapshots(repository: repository)
+                    }
+                } label: {
+                    Label("Refresh Points", systemImage: "arrow.clockwise")
+                }
+                .disabled(selectedRepository == nil || model.isWorking)
+            }
+        ) {
+            RestoreStepCard(number: 1, title: "Restore Point", subtitle: "Choose where the backup is stored and the point in time.") {
+                RestoreForm {
+                    RestoreFormRow(title: "Destination") {
+                        Picker("Destination", selection: $repositoryID) {
+                            Text("Choose").tag(UUID?.none)
+                            ForEach(model.repositories) { repository in
+                                Text(repository.name).tag(Optional(repository.id))
+                            }
+                        }
+                        .labelsHidden()
+                        .frame(width: 300, alignment: .leading)
+                    }
+
+                    RestoreFormRow(title: "Restore Point") {
+                        Picker("Restore Point", selection: $snapshotID) {
+                            Text("Choose").tag("")
+                            ForEach(repositorySnapshots) { snapshot in
+                                Text("\(snapshot.time.formatted(date: .abbreviated, time: .shortened))  \(snapshot.id.prefix(8))").tag(snapshot.id)
+                            }
+                        }
+                        .labelsHidden()
+                        .frame(width: 420, alignment: .leading)
+                    }
+                }
+            }
+
+            RestoreStepCard(number: 2, title: "Scope", subtitle: "Restore everything from that point, or limit recovery to selected paths.") {
+                RestoreForm {
+                    RestoreFormRow(title: "Paths") {
+                        VStack(alignment: .leading, spacing: 8) {
+                            TextField("Leave empty to restore everything, or enter comma-separated paths", text: $selectedPaths)
+                                .textFieldStyle(.roundedBorder)
+                            Text(selectedPaths.isEmpty ? "Everything from this restore point is selected." : "Only matching paths will be restored.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+            }
+
+            RestoreStepCard(number: 3, title: "Destination", subtitle: "Preview by default, then restore to a chosen folder or original paths.") {
+                VStack(alignment: .leading, spacing: 14) {
+                    RestoreFormRow(title: "") {
+                        Toggle("Restore to original paths", isOn: $restoreOriginalPaths)
+                            .toggleStyle(.checkbox)
+                    }
+
+                    if restoreOriginalPaths && !dryRun {
+                        InlineWarning(
+                            symbol: "exclamationmark.triangle",
+                            title: "In-place restore can overwrite current files.",
+                            message: "Create a pre-restore backup and confirm this operation before continuing."
+                        )
+                        RestoreFormRow(title: "") {
+                            Toggle("I understand this in-place restore can overwrite current files.", isOn: $acknowledgedInPlaceRestore)
+                                .toggleStyle(.checkbox)
+                        }
+                    }
+
+                    RestoreFormRow(title: "Destination") {
+                        HStack(spacing: 8) {
+                            TextField("Destination folder", text: $destinationPath)
+                                .textFieldStyle(.roundedBorder)
+                                .disabled(restoreOriginalPaths)
+                            Button {
+                                if let path = model.chooseFolder().first {
+                                    destinationPath = path
+                                }
+                            } label: {
+                                Image(systemName: "folder")
+                            }
+                            .help("Choose destination folder")
+                            .disabled(restoreOriginalPaths)
+                        }
+                    }
+
+                    RestoreFormRow(title: "Conflicts") {
+                        Picker("Conflicts", selection: $conflictPolicy) {
+                            ForEach(RestoreConflictPolicy.allCases, id: \.self) { policy in
+                                Text(policy.resticValue).tag(policy)
+                            }
+                        }
+                        .labelsHidden()
+                        .frame(width: 170, alignment: .leading)
+
+                        Toggle("Dry run", isOn: $dryRun)
+                            .toggleStyle(.checkbox)
+                        Toggle("Verify files", isOn: $verify)
+                            .toggleStyle(.checkbox)
+                    }
+
+                    RestoreFormRow(title: "Pre-restore backup") {
+                        Picker("Pre-restore backup", selection: $preRestoreProfileID) {
+                            Text("None").tag(UUID?.none)
+                            ForEach(model.profiles) { profile in
+                                Text(profile.name).tag(Optional(profile.id))
+                            }
+                        }
+                        .labelsHidden()
+                        .frame(width: 300, alignment: .leading)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            HStack {
+                Spacer()
+                Button {
+                    runRestore()
+                } label: {
+                    Label(dryRun ? "Preview Restore" : "Start Restore", systemImage: dryRun ? "doc.text.magnifyingglass" : "arrow.uturn.backward.circle")
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .disabled(!canRestore || model.isWorking)
+            }
+        }
+        .onAppear {
+            repositoryID = repositoryID ?? model.repositories.first?.id
+        }
+    }
+
+    private var selectedRepository: BackupRepository? {
+        guard let repositoryID else { return nil }
+        return model.repositories.first(where: { $0.id == repositoryID })
+    }
+
+    private var repositorySnapshots: [ResticSnapshot] {
+        guard let repositoryID else { return [] }
+        return model.snapshotsByRepository[repositoryID] ?? []
+    }
+
+    private var canRestore: Bool {
+        let destinationIsValid = restoreOriginalPaths || !destinationPath.isEmpty
+        let inPlaceIsAcknowledged = !restoreOriginalPaths || dryRun || acknowledgedInPlaceRestore
+        return selectedRepository != nil && !snapshotID.isEmpty && destinationIsValid && inPlaceIsAcknowledged
+    }
+
+    private func runRestore() {
+        guard let repository = selectedRepository else { return }
+        let paths = selectedPaths
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        let request = RestoreRequest(
+            repositoryID: repository.id,
+            snapshotID: snapshotID,
+            scope: paths.isEmpty ? .fullSnapshot : .selectedPaths(paths),
+            destination: restoreOriginalPaths ? .originalPaths : .chosenFolder(destinationPath),
+            conflictPolicy: conflictPolicy,
+            verifyRestoredFiles: verify,
+            dryRun: dryRun,
+            preRestoreBackupProfileID: preRestoreProfileID
+        )
+        model.runRestore(repository: repository, request: request)
+    }
+}
+
+struct ActivityView: View {
+    @EnvironmentObject private var model: DeltaAppModel
+
+    var body: some View {
+        PageScaffold(title: "Activity", subtitle: "Jobs, destination checks, and system events") {
+            SurfaceSection(title: "Live Backup Logs", symbol: "terminal") {
+                if model.liveLogLines.isEmpty {
+                    CompactEmptyRow(text: model.isWorking ? "Waiting for backup output..." : "No backup output is streaming right now.")
+                } else {
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(model.liveLogLines.suffix(120)) { line in
+                            LiveLogRow(line: line)
+                        }
+                    }
+                    .font(.system(.caption, design: .monospaced))
+                    .textSelection(.enabled)
+                }
+            }
+
+            SurfaceSection(title: "Recent Jobs", symbol: "waveform.path.ecg") {
+                if model.jobs.isEmpty {
+                    CompactEmptyRow(text: "No jobs have run yet.")
+                } else {
+                    ForEach(model.jobs) { job in
+                        JobRow(job: job)
+                    }
+                }
+            }
+
+            SurfaceSection(title: "Events", symbol: "list.bullet.rectangle") {
+                if model.events.isEmpty {
+                    CompactEmptyRow(text: "No events recorded.")
+                } else {
+                    ForEach(model.events) { event in
+                        EventRow(event: event)
+                    }
+                }
+            }
+        }
+    }
+}
+
+struct SettingsView: View {
+    @EnvironmentObject private var model: DeltaAppModel
+    @EnvironmentObject private var softwareUpdateController: SoftwareUpdateController
+    @State private var automaticallyChecksForUpdates = true
+
+    var body: some View {
+        PageScaffold(title: "Settings", subtitle: "Updates, permissions, and background scheduling") {
+            SettingsCard(symbol: "arrow.down.circle", title: "Automatic Updates") {
+                Toggle("Automatically check for updates", isOn: $automaticallyChecksForUpdates)
+                    .toggleStyle(.checkbox)
+                    .onChange(of: automaticallyChecksForUpdates) { _, newValue in
+                        softwareUpdateController.automaticallyChecksForUpdates = newValue
+                    }
+                ActionLine(
+                    description: "Delta verifies signed update packages before installing them.",
+                    buttonTitle: "Check Now",
+                    symbol: "arrow.clockwise",
+                    action: softwareUpdateController.checkForUpdates
+                )
+            }
+
+            SettingsCard(symbol: "lock.shield", title: "Full Disk Access") {
+                HStack {
+                    StateBadge(
+                        text: model.fullDiskAccessStatus.hasLikelyFullDiskAccess ? "Ready" : "Needs Access",
+                        color: model.fullDiskAccessStatus.hasLikelyFullDiskAccess ? .green : .orange
+                    )
+                    Text(model.fullDiskAccessStatus.hasLikelyFullDiskAccess ? "Protected locations look readable." : "Protected locations are not readable yet.")
+                        .foregroundStyle(.secondary)
+                }
+                ActionLine(
+                    description: "Grant Delta and DeltaAgent access before full-volume backups.",
+                    buttonTitle: "Open Settings",
+                    symbol: "arrow.up.forward.app",
+                    action: model.openFullDiskAccessSettings
+                )
+                Button {
+                    model.reload()
+                } label: {
+                    Label("Recheck Access", systemImage: "arrow.clockwise")
+                }
+            }
+
+            SettingsCard(symbol: "clock.badge.checkmark", title: "LaunchAgent") {
+                HStack {
+                    Text("Status")
+                        .foregroundStyle(.secondary)
+                    Text(LaunchAgentController.status())
+                        .font(.system(.body, design: .monospaced))
+                }
+                HStack {
+                    Button("Register") {
+                        model.registerAgent()
+                    }
+                    Button("Unregister") {
+                        model.unregisterAgent()
+                    }
+                }
+            }
+        }
+        .onAppear {
+            automaticallyChecksForUpdates = softwareUpdateController.automaticallyChecksForUpdates
+            softwareUpdateController.updateCheckInterval = 86_400
+        }
+    }
+}
+
+struct ProfileRow: View {
+    @EnvironmentObject private var model: DeltaAppModel
+    var profile: BackupProfile
+
+    var body: some View {
+        Card {
+            HStack(spacing: 14) {
+                StatusIcon(symbol: profile.sourceMode == .fullVolume ? "internaldrive" : "folder", color: .blue)
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(profile.name)
+                        .font(.headline)
+                    Text(sourceSummary)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                    Text(repositorySummary)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                Spacer()
+                MetadataBadge(text: profile.sourceMode.displayName)
+                MetadataBadge(text: scheduleSummary)
+                MetadataBadge(text: retentionSummary)
+                IconButton(symbol: "play.fill", help: "Run backup now") {
+                    model.runNow(profile: profile)
+                }
+                .disabled(model.isWorking)
+                IconButton(symbol: "scissors", help: "Apply retention and prune") {
+                    model.prune(profile: profile)
+                }
+                .disabled(model.isWorking)
+            }
+        }
+    }
+
+    private var sourceSummary: String {
+        profile.sources.map(\.path).joined(separator: ", ")
+    }
+
+    private var repositorySummary: String {
+        let repositoryName = model.repositories.first(where: { $0.id == profile.repositoryID })?.name ?? "Missing destination"
+        return "Destination: \(repositoryName)"
+    }
+
+    private var scheduleSummary: String {
+        guard profile.schedule.isEnabled else { return "Paused" }
+        switch profile.schedule.kind {
+        case let .hourly(minute):
+            return "Hourly :\(String(format: "%02d", minute))"
+        case let .daily(hour, minute):
+            return "Daily \(String(format: "%02d:%02d", hour, minute))"
+        case let .weekly(weekday, hour, minute):
+            return "\(weekdayName(weekday)) \(String(format: "%02d:%02d", hour, minute))"
+        case let .monthly(day, hour, minute):
+            return "Monthly \(day) \(String(format: "%02d:%02d", hour, minute))"
+        case let .customInterval(seconds):
+            return "Every \(Int(seconds / 60))m"
+        }
+    }
+
+    private var retentionSummary: String {
+        "Keep \(profile.retention.keepDaily)d/\(profile.retention.keepWeekly)w/\(profile.retention.keepMonthly)m"
+    }
+
+    private func weekdayName(_ weekday: Int) -> String {
+        let symbols = Calendar.current.shortWeekdaySymbols
+        let index = min(max(weekday - 1, 0), symbols.count - 1)
+        return symbols[index]
+    }
+}
+
+struct RepositoryRow: View {
+    @EnvironmentObject private var model: DeltaAppModel
+    var repository: BackupRepository
+
+    var body: some View {
+        Card {
+            HStack(spacing: 14) {
+                StatusIcon(symbol: repository.backend.kind == .local ? "externaldrive" : "network", color: .teal)
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(repository.name)
+                        .font(.headline)
+                    Text(repository.backend.kind.displayName)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(backendSummary)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                Spacer()
+                MetadataBadge(text: repository.secretStorageMode.displayName)
+                IconButton(symbol: "shippingbox.and.arrow.backward", help: "Prepare destination") {
+                    model.initializeRepository(repository)
+                }
+                .disabled(model.isWorking)
+                IconButton(symbol: "checkmark.shield", help: "Check destination") {
+                    model.checkRepository(repository)
+                }
+                .disabled(model.isWorking)
+                IconButton(symbol: "arrow.clockwise", help: "Refresh restore points") {
+                    model.refreshSnapshots(repository: repository)
+                }
+                .disabled(model.isWorking)
+            }
+        }
+    }
+
+    private var backendSummary: String {
+        switch repository.backend {
+        case let .local(path):
+            return path
+        case let .sftp(host, path, username, port):
+            let user = username.map { "\($0)@" } ?? ""
+            let portPart = port.map { ":\($0)" } ?? ""
+            return "\(user)\(host)\(portPart):\(path)"
+        case let .rest(url):
+            return url
+        case let .s3(endpoint, bucket, path, _):
+            return [endpoint, bucket, path].compactMap { $0 }.joined(separator: " / ")
+        case let .backblazeB2(bucket, path),
+             let .azureBlob(bucket, path),
+             let .googleCloudStorage(bucket, path),
+             let .swiftObjectStorage(bucket, path):
+            return [bucket, path].compactMap { $0 }.joined(separator: " / ")
+        case let .rclone(remote, path):
+            return "\(remote):\(path)"
+        case let .custom(repository):
+            return repository
+        }
+    }
+}
+
+struct ProfileEditorView: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var model: DeltaAppModel
+    @State private var name = "Mac Backup"
+    @State private var mode: BackupSourceMode = .customFolders
+    @State private var sources: [BackupSource] = []
+    @State private var repositoryID: UUID?
+    @State private var scheduleKind: ScheduleEditorKind = .daily
+    @State private var hour = 20
+    @State private var minute = 0
+    @State private var weekday = 2
+    @State private var day = 1
+    @State private var intervalMinutes = 120
+    @State private var scheduleEnabled = true
+    @State private var catchUpMissedRuns = true
+    @State private var runOnBattery = true
+    @State private var runInLowPowerMode = false
+    @State private var uploadLimit = ""
+    @State private var downloadLimit = ""
+    @State private var keepHourly = 24
+    @State private var keepDaily = 30
+    @State private var keepWeekly = 12
+    @State private var keepMonthly = 12
+    @State private var keepYearly = 0
+    @State private var pruneAfterForget = true
+    @State private var checkAfterPrune = true
+
+    var body: some View {
+        SheetScaffold(title: "New Backup Profile", subtitle: "Define what to protect and when to run.") {
+            FieldRow(title: "Name") {
+                TextField("Profile name", text: $name)
+                    .textFieldStyle(.roundedBorder)
+            }
+
+            FieldRow(title: "Source type") {
+                Picker("Source", selection: $mode) {
+                    ForEach(BackupSourceMode.allCases, id: \.self) { mode in
+                        Text(mode.displayName).tag(mode)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+            }
+
+            FieldRow(title: "Sources") {
+                HStack {
+                    Button {
+                        if mode == .fullVolume {
+                            sources = model.chooseBackupSources(allowsMultipleSelection: false, includeSubvolumes: false)
+                        } else {
+                            sources = model.chooseBackupSources(allowsMultipleSelection: true, includeSubvolumes: true)
+                        }
+                    } label: {
+                        Label("Choose", systemImage: "folder.badge.plus")
+                    }
+                    Text(sources.isEmpty ? "No sources selected" : sources.map(\.path).joined(separator: ", "))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+
+            FieldRow(title: "Destination") {
+                Picker("Destination", selection: $repositoryID) {
+                    Text("Choose").tag(UUID?.none)
+                    ForEach(model.repositories) { repository in
+                        Text(repository.name).tag(Optional(repository.id))
+                    }
+                }
+                .labelsHidden()
+                .frame(maxWidth: 360)
+            }
+
+            FieldRow(title: "Schedule") {
+                VStack(alignment: .leading, spacing: 10) {
+                    Picker("Schedule", selection: $scheduleKind) {
+                        ForEach(ScheduleEditorKind.allCases) { kind in
+                            Text(kind.displayName).tag(kind)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.segmented)
+
+                    scheduleControls
+                }
+            }
+
+            FieldRow(title: "Run policy") {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 16) {
+                        Toggle("Enabled", isOn: $scheduleEnabled)
+                            .toggleStyle(.checkbox)
+                        Toggle("Catch up missed runs", isOn: $catchUpMissedRuns)
+                            .toggleStyle(.checkbox)
+                    }
+                    HStack(spacing: 16) {
+                        Toggle("Run on battery", isOn: $runOnBattery)
+                            .toggleStyle(.checkbox)
+                        Toggle("Run in Low Power Mode", isOn: $runInLowPowerMode)
+                            .toggleStyle(.checkbox)
+                    }
+                }
+            }
+
+            FieldRow(title: "Bandwidth") {
+                HStack(spacing: 10) {
+                    TextField("Upload KiB/s", text: $uploadLimit)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 120)
+                    TextField("Download KiB/s", text: $downloadLimit)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 140)
+                }
+            }
+
+            FieldRow(title: "Retention") {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 12) {
+                        Stepper("Hourly \(keepHourly)", value: $keepHourly, in: 0...168)
+                        Stepper("Daily \(keepDaily)", value: $keepDaily, in: 0...365)
+                        Stepper("Weekly \(keepWeekly)", value: $keepWeekly, in: 0...260)
+                    }
+                    HStack(spacing: 12) {
+                        Stepper("Monthly \(keepMonthly)", value: $keepMonthly, in: 0...120)
+                        Stepper("Yearly \(keepYearly)", value: $keepYearly, in: 0...50)
+                    }
+                    HStack(spacing: 16) {
+                        Toggle("Prune after forget", isOn: $pruneAfterForget)
+                            .toggleStyle(.checkbox)
+                        Toggle("Check after prune", isOn: $checkAfterPrune)
+                            .toggleStyle(.checkbox)
+                    }
+                }
+            }
+
+            SheetActions {
+                Button("Cancel") { dismiss() }
+                Button("Create") {
+                    if let repositoryID {
+                        model.createProfile(
+                            name: name,
+                            mode: mode,
+                            sources: sources,
+                            repositoryID: repositoryID,
+                            schedule: selectedSchedule,
+                            retention: selectedRetention
+                        )
+                        dismiss()
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(name.isEmpty || repositoryID == nil || sources.isEmpty)
+            }
+        }
+        .onAppear {
+            repositoryID = repositoryID ?? model.repositories.first?.id
+        }
+    }
+
+    @ViewBuilder
+    private var scheduleControls: some View {
+        switch scheduleKind {
+        case .hourly:
+            Stepper("Minute \(minute)", value: $minute, in: 0...59)
+        case .daily:
+            TimeControls(hour: $hour, minute: $minute)
+        case .weekly:
+            HStack(spacing: 12) {
+                Picker("Weekday", selection: $weekday) {
+                    ForEach(1...7, id: \.self) { value in
+                        Text(Calendar.current.weekdaySymbols[value - 1]).tag(value)
+                    }
+                }
+                .frame(width: 170)
+                TimeControls(hour: $hour, minute: $minute)
+            }
+        case .monthly:
+            HStack(spacing: 12) {
+                Stepper("Day \(day)", value: $day, in: 1...31)
+                TimeControls(hour: $hour, minute: $minute)
+            }
+        case .custom:
+            Stepper("Every \(intervalMinutes) minutes", value: $intervalMinutes, in: 1...10_080, step: 15)
+        }
+    }
+
+    private var selectedSchedule: BackupSchedule {
+        BackupSchedule(
+            kind: selectedScheduleKind,
+            isEnabled: scheduleEnabled,
+            catchUpMissedRuns: catchUpMissedRuns,
+            runOnBattery: runOnBattery,
+            runInLowPowerMode: runInLowPowerMode,
+            uploadLimitKiB: positiveInteger(uploadLimit),
+            downloadLimitKiB: positiveInteger(downloadLimit)
+        )
+    }
+
+    private var selectedScheduleKind: ScheduleKind {
+        switch scheduleKind {
+        case .hourly:
+            return .hourly(minute: minute)
+        case .daily:
+            return .daily(hour: hour, minute: minute)
+        case .weekly:
+            return .weekly(weekday: weekday, hour: hour, minute: minute)
+        case .monthly:
+            return .monthly(day: day, hour: hour, minute: minute)
+        case .custom:
+            return .customInterval(seconds: TimeInterval(intervalMinutes * 60))
+        }
+    }
+
+    private var selectedRetention: RetentionPolicy {
+        RetentionPolicy(
+            keepHourly: keepHourly,
+            keepDaily: keepDaily,
+            keepWeekly: keepWeekly,
+            keepMonthly: keepMonthly,
+            keepYearly: keepYearly,
+            pruneAfterForget: pruneAfterForget,
+            checkAfterPrune: checkAfterPrune
+        )
+    }
+
+    private func positiveInteger(_ value: String) -> Int? {
+        guard let integer = Int(value.trimmingCharacters(in: .whitespacesAndNewlines)), integer > 0 else {
+            return nil
+        }
+        return integer
+    }
+}
+
+enum ScheduleEditorKind: String, CaseIterable, Identifiable {
+    case hourly
+    case daily
+    case weekly
+    case monthly
+    case custom
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .hourly: "Hourly"
+        case .daily: "Daily"
+        case .weekly: "Weekly"
+        case .monthly: "Monthly"
+        case .custom: "Custom"
+        }
+    }
+}
+
+struct TimeControls: View {
+    @Binding var hour: Int
+    @Binding var minute: Int
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Stepper("Hour \(hour)", value: $hour, in: 0...23)
+            Stepper("Minute \(minute)", value: $minute, in: 0...59)
+        }
+    }
+}
+
+struct RepositoryEditorView: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var model: DeltaAppModel
+    @State private var name = "Primary Destination"
+    @State private var kind: RepositoryBackendKind = .local
+    @State private var primary = ""
+    @State private var secondary = ""
+    @State private var tertiary = ""
+    @State private var storageMode: SecretStorageMode = .appManagedKeychain
+    @State private var passphrase = ""
+    @State private var credentialValues: [String: String] = [:]
+
+    var body: some View {
+        SheetScaffold(title: "New Destination", subtitle: "Choose where encrypted restore points are stored.") {
+            FieldRow(title: "Name") {
+                TextField("Destination name", text: $name)
+                    .textFieldStyle(.roundedBorder)
+            }
+
+            FieldRow(title: "Backend") {
+                Picker("Backend", selection: $kind) {
+                    ForEach(RepositoryBackendKind.allCases, id: \.self) { kind in
+                        Text(kind.displayName).tag(kind)
+                    }
+                }
+                .labelsHidden()
+            }
+
+            backendFields
+            credentialFields
+
+            FieldRow(title: "Encryption password") {
+                Picker("Password", selection: $storageMode) {
+                    ForEach(SecretStorageMode.allCases, id: \.self) { mode in
+                        Text(mode.displayName).tag(mode)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+            }
+
+            if storageMode == .userManagedPassphrase {
+                FieldRow(title: "Passphrase") {
+                    SecureField("Encryption passphrase", text: $passphrase)
+                        .textFieldStyle(.roundedBorder)
+                }
+            }
+
+            SheetActions {
+                Button("Cancel") { dismiss() }
+                Button("Create") {
+                    model.createRepository(
+                        name: name,
+                        backend: backend,
+                        storageMode: storageMode,
+                        passphrase: passphrase,
+                        backendCredentials: sanitizedCredentialValues
+                    )
+                    dismiss()
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(name.isEmpty || primary.isEmpty)
+            }
+        }
+        .onChange(of: kind) { _, newKind in
+            let keys = ResticBackendCredentialTemplates.keys(for: newKind)
+            credentialValues = Dictionary(uniqueKeysWithValues: keys.map { ($0, credentialValues[$0] ?? "") })
+        }
+    }
+
+    @ViewBuilder
+    private var backendFields: some View {
+        switch kind {
+        case .local:
+            FieldRow(title: "Folder") {
+                HStack {
+                    TextField("Destination folder", text: $primary)
+                        .textFieldStyle(.roundedBorder)
+                    Button {
+                        if let path = model.chooseFolder().first {
+                            primary = path
+                        }
+                    } label: {
+                        Image(systemName: "folder")
+                    }
+                }
+            }
+        case .sftp:
+            FieldRow(title: "Host") { TextField("nas.local", text: $primary).textFieldStyle(.roundedBorder) }
+            FieldRow(title: "Path") { TextField("/absolute/destination/path", text: $secondary).textFieldStyle(.roundedBorder) }
+            FieldRow(title: "Username") { TextField("Optional", text: $tertiary).textFieldStyle(.roundedBorder) }
+        case .rest:
+            FieldRow(title: "URL") { TextField("https://backup.example.com/repo", text: $primary).textFieldStyle(.roundedBorder) }
+        case .s3:
+            FieldRow(title: "Bucket") { TextField("bucket", text: $primary).textFieldStyle(.roundedBorder) }
+            FieldRow(title: "Path") { TextField("Optional", text: $secondary).textFieldStyle(.roundedBorder) }
+            FieldRow(title: "Endpoint") { TextField("Optional", text: $tertiary).textFieldStyle(.roundedBorder) }
+        case .backblazeB2:
+            FieldRow(title: "Bucket") { TextField("bucket", text: $primary).textFieldStyle(.roundedBorder) }
+            FieldRow(title: "Path") { TextField("Optional", text: $secondary).textFieldStyle(.roundedBorder) }
+        case .azureBlob:
+            FieldRow(title: "Container") { TextField("container", text: $primary).textFieldStyle(.roundedBorder) }
+            FieldRow(title: "Path") { TextField("Optional", text: $secondary).textFieldStyle(.roundedBorder) }
+        case .googleCloudStorage:
+            FieldRow(title: "Bucket") { TextField("bucket", text: $primary).textFieldStyle(.roundedBorder) }
+            FieldRow(title: "Path") { TextField("Optional", text: $secondary).textFieldStyle(.roundedBorder) }
+        case .swiftObjectStorage:
+            FieldRow(title: "Container") { TextField("container", text: $primary).textFieldStyle(.roundedBorder) }
+            FieldRow(title: "Path") { TextField("Optional", text: $secondary).textFieldStyle(.roundedBorder) }
+        case .rclone:
+            FieldRow(title: "Remote") { TextField("remote", text: $primary).textFieldStyle(.roundedBorder) }
+            FieldRow(title: "Path") { TextField("path", text: $secondary).textFieldStyle(.roundedBorder) }
+        case .custom:
+            FieldRow(title: "Destination URL") { TextField("Backup destination URL", text: $primary).textFieldStyle(.roundedBorder) }
+        }
+    }
+
+    @ViewBuilder
+    private var credentialFields: some View {
+        let keys = ResticBackendCredentialTemplates.keys(for: kind)
+        if !keys.isEmpty {
+            Divider()
+            ForEach(keys, id: \.self) { key in
+                FieldRow(title: key) {
+                    SecureField(key, text: credentialBinding(for: key))
+                        .textFieldStyle(.roundedBorder)
+                }
+            }
+        }
+    }
+
+    private var backend: RepositoryBackend {
+        switch kind {
+        case .local: .local(path: primary)
+        case .sftp: .sftp(host: primary, path: secondary, username: tertiary.isEmpty ? nil : tertiary, port: nil)
+        case .rest: .rest(url: primary)
+        case .s3: .s3(endpoint: tertiary.isEmpty ? nil : tertiary, bucket: primary, path: secondary.isEmpty ? nil : secondary, region: nil)
+        case .backblazeB2: .backblazeB2(bucket: primary, path: secondary.isEmpty ? nil : secondary)
+        case .azureBlob: .azureBlob(container: primary, path: secondary.isEmpty ? nil : secondary)
+        case .googleCloudStorage: .googleCloudStorage(bucket: primary, path: secondary.isEmpty ? nil : secondary)
+        case .swiftObjectStorage: .swiftObjectStorage(container: primary, path: secondary.isEmpty ? nil : secondary)
+        case .rclone: .rclone(remote: primary, path: secondary)
+        case .custom: .custom(repository: primary)
+        }
+    }
+
+    private var sanitizedCredentialValues: [String: String] {
+        credentialValues.filter { !$0.key.isEmpty && !$0.value.isEmpty }
+    }
+
+    private func credentialBinding(for key: String) -> Binding<String> {
+        Binding(
+            get: { credentialValues[key, default: ""] },
+            set: { credentialValues[key] = $0 }
+        )
+    }
+}
+
+struct PageScaffold<Actions: View, Content: View>: View {
+    var title: String
+    var subtitle: String
+    @ViewBuilder var actions: Actions
+    @ViewBuilder var content: Content
+
+    init(
+        title: String,
+        subtitle: String,
+        @ViewBuilder actions: () -> Actions = { EmptyView() },
+        @ViewBuilder content: () -> Content
+    ) {
+        self.title = title
+        self.subtitle = subtitle
+        self.actions = actions()
+        self.content = content()
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                HStack(alignment: .top, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(title)
+                            .font(.system(size: 28, weight: .semibold, design: .rounded))
+                        Text(subtitle)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    actions
+                }
+                content
+            }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 22)
+            .frame(maxWidth: 1080, alignment: .leading)
+            .frame(maxWidth: .infinity)
+        }
+        .background(DeltaTheme.background)
+    }
+}
+
+struct SheetScaffold<Content: View>: View {
+    var title: String
+    var subtitle: String
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.title2.weight(.semibold))
+                Text(subtitle)
+                    .foregroundStyle(.secondary)
+            }
+            Divider()
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    content
+                }
+                .padding(.vertical, 2)
+            }
+        }
+        .padding(22)
+    }
+}
+
+struct Card<Content: View>: View {
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        content
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(DeltaTheme.panel)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(DeltaTheme.border, lineWidth: 1)
+            )
+    }
+}
+
+struct RestoreStepCard<Content: View>: View {
+    var number: Int
+    var title: String
+    var subtitle: String
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        Card {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(alignment: .top, spacing: 14) {
+                    Text("\(number)")
+                        .font(.caption.weight(.bold))
+                        .frame(width: 24, height: 24)
+                        .background(.blue.opacity(0.18))
+                        .foregroundStyle(.blue)
+                        .clipShape(Circle())
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(title)
+                            .font(.headline)
+                        Text(subtitle)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                content
+                    .padding(.leading, 38)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
+struct RestoreForm<Content: View>: View {
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            content
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+struct RestoreFormRow<Content: View>: View {
+    var title: String
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Text(title)
+                .foregroundStyle(.secondary)
+                .font(.subheadline.weight(.medium))
+                .frame(width: 130, alignment: .trailing)
+                .padding(.top, 5)
+            HStack(spacing: 14) {
+                content
+                Spacer(minLength: 0)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+struct SurfaceSection<Content: View>: View {
+    var title: String
+    var symbol: String
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        Card {
+            VStack(alignment: .leading, spacing: 10) {
+                Label(title, systemImage: symbol)
+                    .font(.headline)
+                Divider()
+                content
+            }
+        }
+    }
+}
+
+struct SettingsCard<Content: View>: View {
+    var symbol: String
+    var title: String
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        Card {
+            HStack(alignment: .top, spacing: 14) {
+                StatusIcon(symbol: symbol, color: .blue)
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(title)
+                        .font(.headline)
+                    content
+                }
+            }
+        }
+    }
+}
+
+struct FieldRow<Content: View>: View {
+    var title: String
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 14) {
+            Text(title)
+                .foregroundStyle(.secondary)
+                .font(.subheadline.weight(.medium))
+                .frame(width: 154, alignment: .trailing)
+            content
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
+struct FormGrid<Content: View>: View {
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            content
+        }
+    }
+}
+
+struct SheetActions<Content: View>: View {
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        HStack {
+            Spacer()
+            content
+        }
+        .padding(.top, 4)
+    }
+}
+
+struct SectionHeader: View {
+    var title: String
+
+    var body: some View {
+        Text(title)
+            .font(.headline)
+            .padding(.top, 4)
+    }
+}
+
+struct StatPanel: View {
+    var title: String
+    var value: String
+    var symbol: String
+
+    var body: some View {
+        Card {
+            VStack(alignment: .leading, spacing: 9) {
+                Image(systemName: symbol)
+                    .font(.title3)
+                    .foregroundStyle(.secondary)
+                Text(value)
+                    .font(.system(size: 28, weight: .semibold, design: .rounded))
+                Text(title)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+}
+
+struct EmptyStateView: View {
+    var symbol: String
+    var title: String
+    var message: String
+
+    var body: some View {
+        Card {
+            VStack(spacing: 8) {
+                Image(systemName: symbol)
+                    .font(.system(size: 32))
+                    .foregroundStyle(.secondary)
+                Text(title)
+                    .font(.headline)
+                Text(message)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+            .frame(maxWidth: .infinity, minHeight: 170)
+        }
+    }
+}
+
+struct SidebarStatusView: View {
+    var isWorking: Bool
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: isWorking ? "arrow.triangle.2.circlepath" : "checkmark.seal")
+            Text(isWorking ? "Running" : "Ready")
+                .font(.caption)
+            Spacer()
+        }
+        .padding(12)
+        .foregroundStyle(.secondary)
+    }
+}
+
+struct StatusIcon: View {
+    var symbol: String
+    var color: Color
+
+    var body: some View {
+        Image(systemName: symbol)
+            .font(.system(size: 16, weight: .semibold))
+            .frame(width: 34, height: 34)
+            .background(color.opacity(0.14))
+            .foregroundStyle(color)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+}
+
+struct MetadataBadge: View {
+    var text: String
+
+    var body: some View {
+        Text(text)
+            .font(.caption.weight(.medium))
+            .padding(.horizontal, 9)
+            .padding(.vertical, 5)
+            .background(DeltaTheme.badge)
+            .clipShape(Capsule())
+    }
+}
+
+struct IconButton: View {
+    var symbol: String
+    var help: String
+    var action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .frame(width: 18, height: 18)
+        }
+        .buttonStyle(.bordered)
+        .help(help)
+    }
+}
+
+struct StatusPill: View {
+    var status: JobStatus
+
+    var body: some View {
+        Text(status.rawValue.capitalized)
+            .font(.caption.weight(.medium))
+            .padding(.horizontal, 9)
+            .padding(.vertical, 5)
+            .background(color.opacity(0.16))
+            .foregroundStyle(color)
+            .clipShape(Capsule())
+    }
+
+    private var color: Color {
+        switch status {
+        case .succeeded: .green
+        case .warning: .orange
+        case .failed: .red
+        case .running: .blue
+        case .queued: .secondary
+        case .cancelled: .gray
+        }
+    }
+}
+
+struct StateBadge: View {
+    var text: String
+    var color: Color
+
+    var body: some View {
+        Text(text)
+            .font(.caption.weight(.medium))
+            .padding(.horizontal, 9)
+            .padding(.vertical, 5)
+            .background(color.opacity(0.16))
+            .foregroundStyle(color)
+            .clipShape(Capsule())
+    }
+}
+
+struct InlineWarning: View {
+    var symbol: String
+    var title: String
+    var message: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: symbol)
+                .foregroundStyle(.orange)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                Text(message)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(12)
+        .background(.orange.opacity(0.12))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+}
+
+struct ActionLine: View {
+    var description: String
+    var buttonTitle: String
+    var symbol: String
+    var action: () -> Void
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 12) {
+            Text(description)
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+            Spacer()
+            Button(action: action) {
+                Label(buttonTitle, systemImage: symbol)
+            }
+        }
+    }
+}
+
+struct JobRow: View {
+    var job: JobRun
+
+    var body: some View {
+        HStack(spacing: 12) {
+            StatusPill(status: job.status)
+            Text(job.kind.displayName)
+                .font(.system(.body, design: .rounded))
+            Spacer()
+            Text(job.startedAt.formatted(date: .abbreviated, time: .shortened))
+                .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 6)
+    }
+}
+
+struct EventRow: View {
+    var event: EventLog
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: event.level == .error ? "exclamationmark.triangle" : "info.circle")
+                .foregroundStyle(event.level == .error ? .red : .secondary)
+            Text(event.message)
+            Spacer()
+            Text(event.createdAt.formatted(date: .omitted, time: .shortened))
+                .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 6)
+    }
+}
+
+struct LiveLogRow: View {
+    var line: ResticOutputEvent
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(line.date.formatted(date: .omitted, time: .standard))
+                .foregroundStyle(.tertiary)
+                .frame(width: 72, alignment: .leading)
+            Text(line.stream == .standardError ? "ERR" : "OUT")
+                .foregroundStyle(line.stream == .standardError ? .orange : .secondary)
+                .frame(width: 30, alignment: .leading)
+            Text(line.message)
+                .foregroundStyle(line.stream == .standardError ? .primary : .secondary)
+                .lineLimit(4)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+struct CompactEmptyRow: View {
+    var text: String
+
+    var body: some View {
+        Text(text)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 8)
+    }
+}
+
+enum DeltaTheme {
+    static let background = Color(nsColor: .windowBackgroundColor)
+    static let panel = Color(nsColor: .controlBackgroundColor)
+    static let border = Color(nsColor: .separatorColor).opacity(0.45)
+    static let badge = Color(nsColor: .tertiarySystemFill)
+    static let statColumns = [
+        GridItem(.adaptive(minimum: 190), spacing: 12)
+    ]
+}

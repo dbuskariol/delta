@@ -1,0 +1,220 @@
+import Foundation
+
+public struct ResticCommand: Equatable, Sendable {
+    public var executableURL: URL
+    public var arguments: [String]
+    public var environment: [String: String]
+
+    public init(executableURL: URL, arguments: [String], environment: [String: String] = [:]) {
+        self.executableURL = executableURL
+        self.arguments = arguments
+        self.environment = environment
+    }
+
+    public var redactedDescription: String {
+        ([executableURL.path] + arguments).map { argument in
+            argument.contains("password") ? "<redacted>" : ShellEscaper.singleQuoted(argument)
+        }.joined(separator: " ")
+    }
+}
+
+public struct ResticExecutableLocator: Sendable {
+    public var bundledExecutableName: String
+    public var fallbackExecutableName: String
+
+    public init(bundledExecutableName: String = "restic", fallbackExecutableName: String = "restic") {
+        self.bundledExecutableName = bundledExecutableName
+        self.fallbackExecutableName = fallbackExecutableName
+    }
+
+    public func locate(in bundle: Bundle = .main) -> URL {
+        if let bundled = bundle.url(forAuxiliaryExecutable: bundledExecutableName) {
+            return bundled
+        }
+        if let resource = bundle.url(forResource: bundledExecutableName, withExtension: nil) {
+            return resource
+        }
+        if let executablePath = CommandLine.arguments.first {
+            let sibling = URL(fileURLWithPath: executablePath)
+                .deletingLastPathComponent()
+                .appendingPathComponent(bundledExecutableName)
+            if FileManager.default.isExecutableFile(atPath: sibling.path) {
+                return sibling
+            }
+        }
+        return URL(fileURLWithPath: "/usr/bin/env")
+    }
+
+    public func fallbackArguments(for command: ResticCommand) -> [String] {
+        if command.executableURL.path == "/usr/bin/env" {
+            return [fallbackExecutableName] + command.arguments
+        }
+        return command.arguments
+    }
+}
+
+public struct ResticCommandBuilder: Sendable {
+    public var resticExecutableURL: URL
+    public var secretBridgeURL: URL
+    public var backendURLBuilder: ResticBackendURLBuilder
+    public var credentialResolver: RepositoryCredentialResolver
+
+    public init(
+        resticExecutableURL: URL,
+        secretBridgeURL: URL,
+        backendURLBuilder: ResticBackendURLBuilder = ResticBackendURLBuilder(),
+        credentialResolver: RepositoryCredentialResolver = RepositoryCredentialResolver()
+    ) {
+        self.resticExecutableURL = resticExecutableURL
+        self.secretBridgeURL = secretBridgeURL
+        self.backendURLBuilder = backendURLBuilder
+        self.credentialResolver = credentialResolver
+    }
+
+    public func initializeRepository(repository: BackupRepository) throws -> ResticCommand {
+        try command(
+            repository: repository,
+            extraGlobalArguments: ["--json"],
+            subcommand: ["init"]
+        )
+    }
+
+    public func backup(profile: BackupProfile, repository: BackupRepository) throws -> ResticCommand {
+        let sources = profile.sources.map(\.path)
+        var subcommand = [
+            "backup",
+            "--json",
+            "--compression", "auto",
+            "--skip-if-unchanged",
+            "--tag", "delta",
+            "--tag", "profile:\(profile.id.uuidString)"
+        ]
+
+        if profile.sourceMode == .fullVolume || profile.sources.contains(where: { !$0.includeSubvolumes }) {
+            subcommand.append("--one-file-system")
+        }
+
+        for pattern in BackupExcludePolicy.excludes(for: profile, repository: repository) {
+            subcommand += ["--exclude", pattern]
+        }
+
+        subcommand += sources
+
+        return try command(
+            repository: repository,
+            extraGlobalArguments: bandwidthArguments(from: profile.schedule),
+            subcommand: subcommand
+        )
+    }
+
+    public func snapshots(repository: BackupRepository) throws -> ResticCommand {
+        try command(repository: repository, subcommand: ["snapshots", "--json"])
+    }
+
+    public func restore(request: RestoreRequest, repository: BackupRepository) throws -> ResticCommand {
+        var snapshotArgument = request.snapshotID
+        var subcommand = [
+            "restore",
+            "--json",
+            "--overwrite", request.conflictPolicy.resticValue
+        ]
+
+        switch request.scope {
+        case .fullSnapshot:
+            break
+        case let .selectedPaths(paths):
+            if paths.count == 1, let first = paths.first {
+                snapshotArgument = "\(request.snapshotID):\(first)"
+            } else {
+                for path in paths {
+                    subcommand += ["--include", path]
+                }
+            }
+        }
+
+        if request.verifyRestoredFiles {
+            subcommand.append("--verify")
+        }
+        if request.dryRun {
+            subcommand.append("--dry-run")
+            subcommand += ["--verbose", "2"]
+        }
+
+        switch request.destination {
+        case let .chosenFolder(path):
+            subcommand += ["--target", path]
+        case .originalPaths:
+            subcommand += ["--target", "/"]
+        }
+
+        subcommand.append(snapshotArgument)
+        return try command(repository: repository, subcommand: subcommand)
+    }
+
+    public func forgetAndPrune(profile: BackupProfile, repository: BackupRepository) throws -> ResticCommand {
+        var subcommand = ["forget"]
+        let policy = profile.retention
+        if policy.keepHourly > 0 { subcommand += ["--keep-hourly", "\(policy.keepHourly)"] }
+        if policy.keepDaily > 0 { subcommand += ["--keep-daily", "\(policy.keepDaily)"] }
+        if policy.keepWeekly > 0 { subcommand += ["--keep-weekly", "\(policy.keepWeekly)"] }
+        if policy.keepMonthly > 0 { subcommand += ["--keep-monthly", "\(policy.keepMonthly)"] }
+        if policy.keepYearly > 0 { subcommand += ["--keep-yearly", "\(policy.keepYearly)"] }
+        subcommand += ["--group-by", "host,paths,tags"]
+        if policy.pruneAfterForget {
+            subcommand.append("--prune")
+        }
+        return try command(repository: repository, subcommand: subcommand)
+    }
+
+    public func check(repository: BackupRepository, readDataSubset: String? = nil) throws -> ResticCommand {
+        var subcommand = ["check", "--json"]
+        if let readDataSubset, !readDataSubset.isEmpty {
+            subcommand += ["--read-data-subset", readDataSubset]
+        }
+        return try command(repository: repository, subcommand: subcommand)
+    }
+
+    private func command(
+        repository: BackupRepository,
+        extraGlobalArguments: [String] = [],
+        subcommand: [String]
+    ) throws -> ResticCommand {
+        let repositoryURL = try backendURLBuilder.repositoryURL(for: repository.backend)
+        let passwordCommand = [
+            ShellEscaper.singleQuoted(secretBridgeURL.path),
+            ShellEscaper.singleQuoted(repository.keychainAccount)
+        ].joined(separator: " ")
+
+        let globalArguments = [
+            "-r", repositoryURL,
+            "--password-command", passwordCommand,
+            "--cleanup-cache"
+        ] + extraGlobalArguments
+
+        var environment = ProcessInfo.processInfo.environment
+        environment["RESTIC_PROGRESS_FPS"] = "1"
+        let toolDirectory = resticExecutableURL.deletingLastPathComponent().path
+        let existingPath = environment["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin"
+        environment["PATH"] = "\(toolDirectory):\(existingPath)"
+        try credentialResolver.environment(for: repository).forEach { key, value in
+            environment[key] = value
+        }
+
+        return ResticCommand(
+            executableURL: resticExecutableURL,
+            arguments: globalArguments + subcommand,
+            environment: environment
+        )
+    }
+
+    private func bandwidthArguments(from schedule: BackupSchedule) -> [String] {
+        var arguments: [String] = []
+        if let uploadLimitKiB = schedule.uploadLimitKiB {
+            arguments += ["--limit-upload", "\(uploadLimitKiB)"]
+        }
+        if let downloadLimitKiB = schedule.downloadLimitKiB {
+            arguments += ["--limit-download", "\(downloadLimitKiB)"]
+        }
+        return arguments
+    }
+}
