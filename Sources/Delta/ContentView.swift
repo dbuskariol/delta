@@ -1569,7 +1569,7 @@ struct SettingsView: View {
                         SettingsNotice(
                             symbol: "questionmark.circle",
                             title: "Access not checked yet",
-                            text: "Refresh status after saving a destination so Delta can confirm background password access.",
+                            text: "Refresh status after saving a destination so Delta can confirm Password Access for scheduled backups.",
                             color: .secondary
                         )
                     }

@@ -49,11 +49,11 @@ PRODUCT_LANGUAGE_FILES=(
   "Scripts/verify-tools.sh"
 )
 
-if /opt/homebrew/bin/rg -n "repository-secrets|Delta repository secrets|Repair Keychain Access|com\\.delta\\.backup\\.secrets" \
+if /opt/homebrew/bin/rg -n "repository-secrets|Delta repository secrets|Repair Keychain Access|com\\.delta\\.backup\\.secrets|Scheduled Helper|scheduled helper|Scheduled Backups helper|background secret|Background secret|background password access|background password-access|helper smoke checks" \
   "${PRODUCT_LANGUAGE_FILES[@]}" 2>/dev/null ||
-  /usr/bin/grep -REn "repository-secrets|Delta repository secrets|Repair Keychain Access|com\\.delta\\.backup\\.secrets" \
+  /usr/bin/grep -REn "repository-secrets|Delta repository secrets|Repair Keychain Access|com\\.delta\\.backup\\.secrets|Scheduled Helper|scheduled helper|Scheduled Backups helper|background secret|Background secret|background password access|background password-access|helper smoke checks" \
   "${PRODUCT_LANGUAGE_FILES[@]}" 2>/dev/null; then
-  printf "Old repository-oriented Keychain or settings wording is not allowed.\n" >&2
+  printf "Old repository, helper, or background-password wording is not allowed in product-facing surfaces.\n" >&2
   exit 1
 fi
 

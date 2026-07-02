@@ -284,5 +284,5 @@ This runs:
 - minimal hardened-runtime entitlement checks for Delta, DeltaAgent, DeltaSecretBridge, restic, and rclone
 - same-executable scheduled password resolution and non-interactive password-bridge acceptance
 - Sparkle framework checks and signed appcast/update metadata
-- helper smoke checks
+- scheduler smoke checks
 - bundled restic/rclone version checks

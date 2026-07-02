@@ -24,7 +24,7 @@ The automated gate must pass before any beta or production build is shipped. It 
 - non-ad-hoc app signing identity for stable macOS privacy permissions
 - hardened-runtime entitlement hygiene
 - same-executable scheduled password resolution and non-interactive password-bridge acceptance
-- background password-access health diagnostics for saved destination passwords and backend credentials
+- Password Access health diagnostics for saved destination passwords and backend credentials
 - installed Scheduled Backups scheduler acceptance with an isolated due profile, automatic destination preparation, real backup, cached restore point refresh, and source-context log persistence
 - installed-app diagnostic export with redaction of seeded destination and backend credential values
 - source access preflight before restic starts or a new destination is prepared

@@ -30,13 +30,13 @@ enum AcceptanceScheduledAgentCommand {
 
         let repository = BackupRepository(
             id: repositoryID,
-            name: "Scheduled Helper Acceptance",
+            name: "Scheduled Backups Acceptance",
             backend: .local(path: destinationURL.path),
             keychainAccount: keychainAccount
         )
         let profile = BackupProfile(
             id: profileID,
-            name: "Scheduled Helper Acceptance",
+            name: "Scheduled Backups Acceptance",
             sourceMode: .customFolders,
             sources: [BackupSource(path: sourceURL.path)],
             repositoryID: repositoryID,
