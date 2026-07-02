@@ -626,6 +626,41 @@ final class DeltaAppModel: ObservableObject {
         }
     }
 
+    func repairBackgroundSecretAccess() {
+        guardPersistentStoreAvailable()
+        guard isPersistentStoreAvailable else { return }
+        guard !isWorking else {
+            alertMessage = "Wait for the current Delta job to finish before repairing background secret access."
+            return
+        }
+        guard !repositories.isEmpty else {
+            alertMessage = "There are no saved destinations to repair."
+            return
+        }
+
+        let repairer = RepositorySecretAccessRepairer(secretStore: secretStore)
+        let reports = repositories.map { repairer.repair(repository: $0) }
+        let checkedAccounts = reports.reduce(0) { $0 + $1.checkedAccounts }
+        let repairedAccounts = reports.reduce(0) { $0 + $1.repairedAccounts }
+        let failures = reports.flatMap(\.failures)
+        let failedRepositories = reports.filter { !$0.isFullyAccessible }.map(\.repositoryName)
+
+        do {
+            if failures.isEmpty {
+                let message = "Background secret access was repaired for \(repairedAccounts) saved \(repairedAccounts == 1 ? "secret" : "secrets") across \(reports.count) \(reports.count == 1 ? "destination" : "destinations")."
+                try database.appendEvent(EventLog(level: .info, message: message))
+                alertMessage = "\(message) Scheduled backups can read these secrets without interactive Keychain prompts."
+            } else {
+                let message = "Background secret access repaired \(repairedAccounts) of \(checkedAccounts) saved secrets. Review \(failedRepositories.joined(separator: ", "))."
+                try database.appendEvent(EventLog(level: .warning, message: message))
+                alertMessage = "\(message) The first failure was \(failures[0].purpose): \(failures[0].message)"
+            }
+            reload()
+        } catch {
+            alertMessage = error.localizedDescription
+        }
+    }
+
     private func requestBackgroundBackupsIfNeeded(for profile: BackupProfile) {
         guard profile.schedule.isEnabled else {
             return

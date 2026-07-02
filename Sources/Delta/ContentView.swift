@@ -1019,6 +1019,10 @@ struct SettingsView: View {
                     text: "macOS may require approval in Login Items before background backups can run. Delta can open that pane, but macOS does not allow apps to approve themselves."
                 )
 
+                SettingsDescription(
+                    text: "If macOS asks DeltaSecretBridge for Keychain access or a scheduled job reports that a destination password is unavailable, repair saved secret access once from here."
+                )
+
                 HStack(spacing: 8) {
                     Button {
                         model.openLoginItemsSettings()
@@ -1030,6 +1034,13 @@ struct SettingsView: View {
                     } label: {
                         Label("Refresh Status", systemImage: "arrow.clockwise")
                     }
+                    Button {
+                        model.repairBackgroundSecretAccess()
+                    } label: {
+                        Label("Repair Secret Access", systemImage: "key")
+                    }
+                    .disabled(model.repositories.isEmpty || model.isWorking || !model.isPersistentStoreAvailable)
+                    .deltaTooltip("Rewrite saved destination passwords and backend credentials so scheduled backups can read them without Keychain prompts.")
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)

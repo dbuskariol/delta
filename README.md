@@ -64,6 +64,7 @@ Important implementation details:
 - **Profile validation** normalizes source paths, schedule values, bandwidth limits, retention limits, cleanup windows, and exclude patterns before saving or running backups.
 - **Operation-aware destination checks** allow a first backup to prepare a writable new local destination, while restore, browse, check, and cleanup require the destination itself to be connected or mounted before restic is invoked.
 - **Keychain secrets** use `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly` and a trusted-application access list for the signed Delta app, agent, and secret bridge. Background secret reads fail closed instead of showing system prompts.
+- **Background secret repair** rewrites saved destination passwords and backend credentials through the current signed app identity if a development build or old local Keychain item would otherwise prompt during scheduled jobs.
 - **Security-scoped bookmarks** preserve access to selected source folders where macOS requires it.
 - **Per-destination locks** prevent overlapping backup, restore, prune, and check jobs across app/agent processes.
 - **Per-job output logs** persist formatted restic progress, warnings, errors, start lines, and finish lines for troubleshooting after relaunch or scheduled agent runs.
