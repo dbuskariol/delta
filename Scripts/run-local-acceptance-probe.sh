@@ -265,6 +265,13 @@ else
   else
     installed_run_control_evidence="Installed app run-control acceptance failed: $installed_run_control_output"
   fi
+  installed_rclone_local_output="$(run_capture installed_rclone_local "$ROOT_DIR/Scripts/run-installed-rclone-local-acceptance.sh" "$APP_PATH")"
+  installed_rclone_local_status="$(command_status installed_rclone_local)"
+  if [[ "$installed_rclone_local_status" -eq 0 ]]; then
+    installed_rclone_local_evidence="Installed app rclone local-remote lifecycle acceptance passed through Delta coordinator using the bundled rclone backend: automatic destination preparation, existing-destination reuse, no-change backup, incremental backup, restore-point cache, backup browser listing, full restore, selected folder restore, destination check, cleanup, and post-cleanup check. $installed_rclone_local_output"
+  else
+    installed_rclone_local_evidence="Installed app rclone local-remote lifecycle acceptance failed: $installed_rclone_local_output"
+  fi
 
   mounted_acceptance_status="not_configured"
   mounted_acceptance_evidence=""
@@ -343,6 +350,12 @@ else
         additional_remote_statuses+=("failed")
         additional_remote_evidence+=("External $name acceptance failed: $output")
       fi
+    elif [[ "$kind" == "rclone" && "$installed_rclone_local_status" -eq 0 ]]; then
+      additional_remote_statuses+=("passed")
+      additional_remote_evidence+=("$installed_rclone_local_evidence")
+    elif [[ "$kind" == "rclone" && "$installed_rclone_local_status" -ne 0 ]]; then
+      additional_remote_statuses+=("failed")
+      additional_remote_evidence+=("$installed_rclone_local_evidence")
     else
       additional_remote_statuses+=("not_configured")
       additional_remote_evidence+=("$name acceptance was not configured. Set $env_key and provider credentials/configuration to run it.")
