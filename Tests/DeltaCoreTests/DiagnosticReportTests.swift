@@ -18,6 +18,7 @@ final class DiagnosticReportTests: XCTestCase {
             appLoginItemStatus: "Enabled",
             notificationStatus: "Enabled",
             menuBarStatus: "Shown",
+            operationalHistoryRetentionStatus: "Keep 90 days",
             backupFreshnessStatus: "Warn after 3 days",
             destinationVerificationStatus: "Warn after 30 days",
             restoreDefaultsStatus: "Preview first, verify files, Replace changed",
@@ -50,6 +51,7 @@ final class DiagnosticReportTests: XCTestCase {
         XCTAssertTrue(report.contains("- Start at Login: Enabled"))
         XCTAssertTrue(report.contains("- Notifications: Enabled"))
         XCTAssertTrue(report.contains("- Menu Bar: Shown"))
+        XCTAssertTrue(report.contains("- Activity History Retention: Keep 90 days"))
         XCTAssertTrue(report.contains("- Backup Freshness: Warn after 3 days"))
         XCTAssertTrue(report.contains("- Destination Verification: Warn after 30 days"))
         XCTAssertTrue(report.contains("- Restore Defaults: Preview first, verify files, Replace changed"))
@@ -78,6 +80,7 @@ final class DiagnosticReportTests: XCTestCase {
             appLoginItemStatus: "Not Registered",
             notificationStatus: "Disabled",
             menuBarStatus: "Hidden",
+            operationalHistoryRetentionStatus: "Keep 90 days",
             backupFreshnessStatus: "Warn after 3 days",
             destinationVerificationStatus: "Warn after 30 days",
             restoreDefaultsStatus: "Preview first, verify files, Replace changed",

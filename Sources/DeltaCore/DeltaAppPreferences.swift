@@ -16,6 +16,7 @@ public enum DeltaAppPreferenceKeys {
     public static let defaultProfileRunOnBattery = "Delta.defaultProfileRunOnBattery"
     public static let defaultProfileUploadLimitKiB = "Delta.defaultProfileUploadLimitKiB"
     public static let defaultRestoreConflictPolicy = "Delta.defaultRestoreConflictPolicy"
+    public static let operationalHistoryRetentionDays = "Delta.operationalHistoryRetentionDays"
     public static let previewsRestoresByDefault = "Delta.previewsRestoresByDefault"
     public static let sendsJobNotifications = "Delta.sendsJobNotifications"
     public static let sendsSuccessfulBackupNotifications = "Delta.sendsSuccessfulBackupNotifications"
@@ -136,5 +137,58 @@ public enum DestinationVerificationWarningThreshold: Int, CaseIterable, Identifi
 
     public static func normalized(_ rawValue: Int) -> DestinationVerificationWarningThreshold {
         DestinationVerificationWarningThreshold(rawValue: rawValue) ?? .thirtyDays
+    }
+}
+
+public enum OperationalHistoryRetention: Int, CaseIterable, Identifiable, Sendable {
+    case sevenDays = 7
+    case thirtyDays = 30
+    case ninetyDays = 90
+    case oneYear = 365
+    case forever = 0
+
+    public var id: Int { rawValue }
+
+    public var title: String {
+        switch self {
+        case .sevenDays: "7 days"
+        case .thirtyDays: "30 days"
+        case .ninetyDays: "90 days"
+        case .oneYear: "1 year"
+        case .forever: "Forever"
+        }
+    }
+
+    public var summaryText: String {
+        switch self {
+        case .forever: "Keep forever"
+        default: "Keep \(title)"
+        }
+    }
+
+    public var cutoffInterval: TimeInterval? {
+        switch self {
+        case .forever:
+            return nil
+        default:
+            return TimeInterval(rawValue) * 86_400
+        }
+    }
+
+    public func cutoffDate(now: Date) -> Date? {
+        cutoffInterval.map { now.addingTimeInterval(-$0) }
+    }
+
+    public static func normalized(_ rawValue: Int) -> OperationalHistoryRetention {
+        OperationalHistoryRetention(rawValue: rawValue) ?? .ninetyDays
+    }
+
+    public static func current() -> OperationalHistoryRetention {
+        normalized(
+            DeltaAppPreferences.integer(
+                for: DeltaAppPreferenceKeys.operationalHistoryRetentionDays,
+                default: OperationalHistoryRetention.ninetyDays.rawValue
+            )
+        )
     }
 }

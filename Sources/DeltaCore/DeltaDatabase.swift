@@ -11,6 +11,29 @@ public enum DeltaDatabaseError: Error, LocalizedError {
     }
 }
 
+public struct OperationalHistoryPruneResult: Equatable, Sendable {
+    public var deletedJobRuns: Int
+    public var deletedJobLogs: Int
+    public var deletedRestoreRequests: Int
+    public var deletedEvents: Int
+
+    public init(
+        deletedJobRuns: Int = 0,
+        deletedJobLogs: Int = 0,
+        deletedRestoreRequests: Int = 0,
+        deletedEvents: Int = 0
+    ) {
+        self.deletedJobRuns = deletedJobRuns
+        self.deletedJobLogs = deletedJobLogs
+        self.deletedRestoreRequests = deletedRestoreRequests
+        self.deletedEvents = deletedEvents
+    }
+
+    public var totalDeleted: Int {
+        deletedJobRuns + deletedJobLogs + deletedRestoreRequests + deletedEvents
+    }
+}
+
 public final class DeltaDatabase: @unchecked Sendable {
     private let queue: DatabaseQueue
     private let encoder: JSONEncoder
@@ -240,6 +263,72 @@ public final class DeltaDatabase: @unchecked Sendable {
         try fetchAll(table: "event_logs", limit: limit)
     }
 
+    public func pruneOperationalHistory(
+        olderThan cutoff: Date,
+        minimumRecentJobs: Int = 100
+    ) throws -> OperationalHistoryPruneResult {
+        let cutoffString = Self.timestampString(cutoff)
+        let retainedJobCount = max(0, minimumRecentJobs)
+
+        return try queue.write { db in
+            let oldLogCount = try count(
+                db,
+                sql: "SELECT COUNT(*) FROM job_logs WHERE created_at < ?",
+                arguments: [cutoffString]
+            )
+            try db.execute(sql: "DELETE FROM job_logs WHERE created_at < ?", arguments: [cutoffString])
+
+            let oldJobCount = try count(
+                db,
+                sql: """
+                SELECT COUNT(*) FROM job_runs
+                WHERE updated_at < ?
+                  AND id NOT IN (
+                    SELECT id FROM job_runs ORDER BY updated_at DESC LIMIT ?
+                  )
+                """,
+                arguments: [cutoffString, retainedJobCount]
+            )
+            try db.execute(
+                sql: """
+                DELETE FROM job_runs
+                WHERE updated_at < ?
+                  AND id NOT IN (
+                    SELECT id FROM job_runs ORDER BY updated_at DESC LIMIT ?
+                  )
+                """,
+                arguments: [cutoffString, retainedJobCount]
+            )
+
+            let orphanLogCount = try count(
+                db,
+                sql: "SELECT COUNT(*) FROM job_logs WHERE job_id NOT IN (SELECT id FROM job_runs)"
+            )
+            try db.execute(sql: "DELETE FROM job_logs WHERE job_id NOT IN (SELECT id FROM job_runs)")
+
+            let restoreRequestCount = try count(
+                db,
+                sql: "SELECT COUNT(*) FROM restore_jobs WHERE updated_at < ?",
+                arguments: [cutoffString]
+            )
+            try db.execute(sql: "DELETE FROM restore_jobs WHERE updated_at < ?", arguments: [cutoffString])
+
+            let eventCount = try count(
+                db,
+                sql: "SELECT COUNT(*) FROM event_logs WHERE updated_at < ?",
+                arguments: [cutoffString]
+            )
+            try db.execute(sql: "DELETE FROM event_logs WHERE updated_at < ?", arguments: [cutoffString])
+
+            return OperationalHistoryPruneResult(
+                deletedJobRuns: oldJobCount,
+                deletedJobLogs: oldLogCount + orphanLogCount,
+                deletedRestoreRequests: restoreRequestCount,
+                deletedEvents: eventCount
+            )
+        }
+    }
+
     public func deleteAll() throws {
         try queue.write { db in
             for table in Self.payloadTables {
@@ -253,6 +342,10 @@ public final class DeltaDatabase: @unchecked Sendable {
         try queue.write { db in
             try db.execute(sql: "DELETE FROM \(table) WHERE id = ?", arguments: [id])
         }
+    }
+
+    private func count(_ db: Database, sql: String, arguments: StatementArguments = StatementArguments()) throws -> Int {
+        try Int.fetchOne(db, sql: sql, arguments: arguments) ?? 0
     }
 
     private func migrate() throws {

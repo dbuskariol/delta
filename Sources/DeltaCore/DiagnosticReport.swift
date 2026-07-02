@@ -83,6 +83,7 @@ public struct DiagnosticReportSnapshot: Equatable, Sendable {
     public var appLoginItemStatus: String
     public var notificationStatus: String
     public var menuBarStatus: String
+    public var operationalHistoryRetentionStatus: String
     public var backupFreshnessStatus: String
     public var destinationVerificationStatus: String
     public var restoreDefaultsStatus: String
@@ -111,6 +112,7 @@ public struct DiagnosticReportSnapshot: Equatable, Sendable {
         appLoginItemStatus: String,
         notificationStatus: String,
         menuBarStatus: String,
+        operationalHistoryRetentionStatus: String,
         backupFreshnessStatus: String,
         destinationVerificationStatus: String,
         restoreDefaultsStatus: String,
@@ -138,6 +140,7 @@ public struct DiagnosticReportSnapshot: Equatable, Sendable {
         self.appLoginItemStatus = appLoginItemStatus
         self.notificationStatus = notificationStatus
         self.menuBarStatus = menuBarStatus
+        self.operationalHistoryRetentionStatus = operationalHistoryRetentionStatus
         self.backupFreshnessStatus = backupFreshnessStatus
         self.destinationVerificationStatus = destinationVerificationStatus
         self.restoreDefaultsStatus = restoreDefaultsStatus
@@ -179,6 +182,7 @@ public struct DiagnosticReportBuilder: Sendable {
             "- Start at Login: \(snapshot.appLoginItemStatus)",
             "- Notifications: \(snapshot.notificationStatus)",
             "- Menu Bar: \(snapshot.menuBarStatus)",
+            "- Activity History Retention: \(snapshot.operationalHistoryRetentionStatus)",
             "- Backup Freshness: \(snapshot.backupFreshnessStatus)",
             "- Destination Verification: \(snapshot.destinationVerificationStatus)",
             "- Restore Defaults: \(snapshot.restoreDefaultsStatus)",

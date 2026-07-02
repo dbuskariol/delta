@@ -1139,6 +1139,10 @@ struct SettingsView: View {
         store: DeltaAppPreferences.sharedStore()
     ) private var activityLogDetailRawValue = ActivityLogDetail.standard.rawValue
     @AppStorage(
+        DeltaAppPreferenceKeys.operationalHistoryRetentionDays,
+        store: DeltaAppPreferences.sharedStore()
+    ) private var operationalHistoryRetentionDays = OperationalHistoryRetention.ninetyDays.rawValue
+    @AppStorage(
         DeltaAppPreferenceKeys.backupFreshnessWarningHours,
         store: DeltaAppPreferences.sharedStore()
     ) private var backupFreshnessWarningHours = BackupFreshnessWarningThreshold.threeDays.rawValue
@@ -1880,6 +1884,29 @@ struct SettingsView: View {
                     .frame(width: 260)
                 }
 
+                SettingsControlRow(
+                    title: "History retention",
+                    detail: "Automatically remove old job summaries, saved output, restore requests, and events. Backup data and restore points are not affected."
+                ) {
+                    Picker("", selection: $operationalHistoryRetentionDays) {
+                        ForEach(OperationalHistoryRetention.allCases) { retention in
+                            Text(retention.title).tag(retention.rawValue)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .frame(width: 180)
+                    .onChange(of: operationalHistoryRetentionDays) { _, _ in
+                        normalizeOperationalHistoryRetention()
+                    }
+                }
+
+                SettingsFactGrid(items: [
+                    SettingsFact(title: "Live view", value: activityLogDetail.title),
+                    SettingsFact(title: "Saved history", value: operationalHistoryRetention.summaryText),
+                    SettingsFact(title: "Backup data", value: "Unaffected")
+                ])
+
                 ActionLine(
                     description: "Copy a sanitized report with app, helper, destination, profile, and recent job state.",
                     buttonTitle: "Copy Report",
@@ -1892,11 +1919,23 @@ struct SettingsView: View {
                     symbol: "square.and.arrow.down",
                     action: model.exportDiagnosticReport
                 )
+
+                SettingsActionBar {
+                    Button {
+                        normalizeOperationalHistoryRetention()
+                        model.pruneOperationalHistoryNow()
+                    } label: {
+                        Label("Clean Up Now", systemImage: "trash")
+                    }
+                    .disabled(model.isWorking || !model.isPersistentStoreAvailable)
+                    .deltaTooltip("Apply the selected activity history retention policy now.")
+                }
             }
         }
         .onAppear {
             automaticallyChecksForUpdates = softwareUpdateController.automaticallyChecksForUpdates
             activityLogDetailRawValue = activityLogDetail.rawValue
+            normalizeOperationalHistoryRetention()
             normalizeHealthMonitoring()
             normalizeBackupDefaults()
             normalizeRestorePreferences()
@@ -2020,6 +2059,10 @@ struct SettingsView: View {
 
     private var activityLogDetail: ActivityLogDetail {
         ActivityLogDetail.normalized(activityLogDetailRawValue)
+    }
+
+    private var operationalHistoryRetention: OperationalHistoryRetention {
+        OperationalHistoryRetention.normalized(operationalHistoryRetentionDays)
     }
 
     private var backgroundBackupsStatusText: String {
@@ -2341,6 +2384,13 @@ struct SettingsView: View {
     private func normalizeRestorePreferences() {
         if RestoreConflictPolicy(rawValue: defaultRestoreConflictPolicyRawValue) == nil {
             defaultRestoreConflictPolicyRawValue = RestoreConflictPolicy.ifChanged.rawValue
+        }
+    }
+
+    private func normalizeOperationalHistoryRetention() {
+        let normalized = operationalHistoryRetention.rawValue
+        if operationalHistoryRetentionDays != normalized {
+            operationalHistoryRetentionDays = normalized
         }
     }
 

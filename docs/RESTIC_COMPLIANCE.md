@@ -142,6 +142,8 @@ Generic `permission denied` or `operation not permitted` failures are not treate
 
 Restic progress totals can change while it scans sources, so Delta does not expose volatile live percentages as authoritative completion. The UI uses a monotonic estimated progress bar that never moves backward during a running job, paired with stable processed-file and processed-byte counters. Backup jobs record source paths at job start, and saved logs are grouped by job with expandable full-log loading from SQLite. Restic summary JSON is parsed into explicit new, changed, unchanged, added, and checked counts so unchanged successful runs are clearly distinguished from runs that created new backup data. Delta stores those counts as compact structured job metadata, including restic `snapshot_id` when present, instead of storing the complete restic stdout stream in the job message.
 
+Saved activity output is operational history, not backup data. Delta applies a configurable local retention policy to job summaries, saved stdout/stderr lines, restore request records, and app events from both the main app and Background Backups helper. Cleanup keeps a minimum set of recent job summaries for UI continuity and never deletes cached restore points or restic repository data.
+
 ## Snapshots / Restore Points
 
 Delta lists restore points with:

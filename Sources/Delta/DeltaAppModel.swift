@@ -81,6 +81,7 @@ final class DeltaAppModel: ObservableObject {
     private var localOperationIsRunning = false
     private var databaseRefreshTask: Task<Void, Never>?
     private var lastLiveLogWasStatus = false
+    private var lastOperationalHistoryPruneAt: Date?
 
     init() {
         let result = Self.openDatabase()
@@ -107,6 +108,7 @@ final class DeltaAppModel: ObservableObject {
         do {
             if !localOperationIsRunning {
                 _ = try makeCoordinator().recoverAbandonedRunningJobs()
+                pruneOperationalHistoryIfNeeded()
             }
             let storedRepositories = try database.fetchRepositories()
             let storedProfiles = try database.fetchProfiles()
@@ -839,6 +841,29 @@ final class DeltaAppModel: ObservableObject {
         }
     }
 
+    func pruneOperationalHistoryNow() {
+        guardPersistentStoreAvailable()
+        guard isPersistentStoreAvailable else { return }
+        guard !isWorking else {
+            alertMessage = "Wait for the current Delta job to finish before cleaning up activity history."
+            return
+        }
+
+        do {
+            let result = try OperationalHistoryMaintenance.prune(database: database)
+            if result.totalDeleted > 0 {
+                try? database.appendEvent(EventLog(level: .info, message: operationalHistoryPruneMessage(result)))
+                alertMessage = "Cleaned up \(result.totalDeleted) old activity \(result.totalDeleted == 1 ? "item" : "items")."
+            } else {
+                alertMessage = "No old activity history needed cleanup."
+            }
+            lastOperationalHistoryPruneAt = Date()
+            reload()
+        } catch {
+            alertMessage = error.localizedDescription
+        }
+    }
+
     func chooseFolder(allowsMultipleSelection: Bool = false) -> [String] {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
@@ -866,6 +891,25 @@ final class DeltaAppModel: ObservableObject {
         } catch {
             alertMessage = error.localizedDescription
         }
+    }
+
+    private func pruneOperationalHistoryIfNeeded(now: Date = Date()) {
+        if let lastOperationalHistoryPruneAt, now.timeIntervalSince(lastOperationalHistoryPruneAt) < 3_600 {
+            return
+        }
+        lastOperationalHistoryPruneAt = now
+        do {
+            let result = try OperationalHistoryMaintenance.prune(database: database, now: now)
+            if result.totalDeleted > 0 {
+                try? database.appendEvent(EventLog(level: .info, message: operationalHistoryPruneMessage(result)))
+            }
+        } catch {
+            try? database.appendEvent(EventLog(level: .warning, message: "Could not clean up old activity history: \(error.localizedDescription)"))
+        }
+    }
+
+    private func operationalHistoryPruneMessage(_ result: OperationalHistoryPruneResult) -> String {
+        "Activity history cleanup removed \(result.totalDeleted) old \(result.totalDeleted == 1 ? "item" : "items") from Delta's local database."
     }
 
     private func makeDiagnosticReport() -> String {
@@ -905,6 +949,7 @@ final class DeltaAppModel: ObservableObject {
             appLoginItemStatus: appLoginItemStatus.displayName,
             notificationStatus: DeltaAppPreferences.bool(for: DeltaAppPreferenceKeys.sendsJobNotifications, default: false) ? "Enabled" : "Disabled",
             menuBarStatus: DeltaAppPreferences.bool(for: DeltaAppPreferenceKeys.showsMenuBarExtra, default: true) ? "Shown" : "Hidden",
+            operationalHistoryRetentionStatus: OperationalHistoryRetention.current().summaryText,
             backupFreshnessStatus: BackupFreshnessWarningThreshold
                 .normalized(
                     DeltaAppPreferences.integer(

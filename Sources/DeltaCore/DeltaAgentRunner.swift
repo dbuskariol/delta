@@ -22,6 +22,7 @@ public enum DeltaAgentRunner {
         _ = try coordinator.recoverAbandonedRunningJobs()
         let runs = try coordinator.runDueBackups()
         try notifyCompletedJobs(runs, database: database)
+        pruneOperationalHistory(database: database)
         print("DeltaAgent completed \(runs.count) due backup run(s).")
         return runs.contains(where: { $0.status == .failed }) ? 1 : 0
     }
@@ -53,6 +54,27 @@ public enum DeltaAgentRunner {
                 continue
             }
             DeltaUserNotifier.deliver(content)
+        }
+    }
+
+    private static func pruneOperationalHistory(database: DeltaDatabase) {
+        do {
+            let result = try OperationalHistoryMaintenance.prune(database: database)
+            if result.totalDeleted > 0 {
+                try? database.appendEvent(
+                    EventLog(
+                        level: .info,
+                        message: "Activity history cleanup removed \(result.totalDeleted) old \(result.totalDeleted == 1 ? "item" : "items") from Delta's local database."
+                    )
+                )
+            }
+        } catch {
+            try? database.appendEvent(
+                EventLog(
+                    level: .warning,
+                    message: "Could not clean up old activity history: \(error.localizedDescription)"
+                )
+            )
         }
     }
 }

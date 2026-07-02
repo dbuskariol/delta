@@ -131,6 +131,23 @@ final class DeltaAppPreferencesTests: XCTestCase {
         XCTAssertEqual(DestinationVerificationWarningThreshold.thirtyDays.summaryText, "Warn after 30 days")
     }
 
+    func testOperationalHistoryRetentionNormalizesUnsupportedValues() {
+        XCTAssertEqual(OperationalHistoryRetention.normalized(OperationalHistoryRetention.sevenDays.rawValue), .sevenDays)
+        XCTAssertEqual(OperationalHistoryRetention.normalized(OperationalHistoryRetention.forever.rawValue), .forever)
+        XCTAssertEqual(OperationalHistoryRetention.normalized(-1), .ninetyDays)
+        XCTAssertEqual(OperationalHistoryRetention.ninetyDays.summaryText, "Keep 90 days")
+        XCTAssertEqual(OperationalHistoryRetention.forever.summaryText, "Keep forever")
+    }
+
+    func testOperationalHistoryRetentionComputesCutoffDate() throws {
+        let now = Date(timeIntervalSince1970: 1_000_000)
+
+        let cutoff = try XCTUnwrap(OperationalHistoryRetention.sevenDays.cutoffDate(now: now))
+
+        XCTAssertEqual(cutoff, now.addingTimeInterval(-7 * 86_400))
+        XCTAssertNil(OperationalHistoryRetention.forever.cutoffDate(now: now))
+    }
+
     func testBackupProfileDefaultsUseRecommendedPolicyWhenUnset() {
         withClearedBackupProfileDefaults {
             let schedule = BackupProfileDefaults.schedule()

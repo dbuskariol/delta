@@ -74,6 +74,7 @@ Important implementation details:
 - **Per-destination locks** prevent overlapping backup, restore, prune, and check jobs across app/agent processes.
 - **Per-job output logs** persist formatted restic progress, warnings, errors, start lines, and finish lines for troubleshooting after relaunch or scheduled agent runs.
 - **Compact backup summaries** persist structured new/changed/unchanged/add/check counts on job records without storing full restic stdout in the job message.
+- **Bounded operational history** applies a configurable retention policy to job summaries, saved output, restore requests, and app events from both the main app and Background Backups. Restore points and backup data are not affected.
 - **Notification policy** is shared by the app and Background Backups helper. Failure and warning alerts are opt-in; successful backup summaries require a second opt-in to avoid alert fatigue.
 - **Durable run controls** let the app request pause/cancel for an agent-owned restic process without relying on in-memory UI state.
 - **Abandoned-job recovery** marks stale running jobs interrupted after restart only when the per-destination lock proves no restic process still owns the destination.
@@ -103,6 +104,8 @@ Custom-folder profiles use the selected source folders and stored security-scope
 Each profile keeps Delta's default macOS-safe excludes and can add extra restic exclude patterns. Extra excludes are saved with the profile and passed to restic as additional `--exclude` arguments.
 
 Settings include app-level defaults for newly-created backup profiles: missed-run catchup, battery policy, Low Power Mode policy, optional bandwidth limits, cleanup space reclamation, cleanup verification, and cleanup cadence. Those defaults seed new profiles only. Existing profiles keep their own schedule, power, bandwidth, retention, and maintenance settings until edited.
+
+Diagnostics settings include live-log detail and local activity history retention. History retention removes old job summaries, saved output, restore requests, and app events from Delta's SQLite database. It does not remove restore points or backup data from any destination.
 
 ## Scheduling And Maintenance
 

@@ -169,6 +169,74 @@ final class DatabaseTests: XCTestCase {
         XCTAssertEqual(repositoryLogs.first?.id, entry.id)
     }
 
+    func testPruneOperationalHistoryDeletesOldLocalActivityWithoutDeletingRestorePoints() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let databaseURL = directory.appendingPathComponent("Delta.sqlite")
+        let database = try DeltaDatabase(url: databaseURL)
+        let repository = BackupRepository(name: "Local", backend: .local(path: "/repo"))
+        let oldJob = JobRun(repositoryID: repository.id, kind: .backup, status: .succeeded)
+        let recentJob = JobRun(repositoryID: repository.id, kind: .backup, status: .succeeded)
+        let oldRestore = RestoreRequest(repositoryID: repository.id, snapshotID: "old", destination: .chosenFolder("/tmp/old"))
+        let recentRestore = RestoreRequest(repositoryID: repository.id, snapshotID: "recent", destination: .chosenFolder("/tmp/recent"))
+        let oldEvent = EventLog(level: .info, message: "old event")
+        let recentEvent = EventLog(level: .info, message: "recent event")
+        let snapshot = ResticSnapshot(id: "snapshot", time: Date(timeIntervalSince1970: 10), paths: ["/Users/me/Documents"])
+        let oldDate = Date(timeIntervalSince1970: 10)
+        let recentDate = Date(timeIntervalSince1970: 2_000)
+        let cutoff = Date(timeIntervalSince1970: 1_000)
+
+        try database.saveRepository(repository)
+        try database.saveJobRun(oldJob)
+        try database.saveJobRun(recentJob)
+        try database.appendJobLog(JobLogEntry(jobID: oldJob.id, repositoryID: repository.id, date: oldDate, stream: .standardOutput, message: "old"))
+        try database.appendJobLog(JobLogEntry(jobID: recentJob.id, repositoryID: repository.id, date: recentDate, stream: .standardOutput, message: "recent"))
+        try database.saveRestoreRequest(oldRestore)
+        try database.saveRestoreRequest(recentRestore)
+        try database.appendEvent(oldEvent)
+        try database.appendEvent(recentEvent)
+        try database.saveSnapshot(snapshot, repositoryID: repository.id)
+        try setUpdatedAt(databaseURL: databaseURL, table: "job_runs", id: oldJob.id, date: oldDate)
+        try setUpdatedAt(databaseURL: databaseURL, table: "restore_jobs", id: oldRestore.id, date: oldDate)
+        try setUpdatedAt(databaseURL: databaseURL, table: "event_logs", id: oldEvent.id, date: oldDate)
+
+        let result = try database.pruneOperationalHistory(olderThan: cutoff, minimumRecentJobs: 1)
+
+        XCTAssertEqual(result.deletedJobRuns, 1)
+        XCTAssertEqual(result.deletedJobLogs, 1)
+        XCTAssertEqual(result.deletedRestoreRequests, 1)
+        XCTAssertEqual(result.deletedEvents, 1)
+        XCTAssertEqual(try database.fetchJobRuns(limit: 10).map(\.id), [recentJob.id])
+        XCTAssertEqual(try database.fetchJobLogs(repositoryID: repository.id).map(\.message), ["recent"])
+        XCTAssertEqual(try database.fetchRestoreRequests(limit: 10).map(\.id), [recentRestore.id])
+        XCTAssertEqual(try database.fetchEvents(limit: 10).map(\.id), [recentEvent.id])
+        XCTAssertEqual(try database.fetchSnapshots(repositoryID: repository.id).map(\.id), ["snapshot"])
+    }
+
+    func testPruneOperationalHistoryKeepsMinimumRecentJobSummaries() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let databaseURL = directory.appendingPathComponent("Delta.sqlite")
+        let database = try DeltaDatabase(url: databaseURL)
+        let repository = BackupRepository(name: "Local", backend: .local(path: "/repo"))
+        let olderJob = JobRun(repositoryID: repository.id, kind: .backup, status: .succeeded)
+        let newestOldJob = JobRun(repositoryID: repository.id, kind: .backup, status: .succeeded)
+        try database.saveRepository(repository)
+        try database.saveJobRun(olderJob)
+        try database.saveJobRun(newestOldJob)
+        try setUpdatedAt(databaseURL: databaseURL, table: "job_runs", id: olderJob.id, date: Date(timeIntervalSince1970: 10))
+        try setUpdatedAt(databaseURL: databaseURL, table: "job_runs", id: newestOldJob.id, date: Date(timeIntervalSince1970: 20))
+
+        let result = try database.pruneOperationalHistory(olderThan: Date(timeIntervalSince1970: 1_000), minimumRecentJobs: 1)
+
+        XCTAssertEqual(result.deletedJobRuns, 1)
+        XCTAssertEqual(try database.fetchJobRuns(limit: 10).map(\.id), [newestOldJob.id])
+    }
+
     func testDatabaseHandlesConcurrentAppAndAgentWriters() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -382,6 +450,22 @@ final class DatabaseTests: XCTestCase {
         try database.saveSnapshot(snapshot, repositoryID: repository.id)
 
         XCTAssertEqual(try database.fetchSnapshots(repositoryID: repository.id).map(\.id), ["current"])
+    }
+
+    private func setUpdatedAt(databaseURL: URL, table: String, id: UUID, date: Date) throws {
+        let queue = try DatabaseQueue(path: databaseURL.path)
+        try queue.write { db in
+            try db.execute(
+                sql: "UPDATE \(table) SET updated_at = ? WHERE id = ?",
+                arguments: [databaseTimestamp(date), id.uuidString]
+            )
+        }
+    }
+
+    private func databaseTimestamp(_ date: Date) -> String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter.string(from: date)
     }
 }
 
