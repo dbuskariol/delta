@@ -100,6 +100,36 @@ final class DatabaseTests: XCTestCase {
         XCTAssertEqual(repositoryLogs.first?.id, entry.id)
     }
 
+    func testDatabaseHandlesConcurrentAppAndAgentWriters() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let databaseURL = directory.appendingPathComponent("Delta.sqlite")
+        let appDatabase = try DeltaDatabase(url: databaseURL)
+        let agentDatabase = try DeltaDatabase(url: databaseURL)
+        let errors = ErrorRecorder()
+        let group = DispatchGroup()
+        let queue = DispatchQueue(label: "delta.database.concurrent-writes", attributes: .concurrent)
+
+        for index in 0..<80 {
+            group.enter()
+            queue.async {
+                defer { group.leave() }
+                do {
+                    let database = index.isMultiple(of: 2) ? appDatabase : agentDatabase
+                    try database.appendEvent(EventLog(level: .info, message: "event \(index)"))
+                } catch {
+                    errors.append(error)
+                }
+            }
+        }
+
+        XCTAssertEqual(group.wait(timeout: .now() + 10), .success)
+        XCTAssertTrue(errors.values.isEmpty, "\(errors.values)")
+        XCTAssertEqual(try appDatabase.fetchEvents(limit: 100).count, 80)
+    }
+
     func testSavingExistingProfileUpdatesEditableFields() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -170,5 +200,22 @@ final class DatabaseTests: XCTestCase {
 
         XCTAssertTrue(try database.fetchRepositories().isEmpty)
         XCTAssertTrue(try database.fetchSnapshots(repositoryID: repository.id).isEmpty)
+    }
+}
+
+private final class ErrorRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var recordedErrors: [Error] = []
+
+    var values: [Error] {
+        lock.lock()
+        defer { lock.unlock() }
+        return recordedErrors
+    }
+
+    func append(_ error: Error) {
+        lock.lock()
+        recordedErrors.append(error)
+        lock.unlock()
     }
 }

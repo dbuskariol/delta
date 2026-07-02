@@ -81,6 +81,9 @@ final class DeltaAppModel: ObservableObject {
 
     func reload() {
         do {
+            if !localOperationIsRunning {
+                _ = try makeCoordinator().recoverAbandonedRunningJobs()
+            }
             let storedRepositories = try database.fetchRepositories()
             let storedProfiles = try database.fetchProfiles()
             let storedJobs = try database.fetchJobRuns(limit: 100)

@@ -22,6 +22,7 @@ enum DeltaAgentMain {
                 return 0
             }
 
+            _ = try coordinator.recoverAbandonedRunningJobs()
             let runs = try coordinator.runDueBackups()
             print("DeltaAgent completed \(runs.count) due backup run(s).")
             return runs.contains(where: { $0.status == .failed }) ? 1 : 0

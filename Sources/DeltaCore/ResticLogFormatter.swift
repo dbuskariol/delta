@@ -54,6 +54,35 @@ public struct ResticBackupSummary: Equatable, Sendable {
     }
 
     public var conciseText: String {
+        if !hasChanges {
+            var parts = [
+                "\(filesNew.formatted()) new",
+                "\(filesChanged.formatted()) changed"
+            ]
+            if totalBytesProcessed > 0 {
+                parts.append("\(Self.byteString(totalBytesProcessed)) checked")
+            } else {
+                let fileCount = totalFilesProcessed > 0 ? totalFilesProcessed : filesUnmodified
+                if fileCount > 0 {
+                    parts.append("\(fileCount.formatted()) files checked")
+                }
+            }
+            return parts.joined(separator: " · ")
+        }
+
+        var parts = [
+            "\(filesNew.formatted()) new",
+            "\(filesChanged.formatted()) changed"
+        ]
+        if let dataAdded, dataAdded > 0 {
+            parts.append("\(Self.byteString(dataAdded)) added")
+        } else if totalBytesProcessed > 0 {
+            parts.append("\(Self.byteString(totalBytesProcessed)) checked")
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    public var detailedText: String {
         var parts = [
             "\(filesNew.formatted()) new",
             "\(filesChanged.formatted()) changed",
@@ -68,7 +97,7 @@ public struct ResticBackupSummary: Equatable, Sendable {
     }
 
     public var logText: String {
-        hasChanges ? "Backup summary · \(conciseText)" : "No changes detected · \(conciseText)"
+        hasChanges ? "Backup summary · \(detailedText)" : "No changes detected · \(conciseText)"
     }
 
     private static func byteString(_ bytes: Int64) -> String {

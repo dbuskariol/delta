@@ -47,6 +47,38 @@ public final class BackupCoordinator: @unchecked Sendable {
     }
 
     @discardableResult
+    public func recoverAbandonedRunningJobs(now: Date = Date()) throws -> [JobRun] {
+        let runningJobs = try database.fetchJobRuns(limit: 500)
+            .filter { $0.status == .running }
+        var recoveredJobs: [JobRun] = []
+
+        for job in runningJobs {
+            guard let lock = try lockManager.acquire(repositoryID: job.repositoryID) else {
+                continue
+            }
+            defer { withExtendedLifetime(lock) {} }
+
+            var recoveredJob = job
+            recoveredJob.status = .cancelled
+            recoveredJob.finishedAt = now
+            recoveredJob.message = "Job was interrupted because Delta stopped while it was running. Run it again to continue from already saved backup data."
+            try database.saveJobRun(recoveredJob)
+            recordJobLog(
+                jobID: recoveredJob.id,
+                profileID: recoveredJob.profileID,
+                repositoryID: recoveredJob.repositoryID,
+                date: now,
+                stream: .standardError,
+                message: recoveredJob.message ?? "Job was interrupted."
+            )
+            try database.appendEvent(EventLog(level: .warning, message: "\(recoveredJob.kind.displayName) was marked interrupted after Delta restarted."))
+            recoveredJobs.append(recoveredJob)
+        }
+
+        return recoveredJobs
+    }
+
+    @discardableResult
     public func runBackup(profile: BackupProfile, repository: BackupRepository) throws -> JobRun {
         guard availabilityChecker.isAvailable(repository) else {
             let message = "Destination is not available."

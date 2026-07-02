@@ -197,6 +197,10 @@ Delta uses two lock layers:
 
 Delta maps restic lock exit code `11` and lock-related stderr to a user-facing busy message.
 
+The shared SQLite database is opened with WAL journal mode and a busy timeout so the app and `DeltaAgent` can read/write job state without immediately failing during short concurrent writes.
+
+On app or agent startup, Delta also reconciles any persisted `running` job rows. A job is marked interrupted only when Delta can acquire the destination's per-process lock, which proves no app/agent process currently owns that destination. If the lock is still held, the job remains running and the UI continues to observe it through SQLite/log polling.
+
 ## Streaming Logs
 
 `ResticRunner` streams stdout and stderr while the process is running. The coordinator records start, streamed output, and finish lines as per-job SQLite log entries, while the UI also receives the same live events for Activity output. When a scheduled backup is started by `DeltaAgent`, the app polls the same SQLite job/log state so the dashboard, Activity page, and menu bar still show the active operation. Restic JSON status/error lines are formatted into readable messages before durable storage.

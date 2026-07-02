@@ -20,7 +20,7 @@ struct DeltaApp: App {
                 .environmentObject(softwareUpdateController)
                 .frame(width: 340)
         } label: {
-            Label("Delta", systemImage: model.isWorking ? "arrow.triangle.2.circlepath" : "externaldrive.badge.checkmark")
+            Label("Delta", systemImage: "externaldrive.badge.checkmark")
         }
         .menuBarExtraStyle(.window)
     }

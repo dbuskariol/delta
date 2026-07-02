@@ -18,7 +18,10 @@ public final class DeltaDatabase: @unchecked Sendable {
 
     public init(url: URL) throws {
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        self.queue = try DatabaseQueue(path: url.path)
+        var configuration = Configuration()
+        configuration.busyMode = .timeout(10)
+        configuration.journalMode = .wal
+        self.queue = try DatabaseQueue(path: url.path, configuration: configuration)
         self.encoder = JSONEncoder()
         self.decoder = JSONDecoder()
         encoder.dateEncodingStrategy = .custom { date, encoder in

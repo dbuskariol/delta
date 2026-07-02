@@ -92,20 +92,19 @@ struct DashboardView: View {
                 )
             }
 
-            Card {
-                HStack(alignment: .top, spacing: 14) {
-                    StatusIcon(symbol: "lock.shield", color: model.fullDiskAccessStatus.hasLikelyFullDiskAccess ? .green : .orange)
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Readiness")
-                            .font(.headline)
-                        Text(model.fullDiskAccessStatus.hasLikelyFullDiskAccess ? "Full Disk Access looks available for protected locations." : "Full Disk Access has not been confirmed. Full-volume backups may miss protected data.")
-                            .foregroundStyle(.secondary)
+            if !model.fullDiskAccessStatus.hasLikelyFullDiskAccess {
+                Card {
+                    HStack(alignment: .top, spacing: 14) {
+                        StatusIcon(symbol: "lock.shield", color: .orange)
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Readiness")
+                                .font(.headline)
+                            Text("Full Disk Access has not been confirmed. Full-volume backups may miss protected data.")
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        StateBadge(text: "Needs Access", color: .orange)
                     }
-                    Spacer()
-                    StateBadge(
-                        text: model.fullDiskAccessStatus.hasLikelyFullDiskAccess ? "Ready" : "Needs Access",
-                        color: model.fullDiskAccessStatus.hasLikelyFullDiskAccess ? .green : .orange
-                    )
                 }
             }
 
@@ -2515,7 +2514,7 @@ struct BackupRunSummaryLine: View {
         if let summaryText {
             Text(summaryText)
                 .font(.caption)
-                .foregroundStyle(summaryColor)
+                .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .truncationMode(.tail)
         }
@@ -2529,13 +2528,6 @@ struct BackupRunSummaryLine: View {
             return summary.conciseText
         }
         return job.message?.localizedCaseInsensitiveContains("paused") == true ? job.message : nil
-    }
-
-    private var summaryColor: Color {
-        guard let summary = ResticLogFormatter.backupSummary(from: job.message) else {
-            return .secondary
-        }
-        return summary.hasChanges ? .secondary : .orange
     }
 }
 

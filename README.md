@@ -57,12 +57,13 @@ The app is split into signed targets:
 
 Important implementation details:
 
-- **SQLite persistence** lives under Application Support through `AppDirectories.databaseURL()`.
+- **SQLite persistence** lives under Application Support through `AppDirectories.databaseURL()` with WAL mode and a busy timeout for app/agent concurrent access.
 - **Keychain secrets** use `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly` and a trusted-application access list for the signed Delta app, agent, and secret bridge. Background secret reads fail closed instead of showing system prompts.
 - **Security-scoped bookmarks** preserve access to selected source folders where macOS requires it.
 - **Per-destination locks** prevent overlapping backup, restore, prune, and check jobs across app/agent processes.
 - **Per-job output logs** persist formatted restic progress, warnings, errors, start lines, and finish lines for troubleshooting after relaunch or scheduled agent runs.
 - **Durable run controls** let the app request pause/cancel for an agent-owned restic process without relying on in-memory UI state.
+- **Abandoned-job recovery** marks stale running jobs interrupted after restart only when the per-destination lock proves no restic process still owns the destination.
 - **Bundled tools** are pinned and checksum-verified through `Scripts/bootstrap-tools.sh`.
 - **Packaged app verification** checks signatures, Sparkle embedding, LaunchAgent plist integrity, helper smoke tests, Sparkle update metadata, and bundled restic/rclone versions.
 

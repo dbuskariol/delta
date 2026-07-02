@@ -143,7 +143,8 @@ final class ResticRunnerTests: XCTestCase {
         """)
 
         XCTAssertEqual(message, "Backup summary · 2 new · 3 changed · 95 unchanged · 1 MB added")
-        XCTAssertEqual(summary?.conciseText, "2 new · 3 changed · 95 unchanged · 1 MB added")
+        XCTAssertEqual(summary?.conciseText, "2 new · 3 changed · 1 MB added")
+        XCTAssertEqual(summary?.detailedText, "2 new · 3 changed · 95 unchanged · 1 MB added")
     }
 
     func testLogFormatterCallsOutUnchangedBackups() {
@@ -151,7 +152,7 @@ final class ResticRunnerTests: XCTestCase {
         {"message_type":"summary","files_new":0,"files_changed":0,"files_unmodified":100,"data_added":0,"total_files_processed":100,"total_bytes_processed":2097152}
         """)
 
-        XCTAssertEqual(message, "No changes detected · 0 new · 0 changed · 100 unchanged · 2.1 MB checked")
+        XCTAssertEqual(message, "No changes detected · 0 new · 0 changed · 2.1 MB checked")
     }
 
     func testLogFormatterDoesNotTreatGenericSummaryAsBackupSummary() {

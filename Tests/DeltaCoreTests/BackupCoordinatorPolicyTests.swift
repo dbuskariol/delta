@@ -78,6 +78,56 @@ final class BackupCoordinatorPolicyTests: XCTestCase {
         XCTAssertNil(storedRepository.lastVerifiedAt)
     }
 
+    func testRecoverAbandonedRunningJobsMarksUnlockedJobInterrupted() throws {
+        let fixture = try Fixture()
+        let runner = MockResticRunner(results: [])
+        let coordinator = fixture.makeCoordinator(runner: runner)
+        let profile = fixture.profile()
+        let job = JobRun(
+            profileID: profile.id,
+            repositoryID: fixture.repository.id,
+            kind: .backup,
+            status: .running
+        )
+        try fixture.database.saveJobRun(job)
+
+        let recovered = try coordinator.recoverAbandonedRunningJobs()
+        let storedJob = try XCTUnwrap(fixture.database.fetchJobRuns(limit: 10).first { $0.id == job.id })
+        let logs = try fixture.database.fetchJobLogs(jobID: job.id)
+        let events = try fixture.database.fetchEvents(limit: 10)
+
+        XCTAssertEqual(recovered.map(\.id), [job.id])
+        XCTAssertEqual(storedJob.status, .cancelled)
+        XCTAssertNotNil(storedJob.finishedAt)
+        XCTAssertTrue(storedJob.message?.localizedCaseInsensitiveContains("interrupted") == true, storedJob.message ?? "")
+        XCTAssertTrue(logs.contains { $0.message.localizedCaseInsensitiveContains("interrupted") })
+        XCTAssertTrue(events.contains { $0.message.localizedCaseInsensitiveContains("interrupted") })
+    }
+
+    func testRecoverAbandonedRunningJobsLeavesLockedJobRunning() throws {
+        let fixture = try Fixture()
+        let runner = MockResticRunner(results: [])
+        let coordinator = fixture.makeCoordinator(runner: runner)
+        let profile = fixture.profile()
+        let job = JobRun(
+            profileID: profile.id,
+            repositoryID: fixture.repository.id,
+            kind: .backup,
+            status: .running
+        )
+        try fixture.database.saveJobRun(job)
+        let lock = try XCTUnwrap(fixture.lockManager.acquire(repositoryID: fixture.repository.id))
+
+        let recovered = try withExtendedLifetime(lock) {
+            try coordinator.recoverAbandonedRunningJobs()
+        }
+        let storedJob = try XCTUnwrap(fixture.database.fetchJobRuns(limit: 10).first { $0.id == job.id })
+
+        XCTAssertTrue(recovered.isEmpty)
+        XCTAssertEqual(storedJob.status, .running)
+        XCTAssertNil(storedJob.finishedAt)
+    }
+
     func testRunBackupPreparesMissingLocalDestinationBeforeFirstBackup() throws {
         let fixture = try Fixture(repositoryPrepared: false)
         let runner = MockResticRunner(results: [.success, .success])
