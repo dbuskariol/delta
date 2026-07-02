@@ -15,6 +15,7 @@ mkdir -p "$OUTPUT_DIR"
 TIMESTAMP="$(/bin/date -u +%Y%m%dT%H%M%SZ)"
 OUTPUT="$OUTPUT_DIR/Delta-release-evidence-$TIMESTAMP.md"
 INFO_PLIST="$APP_PATH/Contents/Info.plist"
+AUTOMATED_GATE_STATUS="${DELTA_AUTOMATED_GATE_STATUS:-Not recorded in this report}"
 
 plist_value() {
   local key="$1"
@@ -66,7 +67,7 @@ if [[ -d "$ROOT_DIR/dist/updates" ]]; then
   append_command "Sparkle Update Artifacts" /bin/sh -c "ls -la '$ROOT_DIR/dist/updates' && test -f '$ROOT_DIR/dist/updates/appcast.xml' && grep -E 'sparkle:(version|shortVersionString)|sparkle:edSignature' '$ROOT_DIR/dist/updates/appcast.xml'"
 fi
 
-cat >>"$OUTPUT" <<'EOF'
+cat >>"$OUTPUT" <<EOF
 ## Manual macOS Acceptance Evidence
 
 Record tester, date, macOS build, signing identity, and notes beside each item before external beta distribution.
@@ -97,7 +98,7 @@ Record tester, date, macOS build, signing identity, and notes beside each item b
 
 ## Release Decision
 
-- Automated gate passed: Not recorded here
+- Automated gate passed: $AUTOMATED_GATE_STATUS
 - Manual matrix passed: No
 - Developer ID notarization complete: No
 - Ready for external distribution: No
