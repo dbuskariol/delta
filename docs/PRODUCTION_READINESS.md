@@ -43,7 +43,7 @@ For a faster local readiness picture, run:
 Scripts/run-local-acceptance-probe.sh
 ```
 
-The probe writes `dist/local-acceptance/latest.md`. It only marks machine-verifiable evidence as automated or partial evidence. It intentionally keeps Full Disk Access, closed-window schedule behavior, real SMB/NFS/SFTP/S3 targets, menu bar interaction, notifications, Sparkle install flow, and notarization as explicit manual follow-up where a shell process would give weak or misleading evidence.
+The probe writes `dist/local-acceptance/latest.md`. It also runs `Scripts/run-installed-local-backup-acceptance.sh`, which uses the app bundle's own restic binary to initialize a temporary encrypted local destination, run first and deduplicated second backups, restore a full restore point, restore a selected folder, check, prune, and run a post-prune check. The probe only marks machine-verifiable evidence as automated or partial evidence. It intentionally keeps Full Disk Access, closed-window schedule behavior, real SMB/NFS/SFTP/S3 targets, menu bar interaction, notifications, Sparkle install flow, and notarization as explicit manual follow-up where a shell process would give weak or misleading evidence.
 
 After manual acceptance, Developer ID notarization, and local installation of the exact release candidate, run the external distribution gate:
 

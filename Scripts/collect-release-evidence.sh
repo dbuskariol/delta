@@ -109,6 +109,9 @@ if [[ -x "$ROOT_DIR/Scripts/run-local-acceptance-probe.sh" ]]; then
   if [[ -f "$ROOT_DIR/dist/local-acceptance/latest.md" ]]; then
     append_command "Local Acceptance Probe Report" /bin/cat "$ROOT_DIR/dist/local-acceptance/latest.md"
   fi
+  if [[ -f "$ROOT_DIR/dist/local-acceptance/installed-local-backup-latest.md" ]]; then
+    append_command "Installed Local Backup Acceptance Report" /bin/cat "$ROOT_DIR/dist/local-acceptance/installed-local-backup-latest.md"
+  fi
 fi
 
 MANUAL_MATRIX_PASSED="No"

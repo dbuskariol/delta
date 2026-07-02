@@ -212,11 +212,24 @@ else
     append_row "keychain_background_access" "$(item_area keychain_background_access)" "Failed" "DeltaSecretBridge was not executable at $bridge." "Rebuild and reinstall the app bundle."
   fi
 
+  installed_local_output="$(run_capture installed_local_backup "$ROOT_DIR/Scripts/run-installed-local-backup-acceptance.sh" "$APP_PATH")"
+  installed_local_status="$(command_status installed_local_backup)"
+  if [[ "$installed_local_status" -eq 0 ]]; then
+    installed_local_evidence="Installed-bundle local backup acceptance passed: init, first backup, deduplicated second backup with no new or changed file data, full restore, selected folder restore, check, prune, and post-prune check. $installed_local_output"
+  else
+    installed_local_evidence="Installed-bundle local backup acceptance failed: $installed_local_output"
+  fi
+
   automated_gate_status="$(gate_status_value status)"
   automated_gate_commit="$(gate_status_value git_commit)"
   if [[ "$automated_gate_status" == "Passed" && "$automated_gate_commit" == "$git_commit" ]]; then
-    append_row "local_drive_destination" "$(item_area local_drive_destination)" "Partial" "Automated release gate passed local restic init, first backup, no-change backup, restore, check, prune, and post-prune check for commit $git_commit." "Repeat through the installed app UI with the target local or external drive."
-    append_row "restore_wizard" "$(item_area restore_wizard)" "Partial" "Automated release gate passed full restore, selected restore, and dry-run restore command paths for commit $git_commit." "Exercise the installed Restore wizard UI, original-path confirmation, browser selection, and each overwrite policy."
+    if [[ "$installed_local_status" -eq 0 ]]; then
+      append_row "local_drive_destination" "$(item_area local_drive_destination)" "Partial" "$installed_local_evidence Automated release gate also passed local restic lifecycle coverage for commit $git_commit." "Repeat through the installed app UI with the target local or external drive."
+      append_row "restore_wizard" "$(item_area restore_wizard)" "Partial" "$installed_local_evidence Automated release gate also passed dry-run restore command paths for commit $git_commit." "Exercise the installed Restore wizard UI, original-path confirmation, browser selection, and each overwrite policy."
+    else
+      append_row "local_drive_destination" "$(item_area local_drive_destination)" "Failed" "$installed_local_evidence" "Fix installed-bundle local backup acceptance, then repeat through the installed app UI."
+      append_row "restore_wizard" "$(item_area restore_wizard)" "Failed" "$installed_local_evidence" "Fix installed-bundle restore acceptance, then exercise the installed Restore wizard UI."
+    fi
     append_row "new_backup_defaults" "$(item_area new_backup_defaults)" "Partial" "Automated release gate passed backup-default preference and schedule policy tests for commit $git_commit." "Change defaults in Settings and confirm newly-created UI profiles inherit them without mutating existing profiles."
     append_row "browse_restore_points" "$(item_area browse_restore_points)" "Partial" "Automated release gate passed restore-point parsing, cache replacement, newest-first reads, and browser path command validation for commit $git_commit." "Open Restore, confirm restore points load on tab selection, refresh returns all current points, and pruned points disappear."
     append_row "pause_resume_cancel" "$(item_area pause_resume_cancel)" "Partial" "Automated release gate passed durable run-control and stopped-job model coverage for commit $git_commit." "Pause, resume, and cancel a real large backup from the main app and menu bar."
