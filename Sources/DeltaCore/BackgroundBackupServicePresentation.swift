@@ -20,7 +20,7 @@ public struct BackgroundBackupServicePresentation: Equatable, Sendable {
         attentionTitle != nil && attentionText != nil
     }
 
-    public static let purposeText = "Delta can run due scheduled backups after you sign in, even when the main window is closed. macOS manages this through Login Items, and Delta presents it as a scheduler instead of exposing the operating-system mechanism. It runs as your user account, checks each profile's power and destination rules, starts eligible backups, then exits when there is no work."
+    public static let purposeText = "Scheduled Backups check for due profiles after you sign in, start only work allowed by each profile's power and destination rules, then exit when there is no work. They use macOS Login Items approval, run as your user account, and do not use admin privileges."
 
     public static func make(
         status: LaunchAgentRegistrationStatus,

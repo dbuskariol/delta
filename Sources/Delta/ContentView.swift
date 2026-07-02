@@ -1248,6 +1248,32 @@ struct SettingsView: View {
                 return SettingsSurfaceContract.categoryAdvanced
             }
         }
+
+        var symbol: String {
+            switch self {
+            case .essentials:
+                return "checkmark.seal"
+            case .defaults:
+                return "slider.horizontal.3"
+            case .updates:
+                return "arrow.down.circle"
+            case .support:
+                return "stethoscope"
+            }
+        }
+
+        var subtitle: String {
+            switch self {
+            case .essentials:
+                return "Permissions, scheduling, alerts"
+            case .defaults:
+                return "Backup and restore behavior"
+            case .updates:
+                return "Signed release checks"
+            case .support:
+                return "Diagnostics and local files"
+            }
+        }
     }
 
     @EnvironmentObject private var model: DeltaAppModel
@@ -1380,7 +1406,7 @@ struct SettingsView: View {
     var body: some View {
         PageScaffold(
             title: "Settings",
-            subtitle: "System access, scheduled backups, updates, and safe defaults",
+            subtitle: "Permissions, scheduling, updates, and safe defaults",
             actions: {
                 Button {
                     model.reload()
@@ -1419,15 +1445,7 @@ struct SettingsView: View {
                 items: settingsStatusItems
             )
 
-            Picker("Settings Group", selection: $settingsCategory) {
-                ForEach(SettingsCategory.allCases) { category in
-                    Text(category.title).tag(category)
-                }
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .frame(maxWidth: 520, alignment: .leading)
-            .accessibilityLabel("Settings group")
+            settingsCategorySelector
 
             if settingsCategory == .essentials {
                 SettingsSectionLabel(
@@ -1462,7 +1480,7 @@ struct SettingsView: View {
 
                 SettingsNotice(
                     symbol: "clock.arrow.circlepath",
-                    title: "How scheduled backups run",
+                    title: "What scheduled backups do",
                     text: BackgroundBackupServicePresentation.purposeText,
                     color: .blue
                 )
@@ -1477,10 +1495,10 @@ struct SettingsView: View {
                     SettingsFact(title: "Scheduled profiles", value: "\(scheduledProfileCount)"),
                     SettingsFact(title: "Automation", value: pausesScheduledBackups ? "Paused" : "Running"),
                     SettingsFact(title: "Passwords", value: backgroundSecretAccessSummary.displayName),
-                    SettingsFact(title: "Check cadence", value: "Every 5 min"),
-                    SettingsFact(title: "Sign-in check", value: "Enabled"),
+                    SettingsFact(title: "Check cadence", value: "5 minutes"),
+                    SettingsFact(title: "Sign-in check", value: "On"),
                     SettingsFact(title: "Runs as", value: "Your user"),
-                    SettingsFact(title: "Admin access", value: "No"),
+                    SettingsFact(title: "Admin access", value: "Never"),
                     SettingsFact(title: "macOS approval", value: backgroundBackupsPresentation.approvalText)
                 ])
 
@@ -2310,6 +2328,53 @@ struct SettingsView: View {
 
     private var scheduledProfileCount: Int {
         model.profiles.filter { $0.schedule.isEnabled }.count
+    }
+
+    private var settingsCategorySelector: some View {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 190), spacing: 10)], spacing: 10) {
+            ForEach(SettingsCategory.allCases) { category in
+                let isSelected = settingsCategory == category
+                Button {
+                    settingsCategory = category
+                } label: {
+                    HStack(alignment: .top, spacing: 10) {
+                        Image(systemName: category.symbol)
+                            .font(.system(size: 13, weight: .semibold))
+                            .frame(width: 24, height: 24)
+                            .foregroundStyle(isSelected ? Color.accentColor : .secondary)
+                            .background((isSelected ? Color.accentColor : Color(nsColor: .secondaryLabelColor)).opacity(0.14))
+                            .clipShape(RoundedRectangle(cornerRadius: 7))
+
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(category.title)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.primary)
+                            Text(category.subtitle)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(2)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .padding(.vertical, 10)
+                    .padding(.horizontal, 12)
+                    .frame(maxWidth: .infinity, minHeight: 64, alignment: .topLeading)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(isSelected ? Color.accentColor.opacity(0.12) : DeltaTheme.panel)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(isSelected ? Color.accentColor.opacity(0.55) : DeltaTheme.border, lineWidth: 1)
+                    )
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(category.title)
+                .accessibilityValue(isSelected ? "Selected" : category.subtitle)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var backgroundSecretAccessSummary: BackgroundSecretAccessSummary {

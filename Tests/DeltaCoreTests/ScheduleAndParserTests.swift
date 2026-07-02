@@ -167,6 +167,18 @@ final class ScheduleAndParserTests: XCTestCase {
         XCTAssertFalse(presentation.needsAttention)
     }
 
+    func testBackgroundBackupPurposeUsesProductLanguage() {
+        let text = BackgroundBackupServicePresentation.purposeText
+
+        XCTAssertTrue(text.contains("Scheduled Backups"))
+        for forbiddenTerm in ["LaunchAgent", "Launch Agent", "SMAppService", "rawValue", "Register", "Unregister"] {
+            XCTAssertFalse(
+                text.localizedCaseInsensitiveContains(forbiddenTerm),
+                "Scheduled backup explanation exposes implementation term: \(forbiddenTerm)"
+            )
+        }
+    }
+
     func testBackgroundBackupPresentationSurfacesReadyScheduledService() {
         let presentation = BackgroundBackupServicePresentation.make(
             status: .enabled,
