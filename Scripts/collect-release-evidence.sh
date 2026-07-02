@@ -175,10 +175,28 @@ Create one with Scripts/create-manual-acceptance-report.sh, fill it in, then rer
 EOF
 fi
 
+EXTERNAL_ACCEPTANCE_PASSED="No"
+EXTERNAL_ACCEPTANCE_OUTPUT="$(/usr/bin/mktemp -t delta-external-acceptance.XXXXXX)"
+set +e
+"$ROOT_DIR/Scripts/verify-external-acceptance-evidence.sh" "$APP_PATH" >"$EXTERNAL_ACCEPTANCE_OUTPUT" 2>&1
+EXTERNAL_ACCEPTANCE_STATUS=$?
+set -e
+if [[ "$EXTERNAL_ACCEPTANCE_STATUS" -eq 0 ]]; then
+  EXTERNAL_ACCEPTANCE_PASSED="Yes"
+fi
+{
+  printf "### Real External Backend Acceptance Verification\n\n"
+  printf '```text\n'
+  /bin/cat "$EXTERNAL_ACCEPTANCE_OUTPUT"
+  printf '```\n\n'
+} >>"$OUTPUT"
+/bin/rm -f "$EXTERNAL_ACCEPTANCE_OUTPUT"
+
 READY_FOR_EXTERNAL_DISTRIBUTION="No"
 if [[ "$AUTOMATED_GATE_STATUS" == "Passed" \
   && "$MANUAL_MATRIX_PASSED" == "Yes" \
   && "$MANUAL_REPORT_CURRENT" == "Yes" \
+  && "$EXTERNAL_ACCEPTANCE_PASSED" == "Yes" \
   && "$NOTARIZATION_COMPLETE" == "Yes" ]]
 then
   READY_FOR_EXTERNAL_DISTRIBUTION="Yes"
@@ -196,6 +214,7 @@ Manual matrix passed: $MANUAL_MATRIX_PASSED
 - Automated gate passed: $AUTOMATED_GATE_STATUS
 - Manual report matches git commit: $MANUAL_REPORT_CURRENT
 - Manual matrix passed: $MANUAL_MATRIX_PASSED
+- Real external backend acceptance passed: $EXTERNAL_ACCEPTANCE_PASSED
 - Developer ID notarization complete: $NOTARIZATION_COMPLETE
 - Ready for external distribution: $READY_FOR_EXTERNAL_DISTRIBUTION
 EOF

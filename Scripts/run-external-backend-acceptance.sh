@@ -198,6 +198,47 @@ if [[ ! -x "$RESTIC" ]]; then
   fail "Bundled restic was not executable at $RESTIC"
 fi
 
+is_loopback_repository() {
+  case "$1" in
+    *127.0.0.1*|*localhost*|*"::1"*)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+acceptance_environment_for() {
+  local kind="$1"
+  local repository_url="$2"
+  case "$kind" in
+    mounted)
+      printf "mounted-network"
+      ;;
+    sftp|rest|s3)
+      if is_loopback_repository "$repository_url"; then
+        printf "local-harness"
+      else
+        printf "real-external"
+      fi
+      ;;
+    *)
+      if is_loopback_repository "$repository_url"; then
+        printf "local-harness"
+      else
+        printf "real-external"
+      fi
+      ;;
+  esac
+}
+
+code_signature_value() {
+  local app="$1"
+  local key="$2"
+  /usr/bin/codesign -dvvv "$app" 2>&1 | /usr/bin/awk -F= -v key="$key" '$1 == key && value == "" { value = $2 } END { print value }'
+}
+
 /bin/mkdir -p "$OUTPUT_DIR"
 TIMESTAMP="$(/bin/date -u +%Y%m%dT%H%M%SZ)"
 OUTPUT="$OUTPUT_DIR/Delta-external-$KIND-acceptance-$TIMESTAMP.md"
@@ -223,6 +264,7 @@ declare -a COMMAND_ENV=(
   "DELTA_APP_SUPPORT_DIR=$SUPPORT_DIR"
   "DELTA_EXTERNAL_ACCEPTANCE_KIND=$KIND"
 )
+repository_url=""
 
 case "$KIND" in
   mounted)
@@ -247,6 +289,7 @@ case "$KIND" in
     repository_dir="$(/usr/bin/mktemp -d "$mounted_path/DeltaExternalAcceptance.XXXXXX")"
     CLEANUP_PATHS+=("$repository_dir")
     COMMAND_ENV+=("DELTA_ACCEPTANCE_MOUNTED_REPOSITORY_PATH=$repository_dir")
+    repository_url="$repository_dir"
     ;;
   sftp)
     repository_url="${DELTA_ACCEPTANCE_SFTP_REPOSITORY:-}"
@@ -260,6 +303,7 @@ case "$KIND" in
     fi
     ;;
   rest)
+    repository_url="${DELTA_ACCEPTANCE_REST_REPOSITORY:-}"
     require_env DELTA_ACCEPTANCE_REST_REPOSITORY
     require_acceptance_remote "$DELTA_ACCEPTANCE_REST_REPOSITORY"
     ;;
@@ -272,18 +316,21 @@ case "$KIND" in
     COMMAND_ENV+=("DELTA_EXTERNAL_ACCEPTANCE_REQUIRE_MISSING_CREDENTIAL_PROBE=1")
     ;;
   b2)
+    repository_url="${DELTA_ACCEPTANCE_B2_REPOSITORY:-}"
     require_env DELTA_ACCEPTANCE_B2_REPOSITORY
     require_acceptance_remote "$DELTA_ACCEPTANCE_B2_REPOSITORY"
     require_env B2_ACCOUNT_ID
     require_env B2_ACCOUNT_KEY
     ;;
   azure)
+    repository_url="${DELTA_ACCEPTANCE_AZURE_REPOSITORY:-}"
     require_env DELTA_ACCEPTANCE_AZURE_REPOSITORY
     require_acceptance_remote "$DELTA_ACCEPTANCE_AZURE_REPOSITORY"
     require_env AZURE_ACCOUNT_NAME
     require_any_env AZURE_ACCOUNT_KEY AZURE_ACCOUNT_SAS
     ;;
   gcs)
+    repository_url="${DELTA_ACCEPTANCE_GCS_REPOSITORY:-}"
     require_env DELTA_ACCEPTANCE_GCS_REPOSITORY
     require_acceptance_remote "$DELTA_ACCEPTANCE_GCS_REPOSITORY"
     require_any_env GOOGLE_APPLICATION_CREDENTIALS GOOGLE_ACCESS_TOKEN
@@ -292,6 +339,7 @@ case "$KIND" in
     fi
     ;;
   swift)
+    repository_url="${DELTA_ACCEPTANCE_SWIFT_REPOSITORY:-}"
     require_env DELTA_ACCEPTANCE_SWIFT_REPOSITORY
     require_acceptance_remote "$DELTA_ACCEPTANCE_SWIFT_REPOSITORY"
     if has_all_env ST_AUTH ST_USER ST_KEY \
@@ -305,16 +353,20 @@ case "$KIND" in
     fi
     ;;
   rclone)
+    repository_url="${DELTA_ACCEPTANCE_RCLONE_REPOSITORY:-}"
     require_env DELTA_ACCEPTANCE_RCLONE_REPOSITORY
     require_acceptance_remote "$DELTA_ACCEPTANCE_RCLONE_REPOSITORY"
     require_readable_file_env RCLONE_CONFIG
     ;;
   custom)
+    repository_url="${DELTA_ACCEPTANCE_CUSTOM_REPOSITORY:-}"
     require_env DELTA_ACCEPTANCE_CUSTOM_REPOSITORY
     require_acceptance_remote "$DELTA_ACCEPTANCE_CUSTOM_REPOSITORY"
     require_custom_credentials
     ;;
 esac
+
+ACCEPTANCE_ENVIRONMENT="$(acceptance_environment_for "$KIND" "$repository_url")"
 
 set +e
 /usr/bin/env "${COMMAND_ENV[@]}" "$DELTA_EXECUTABLE" --acceptance-external-lifecycle >"$STDOUT_FILE" 2>"$STDERR_FILE"
@@ -353,6 +405,13 @@ if [[ -s "$STDERR_FILE" ]]; then
 fi
 
 /bin/cp "$STDOUT_FILE" "$OUTPUT"
+{
+  printf "\n## Acceptance Provenance\n\n"
+  printf -- "- Runner: Scripts/run-external-backend-acceptance.sh\n"
+  printf -- "- Git Commit: %s\n" "$(/usr/bin/git -C "$ROOT_DIR" rev-parse --short HEAD 2>/dev/null || printf "unknown")"
+  printf -- "- Acceptance environment: %s\n" "$ACCEPTANCE_ENVIRONMENT"
+  printf -- "- App CDHash: %s\n" "$(code_signature_value "$APP_PATH" CDHash)"
+} >>"$OUTPUT"
 for expected in \
   "Installed external $KIND lifecycle acceptance passed." \
   "Delta coordinator lifecycle: Yes" \

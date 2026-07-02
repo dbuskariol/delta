@@ -367,6 +367,14 @@ Scripts/run-external-backend-acceptance.sh rest
 
 `Scripts/preflight-external-backend-acceptance.sh` validates configured external acceptance URLs, required provider credentials, readable key/config files, and mounted-network path mapping without initializing repositories or writing backup data. Use `all` for a redacted readiness matrix or a backend name such as `s3` when a single backend must be ready before running the full lifecycle.
 
+Before external production verification, the real mounted-network, SFTP, and S3-compatible lifecycle reports must pass:
+
+```sh
+Scripts/verify-external-acceptance-evidence.sh /Applications/Delta.app
+```
+
+This rejects localhost/local harness reports for SFTP and S3, requires reports for the current git commit and exact app CDHash, and checks the backup, browse, restore, check, cleanup, S3 missing-credential, and SFTP failure-probe evidence.
+
 Create and verify the manual macOS acceptance report:
 
 ```sh

@@ -279,6 +279,7 @@ This runs:
 - bundled restic command, flag, and backend option surface verification for SFTP, REST, S3, Backblaze B2, Azure Blob, Google Cloud Storage, OpenStack Swift, and rclone
 - external backend parser and credential-policy contract tests for mounted paths, SFTP, REST, S3-compatible, Backblaze B2, Azure Blob, Google Cloud Storage, OpenStack Swift, rclone, and custom restic URLs
 - installed external backend preflight reporting for configured real-provider acceptance environments before destructive lifecycle runs
+- production external acceptance evidence verification for a real mounted SMB/NFS destination, real SFTP destination, and real S3-compatible destination, rejecting localhost harness reports
 - local restic integration test with real init/backup/restore, dry-run restore without writes, check, prune, and post-prune check
 - backup source preflight coverage for moved, invalid, and unreadable source selections
 - packaged app build

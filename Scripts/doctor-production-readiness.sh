@@ -302,6 +302,14 @@ if [[ "$configured_external_backends" -gt 0 ]]; then
   /bin/rm -f /tmp/delta-external-preflight-doctor.$$
 fi
 
+if "$ROOT_DIR/Scripts/verify-external-acceptance-evidence.sh" "$APP_PATH" >/tmp/delta-external-acceptance-evidence-doctor.$$ 2>&1; then
+  pass "$(/bin/cat /tmp/delta-external-acceptance-evidence-doctor.$$)"
+else
+  evidence_output="$(/bin/cat /tmp/delta-external-acceptance-evidence-doctor.$$ 2>/dev/null || true)"
+  block "Required real external backend acceptance evidence is incomplete. ${evidence_output}"
+fi
+/bin/rm -f /tmp/delta-external-acceptance-evidence-doctor.$$
+
 printf "\n## Summary\n\n"
 printf -- "- Blockers: %d\n" "$blockers"
 printf -- "- Warnings: %d\n" "$warnings"

@@ -39,6 +39,7 @@ The automated gate must pass before any beta or production build is shipped. It 
 - installed S3-compatible backend lifecycle acceptance through a temporary local rclone S3 server with missing-credential and corrected-credential coverage
 - installed SFTP backend lifecycle acceptance through a temporary localhost SFTP server with temporary host/client keys and non-interactive known_hosts
 - installed rclone backend lifecycle acceptance through a temporary local rclone remote, proving automatic preparation, existing-destination reuse, backup, restore browsing, restore, check, cleanup, and prune via restic's `rclone:` backend
+- production external-evidence verification requiring current reports from a real mounted SMB/NFS destination, real SFTP destination, and real S3-compatible destination
 - bundled Login Item scheduler plist
 - app launch smoke test
 - DeltaAgent status, dry-run, and fail-closed argument smoke tests
@@ -93,6 +94,18 @@ The external harness requires remote URLs to include `delta-acceptance` unless `
 
 Before running a real external lifecycle, run `Scripts/preflight-external-backend-acceptance.sh all /Applications/Delta.app` or a single backend name such as `s3`. The preflight uses the installed Delta app's typed parser and credential policy, writes a redacted matrix under `dist/local-acceptance`, and fails configured-but-invalid backends before any repository initialization or backup data writes occur.
 
+Production verification requires current real-provider reports for mounted network, SFTP, and S3-compatible destinations. Localhost harness reports are deliberately rejected. After running the real lifecycles, verify the evidence before notarization sign-off:
+
+```sh
+Scripts/run-external-backend-acceptance.sh mounted /Applications/Delta.app
+Scripts/run-external-backend-acceptance.sh sftp /Applications/Delta.app
+Scripts/run-external-backend-acceptance.sh s3 /Applications/Delta.app
+
+Scripts/verify-external-acceptance-evidence.sh /Applications/Delta.app
+```
+
+The verifier checks that each report is for the current git commit, matches the exact app CDHash, was produced by `Scripts/run-external-backend-acceptance.sh`, is not localhost/local-harness evidence for SFTP or S3, includes destination preparation, backup, incremental/no-change backup, browse, full restore, selected restore, check, cleanup, and keychain cleanup evidence, and includes the S3 missing-credential probe plus the SFTP wrong-target or wrong-credential probe.
+
 The probe only marks machine-verifiable evidence as automated or partial evidence. It can record the installed app's own Full Disk Access diagnostic result, but it intentionally keeps Full Disk Access approval, macOS Login Items approval, closed-window schedule visibility, UI disconnect/reconnect behavior, menu bar visual interaction, Notification Center delivery, Sparkle install flow, and notarization as explicit manual follow-up where a shell process would give weak or misleading evidence.
 
 After manual acceptance, Developer ID notarization, and local installation of the exact release candidate, run the external distribution gate:
@@ -101,7 +114,7 @@ After manual acceptance, Developer ID notarization, and local installation of th
 Scripts/verify-production-readiness.sh
 ```
 
-This gate fails unless the automated gate passed for the current git commit, the manual acceptance report passes for the same commit, the app is signed with Developer ID, the notarization ticket is stapled and accepted by Gatekeeper, notarization logs are archived, `/Applications/Delta.app` matches the verified app, installed-app smoke verification passes, and the regenerated release evidence says the build is ready for external distribution.
+This gate fails unless the automated gate passed for the current git commit, the manual acceptance report passes for the same commit, the app is signed with Developer ID, the notarization ticket is stapled and accepted by Gatekeeper, notarization logs are archived, `/Applications/Delta.app` matches the verified app, installed-app smoke verification passes, required real external backend acceptance evidence passes, and the regenerated release evidence says the build is ready for external distribution.
 
 To inspect those prerequisites before running the hard gate, use:
 

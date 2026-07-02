@@ -116,6 +116,8 @@ fi
 DELTA_VERIFY_INSTALLED_LAUNCH="${DELTA_PRODUCTION_VERIFY_INSTALLED_LAUNCH:-1}" \
   "$ROOT_DIR/Scripts/verify-installed-app.sh" "$INSTALLED_APP"
 
+"$ROOT_DIR/Scripts/verify-external-acceptance-evidence.sh" "$APP"
+
 EVIDENCE_OUTPUT="$("$ROOT_DIR/Scripts/collect-release-evidence.sh" "$APP")"
 printf "%s\n" "$EVIDENCE_OUTPUT"
 EVIDENCE_PATH="$(printf "%s\n" "$EVIDENCE_OUTPUT" | /usr/bin/awk '/^Wrote release evidence to / { print substr($0, 27); exit }')"

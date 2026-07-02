@@ -18,6 +18,16 @@ cd "$ROOT_DIR"
 /bin/bash -n "$ROOT_DIR/Scripts/run-installed-menu-bar-surface-acceptance.sh"
 /bin/bash -n "$ROOT_DIR/Scripts/run-installed-mounted-volume-acceptance.sh"
 /bin/bash -n "$ROOT_DIR/Scripts/run-installed-rclone-local-acceptance.sh"
+/bin/bash -n "$ROOT_DIR/Scripts/preflight-external-backend-acceptance.sh"
+/bin/bash -n "$ROOT_DIR/Scripts/verify-external-acceptance-evidence.sh"
+if [[ ! -x "$ROOT_DIR/Scripts/preflight-external-backend-acceptance.sh" ]]; then
+  printf "Scripts/preflight-external-backend-acceptance.sh must be executable.\n" >&2
+  exit 1
+fi
+if [[ ! -x "$ROOT_DIR/Scripts/verify-external-acceptance-evidence.sh" ]]; then
+  printf "Scripts/verify-external-acceptance-evidence.sh must be executable.\n" >&2
+  exit 1
+fi
 if [[ ! -x "$ROOT_DIR/Scripts/run-installed-menu-bar-surface-acceptance.sh" ]]; then
   printf "Scripts/run-installed-menu-bar-surface-acceptance.sh must be executable.\n" >&2
   exit 1
