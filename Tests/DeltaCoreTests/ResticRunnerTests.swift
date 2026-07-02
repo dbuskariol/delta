@@ -227,6 +227,21 @@ final class ResticRunnerTests: XCTestCase {
         )
     }
 
+    func testGenericPermissionDeniedDoesNotMasqueradeAsUnreadableSourceWarning() {
+        let result = ResticRunResult(
+            exitCode: 1,
+            standardOutput: "",
+            standardError: "Fatal: mkdir /restore/private: permission denied"
+        )
+
+        XCTAssertEqual(result.status, .failed)
+        XCTAssertEqual(result.failureKind, .permissionDenied)
+        XCTAssertEqual(
+            result.userFacingMessage,
+            "Delta does not have permission to read or write one of the selected paths. Check the source, restore target, destination, and Full Disk Access permissions."
+        )
+    }
+
     func testPasswordCommandFailureMapsToRepairableDestinationSecretMessage() {
         let result = ResticRunResult(
             exitCode: 1,

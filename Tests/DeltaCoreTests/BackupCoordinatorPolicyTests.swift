@@ -974,6 +974,13 @@ final class BackupCoordinatorPolicyTests: XCTestCase {
                 "some files could not be read"
             ),
             (
+                "generic permission denied",
+                ResticRunResult(exitCode: 1, standardOutput: "", standardError: "mkdir /restore/private: permission denied"),
+                .failed,
+                .permissionDenied,
+                "permission to read or write"
+            ),
+            (
                 "interrupted",
                 ResticRunResult(exitCode: 130, standardOutput: "", standardError: "backup interrupted"),
                 .cancelled,

@@ -37,7 +37,7 @@ At a high level:
 4. Scheduled or manual runs invoke bundled `restic` through `ResticRunner`.
 5. Destination passwords are fetched from Keychain through `DeltaSecretBridge` using restic `--password-command`.
 6. Job state, restore points, events, settings, restore requests, and profile definitions are persisted in SQLite via GRDB.
-7. Restore always goes through a wizard: destination, restore point, scope, restore location, conflict policy, dry run, then execution.
+7. Restore always goes through a wizard: destination, restore point, scope, restore location, conflict policy, preview, then execution.
 
 ## Terminology
 

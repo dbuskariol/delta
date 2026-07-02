@@ -82,6 +82,7 @@ public enum ResticFailureKind: String, Codable, CaseIterable, Sendable {
     case missingBackendCredentials
     case networkUnavailable
     case unreadableSourceFiles
+    case permissionDenied
     case interrupted
     case unknown
 }
@@ -145,8 +146,11 @@ public enum ResticFailureClassifier {
         if containsAny(text, ["network is unreachable", "no route to host", "could not resolve", "connection refused", "connection reset", "timed out", "timeout"]) {
             return .networkUnavailable
         }
-        if containsAny(text, ["permission denied", "operation not permitted", "failed to read", "unreadable"]) {
+        if containsAny(text, ["failed to read", "unreadable"]) {
             return .unreadableSourceFiles
+        }
+        if containsAny(text, ["permission denied", "operation not permitted"]) {
+            return .permissionDenied
         }
         if containsAny(text, ["interrupt", "interrupted", "context canceled", "operation cancelled", "operation canceled", "signal: killed"]) {
             return .interrupted
@@ -177,6 +181,8 @@ public enum ResticFailureClassifier {
             return status == .warning
                 ? "Backup completed, but some files could not be read. Check Full Disk Access and source permissions."
                 : "Some selected files could not be read. Check Full Disk Access and source permissions."
+        case .permissionDenied:
+            return "Delta does not have permission to read or write one of the selected paths. Check the source, restore target, destination, and Full Disk Access permissions."
         case .interrupted:
             return "The job was interrupted. Delta can continue from existing backup data on the next run."
         case .unknown:
