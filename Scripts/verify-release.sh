@@ -14,6 +14,7 @@ cd "$ROOT_DIR"
   "$ROOT_DIR/Scripts/collect-release-evidence.sh" \
   "$ROOT_DIR/Scripts/create-manual-acceptance-report.sh" \
   "$ROOT_DIR/Scripts/verify-installed-app.sh" \
+  "$ROOT_DIR/Scripts/verify-manual-acceptance-matrix.sh" \
   "$ROOT_DIR/Scripts/verify-manual-acceptance.sh" \
   "$ROOT_DIR/Scripts/run-external-backend-acceptance.sh" \
   "$ROOT_DIR/Scripts/run-installed-keychain-access-acceptance.sh" \
@@ -40,6 +41,10 @@ if [[ ! -x "$ROOT_DIR/Scripts/verify-manual-acceptance.sh" ]]; then
   printf "Scripts/verify-manual-acceptance.sh must be executable.\n" >&2
   exit 1
 fi
+if [[ ! -x "$ROOT_DIR/Scripts/verify-manual-acceptance-matrix.sh" ]]; then
+  printf "Scripts/verify-manual-acceptance-matrix.sh must be executable.\n" >&2
+  exit 1
+fi
 if [[ ! -x "$ROOT_DIR/Scripts/run-local-acceptance-probe.sh" ]]; then
   printf "Scripts/run-local-acceptance-probe.sh must be executable.\n" >&2
   exit 1
@@ -60,6 +65,7 @@ if [[ ! -x "$ROOT_DIR/Scripts/verify-production-readiness.sh" ]]; then
   printf "Scripts/verify-production-readiness.sh must be executable.\n" >&2
   exit 1
 fi
+"$ROOT_DIR/Scripts/verify-manual-acceptance-matrix.sh"
 "$ROOT_DIR/Scripts/bootstrap-tools.sh"
 "$ROOT_DIR/Scripts/verify-tools.sh"
 "$ROOT_DIR/Scripts/verify-restic-surface.sh"
