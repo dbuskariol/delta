@@ -118,7 +118,7 @@ Selected-path restore uses restic snapshot path syntax for one selected path, an
 - Passwords and backend credentials are stored in Keychain.
 - Restic receives the repository password through a short-lived password command, not a long-lived plaintext environment variable.
 - Command redaction hides password-command values from logs/descriptions.
-- Backend credentials are injected only into the child process environment for the restic run.
+- Backend credentials are injected only into a curated child-process environment for the restic run; Delta does not forward arbitrary ambient environment secrets.
 - Empty-password restic repositories are not used.
 
 Losing the repository password means losing access to the encrypted backup data. That is a restic security property, not a recoverable app state.

@@ -192,6 +192,36 @@ final class ResticCommandTests: XCTestCase {
         XCTAssertEqual(command.environment["AWS_SECRET_ACCESS_KEY"], "secret-value")
     }
 
+    func testCommandEnvironmentDoesNotInheritAmbientSecrets() throws {
+        let repository = BackupRepository(name: "Local", backend: .local(path: "/repo"))
+        let builder = ResticCommandBuilder(
+            resticExecutableURL: URL(fileURLWithPath: "/Applications/Delta.app/Contents/MacOS/restic"),
+            secretBridgeURL: URL(fileURLWithPath: "/Applications/Delta.app/Contents/MacOS/DeltaSecretBridge"),
+            baseEnvironment: [
+                "PATH": "/usr/bin:/bin",
+                "HOME": "/Users/me",
+                "TMPDIR": "/tmp/me/",
+                "LANG": "en_US.UTF-8",
+                "LC_CTYPE": "en_US.UTF-8",
+                "SSH_AUTH_SOCK": "/tmp/ssh-agent.sock",
+                "AWS_SECRET_ACCESS_KEY": "ambient-secret",
+                "SECRET_TOKEN": "ambient-token"
+            ]
+        )
+
+        let command = try builder.snapshots(repository: repository)
+
+        XCTAssertEqual(command.environment["HOME"], "/Users/me")
+        XCTAssertEqual(command.environment["TMPDIR"], "/tmp/me/")
+        XCTAssertEqual(command.environment["LANG"], "en_US.UTF-8")
+        XCTAssertEqual(command.environment["LC_CTYPE"], "en_US.UTF-8")
+        XCTAssertEqual(command.environment["SSH_AUTH_SOCK"], "/tmp/ssh-agent.sock")
+        XCTAssertEqual(command.environment["RESTIC_PROGRESS_FPS"], "1")
+        XCTAssertEqual(command.environment["PATH"], "/Applications/Delta.app/Contents/MacOS:/usr/bin:/bin")
+        XCTAssertNil(command.environment["AWS_SECRET_ACCESS_KEY"])
+        XCTAssertNil(command.environment["SECRET_TOKEN"])
+    }
+
     func testCredentialUpdatePreservesBlankExistingValuesAndReplacesProvidedValues() throws {
         let service = "com.delta.backup.tests.\(UUID().uuidString)"
         let store = KeychainSecretStore(service: service)

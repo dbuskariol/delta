@@ -88,17 +88,20 @@ public struct ResticCommandBuilder: Sendable {
     public var secretBridgeURL: URL
     public var backendURLBuilder: ResticBackendURLBuilder
     public var credentialResolver: RepositoryCredentialResolver
+    public var baseEnvironment: [String: String]
 
     public init(
         resticExecutableURL: URL,
         secretBridgeURL: URL,
         backendURLBuilder: ResticBackendURLBuilder = ResticBackendURLBuilder(),
-        credentialResolver: RepositoryCredentialResolver = RepositoryCredentialResolver()
+        credentialResolver: RepositoryCredentialResolver = RepositoryCredentialResolver(),
+        baseEnvironment: [String: String] = ProcessInfo.processInfo.environment
     ) {
         self.resticExecutableURL = resticExecutableURL
         self.secretBridgeURL = secretBridgeURL
         self.backendURLBuilder = backendURLBuilder
         self.credentialResolver = credentialResolver
+        self.baseEnvironment = baseEnvironment
     }
 
     public func initializeRepository(repository: BackupRepository) throws -> ResticCommand {
@@ -223,11 +226,8 @@ public struct ResticCommandBuilder: Sendable {
         globalArguments += backendOptionArguments(for: repository)
         globalArguments += extraGlobalArguments
 
-        var environment = ProcessInfo.processInfo.environment
-        environment["RESTIC_PROGRESS_FPS"] = "1"
         let toolDirectory = resticExecutableURL.deletingLastPathComponent().path
-        let existingPath = environment["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin"
-        environment["PATH"] = "\(toolDirectory):\(existingPath)"
+        var environment = resticEnvironment(toolDirectory: toolDirectory)
         try credentialResolver.environment(for: repository).forEach { key, value in
             environment[key] = value
         }
@@ -267,4 +267,32 @@ public struct ResticCommandBuilder: Sendable {
             return []
         }
     }
+
+    private func resticEnvironment(toolDirectory: String) -> [String: String] {
+        let existingPath = baseEnvironment["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin"
+        var environment: [String: String] = [
+            "PATH": "\(toolDirectory):\(existingPath)",
+            "HOME": baseEnvironment["HOME"] ?? NSHomeDirectory(),
+            "TMPDIR": baseEnvironment["TMPDIR"] ?? NSTemporaryDirectory(),
+            "RESTIC_PROGRESS_FPS": "1"
+        ]
+
+        for key in Self.forwardedEnvironmentKeys {
+            if let value = baseEnvironment[key], !value.isEmpty {
+                environment[key] = value
+            }
+        }
+        for (key, value) in baseEnvironment where key.hasPrefix("LC_") && !value.isEmpty {
+            environment[key] = value
+        }
+        return environment
+    }
+
+    private static let forwardedEnvironmentKeys: Set<String> = [
+        "LANG",
+        "LOGNAME",
+        "SHELL",
+        "SSH_AUTH_SOCK",
+        "USER"
+    ]
 }

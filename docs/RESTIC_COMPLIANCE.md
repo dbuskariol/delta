@@ -47,7 +47,7 @@ URL construction is covered by `ResticCommandTests`.
 
 ## Backend Credentials
 
-Backend credentials are stored in Keychain and injected into the restic process environment only for the job run.
+Backend credentials are stored in Keychain and injected into a curated restic process environment only for the job run. Delta forwards operational values such as `PATH`, `HOME`, `TMPDIR`, locale, and `SSH_AUTH_SOCK`, but does not pass arbitrary ambient environment variables to restic.
 
 Supported credential templates include:
 
