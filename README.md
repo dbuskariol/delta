@@ -24,7 +24,7 @@ The product goal is simple: make serious backup practices approachable without h
 - **Notification Center alerts** for failed or warning jobs, with optional successful-backup summaries. The signed background helper uses the same notification policy for scheduled runs.
 - **Full or browsed selected restore** with backup browsing, file/folder selection, configurable dry-run and verification defaults, overwrite policies, original-path restore, chosen-folder restore, and optional pre-restore backup.
 - **Streaming and saved backup logs** from restic stdout/stderr with source context, stable processed-file counters, clean change summaries, fixed-height live panes, and expandable per-job audit history.
-- **Settings and diagnostics** with a compact health summary for system access, schedules, updates, notifications, and bundled backup tools, plus controls for health monitoring thresholds, new-backup defaults, restore safety defaults, menu bar visibility, start-at-login, Activity log detail, app version, helper status, tool paths, profile/destination counts, recent jobs, and local support paths.
+- **Settings and diagnostics** with a compact health summary for system access, schedules, updates, notifications, and bundled backup tools, plus controls for health monitoring thresholds, new-backup defaults, restore safety defaults, menu bar visibility, start-at-login, Activity log detail, scheduled-backup test runs, app version, helper status, tool paths, profile/destination counts, recent jobs, and local support paths.
 - **Sparkle automatic updates** with generated appcast/update archive support.
 
 ## How It Works
@@ -124,7 +124,7 @@ On each check, Background Backups evaluate:
 - per-destination lock state
 - scheduled retention maintenance
 
-When an enabled scheduled profile is saved, Delta requests Background Backups registration automatically. If macOS still requires approval, Delta shows an action-needed scheduled-backup card on the dashboard and a detailed status in Settings. macOS may require manual approval in Login Items; apps cannot approve their own background items.
+When an enabled scheduled profile is saved, Delta requests Background Backups registration automatically. If macOS still requires approval, Delta shows an action-needed scheduled-backup card on the dashboard and a detailed status in Settings. Settings also exposes a Run Due Now action so the scheduler path can be tested without waiting for the next five-minute check. macOS may require manual approval in Login Items; apps cannot approve their own background items.
 
 The visible menu bar dropdown and Start at Login setting are separate from Background Backups. Users can show or hide the menu bar item and choose whether Delta opens after sign-in without changing scheduled backup execution. Delta uses a native AppKit status item with a SwiftUI popover so long-running backup status updates do not dismiss the dropdown. The menu bar item changes symbol for ready, running, and attention states, and provides quick access to Back Up Now, Run Due Backups, Pause, Stop, Activity, update checks, and last-backup status.
 

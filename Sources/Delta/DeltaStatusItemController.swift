@@ -4,18 +4,21 @@ import DeltaCore
 import SwiftUI
 
 @MainActor
-final class DeltaStatusItemController: NSObject, ObservableObject {
+final class DeltaStatusItemController: NSObject, ObservableObject, NSPopoverDelegate {
     private var statusItem: NSStatusItem?
     private let popover = NSPopover()
     private var model: DeltaAppModel?
     private var softwareUpdateController: SoftwareUpdateController?
     private var openApp: ((DeltaAppModel.Section) -> Void)?
     private var modelSubscription: AnyCancellable?
+    private var localEventMonitor: Any?
+    private var globalEventMonitor: Any?
 
     override init() {
         super.init()
-        popover.behavior = .transient
+        popover.behavior = .applicationDefined
         popover.animates = true
+        popover.delegate = self
     }
 
     func configure(
@@ -49,7 +52,7 @@ final class DeltaStatusItemController: NSObject, ObservableObject {
     }
 
     private func removeStatusItem() {
-        popover.performClose(nil)
+        closePopover()
         if let statusItem {
             NSStatusBar.system.removeStatusItem(statusItem)
         }
@@ -60,7 +63,7 @@ final class DeltaStatusItemController: NSObject, ObservableObject {
         guard let model, let softwareUpdateController else { return }
 
         let rootView = DeltaMenuBarView { [weak self] section in
-            self?.popover.performClose(nil)
+            self?.closePopover()
             self?.openApp?(section)
         }
         .environmentObject(model)
@@ -92,11 +95,65 @@ final class DeltaStatusItemController: NSObject, ObservableObject {
 
     @objc private func togglePopover(_ sender: NSStatusBarButton) {
         if popover.isShown {
-            popover.performClose(sender)
+            closePopover()
         } else {
             popover.show(relativeTo: sender.bounds, of: sender, preferredEdge: .minY)
+            installDismissalEventMonitors()
             NSApplication.shared.activate(ignoringOtherApps: true)
         }
+    }
+
+    private func closePopover() {
+        popover.performClose(nil)
+        removeDismissalEventMonitors()
+    }
+
+    private func installDismissalEventMonitors() {
+        removeDismissalEventMonitors()
+
+        localEventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                if !self.isEventInsidePopoverOrStatusItem(event) {
+                    self.closePopover()
+                }
+            }
+            return event
+        }
+
+        globalEventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.closePopover()
+            }
+        }
+    }
+
+    private func removeDismissalEventMonitors() {
+        if let localEventMonitor {
+            NSEvent.removeMonitor(localEventMonitor)
+            self.localEventMonitor = nil
+        }
+        if let globalEventMonitor {
+            NSEvent.removeMonitor(globalEventMonitor)
+            self.globalEventMonitor = nil
+        }
+    }
+
+    func popoverDidClose(_ notification: Notification) {
+        removeDismissalEventMonitors()
+    }
+
+    private func isEventInsidePopoverOrStatusItem(_ event: NSEvent) -> Bool {
+        guard let eventWindow = event.window else {
+            return false
+        }
+        if eventWindow == popover.contentViewController?.view.window {
+            return true
+        }
+        if eventWindow == statusItem?.button?.window {
+            return true
+        }
+        return false
     }
 
     private var statusSymbolName: String {

@@ -1278,19 +1278,19 @@ struct SettingsView: View {
             )
 
             SettingsSectionLabel(
-                title: "Required Setup",
-                subtitle: "Permissions and approvals needed for reliable unattended backups."
+                title: "Backup Automation",
+                subtitle: "Permissions and approvals needed for reliable unattended scheduled backups."
             )
 
             SettingsCard(
                 symbol: "clock.badge.checkmark",
                 title: "Background Backups",
-                subtitle: "Let scheduled profiles run when Delta's main window is closed.",
+                subtitle: "Run scheduled backups while Delta's main window is closed.",
                 statusText: backgroundBackupsStatusText,
                 statusColor: backgroundBackupsStatusColor
             ) {
                 SettingsControlRow(
-                    title: "Scheduled background runs",
+                    title: "Run scheduled backups in background",
                     detail: backgroundBackupsControlDetail
                 ) {
                     Toggle("", isOn: backgroundBackupsBinding)
@@ -1301,14 +1301,16 @@ struct SettingsView: View {
                 SettingsNotice(
                     symbol: "clock.arrow.circlepath",
                     title: "How it works",
-                    text: "macOS can wake Delta for short schedule checks. It runs as your user account, uses the same saved destinations, starts due backups, then exits when there is no work.",
+                    text: "macOS starts Delta's signed background helper at sign-in and during short schedule checks. It runs as your user account, uses the same saved destinations, starts due backups when policy allows, then exits when there is no work.",
                     color: .blue
                 )
 
                 SettingsFactGrid(items: [
                     SettingsFact(title: "Scheduled profiles", value: "\(scheduledProfileCount)"),
-                    SettingsFact(title: "Runs as", value: "Current user"),
-                    SettingsFact(title: "Admin access", value: "Not required"),
+                    SettingsFact(title: "Schedule checks", value: "Every 5 min"),
+                    SettingsFact(title: "Runs at sign-in", value: "Yes"),
+                    SettingsFact(title: "Runs as", value: "Your user"),
+                    SettingsFact(title: "Admin access", value: "No"),
                     SettingsFact(title: "macOS approval", value: backgroundApprovalText)
                 ])
 
@@ -1329,6 +1331,13 @@ struct SettingsView: View {
                 }
 
                 SettingsActionBar {
+                    Button {
+                        model.runDueBackups()
+                    } label: {
+                        Label("Run Due Now", systemImage: "play.fill")
+                    }
+                    .disabled(model.profiles.isEmpty || model.isWorking || !model.isPersistentStoreAvailable)
+                    .deltaTooltip("Run every backup profile that is currently due using the same scheduler path.")
                     Button {
                         model.openLoginItemsSettings()
                     } label: {
@@ -3996,7 +4005,7 @@ struct SettingsControlRow<Control: View>: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             control
-                .frame(width: 270, alignment: .trailing)
+                .frame(width: 340, alignment: .trailing)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
