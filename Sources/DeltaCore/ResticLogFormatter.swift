@@ -1,6 +1,6 @@
 import Foundation
 
-public struct ResticProgressSnapshot: Equatable, Sendable {
+public struct ResticProgressSnapshot: Codable, Equatable, Sendable {
     public var percentDone: Double?
     public var filesDone: Int?
     public var totalFiles: Int?

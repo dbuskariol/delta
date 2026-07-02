@@ -289,6 +289,42 @@ final class BackupCoordinatorPolicyTests: XCTestCase {
         XCTAssertFalse(storedJob.message?.contains("files_done") == true)
     }
 
+    func testStreamingBackupProgressPersistsWhileJobIsRunning() throws {
+        let fixture = try Fixture()
+        let statusJSON = """
+        {"message_type":"status","percent_done":0.42,"files_done":120,"total_files":300,"bytes_done":4096,"current_files":["/Users/me/Documents/file.txt"]}
+        """
+        let runner = MockResticRunner(
+            results: [
+                ResticRunResult(exitCode: 0, standardOutput: "", standardError: ""),
+                .emptySnapshotList
+            ],
+            streamedEvents: [
+                ResticOutputEvent(stream: .standardOutput, message: statusJSON)
+            ]
+        )
+        let observedProgress = LockedValue<ResticProgressSnapshot?>(nil)
+        let coordinator = fixture.makeCoordinator(
+            runner: runner,
+            outputHandler: { jobID, event in
+                guard ResticLogFormatter.progressSnapshot(for: event.message) != nil else {
+                    return
+                }
+                let jobs = try? fixture.database.fetchJobRuns(limit: 10)
+                observedProgress.value = jobs?.first { $0.id == jobID }?.progressSnapshot
+            }
+        )
+        let profile = fixture.profile()
+
+        _ = try coordinator.runBackup(profile: profile, repository: fixture.repository)
+
+        XCTAssertEqual(observedProgress.value?.percentDone, 0.42)
+        XCTAssertEqual(observedProgress.value?.filesDone, 120)
+        XCTAssertEqual(observedProgress.value?.totalFiles, 300)
+        XCTAssertEqual(observedProgress.value?.bytesDone, 4096)
+        XCTAssertEqual(observedProgress.value?.currentPath, "/Users/me/Documents/file.txt")
+    }
+
     func testRunBackupReportsCancelledWhenPreparationIsPaused() throws {
         let fixture = try Fixture(repositoryPrepared: false)
         let runner = MockResticRunner(results: [

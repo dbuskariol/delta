@@ -178,8 +178,10 @@ final class DeltaAppModel: ObservableObject {
             repositories: repositories
         )
         activeStopRequest = runControlStore.stopReason(for: runningJob.id)
-        activeProgress = nil
-        activeDisplayedProgressFraction = nil
+        activeProgress = runningJob.progressSnapshot
+        activeDisplayedProgressFraction = runningJob.progressSnapshot.flatMap {
+            BackupProgressEstimator.displayedFraction(for: $0, previous: nil)
+        }
         liveLogLines = jobLogs
             .filter { $0.jobID == runningJob.id }
             .sorted { $0.date < $1.date }

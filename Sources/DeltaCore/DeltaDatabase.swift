@@ -78,6 +78,34 @@ public final class DeltaDatabase: @unchecked Sendable {
         try fetchAll(table: "job_runs", limit: limit)
     }
 
+    public func updateJobRunProgress(id: UUID, progressSnapshot: ResticProgressSnapshot) throws {
+        try queue.write { db in
+            guard
+                let row = try Row.fetchOne(
+                    db,
+                    sql: "SELECT payload FROM job_runs WHERE id = ?",
+                    arguments: [id.uuidString]
+                )
+            else {
+                return
+            }
+            let payload: String = row["payload"]
+            guard let data = payload.data(using: .utf8) else {
+                throw DeltaDatabaseError.invalidPayload("job_runs")
+            }
+            var job = try decoder.decode(JobRun.self, from: data)
+            guard job.status == .running else {
+                return
+            }
+            job.progressSnapshot = progressSnapshot
+            let updatedPayload = try encodedPayload(job, table: "job_runs")
+            try db.execute(
+                sql: "UPDATE job_runs SET payload = ?, updated_at = ? WHERE id = ?",
+                arguments: [updatedPayload, Self.timestampString(Date()), id.uuidString]
+            )
+        }
+    }
+
     public func appendJobLog(_ entry: JobLogEntry) throws {
         let payloadData = try encoder.encode(entry)
         guard let payload = String(data: payloadData, encoding: .utf8) else {

@@ -606,6 +606,7 @@ public final class BackupCoordinator: @unchecked Sendable {
                             repositoryID: repositoryID,
                             event: event
                         )
+                        self?.recordProgressSnapshot(jobID: jobID, event: event)
                         self?.outputHandler?(jobID, event)
                     },
                     stopReasonProvider: { [runControlStore] in
@@ -623,6 +624,7 @@ public final class BackupCoordinator: @unchecked Sendable {
                         repositoryID: repositoryID,
                         event: event
                     )
+                    self?.recordProgressSnapshot(jobID: jobID, event: event)
                     self?.outputHandler?(jobID, event)
                 }
             } else {
@@ -711,6 +713,17 @@ public final class BackupCoordinator: @unchecked Sendable {
             stream: event.stream,
             message: ResticLogFormatter.displayMessage(for: event.message)
         )
+    }
+
+    private func recordProgressSnapshot(jobID: UUID, event: ResticOutputEvent) {
+        guard let progressSnapshot = ResticLogFormatter.progressSnapshot(for: event.message) else {
+            return
+        }
+        do {
+            try database.updateJobRunProgress(id: jobID, progressSnapshot: progressSnapshot)
+        } catch {
+            try? database.appendEvent(EventLog(level: .warning, message: "Could not save backup progress: \(error.localizedDescription)"))
+        }
     }
 
     private func recordJobLog(

@@ -83,6 +83,39 @@ final class DatabaseTests: XCTestCase {
         XCTAssertEqual(snapshotsByRepository[repository.id]?.first?.id, "snapshot")
     }
 
+    func testRunningJobProgressSnapshotCanBeUpdatedWithoutRawLogs() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let database = try DeltaDatabase(url: directory.appendingPathComponent("Delta.sqlite"))
+        let repository = BackupRepository(name: "Local", backend: .local(path: "/repo"))
+        let runningJob = JobRun(repositoryID: repository.id, kind: .backup, status: .running)
+        let finishedJob = JobRun(repositoryID: repository.id, kind: .backup, status: .succeeded)
+        let progress = ResticProgressSnapshot(
+            percentDone: 0.42,
+            filesDone: 120,
+            totalFiles: 300,
+            bytesDone: 4096,
+            currentPath: "/Users/me/Documents/file.txt",
+            displayMessage: "Processed 120 files"
+        )
+
+        try database.saveRepository(repository)
+        try database.saveJobRun(runningJob)
+        try database.saveJobRun(finishedJob)
+
+        try database.updateJobRunProgress(id: runningJob.id, progressSnapshot: progress)
+        try database.updateJobRunProgress(
+            id: finishedJob.id,
+            progressSnapshot: ResticProgressSnapshot(percentDone: 1, displayMessage: "Finished")
+        )
+
+        let jobs = try database.fetchJobRuns(limit: 10)
+        XCTAssertEqual(jobs.first { $0.id == runningJob.id }?.progressSnapshot, progress)
+        XCTAssertNil(jobs.first { $0.id == finishedJob.id }?.progressSnapshot)
+    }
+
     func testPausedBackupStateRequiresExplicitPauseStopReason() {
         let repositoryID = UUID()
         let paused = JobRun(repositoryID: repositoryID, kind: .backup, status: .cancelled, stopReason: .pause)
