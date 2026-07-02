@@ -234,6 +234,14 @@ final class DeltaAppModel: ObservableObject {
     }
 
     func runNow(profile: BackupProfile) {
+        startBackup(profile: profile, isResume: false)
+    }
+
+    func resumeBackup(profile: BackupProfile) {
+        startBackup(profile: profile, isResume: true)
+    }
+
+    private func startBackup(profile: BackupProfile, isResume: Bool) {
         guard let repository = repositories.first(where: { $0.id == profile.repositoryID }) else {
             alertMessage = "Destination for this profile no longer exists."
             return
@@ -244,8 +252,8 @@ final class DeltaAppModel: ObservableObject {
                 kind: .backup,
                 profileID: profile.id,
                 repositoryID: repository.id,
-                title: "Backing up \(profile.name)",
-                detail: "Saving to \(repository.name)"
+                title: "\(isResume ? "Resuming" : "Backing up") \(profile.name)",
+                detail: "\(isResume ? "Continuing backup to" : "Saving to") \(repository.name)"
             )
         ) {
             _ = try coordinator.runBackup(profile: profile, repository: repository)

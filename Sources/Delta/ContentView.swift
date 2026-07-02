@@ -526,7 +526,7 @@ struct ProfileRow: View {
         Card {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(alignment: .top, spacing: 14) {
-                    StatusIcon(symbol: profile.sourceMode == .fullVolume ? "internaldrive" : "folder", color: isActiveBackup ? .blue : .gray)
+                    StatusIcon(symbol: profile.sourceMode == .fullVolume ? "internaldrive" : "folder", color: statusColor)
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(spacing: 8) {
                             Text(profile.name)
@@ -534,6 +534,8 @@ struct ProfileRow: View {
                                 .lineLimit(1)
                             if isActiveBackup {
                                 StateBadge(text: "Running", color: .blue)
+                            } else if isPausedBackup {
+                                StateBadge(text: "Paused", color: .orange)
                             }
                         }
                         VStack(alignment: .leading, spacing: 3) {
@@ -558,16 +560,20 @@ struct ProfileRow: View {
 
                     VStack(alignment: .trailing, spacing: 8) {
                         Button {
-                            model.runNow(profile: profile)
+                            if isPausedBackup {
+                                model.resumeBackup(profile: profile)
+                            } else {
+                                model.runNow(profile: profile)
+                            }
                         } label: {
-                            Label(isActiveBackup ? "Running" : "Back Up Now", systemImage: isActiveBackup ? "arrow.triangle.2.circlepath" : "play.fill")
+                            Label(primaryActionTitle, systemImage: primaryActionSymbol)
                         }
                         .buttonStyle(.borderedProminent)
                         .controlSize(.small)
                         .disabled(model.isWorking)
                         .fixedSize()
-                        .deltaTooltip(isActiveBackup ? "This backup is running. Progress is shown below." : "Start this backup profile immediately.")
-                        .accessibilityLabel(isActiveBackup ? "Backup running" : "Back up now")
+                        .deltaTooltip(primaryActionTooltip)
+                        .accessibilityLabel(primaryActionTitle)
 
                         HStack(spacing: 8) {
                             IconButton(symbol: "pencil", help: "Edit sources, destination, schedule, and retention") {
@@ -594,6 +600,8 @@ struct ProfileRow: View {
                         onPause: model.pauseActiveBackup,
                         onCancel: model.cancelActiveJob
                     )
+                } else if isPausedBackup {
+                    PausedBackupNotice()
                 }
             }
         }
@@ -618,6 +626,60 @@ struct ProfileRow: View {
 
     private var isActiveBackup: Bool {
         model.activeOperation?.kind == .backup && model.activeOperation?.profileID == profile.id
+    }
+
+    private var isPausedBackup: Bool {
+        guard !isActiveBackup, let latestBackupRun else {
+            return false
+        }
+        return latestBackupRun.status == .cancelled
+            && latestBackupRun.message?.localizedCaseInsensitiveContains("paused") == true
+    }
+
+    private var latestBackupRun: JobRun? {
+        model.jobs
+            .filter { $0.profileID == profile.id && $0.kind == .backup }
+            .max { $0.startedAt < $1.startedAt }
+    }
+
+    private var statusColor: Color {
+        if isActiveBackup {
+            return .blue
+        }
+        if isPausedBackup {
+            return .orange
+        }
+        return .gray
+    }
+
+    private var primaryActionTitle: String {
+        if isActiveBackup {
+            return "Running"
+        }
+        if isPausedBackup {
+            return "Resume"
+        }
+        return "Back Up Now"
+    }
+
+    private var primaryActionSymbol: String {
+        if isActiveBackup {
+            return "arrow.triangle.2.circlepath"
+        }
+        if isPausedBackup {
+            return "play.circle.fill"
+        }
+        return "play.fill"
+    }
+
+    private var primaryActionTooltip: String {
+        if isActiveBackup {
+            return "This backup is running. Progress is shown below."
+        }
+        if isPausedBackup {
+            return "Resume this backup. Delta continues from already saved backup data."
+        }
+        return "Start this backup profile immediately."
     }
 
     private var repositorySummary: String {
@@ -1766,6 +1828,24 @@ struct InlineBackupProgress: View {
             return latestMessage
         }
         return "Scanning sources and preparing backup data..."
+    }
+}
+
+struct PausedBackupNotice: View {
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "pause.circle")
+                .foregroundStyle(.orange)
+            Text("Backup paused. Resume continues from data already saved in the destination.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.tail)
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.orange.opacity(0.10))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 }
 

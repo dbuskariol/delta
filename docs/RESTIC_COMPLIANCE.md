@@ -193,7 +193,7 @@ Delta maps restic lock exit code `11` and lock-related stderr to a user-facing b
 
 `ResticRunner` streams stdout and stderr while the process is running. The coordinator records start, streamed output, and finish lines as per-job SQLite log entries, while the UI also receives the same live events for Activity output. Restic JSON status/error lines are formatted into readable messages before durable storage.
 
-Active backups expose Pause and Cancel controls. Pause sends restic a graceful interrupt, records the job as cancelled with a paused message, and relies on restic's content-addressed storage so the next backup run continues from data already written. Cancel uses the same safe interruption path for any active restic job and records a cancelled job instead of a failed job.
+Active backups expose Pause and Cancel controls. Pause sends restic a graceful interrupt, records the job as cancelled with a paused message, keeps the profile visibly paused, and shows Resume as the next primary action. Resume runs restic backup again, relying on restic's content-addressed storage so already written data is reused. Cancel uses the same safe interruption path for any active restic job and records a cancelled job instead of a failed job.
 
 Relevant files:
 
