@@ -35,11 +35,27 @@ public enum BackupExcludePolicy {
     public static func excludes(for profile: BackupProfile, repository: BackupRepository) -> [String] {
         var patterns = profile.excludePatterns
         if case let .local(path) = repository.backend {
-            let normalizedPath = path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-            let absolutePath = normalizedPath.isEmpty ? "/" : (path.hasPrefix("/") ? "/\(normalizedPath)" : normalizedPath)
+            guard let absolutePath = normalizedLocalRepositoryPath(path) else {
+                return Array(Set(patterns)).sorted()
+            }
             patterns.append(absolutePath)
             patterns.append(absolutePath == "/" ? "/**" : "\(absolutePath)/**")
         }
         return Array(Set(patterns)).sorted()
+    }
+
+    private static func normalizedLocalRepositoryPath(_ path: String) -> String? {
+        let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return nil
+        }
+
+        let expandedPath = (trimmed as NSString).expandingTildeInPath
+        guard expandedPath != "/" else {
+            return "/"
+        }
+
+        let withoutTrailingSlashes = expandedPath.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        return expandedPath.hasPrefix("/") ? "/\(withoutTrailingSlashes)" : withoutTrailingSlashes
     }
 }

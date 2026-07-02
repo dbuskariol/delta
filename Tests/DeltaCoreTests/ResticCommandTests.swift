@@ -72,6 +72,23 @@ final class ResticCommandTests: XCTestCase {
         XCTAssertTrue(command.environment["PATH"]?.hasPrefix("/usr/bin:") == true)
     }
 
+    func testBackupCommandExcludesExpandedLocalHomeDestinationPath() throws {
+        let repository = BackupRepository(name: "Local", backend: .local(path: "  ~/DeltaBackups  "))
+        let profile = BackupProfile(
+            name: "Mac",
+            sourceMode: .customFolders,
+            sources: [BackupSource(path: NSHomeDirectory())],
+            repositoryID: repository.id
+        )
+        let expected = ("~/DeltaBackups" as NSString).expandingTildeInPath
+
+        let command = try makeBuilder().backup(profile: profile, repository: repository)
+
+        XCTAssertTrue(command.arguments.contains(expected))
+        XCTAssertTrue(command.arguments.contains("\(expected)/**"))
+        XCTAssertFalse(command.arguments.contains("~/DeltaBackups"))
+    }
+
     func testRetentionCommandUsesSmartPresetArguments() throws {
         let repository = BackupRepository(name: "Local", backend: .local(path: "/repo"))
         let profile = BackupProfile(
