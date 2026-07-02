@@ -441,6 +441,34 @@ public struct JobRun: Codable, Identifiable, Equatable, Sendable {
     }
 }
 
+public struct JobLogEntry: Codable, Identifiable, Equatable, Sendable {
+    public var id: UUID
+    public var jobID: UUID
+    public var profileID: UUID?
+    public var repositoryID: UUID
+    public var date: Date
+    public var stream: ResticOutputStream
+    public var message: String
+
+    public init(
+        id: UUID = UUID(),
+        jobID: UUID,
+        profileID: UUID? = nil,
+        repositoryID: UUID,
+        date: Date = Date(),
+        stream: ResticOutputStream,
+        message: String
+    ) {
+        self.id = id
+        self.jobID = jobID
+        self.profileID = profileID
+        self.repositoryID = repositoryID
+        self.date = date
+        self.stream = stream
+        self.message = message
+    }
+}
+
 public struct ResticSnapshot: Codable, Identifiable, Equatable, Sendable {
     public var id: String
     public var time: Date

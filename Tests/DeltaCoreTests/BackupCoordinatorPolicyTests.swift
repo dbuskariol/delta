@@ -260,6 +260,48 @@ final class BackupCoordinatorPolicyTests: XCTestCase {
         XCTAssertEqual(secondRunner.commands.count, 1)
     }
 
+    func testRunPersistsStreamingJobLogsAndForwardsLiveEvents() throws {
+        let fixture = try Fixture()
+        let event = ResticOutputEvent(
+            date: Date(timeIntervalSince1970: 1_800),
+            stream: .standardOutput,
+            message: #"{"message_type":"status","percent_done":0.42,"files_done":21,"total_files":50,"bytes_done":1048576}"#
+        )
+        let runner = MockResticRunner(results: [.success], streamedEvents: [event])
+        let recorder = JobOutputRecorder()
+        let coordinator = fixture.makeCoordinator(runner: runner) { jobID, event in
+            recorder.append(jobID: jobID, event: event)
+        }
+        let profile = fixture.profile()
+
+        let job = try coordinator.runBackup(profile: profile, repository: fixture.repository)
+        let logs = try fixture.database.fetchJobLogs(jobID: job.id)
+        let messages = logs.map(\.message)
+
+        XCTAssertEqual(job.status, .succeeded)
+        XCTAssertTrue(messages.contains { $0.hasPrefix("Starting Backup:") && $0.contains("<redacted>") })
+        XCTAssertTrue(messages.contains("Progress 42% · 21/50 files · 1 MB"))
+        XCTAssertTrue(messages.contains("Finished Backup with status succeeded."))
+        XCTAssertEqual(recorder.events.first?.jobID, job.id)
+        XCTAssertEqual(recorder.events.first?.event, event)
+    }
+
+    func testRunnerThrowMarksJobFailedAndPersistsFailureLog() throws {
+        let fixture = try Fixture()
+        let runner = ThrowingResticRunner(error: TestRunError.processLaunchFailed)
+        let coordinator = fixture.makeCoordinator(runner: runner)
+        let profile = fixture.profile()
+
+        XCTAssertThrowsError(try coordinator.runBackup(profile: profile, repository: fixture.repository))
+
+        let job = try XCTUnwrap(fixture.database.fetchJobRuns(limit: 10).first)
+        let logs = try fixture.database.fetchJobLogs(jobID: job.id)
+        XCTAssertEqual(job.status, .failed)
+        XCTAssertNotNil(job.finishedAt)
+        XCTAssertTrue(job.message?.contains("process could not be launched") == true)
+        XCTAssertTrue(logs.contains { $0.stream == .standardError && $0.message.contains("Failed Backup") })
+    }
+
     func testMockedResticFailuresProduceUserFacingJobMessages() throws {
         let cases: [(String, ResticRunResult, JobStatus, ResticFailureKind, String)] = [
             (
@@ -342,23 +384,71 @@ final class BackupCoordinatorPolicyTests: XCTestCase {
     }
 }
 
-private final class MockResticRunner: ResticRunning, @unchecked Sendable {
+private final class MockResticRunner: ResticStreamingRunning, @unchecked Sendable {
     private let lock = NSLock()
     private var results: [ResticRunResult]
+    private let streamedEvents: [ResticOutputEvent]
     private(set) var commands: [ResticCommand] = []
 
-    init(results: [ResticRunResult]) {
+    init(results: [ResticRunResult], streamedEvents: [ResticOutputEvent] = []) {
         self.results = results
+        self.streamedEvents = streamedEvents
     }
 
     func run(_ command: ResticCommand) throws -> ResticRunResult {
+        try run(command, outputHandler: nil)
+    }
+
+    func run(_ command: ResticCommand, outputHandler: (@Sendable (ResticOutputEvent) -> Void)?) throws -> ResticRunResult {
+        lock.lock()
+        commands.append(command)
+        let result = results.isEmpty ? .success : results.removeFirst()
+        let events = streamedEvents
+        lock.unlock()
+        for event in events {
+            outputHandler?(event)
+        }
+        return result
+    }
+}
+
+private final class JobOutputRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var recordedEvents: [(jobID: UUID, event: ResticOutputEvent)] = []
+
+    var events: [(jobID: UUID, event: ResticOutputEvent)] {
         lock.lock()
         defer { lock.unlock() }
-        commands.append(command)
-        if results.isEmpty {
-            return .success
+        return recordedEvents
+    }
+
+    func append(jobID: UUID, event: ResticOutputEvent) {
+        lock.lock()
+        recordedEvents.append((jobID, event))
+        lock.unlock()
+    }
+}
+
+private final class ThrowingResticRunner: ResticRunning, @unchecked Sendable {
+    private let error: Error
+
+    init(error: Error) {
+        self.error = error
+    }
+
+    func run(_ command: ResticCommand) throws -> ResticRunResult {
+        throw error
+    }
+}
+
+private enum TestRunError: LocalizedError {
+    case processLaunchFailed
+
+    var errorDescription: String? {
+        switch self {
+        case .processLaunchFailed:
+            "process could not be launched"
         }
-        return results.removeFirst()
     }
 }
 
@@ -413,9 +503,10 @@ private struct Fixture {
     }
 
     func makeCoordinator(
-        runner: MockResticRunner,
+        runner: any ResticRunning,
         scheduleEvaluator: ScheduleEvaluator = ScheduleEvaluator(),
-        powerState: PowerState = PowerState(isOnBatteryPower: false, isLowPowerModeEnabled: false)
+        powerState: PowerState = PowerState(isOnBatteryPower: false, isLowPowerModeEnabled: false),
+        outputHandler: (@Sendable (UUID, ResticOutputEvent) -> Void)? = nil
     ) -> BackupCoordinator {
         BackupCoordinator(
             database: database,
@@ -426,7 +517,8 @@ private struct Fixture {
             runner: runner,
             scheduleEvaluator: scheduleEvaluator,
             powerStateProvider: PowerStateProvider(currentPowerState: { powerState }),
-            lockManager: lockManager
+            lockManager: lockManager,
+            outputHandler: outputHandler
         )
     }
 }

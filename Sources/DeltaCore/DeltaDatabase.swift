@@ -75,6 +75,57 @@ public final class DeltaDatabase: @unchecked Sendable {
         try fetchAll(table: "job_runs", limit: limit)
     }
 
+    public func appendJobLog(_ entry: JobLogEntry) throws {
+        let payloadData = try encoder.encode(entry)
+        guard let payload = String(data: payloadData, encoding: .utf8) else {
+            throw DeltaDatabaseError.invalidPayload("job_logs")
+        }
+        let timestamp = Self.timestampString(entry.date)
+
+        try queue.write { db in
+            try db.execute(
+                sql: """
+                INSERT INTO job_logs (id, job_id, repository_id, payload, created_at)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                arguments: [entry.id.uuidString, entry.jobID.uuidString, entry.repositoryID.uuidString, payload, timestamp]
+            )
+        }
+    }
+
+    public func fetchJobLogs(jobID: UUID? = nil, repositoryID: UUID? = nil, limit: Int = 500) throws -> [JobLogEntry] {
+        try queue.read { db in
+            let rows: [Row]
+            if let jobID {
+                rows = try Row.fetchAll(
+                    db,
+                    sql: "SELECT payload FROM job_logs WHERE job_id = ? ORDER BY created_at DESC LIMIT ?",
+                    arguments: [jobID.uuidString, limit]
+                )
+            } else if let repositoryID {
+                rows = try Row.fetchAll(
+                    db,
+                    sql: "SELECT payload FROM job_logs WHERE repository_id = ? ORDER BY created_at DESC LIMIT ?",
+                    arguments: [repositoryID.uuidString, limit]
+                )
+            } else {
+                rows = try Row.fetchAll(
+                    db,
+                    sql: "SELECT payload FROM job_logs ORDER BY created_at DESC LIMIT ?",
+                    arguments: [limit]
+                )
+            }
+
+            return try rows.reversed().map { row in
+                let payload: String = row["payload"]
+                guard let data = payload.data(using: .utf8) else {
+                    throw DeltaDatabaseError.invalidPayload("job_logs")
+                }
+                return try decoder.decode(JobLogEntry.self, from: data)
+            }
+        }
+    }
+
     public func saveSnapshot(_ snapshot: ResticSnapshot, repositoryID: UUID) throws {
         try save(snapshot, id: snapshot.id, table: "snapshots", repositoryID: repositoryID.uuidString)
     }
@@ -133,6 +184,7 @@ public final class DeltaDatabase: @unchecked Sendable {
             for table in Self.payloadTables {
                 try db.execute(sql: "DELETE FROM \(table)")
             }
+            try db.execute(sql: "DELETE FROM job_logs")
         }
     }
 
@@ -157,6 +209,18 @@ public final class DeltaDatabase: @unchecked Sendable {
                 try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_\(table)_repository_id ON \(table)(repository_id)")
                 try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_\(table)_updated_at ON \(table)(updated_at)")
             }
+            try db.execute(sql: """
+            CREATE TABLE IF NOT EXISTS job_logs (
+                id TEXT PRIMARY KEY NOT NULL,
+                job_id TEXT NOT NULL,
+                repository_id TEXT NOT NULL,
+                payload TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+            """)
+            try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_job_logs_job_id ON job_logs(job_id)")
+            try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_job_logs_repository_id ON job_logs(repository_id)")
+            try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_job_logs_created_at ON job_logs(created_at)")
         }
     }
 

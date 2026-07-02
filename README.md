@@ -14,7 +14,7 @@ The product goal is simple: make serious backup practices approachable without h
 - **Power-aware scheduling** with battery and Low Power Mode controls.
 - **Retention maintenance** with scheduled forget/prune/check windows.
 - **Full or selected restore** with dry-run preview, overwrite policies, verification, original-path restore, chosen-folder restore, and optional pre-restore backup.
-- **Streaming backup logs** from restic stdout/stderr with readable progress formatting.
+- **Streaming and saved backup logs** from restic stdout/stderr with readable progress formatting and per-job audit history.
 - **Sparkle automatic updates** with generated appcast/update archive support.
 
 ## How It Works
@@ -49,7 +49,7 @@ The app is split into signed targets:
 - `Delta`: SwiftUI macOS app, menu bar item, settings, backup/restore UI, Sparkle update controller.
 - `DeltaAgent`: LaunchAgent helper for scheduled runs.
 - `DeltaSecretBridge`: CLI password bridge used by restic `--password-command`.
-- `DeltaCore`: shared models, database, command builder, scheduling, restic runner, parser, Keychain, bookmarks, locks, and policy code.
+- `DeltaCore`: shared models, database, command builder, scheduling, restic runner, parser, Keychain, bookmarks, locks, job logs, and policy code.
 
 Important implementation details:
 
@@ -57,6 +57,7 @@ Important implementation details:
 - **Keychain secrets** use `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`.
 - **Security-scoped bookmarks** preserve access to selected source folders where macOS requires it.
 - **Per-destination locks** prevent overlapping backup, restore, prune, and check jobs across app/agent processes.
+- **Per-job output logs** persist formatted restic progress, warnings, errors, start lines, and finish lines for troubleshooting after relaunch or scheduled agent runs.
 - **Bundled tools** are pinned and checksum-verified through `Scripts/bootstrap-tools.sh`.
 - **Packaged app verification** checks signatures, Sparkle embedding, helper smoke tests, and bundled restic/rclone versions.
 

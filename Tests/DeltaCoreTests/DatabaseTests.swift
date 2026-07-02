@@ -60,6 +60,46 @@ final class DatabaseTests: XCTestCase {
         XCTAssertEqual(snapshotsByRepository[repository.id]?.first?.id, "snapshot")
     }
 
+    func testJobLogsRoundTripByJobAndRepository() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let database = try DeltaDatabase(url: directory.appendingPathComponent("Delta.sqlite"))
+        let repository = BackupRepository(name: "Local", backend: .local(path: "/repo"))
+        let profile = BackupProfile(
+            name: "Documents",
+            sourceMode: .customFolders,
+            sources: [BackupSource(path: "/Users/me/Documents")],
+            repositoryID: repository.id
+        )
+        let job = JobRun(profileID: profile.id, repositoryID: repository.id, kind: .backup, status: .running)
+        let entry = JobLogEntry(
+            jobID: job.id,
+            profileID: profile.id,
+            repositoryID: repository.id,
+            stream: .standardOutput,
+            message: "Progress 42%"
+        )
+        try database.saveRepository(repository)
+        try database.saveProfile(profile)
+        try database.saveJobRun(job)
+
+        try database.appendJobLog(entry)
+
+        let jobLogs = try database.fetchJobLogs(jobID: job.id)
+        let repositoryLogs = try database.fetchJobLogs(repositoryID: repository.id)
+        XCTAssertEqual(jobLogs.count, 1)
+        XCTAssertEqual(repositoryLogs.count, 1)
+        XCTAssertEqual(jobLogs.first?.id, entry.id)
+        XCTAssertEqual(jobLogs.first?.jobID, job.id)
+        XCTAssertEqual(jobLogs.first?.profileID, profile.id)
+        XCTAssertEqual(jobLogs.first?.repositoryID, repository.id)
+        XCTAssertEqual(jobLogs.first?.stream, .standardOutput)
+        XCTAssertEqual(jobLogs.first?.message, "Progress 42%")
+        XCTAssertEqual(repositoryLogs.first?.id, entry.id)
+    }
+
     func testSavingExistingProfileUpdatesEditableFields() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)

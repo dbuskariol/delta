@@ -181,12 +181,14 @@ Delta maps restic lock exit code `11` and lock-related stderr to a user-facing b
 
 ## Streaming Logs
 
-`ResticRunner` streams stdout and stderr while the process is running. The UI formats restic JSON status/error lines into readable Activity output and keeps a capped in-memory live log.
+`ResticRunner` streams stdout and stderr while the process is running. The coordinator records start, streamed output, and finish lines as per-job SQLite log entries, while the UI also receives the same live events for Activity output. Restic JSON status/error lines are formatted into readable messages before durable storage.
 
 Relevant files:
 
 - `Sources/DeltaCore/ResticRunner.swift`
 - `Sources/DeltaCore/ResticLogFormatter.swift`
+- `Sources/DeltaCore/BackupCoordinator.swift`
+- `Sources/DeltaCore/DeltaDatabase.swift`
 - `Sources/Delta/DeltaAppModel.swift`
 
 ## Verification

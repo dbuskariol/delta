@@ -31,6 +31,7 @@ final class DeltaAppModel: ObservableObject {
     @Published var repositories: [BackupRepository] = []
     @Published var profiles: [BackupProfile] = []
     @Published var jobs: [JobRun] = []
+    @Published var jobLogs: [JobLogEntry] = []
     @Published var snapshots: [ResticSnapshot] = []
     @Published var snapshotsByRepository: [UUID: [ResticSnapshot]] = [:]
     @Published var events: [EventLog] = []
@@ -56,6 +57,7 @@ final class DeltaAppModel: ObservableObject {
             repositories = try database.fetchRepositories()
             profiles = try database.fetchProfiles()
             jobs = try database.fetchJobRuns(limit: 100)
+            jobLogs = try database.fetchJobLogs(limit: 300)
             snapshots = try database.fetchSnapshots()
             snapshotsByRepository = try database.fetchSnapshotsByRepository()
             events = try database.fetchEvents(limit: 200)
@@ -325,7 +327,8 @@ final class DeltaAppModel: ObservableObject {
                 resticExecutableURL: ResticExecutableLocator().locate(),
                 secretBridgeURL: Self.secretBridgeURL()
             ),
-            runner: ResticRunner { [weak self] event in
+            runner: ResticRunner(),
+            outputHandler: { [weak self] _, event in
                 Task { @MainActor [weak self] in
                     self?.appendLiveLog(event)
                 }

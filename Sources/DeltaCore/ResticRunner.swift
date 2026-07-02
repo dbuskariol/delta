@@ -151,6 +151,10 @@ public protocol ResticRunning: Sendable {
     func run(_ command: ResticCommand) throws -> ResticRunResult
 }
 
+public protocol ResticStreamingRunning: ResticRunning {
+    func run(_ command: ResticCommand, outputHandler: (@Sendable (ResticOutputEvent) -> Void)?) throws -> ResticRunResult
+}
+
 public final class ResticRunner: ResticRunning, @unchecked Sendable {
     private let outputHandler: (@Sendable (ResticOutputEvent) -> Void)?
 
@@ -159,6 +163,10 @@ public final class ResticRunner: ResticRunning, @unchecked Sendable {
     }
 
     public func run(_ command: ResticCommand) throws -> ResticRunResult {
+        try run(command, outputHandler: nil)
+    }
+
+    public func run(_ command: ResticCommand, outputHandler additionalOutputHandler: (@Sendable (ResticOutputEvent) -> Void)?) throws -> ResticRunResult {
         let process = Process()
         process.executableURL = command.executableURL
         process.arguments = normalizedArguments(for: command)
@@ -169,10 +177,14 @@ public final class ResticRunner: ResticRunning, @unchecked Sendable {
         process.standardOutput = stdoutPipe
         process.standardError = stderrPipe
 
+        let combinedOutputHandler: (@Sendable (ResticOutputEvent) -> Void)? = { [outputHandler] event in
+            outputHandler?(event)
+            additionalOutputHandler?(event)
+        }
         let stdoutCollector = DataCollector()
         let stderrCollector = DataCollector()
-        let stdoutLines = LineEmitter(stream: .standardOutput, outputHandler: outputHandler)
-        let stderrLines = LineEmitter(stream: .standardError, outputHandler: outputHandler)
+        let stdoutLines = LineEmitter(stream: .standardOutput, outputHandler: combinedOutputHandler)
+        let stderrLines = LineEmitter(stream: .standardError, outputHandler: combinedOutputHandler)
 
         stdoutPipe.fileHandleForReading.readabilityHandler = { handle in
             let data = handle.availableData
@@ -211,6 +223,8 @@ public final class ResticRunner: ResticRunning, @unchecked Sendable {
         return command.arguments
     }
 }
+
+extension ResticRunner: ResticStreamingRunning {}
 
 private final class LineEmitter: @unchecked Sendable {
     private let lock = NSLock()

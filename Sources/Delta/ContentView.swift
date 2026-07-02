@@ -406,6 +406,23 @@ struct ActivityView: View {
                 }
             }
 
+            SurfaceSection(title: "Saved Job Logs", symbol: "doc.text.magnifyingglass") {
+                if model.jobLogs.isEmpty {
+                    CompactEmptyRow(text: "No saved job output yet.")
+                } else {
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(model.jobLogs.suffix(160)) { entry in
+                            PersistentLogRow(
+                                entry: entry,
+                                job: model.jobs.first(where: { $0.id == entry.jobID })
+                            )
+                        }
+                    }
+                    .font(.system(.caption, design: .monospaced))
+                    .textSelection(.enabled)
+                }
+            }
+
             SurfaceSection(title: "Recent Jobs", symbol: "waveform.path.ecg") {
                 if model.jobs.isEmpty {
                     CompactEmptyRow(text: "No jobs have run yet.")
@@ -1806,6 +1823,38 @@ struct LiveLogRow: View {
                 .lineLimit(4)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+struct PersistentLogRow: View {
+    var entry: JobLogEntry
+    var job: JobRun?
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(entry.date.formatted(date: .omitted, time: .standard))
+                .foregroundStyle(.tertiary)
+                .frame(width: 72, alignment: .leading)
+            Text(jobLabel)
+                .foregroundStyle(.secondary)
+                .frame(width: 118, alignment: .leading)
+                .lineLimit(1)
+                .truncationMode(.tail)
+            Text(entry.stream == .standardError ? "ERR" : "OUT")
+                .foregroundStyle(entry.stream == .standardError ? .orange : .secondary)
+                .frame(width: 30, alignment: .leading)
+            Text(entry.message)
+                .foregroundStyle(entry.stream == .standardError ? .primary : .secondary)
+                .lineLimit(4)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var jobLabel: String {
+        guard let job else {
+            return String(entry.jobID.uuidString.prefix(8))
+        }
+        return "\(job.kind.displayName) \(entry.jobID.uuidString.prefix(6))"
     }
 }
 

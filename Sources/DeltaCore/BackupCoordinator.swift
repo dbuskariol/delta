@@ -10,6 +10,7 @@ public final class BackupCoordinator: @unchecked Sendable {
     private let bookmarkStore: SecurityScopedBookmarkStore
     private let powerStateProvider: PowerStateProvider
     private let lockManager: any RepositoryLocking
+    private let outputHandler: (@Sendable (UUID, ResticOutputEvent) -> Void)?
 
     public init(
         database: DeltaDatabase,
@@ -20,7 +21,8 @@ public final class BackupCoordinator: @unchecked Sendable {
         scheduleEvaluator: ScheduleEvaluator = ScheduleEvaluator(),
         bookmarkStore: SecurityScopedBookmarkStore = SecurityScopedBookmarkStore(),
         powerStateProvider: PowerStateProvider = PowerStateProvider(),
-        lockManager: any RepositoryLocking = RepositoryJobLockManager()
+        lockManager: any RepositoryLocking = RepositoryJobLockManager(),
+        outputHandler: (@Sendable (UUID, ResticOutputEvent) -> Void)? = nil
     ) {
         self.database = database
         self.commandBuilder = commandBuilder
@@ -31,6 +33,7 @@ public final class BackupCoordinator: @unchecked Sendable {
         self.bookmarkStore = bookmarkStore
         self.powerStateProvider = powerStateProvider
         self.lockManager = lockManager
+        self.outputHandler = outputHandler
     }
 
     @discardableResult
@@ -251,18 +254,138 @@ public final class BackupCoordinator: @unchecked Sendable {
         var job = JobRun(profileID: profileID, repositoryID: repositoryID, kind: kind, status: .running)
         try database.saveJobRun(job)
 
-        let command = try makeCommand()
-        let result = try runner.run(command)
+        let command: ResticCommand
+        do {
+            command = try makeCommand()
+        } catch {
+            try markJobFailed(
+                &job,
+                profileID: profileID,
+                repositoryID: repositoryID,
+                kind: kind,
+                message: "Could not start \(kind.displayName): \(error.localizedDescription)"
+            )
+            throw error
+        }
+        recordJobLog(
+            jobID: job.id,
+            profileID: profileID,
+            repositoryID: repositoryID,
+            stream: .standardOutput,
+            message: "Starting \(kind.displayName): \(command.redactedDescription)"
+        )
+
+        let result: ResticRunResult
+        do {
+            if let streamingRunner = runner as? any ResticStreamingRunning {
+                let jobID = job.id
+                let profileID = profileID
+                let repositoryID = repositoryID
+                result = try streamingRunner.run(command) { [weak self] event in
+                    self?.recordJobLog(
+                        jobID: jobID,
+                        profileID: profileID,
+                        repositoryID: repositoryID,
+                        event: event
+                    )
+                    self?.outputHandler?(jobID, event)
+                }
+            } else {
+                result = try runner.run(command)
+            }
+        } catch {
+            try markJobFailed(
+                &job,
+                profileID: profileID,
+                repositoryID: repositoryID,
+                kind: kind,
+                message: "Failed \(kind.displayName): \(error.localizedDescription)"
+            )
+            throw error
+        }
+
         job.status = result.status
         job.finishedAt = Date()
         job.exitCode = result.exitCode
         job.message = result.userFacingMessage
         try database.saveJobRun(job)
+        recordJobLog(
+            jobID: job.id,
+            profileID: profileID,
+            repositoryID: repositoryID,
+            stream: result.status == .failed ? .standardError : .standardOutput,
+            message: "Finished \(kind.displayName) with status \(result.status.rawValue)."
+        )
         if job.status == .succeeded || job.status == .warning {
             try markRepositoryVerified(repositoryID: repositoryID, at: job.finishedAt ?? Date())
         }
         try database.appendEvent(EventLog(level: result.status == .failed ? .error : .info, message: "\(kind.displayName) finished with status \(result.status.rawValue)."))
         return job
+    }
+
+    private func markJobFailed(
+        _ job: inout JobRun,
+        profileID: UUID?,
+        repositoryID: UUID,
+        kind: JobKind,
+        message: String
+    ) throws {
+        job.status = .failed
+        job.finishedAt = Date()
+        job.message = message
+        try database.saveJobRun(job)
+        recordJobLog(
+            jobID: job.id,
+            profileID: profileID,
+            repositoryID: repositoryID,
+            stream: .standardError,
+            message: message
+        )
+        try database.appendEvent(EventLog(level: .error, message: message))
+    }
+
+    private func recordJobLog(
+        jobID: UUID,
+        profileID: UUID?,
+        repositoryID: UUID,
+        event: ResticOutputEvent
+    ) {
+        recordJobLog(
+            jobID: jobID,
+            profileID: profileID,
+            repositoryID: repositoryID,
+            date: event.date,
+            stream: event.stream,
+            message: ResticLogFormatter.displayMessage(for: event.message)
+        )
+    }
+
+    private func recordJobLog(
+        jobID: UUID,
+        profileID: UUID?,
+        repositoryID: UUID,
+        date: Date = Date(),
+        stream: ResticOutputStream,
+        message: String
+    ) {
+        let cleanedMessage = String(message.trimmingCharacters(in: .whitespacesAndNewlines).prefix(4_000))
+        guard !cleanedMessage.isEmpty else {
+            return
+        }
+        do {
+            try database.appendJobLog(
+                JobLogEntry(
+                    jobID: jobID,
+                    profileID: profileID,
+                    repositoryID: repositoryID,
+                    date: date,
+                    stream: stream,
+                    message: cleanedMessage
+                )
+            )
+        } catch {
+            try? database.appendEvent(EventLog(level: .warning, message: "Could not save job log output: \(error.localizedDescription)"))
+        }
     }
 
     private func markRepositoryVerified(repositoryID: UUID, at date: Date) throws {
