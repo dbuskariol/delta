@@ -247,6 +247,54 @@ final class BackupCoordinatorPolicyTests: XCTestCase {
         }
     }
 
+    func testRunBackupRecordsFailureWhenDestinationIsUnavailable() throws {
+        let fixture = try Fixture()
+        let runner = MockResticRunner(results: [.success])
+        let coordinator = fixture.makeCoordinator(runner: runner)
+        let unavailableRepository = BackupRepository(
+            name: "Missing",
+            backend: .local(path: fixture.root.appendingPathComponent("missing", isDirectory: true).appendingPathComponent("repo").path)
+        )
+        let profile = BackupProfile(
+            name: "Mac",
+            sourceMode: .customFolders,
+            sources: [BackupSource(path: fixture.source.path)],
+            repositoryID: unavailableRepository.id
+        )
+
+        let job = try coordinator.runBackup(profile: profile, repository: unavailableRepository)
+        let logs = try fixture.database.fetchJobLogs(jobID: job.id)
+
+        XCTAssertEqual(job.status, .failed)
+        XCTAssertEqual(job.message, "Destination is not available.")
+        XCTAssertTrue(runner.commands.isEmpty)
+        XCTAssertTrue(try fixture.database.fetchEvents().contains { $0.message == "Destination is not available." })
+        XCTAssertTrue(logs.contains { $0.stream == .standardError && $0.message == "Destination is not available." })
+    }
+
+    func testRunBackupRecordsFailureWhenSourceBookmarkCannotResolve() throws {
+        let fixture = try Fixture()
+        let runner = MockResticRunner(results: [.success])
+        let coordinator = fixture.makeCoordinator(runner: runner)
+        var profile = fixture.profile()
+        profile.sources = [
+            BackupSource(
+                path: "/private/protected",
+                bookmarkData: Data([0x00, 0x01, 0x02]),
+                includeSubvolumes: true
+            )
+        ]
+
+        let job = try coordinator.runBackup(profile: profile, repository: fixture.repository)
+        let logs = try fixture.database.fetchJobLogs(jobID: job.id)
+
+        XCTAssertEqual(job.status, .failed)
+        XCTAssertTrue(job.message?.contains("Could not access selected backup sources") == true)
+        XCTAssertTrue(runner.commands.isEmpty)
+        XCTAssertTrue(try fixture.database.fetchEvents().contains { $0.message.contains("Could not access selected backup sources") })
+        XCTAssertTrue(logs.contains { $0.stream == .standardError && $0.message.contains("Could not access selected backup sources") })
+    }
+
     func testDestinationLockIsReleasedAfterJobCompletes() throws {
         let fixture = try Fixture()
         let firstRunner = MockResticRunner(results: [.success])

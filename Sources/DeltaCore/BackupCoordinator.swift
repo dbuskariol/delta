@@ -46,19 +46,51 @@ public final class BackupCoordinator: @unchecked Sendable {
     @discardableResult
     public func runBackup(profile: BackupProfile, repository: BackupRepository) throws -> JobRun {
         guard availabilityChecker.isAvailable(repository) else {
+            let message = "Destination is not available."
             let run = JobRun(
                 profileID: profile.id,
                 repositoryID: repository.id,
                 kind: .backup,
                 status: .failed,
                 finishedAt: Date(),
-                message: "Destination is not available."
+                message: message
             )
             try database.saveJobRun(run)
+            try database.appendEvent(EventLog(level: .error, message: message))
+            recordJobLog(
+                jobID: run.id,
+                profileID: profile.id,
+                repositoryID: repository.id,
+                stream: .standardError,
+                message: message
+            )
             return run
         }
 
-        let resolvedSources = try profile.sources.map { try bookmarkStore.resolve($0) }
+        let resolvedSources: [ResolvedSecurityScopedURL]
+        do {
+            resolvedSources = try profile.sources.map { try bookmarkStore.resolve($0) }
+        } catch {
+            let message = "Could not access selected backup sources: \(error.localizedDescription)"
+            let run = JobRun(
+                profileID: profile.id,
+                repositoryID: repository.id,
+                kind: .backup,
+                status: .failed,
+                finishedAt: Date(),
+                message: message
+            )
+            try database.saveJobRun(run)
+            try database.appendEvent(EventLog(level: .error, message: message))
+            recordJobLog(
+                jobID: run.id,
+                profileID: profile.id,
+                repositoryID: repository.id,
+                stream: .standardError,
+                message: message
+            )
+            return run
+        }
         defer {
             for source in resolvedSources {
                 source.stopAccessing()
