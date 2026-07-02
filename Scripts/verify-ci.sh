@@ -14,8 +14,13 @@ cd "$ROOT_DIR"
 "$ROOT_DIR/Scripts/verify-ci-workflows.sh"
 /bin/bash -n "$ROOT_DIR/Scripts/run-installed-local-s3-acceptance.sh"
 /bin/bash -n "$ROOT_DIR/Scripts/run-installed-local-sftp-acceptance.sh"
+/bin/bash -n "$ROOT_DIR/Scripts/run-installed-menu-bar-surface-acceptance.sh"
 /bin/bash -n "$ROOT_DIR/Scripts/run-installed-mounted-volume-acceptance.sh"
 /bin/bash -n "$ROOT_DIR/Scripts/run-installed-rclone-local-acceptance.sh"
+if [[ ! -x "$ROOT_DIR/Scripts/run-installed-menu-bar-surface-acceptance.sh" ]]; then
+  printf "Scripts/run-installed-menu-bar-surface-acceptance.sh must be executable.\n" >&2
+  exit 1
+fi
 if [[ ! -x "$ROOT_DIR/Scripts/run-installed-mounted-volume-acceptance.sh" ]]; then
   printf "Scripts/run-installed-mounted-volume-acceptance.sh must be executable.\n" >&2
   exit 1

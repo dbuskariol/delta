@@ -53,6 +53,8 @@ struct DeltaApp: App {
             runAcceptanceExternalLifecycle()
         case "--acceptance-preferences":
             runAcceptancePreferences()
+        case "--acceptance-menu-bar-surface":
+            runAcceptanceMenuBarSurface()
         case "--acceptance-seed-scheduled-agent":
             runAcceptanceSeedScheduledAgent(arguments: Array(arguments.dropFirst()))
         case "--acceptance-verify-scheduled-agent":
@@ -251,6 +253,22 @@ struct DeltaApp: App {
             exit(0)
         } catch {
             fputs("Delta preferences acceptance error: \(error.localizedDescription)\n", stderr)
+            exit(1)
+        }
+    }
+
+    private static func runAcceptanceMenuBarSurface() -> Never {
+        guard ProcessInfo.processInfo.environment["DELTA_ENABLE_MENU_BAR_ACCEPTANCE"] == "1" else {
+            fputs("Delta menu bar acceptance command is disabled.\n", stderr)
+            exit(64)
+        }
+
+        do {
+            let report = try AcceptanceMenuBarSurfaceCommand.run()
+            print(report, terminator: report.hasSuffix("\n") ? "" : "\n")
+            exit(0)
+        } catch {
+            fputs("Delta menu bar acceptance error: \(error.localizedDescription)\n", stderr)
             exit(1)
         }
     }

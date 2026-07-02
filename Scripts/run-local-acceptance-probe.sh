@@ -193,6 +193,13 @@ else
   else
     installed_preferences_evidence="Installed preferences acceptance failed: $installed_preferences_output"
   fi
+  installed_menu_bar_output="$(run_capture installed_menu_bar_surface "$ROOT_DIR/Scripts/run-installed-menu-bar-surface-acceptance.sh" "$APP_PATH")"
+  installed_menu_bar_status="$(command_status installed_menu_bar_surface)"
+  if [[ "$installed_menu_bar_status" -eq 0 ]]; then
+    installed_menu_bar_evidence="Installed menu bar surface acceptance passed: the signed app verified status-menu product language, ready/running/attention/blocked status presentations, compact labels, action availability for Back Up Now, Run Due Backups, Pause, Stop, Activity, Updates, and forbidden visible terminology. $installed_menu_bar_output"
+  else
+    installed_menu_bar_evidence="Installed menu bar surface acceptance failed: $installed_menu_bar_output"
+  fi
 
   if [[ "$language_status" -eq 0 && "$installed_diagnostics_status" -eq 0 && "$installed_preferences_status" -eq 0 ]]; then
     append_row "settings_surface" "$(item_area settings_surface)" "Partial" "Product-language verifier passed; raw restic repository and LaunchAgent terminology is blocked from user-facing strings. Installed diagnostics reported Password Access as Ready and Full Disk Access as $installed_full_disk_access_status. Installed preferences acceptance proved the shared Settings surface contract, required categories, compact status summary, scheduler/update/power/defaults/diagnostics controls, and preference behavior. $installed_preferences_evidence" "Open Settings and confirm visual grouping, status summary, Password Access status/refresh/repair controls, Run Due Now behavior, Sparkle automatic check/download controls, idle-sleep protection, reset controls, backup freshness warnings, source-access warnings, destination-check warning controls, local/mounted destination free-space warnings, and activity history retention in the running app."
@@ -538,11 +545,14 @@ else
   else
     append_row "remote_first_backup_preparation" "$(item_area remote_first_backup_preparation)" "Manual Required" "Remote destination preparation needs a real unprepared remote and an existing remote to avoid false confidence. Configure external backend acceptance to automate the backend lifecycle." "Start backup on new unprepared remote and existing remote; confirm init happens only when needed."
   fi
-  if [[ "$automated_gate_status" == "Passed" && "$automated_gate_commit" == "$git_commit" ]] \
+  if [[ "$installed_menu_bar_status" -eq 0 ]]
+  then
+    append_row "menu_bar" "$(item_area menu_bar)" "Partial" "$installed_menu_bar_evidence Native status item visibility and persistent popover behavior still require visual macOS interaction." "Enable/disable the menu bar item and verify ready/running/attention states plus all popover actions."
+  elif [[ "$automated_gate_status" == "Passed" && "$automated_gate_commit" == "$git_commit" ]] \
     && grep -Fq "MenuBarStatusPresentationTests" "$ROOT_DIR/Tests/DeltaCoreTests/MenuBarStatusPresentationTests.swift" \
     && grep -Fq "MenuBarActionAvailabilityTests" "$ROOT_DIR/Tests/DeltaCoreTests/MenuBarActionAvailabilityTests.swift"
   then
-    append_row "menu_bar" "$(item_area menu_bar)" "Partial" "Automated release gate passed menu bar status presentation and action-availability policy coverage for commit $git_commit. Native status item visibility and persistent popover behavior still require visual macOS interaction." "Enable/disable the menu bar item and verify ready/running/attention states plus all popover actions."
+    append_row "menu_bar" "$(item_area menu_bar)" "Failed" "Automated release gate passed older menu bar policy tests, but installed menu bar surface acceptance failed: $installed_menu_bar_evidence" "Fix the installed menu bar surface contract before visual macOS interaction."
   else
     append_row "menu_bar" "$(item_area menu_bar)" "Manual Required" "Native status item presentation and persistent popover behavior require visual macOS interaction." "Enable/disable the menu bar item and verify ready/running/attention states plus all popover actions."
   fi

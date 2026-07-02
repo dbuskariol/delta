@@ -26,6 +26,7 @@ cd "$ROOT_DIR"
   "$ROOT_DIR/Scripts/run-external-backend-acceptance.sh" \
   "$ROOT_DIR/Scripts/run-installed-diagnostics-acceptance.sh" \
   "$ROOT_DIR/Scripts/run-installed-keychain-access-acceptance.sh" \
+  "$ROOT_DIR/Scripts/run-installed-menu-bar-surface-acceptance.sh" \
   "$ROOT_DIR/Scripts/run-installed-mounted-volume-acceptance.sh" \
   "$ROOT_DIR/Scripts/run-installed-local-s3-acceptance.sh" \
   "$ROOT_DIR/Scripts/run-installed-local-sftp-acceptance.sh" \
@@ -94,6 +95,10 @@ if [[ ! -x "$ROOT_DIR/Scripts/run-local-acceptance-probe.sh" ]]; then
 fi
 if [[ ! -x "$ROOT_DIR/Scripts/run-installed-local-backup-acceptance.sh" ]]; then
   printf "Scripts/run-installed-local-backup-acceptance.sh must be executable.\n" >&2
+  exit 1
+fi
+if [[ ! -x "$ROOT_DIR/Scripts/run-installed-menu-bar-surface-acceptance.sh" ]]; then
+  printf "Scripts/run-installed-menu-bar-surface-acceptance.sh must be executable.\n" >&2
   exit 1
 fi
 if [[ ! -x "$ROOT_DIR/Scripts/run-installed-mounted-volume-acceptance.sh" ]]; then
@@ -306,6 +311,7 @@ fi
 "$ROOT_DIR/Scripts/run-installed-keychain-access-acceptance.sh" "$ROOT_DIR/dist/Delta.app"
 "$ROOT_DIR/Scripts/run-installed-diagnostics-acceptance.sh" "$ROOT_DIR/dist/Delta.app"
 "$ROOT_DIR/Scripts/run-installed-preferences-acceptance.sh" "$ROOT_DIR/dist/Delta.app"
+"$ROOT_DIR/Scripts/run-installed-menu-bar-surface-acceptance.sh" "$ROOT_DIR/dist/Delta.app"
 "$ROOT_DIR/Scripts/run-installed-scheduled-agent-acceptance.sh" "$ROOT_DIR/dist/Delta.app"
 "$ROOT_DIR/Scripts/run-installed-run-control-acceptance.sh" "$ROOT_DIR/dist/Delta.app"
 "$ROOT_DIR/Scripts/run-installed-mounted-volume-acceptance.sh" "$ROOT_DIR/dist/Delta.app"
