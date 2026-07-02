@@ -3445,7 +3445,9 @@ struct BackupRunSummaryLine: View {
     var job: JobRun
 
     var body: some View {
-        if let summaryText {
+        if let summary {
+            BackupSummaryMetricRow(summary: summary)
+        } else if let summaryText {
             Text(summaryText)
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -3454,15 +3456,16 @@ struct BackupRunSummaryLine: View {
         }
     }
 
-    private var summaryText: String? {
+    private var summary: ResticBackupSummary? {
         guard job.kind == .backup else {
             return nil
         }
-        if let summary = job.backupSummary {
-            return summary.conciseText
-        }
-        if let summary = ResticLogFormatter.backupSummary(from: job.message) {
-            return summary.conciseText
+        return job.backupSummary ?? ResticLogFormatter.backupSummary(from: job.message)
+    }
+
+    private var summaryText: String? {
+        guard job.kind == .backup else {
+            return nil
         }
         guard let message = job.message, !message.isEmpty else {
             return nil
@@ -3476,6 +3479,81 @@ struct BackupRunSummaryLine: View {
                 .replacingOccurrences(of: "No changes detected · ", with: "")
         }
         return nil
+    }
+}
+
+struct BackupSummaryMetricRow: View {
+    var summary: ResticBackupSummary
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 6) {
+                ForEach(metrics) { metric in
+                    BackupSummaryMetricPill(metric: metric)
+                }
+            }
+            Text(summary.conciseText)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.tail)
+        }
+        .deltaTooltip(summary.detailedText)
+    }
+
+    private var metrics: [BackupSummaryMetric] {
+        var items = [
+            BackupSummaryMetric(title: "New", value: summary.filesNew.formatted()),
+            BackupSummaryMetric(title: "Changed", value: summary.filesChanged.formatted())
+        ]
+        if let dataAdded = summary.dataAdded, dataAdded > 0 {
+            items.append(
+                BackupSummaryMetric(
+                    title: "Added",
+                    value: ByteCountFormatter.string(fromByteCount: dataAdded, countStyle: .file)
+                )
+            )
+        } else if summary.totalBytesProcessed > 0 {
+            items.append(
+                BackupSummaryMetric(
+                    title: "Checked",
+                    value: ByteCountFormatter.string(fromByteCount: summary.totalBytesProcessed, countStyle: .file)
+                )
+            )
+        } else {
+            let fileCount = summary.totalFilesProcessed > 0 ? summary.totalFilesProcessed : summary.filesUnmodified
+            if fileCount > 0 {
+                items.append(BackupSummaryMetric(title: "Checked", value: fileCount.formatted()))
+            }
+        }
+        return items
+    }
+}
+
+struct BackupSummaryMetric: Identifiable {
+    var id: String { title }
+    var title: String
+    var value: String
+}
+
+struct BackupSummaryMetricPill: View {
+    var metric: BackupSummaryMetric
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Text(metric.value)
+                .fontWeight(.semibold)
+                .foregroundStyle(.primary)
+                .monospacedDigit()
+            Text(metric.title.lowercased())
+                .foregroundStyle(.secondary)
+        }
+        .font(.caption)
+        .lineLimit(1)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(DeltaTheme.badge.opacity(0.85))
+        .clipShape(Capsule())
     }
 }
 

@@ -12,7 +12,7 @@ final class KeychainSecretStoreTests: XCTestCase {
 
         let context = try XCTUnwrap(query[kSecUseAuthenticationContext as String] as? LAContext)
         XCTAssertTrue(context.interactionNotAllowed)
-        XCTAssertEqual(query[kSecUseAuthenticationUI as String] as? String, kSecUseAuthenticationUIFail as String)
+        XCTAssertNil(query[kSecUseAuthenticationUI as String])
     }
 
     func testInteractiveLoadQueryDoesNotForceAuthenticationFailure() {
