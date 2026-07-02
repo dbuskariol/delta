@@ -42,6 +42,27 @@ final class ResticCommandTests: XCTestCase {
         XCTAssertEqual(description.components(separatedBy: "<redacted>").count - 1, 4)
     }
 
+    func testPasswordCommandCanUseMainAppBridgeMode() throws {
+        let repository = BackupRepository(
+            name: "Local",
+            backend: .local(path: "/tmp/repo"),
+            keychainAccount: "account"
+        )
+        let builder = ResticCommandBuilder(
+            resticExecutableURL: URL(fileURLWithPath: "/usr/bin/restic"),
+            secretBridgeURL: URL(fileURLWithPath: "/Applications/Delta.app/Contents/MacOS/Delta"),
+            secretBridgeArguments: ["--secret-bridge"]
+        )
+
+        let command = try builder.snapshots(repository: repository)
+
+        XCTAssertEqual(command.arguments[2], "--password-command")
+        XCTAssertEqual(
+            command.arguments[3],
+            "'/Applications/Delta.app/Contents/MacOS/Delta' '--secret-bridge' 'account'"
+        )
+    }
+
     func testBackendURLBuilderSupportsPrimaryBackends() throws {
         let builder = ResticBackendURLBuilder()
 

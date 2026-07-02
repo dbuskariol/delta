@@ -21,6 +21,7 @@ The automated gate must pass before any beta or production build is shipped. It 
 - codesign validation for Delta, DeltaAgent, DeltaSecretBridge, restic, rclone, and Sparkle
 - non-ad-hoc app signing identity for stable macOS privacy permissions
 - hardened-runtime entitlement hygiene
+- same-executable scheduled password resolution and non-interactive password-bridge acceptance
 - bundled Login Item helper plist
 - app launch smoke test
 - DeltaAgent status, dry-run, and fail-closed argument smoke tests
@@ -43,7 +44,7 @@ For a faster local readiness picture, run:
 Scripts/run-local-acceptance-probe.sh
 ```
 
-The probe writes `dist/local-acceptance/latest.md`. It also runs `Scripts/run-installed-local-backup-acceptance.sh`, which uses the app bundle's own restic binary to initialize a temporary encrypted local destination, run first and deduplicated second backups, restore a full restore point, restore a selected folder, check, prune, and run a post-prune check.
+The probe writes `dist/local-acceptance/latest.md`. It also runs `Scripts/run-installed-keychain-access-acceptance.sh`, which creates a throwaway destination-secret item through the installed Delta app, proves the installed password bridge mode can read it without interaction, then deletes it. It also runs `Scripts/run-installed-local-backup-acceptance.sh`, which uses the app bundle's own restic binary to initialize a temporary encrypted local destination, run first and deduplicated second backups, restore a full restore point, restore a selected folder, check, prune, and run a post-prune check.
 
 External backend evidence is opt-in because it needs real infrastructure. Configure these variables before running the local probe when those targets are available:
 

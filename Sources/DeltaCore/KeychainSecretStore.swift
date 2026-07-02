@@ -34,7 +34,10 @@ public struct KeychainSecretStore: Sendable {
     public var service: String
     public var trustedApplicationPaths: [String]
 
-    public init(service: String = Self.defaultService, trustedApplicationPaths: [String]? = nil) {
+    public init(
+        service: String = Self.defaultService,
+        trustedApplicationPaths: [String]? = nil
+    ) {
         self.service = service
         self.trustedApplicationPaths = trustedApplicationPaths ?? Self.defaultTrustedApplicationPaths()
     }
@@ -201,4 +204,5 @@ public struct KeychainSecretStore: Sendable {
         return ["Delta", "DeltaAgent", "DeltaSecretBridge"]
             .map { directory.appendingPathComponent($0).path }
     }
+
 }

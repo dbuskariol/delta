@@ -16,6 +16,7 @@ cd "$ROOT_DIR"
   "$ROOT_DIR/Scripts/verify-installed-app.sh" \
   "$ROOT_DIR/Scripts/verify-manual-acceptance.sh" \
   "$ROOT_DIR/Scripts/run-external-backend-acceptance.sh" \
+  "$ROOT_DIR/Scripts/run-installed-keychain-access-acceptance.sh" \
   "$ROOT_DIR/Scripts/run-installed-local-backup-acceptance.sh" \
   "$ROOT_DIR/Scripts/run-local-acceptance-probe.sh" \
   "$ROOT_DIR/Scripts/verify-production-readiness.sh"
@@ -49,6 +50,10 @@ if [[ ! -x "$ROOT_DIR/Scripts/run-installed-local-backup-acceptance.sh" ]]; then
 fi
 if [[ ! -x "$ROOT_DIR/Scripts/run-external-backend-acceptance.sh" ]]; then
   printf "Scripts/run-external-backend-acceptance.sh must be executable.\n" >&2
+  exit 1
+fi
+if [[ ! -x "$ROOT_DIR/Scripts/run-installed-keychain-access-acceptance.sh" ]]; then
+  printf "Scripts/run-installed-keychain-access-acceptance.sh must be executable.\n" >&2
   exit 1
 fi
 if [[ ! -x "$ROOT_DIR/Scripts/verify-production-readiness.sh" ]]; then
@@ -214,6 +219,7 @@ if [[ "$SECRET_BRIDGE_EXTRA_STATUS" -ne 64 || "$SECRET_BRIDGE_EXTRA_OUTPUT" != *
   printf "DeltaSecretBridge did not fail closed for extra arguments. status=%s output=%s\n" "$SECRET_BRIDGE_EXTRA_STATUS" "$SECRET_BRIDGE_EXTRA_OUTPUT" >&2
   exit 1
 fi
+"$ROOT_DIR/Scripts/run-installed-keychain-access-acceptance.sh" "$ROOT_DIR/dist/Delta.app"
 
 DELTA_SKIP_BUILD=1 "$ROOT_DIR/Scripts/package-update.sh"
 "$ROOT_DIR/Scripts/generate-appcast.sh"

@@ -35,7 +35,7 @@ At a high level:
 2. Delta creates or uses a restic repository at that destination.
 3. A user creates a **Backup Profile**, choosing sources, schedule, retention, bandwidth, and power policy.
 4. Scheduled or manual runs invoke bundled `restic` through `ResticRunner`.
-5. Destination passwords are fetched from Keychain through `DeltaSecretBridge` using restic `--password-command`.
+5. Destination passwords are fetched from Keychain through `Delta --secret-bridge` using restic `--password-command`.
 6. Job state, restore points, events, settings, restore requests, and profile definitions are persisted in SQLite via GRDB.
 7. Restore always goes through a wizard: destination, restore point, scope, restore location, conflict policy, preview, then execution.
 
@@ -56,7 +56,7 @@ The app is split into signed targets:
 
 - `Delta`: SwiftUI macOS app, menu bar item, settings, backup/restore UI, Sparkle update controller.
 - `DeltaAgent`: signed Background Backups Login Item helper for scheduled runs.
-- `DeltaSecretBridge`: CLI password bridge used by restic `--password-command`.
+- `DeltaSecretBridge`: signed fail-closed compatibility password helper. Current backup jobs use `Delta --secret-bridge` so scheduled work and password reads share the same app identity.
 - `DeltaCore`: shared models, database, command builder, scheduling, restic runner, parser, Keychain, bookmarks, locks, job logs, and policy code.
 
 Important implementation details:
@@ -65,7 +65,7 @@ Important implementation details:
 - **Durable-state fail closed** behavior prevents backup, destination, and restore operations if the Application Support database cannot be opened. Delta shows a blocked state instead of continuing against throwaway state.
 - **Profile validation** normalizes source paths, schedule values, bandwidth limits, retention limits, cleanup windows, and exclude patterns before saving or running backups.
 - **Operation-aware destination checks** allow a first backup to prepare a writable new local destination or an uninitialized remote destination, while restore, browse, check, and cleanup require an existing destination before restic is invoked.
-- **Keychain secrets** use `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly` and a trusted-application access list for the signed Delta app, agent, and secret bridge. Background secret reads fail closed instead of showing system prompts. The file-keychain access-list calls are isolated in `DeltaSecurity`, a tiny audited compatibility shim, because the modern data-protection keychain access-group path requires valid signed entitlements that are only appropriate for a fully provisioned Developer ID distribution setup.
+- **Keychain secrets** use `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly` and are read by the same signed Delta executable in app, scheduled, and restic password-command paths. Background secret reads fail closed instead of showing system prompts. The tiny `DeltaSecurity` compatibility shim is kept only for trusted-application access-list support in local development.
 - **Background secret repair** rewrites saved destination passwords and backend credentials through the current signed app identity if a development build or old local Keychain item would otherwise prompt during scheduled jobs.
 - **Destination credential forms** use provider-specific labels and only hide actual password/token fields; non-secret values such as account names and rclone config paths stay readable.
 - **SFTP authentication** uses SSH config, ssh-agent, or an optional destination-level private-key path. Delta forces SSH batch mode for scheduled safety and does not rely on interactive SSH password prompts.
@@ -247,6 +247,12 @@ Generate machine-verifiable local acceptance evidence:
 Scripts/run-local-acceptance-probe.sh
 ```
 
+Run the installed app bundle's non-interactive Keychain access proof directly:
+
+```sh
+Scripts/run-installed-keychain-access-acceptance.sh
+```
+
 Run the installed app bundle's local backup lifecycle directly:
 
 ```sh
@@ -283,7 +289,7 @@ After Developer ID notarization and installing the exact release candidate, run 
 Scripts/verify-production-readiness.sh
 ```
 
-The local acceptance probe writes `dist/local-acceptance/latest.md` and separates automated evidence from human-only checks. It also runs `Scripts/run-installed-local-backup-acceptance.sh`, which uses the exact installed app bundle's restic binary to initialize a temporary encrypted local destination, run first and deduplicated second backups, restore a full restore point, restore a selected folder, check, prune, and run a post-prune check. When configured with `DELTA_ACCEPTANCE_MOUNTED_PATH`, `DELTA_ACCEPTANCE_SFTP_REPOSITORY`, or `DELTA_ACCEPTANCE_S3_REPOSITORY`, it also runs real external backend lifecycle checks through `Scripts/run-external-backend-acceptance.sh`. Remote acceptance URLs must point at dedicated paths containing `delta-acceptance` unless `DELTA_ACCEPTANCE_ALLOW_EXISTING_REMOTE=1` is set after a human confirms the target is safe. New manual reports copy that local evidence into the Evidence / Notes column while keeping every Result as `Not run`. It is useful release evidence, but it does not replace the manual macOS acceptance matrix for Full Disk Access, closed-window scheduling UI, disconnect/reconnect behavior, menu bar interaction, notifications, Sparkle update installation, or notarization.
+The local acceptance probe writes `dist/local-acceptance/latest.md` and separates automated evidence from human-only checks. It also runs `Scripts/run-installed-keychain-access-acceptance.sh`, which creates a throwaway destination-secret item through the installed Delta app, proves the installed password bridge mode can read it without interaction, then deletes it. It also runs `Scripts/run-installed-local-backup-acceptance.sh`, which uses the exact installed app bundle's restic binary to initialize a temporary encrypted local destination, run first and deduplicated second backups, restore a full restore point, restore a selected folder, check, prune, and run a post-prune check. When configured with `DELTA_ACCEPTANCE_MOUNTED_PATH`, `DELTA_ACCEPTANCE_SFTP_REPOSITORY`, or `DELTA_ACCEPTANCE_S3_REPOSITORY`, it also runs real external backend lifecycle checks through `Scripts/run-external-backend-acceptance.sh`. Remote acceptance URLs must point at dedicated paths containing `delta-acceptance` unless `DELTA_ACCEPTANCE_ALLOW_EXISTING_REMOTE=1` is set after a human confirms the target is safe. New manual reports copy that local evidence into the Evidence / Notes column while keeping every Result as `Not run`. It is useful release evidence, but it does not replace the manual macOS acceptance matrix for Full Disk Access, closed-window scheduling UI, disconnect/reconnect behavior, menu bar interaction, notifications, Sparkle update installation, or notarization.
 
 The release evidence report is written under `dist/release-evidence/` and records the app version, git commit, signing details, helper/tool smoke output, Sparkle artifacts, automated gate status, local acceptance probe output, installed app smoke output, notarization ticket status, and manual acceptance report verification. `Scripts/verify-production-readiness.sh` fails unless that evidence, the current manual acceptance report, notarization, Gatekeeper, and the installed app all prove the same current git commit is ready for external distribution.
 

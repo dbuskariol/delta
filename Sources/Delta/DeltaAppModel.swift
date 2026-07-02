@@ -1081,7 +1081,8 @@ final class DeltaAppModel: ObservableObject {
             database: database,
             commandBuilder: ResticCommandBuilder(
                 resticExecutableURL: ResticExecutableLocator().locate(),
-                secretBridgeURL: Self.secretBridgeURL()
+                secretBridgeURL: Self.secretBridgeURL(),
+                secretBridgeArguments: ["--secret-bridge"]
             ),
             runner: ResticRunner(runController: runController),
             runControlStore: runControlStore,
@@ -1162,15 +1163,10 @@ final class DeltaAppModel: ObservableObject {
     }
 
     private static func secretBridgeURL() -> URL {
-        if let bundled = Bundle.main.url(forAuxiliaryExecutable: "DeltaSecretBridge") {
-            return bundled
-        }
         let executable = URL(fileURLWithPath: CommandLine.arguments.first ?? "")
-        let sibling = executable.deletingLastPathComponent().appendingPathComponent("DeltaSecretBridge")
-        if FileManager.default.isExecutableFile(atPath: sibling.path) {
-            return sibling
-        }
-        return URL(fileURLWithPath: "/usr/bin/false")
+        return FileManager.default.isExecutableFile(atPath: executable.path)
+            ? executable
+            : URL(fileURLWithPath: "/usr/bin/false")
     }
 
     private static func openDatabase() -> (database: DeltaDatabase, errorMessage: String?) {

@@ -203,8 +203,12 @@ else
   if [[ -x "$bridge" ]]; then
     bridge_output="$(run_capture secret_bridge /bin/sh -c "'$bridge' 2>&1; test \$? -eq 64")"
     bridge_status="$(command_status secret_bridge)"
-    if [[ "$bridge_status" -eq 0 ]]; then
-      append_row "keychain_background_access" "$(item_area keychain_background_access)" "Partial" "Secret bridge fail-closed argument behavior passed: $bridge_output" "Run scheduled backups against saved app-managed and credentialed destinations and confirm Keychain does not prompt."
+    installed_keychain_output="$(run_capture installed_keychain_access "$ROOT_DIR/Scripts/run-installed-keychain-access-acceptance.sh" "$APP_PATH")"
+    installed_keychain_status="$(command_status installed_keychain_access)"
+    if [[ "$bridge_status" -eq 0 && "$installed_keychain_status" -eq 0 ]]; then
+      append_row "keychain_background_access" "$(item_area keychain_background_access)" "Partial" "Secret bridge fail-closed argument behavior passed, and installed Keychain access acceptance proved a throwaway destination password can be read by Delta --secret-bridge without interaction: $bridge_output $installed_keychain_output" "Run scheduled backups against saved app-managed and credentialed destinations and confirm Keychain does not prompt."
+    elif [[ "$bridge_status" -eq 0 ]]; then
+      append_row "keychain_background_access" "$(item_area keychain_background_access)" "Failed" "Secret bridge fail-closed argument behavior passed, but installed non-interactive Keychain access failed: $installed_keychain_output" "Fix the Keychain trusted-app access list or signed app identity before scheduled-secret testing."
     else
       append_row "keychain_background_access" "$(item_area keychain_background_access)" "Failed" "Secret bridge fail-closed check failed: $bridge_output" "Fix secret bridge argument handling before scheduled-secret testing."
     fi

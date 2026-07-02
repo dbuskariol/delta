@@ -112,6 +112,7 @@ public struct ResticExecutableLocator: Sendable {
 public struct ResticCommandBuilder: Sendable {
     public var resticExecutableURL: URL
     public var secretBridgeURL: URL
+    public var secretBridgeArguments: [String]
     public var backendURLBuilder: ResticBackendURLBuilder
     public var credentialResolver: RepositoryCredentialResolver
     public var baseEnvironment: [String: String]
@@ -119,12 +120,14 @@ public struct ResticCommandBuilder: Sendable {
     public init(
         resticExecutableURL: URL,
         secretBridgeURL: URL,
+        secretBridgeArguments: [String] = [],
         backendURLBuilder: ResticBackendURLBuilder = ResticBackendURLBuilder(),
         credentialResolver: RepositoryCredentialResolver = RepositoryCredentialResolver(),
         baseEnvironment: [String: String] = ProcessInfo.processInfo.environment
     ) {
         self.resticExecutableURL = resticExecutableURL
         self.secretBridgeURL = secretBridgeURL
+        self.secretBridgeArguments = secretBridgeArguments
         self.backendURLBuilder = backendURLBuilder
         self.credentialResolver = credentialResolver
         self.baseEnvironment = baseEnvironment
@@ -262,10 +265,9 @@ public struct ResticCommandBuilder: Sendable {
         subcommand: [String]
     ) throws -> ResticCommand {
         let repositoryURL = try backendURLBuilder.repositoryURL(for: repository.backend)
-        let passwordCommand = [
-            ShellEscaper.singleQuoted(secretBridgeURL.path),
-            ShellEscaper.singleQuoted(repository.keychainAccount)
-        ].joined(separator: " ")
+        let passwordCommand = ([secretBridgeURL.path] + secretBridgeArguments + [repository.keychainAccount])
+            .map(ShellEscaper.singleQuoted)
+            .joined(separator: " ")
 
         var globalArguments = [
             "-r", repositoryURL,

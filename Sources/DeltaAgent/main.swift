@@ -12,7 +12,7 @@ enum DeltaAgentMain {
                 print("DeltaAgent ready; dry run did not start scheduled backups.")
                 return 0
             case .runDueBackups:
-                return try runDueBackups()
+                return execMainAppForDueBackups()
             }
         } catch let error as DeltaAgentArgumentError {
             fputs("DeltaAgent error: \(error.localizedDescription)\n", stderr)
@@ -23,67 +23,34 @@ enum DeltaAgentMain {
         }
     }
 
-    private static func runDueBackups() throws -> Int32 {
-        let database = try DeltaDatabase.live()
-        let coordinator = BackupCoordinator(
-            database: database,
-            commandBuilder: ResticCommandBuilder(
-                resticExecutableURL: ResticExecutableLocator().locate(),
-                secretBridgeURL: secretBridgeURL(),
-                credentialResolver: RepositoryCredentialResolver(
-                    authenticationPolicy: .failIfInteractionNeeded
-                )
-            ),
-            runControlStore: ResticRunControlStore()
-        )
+    private static func execMainAppForDueBackups() -> Int32 {
+        let deltaURL = mainAppURL()
+        var arguments: [UnsafeMutablePointer<CChar>?] = [
+            strdup(deltaURL.path),
+            strdup("--run-due-backups"),
+            nil
+        ]
+        defer {
+            for argument in arguments where argument != nil {
+                free(argument)
+            }
+        }
 
-        _ = try coordinator.recoverAbandonedRunningJobs()
-        let runs = try coordinator.runDueBackups()
-        try notifyCompletedJobs(runs, database: database)
-        print("DeltaAgent completed \(runs.count) due backup run(s).")
-        return runs.contains(where: { $0.status == .failed }) ? 1 : 0
+        execv(deltaURL.path, &arguments)
+        perror("DeltaAgent exec")
+        return 1
     }
 
-    private static func secretBridgeURL() -> URL {
+    private static func mainAppURL() -> URL {
         let executable = URL(fileURLWithPath: CommandLine.arguments.first ?? "")
-        let sibling = executable.deletingLastPathComponent().appendingPathComponent("DeltaSecretBridge")
+        let sibling = executable.deletingLastPathComponent().appendingPathComponent("Delta")
         if FileManager.default.isExecutableFile(atPath: sibling.path) {
             return sibling
         }
-        if let bundled = Bundle.main.url(forAuxiliaryExecutable: "DeltaSecretBridge") {
+        if let bundled = Bundle.main.url(forAuxiliaryExecutable: "Delta") {
             return bundled
         }
         return URL(fileURLWithPath: "/usr/bin/false")
-    }
-
-    private static func notifyCompletedJobs(_ jobs: [JobRun], database: DeltaDatabase) throws {
-        let settings = JobNotificationSettings(
-            isEnabled: DeltaAppPreferences.bool(
-                for: DeltaAppPreferenceKeys.sendsJobNotifications,
-                default: false
-            ),
-            includesSuccessfulBackups: DeltaAppPreferences.bool(
-                for: DeltaAppPreferenceKeys.sendsSuccessfulBackupNotifications,
-                default: false
-            )
-        )
-        guard settings.isEnabled else {
-            return
-        }
-
-        let profilesByID = Dictionary(uniqueKeysWithValues: try database.fetchProfiles().map { ($0.id, $0.name) })
-        let repositoriesByID = Dictionary(uniqueKeysWithValues: try database.fetchRepositories().map { ($0.id, $0.name) })
-        for job in jobs {
-            guard let content = JobNotificationPolicy.content(
-                for: job,
-                settings: settings,
-                profileName: job.profileID.flatMap { profilesByID[$0] },
-                repositoryName: repositoriesByID[job.repositoryID]
-            ) else {
-                continue
-            }
-            DeltaUserNotifier.deliver(content)
-        }
     }
 }
 
