@@ -153,6 +153,15 @@ public enum RestoreConflictPolicy: String, Codable, CaseIterable, Sendable {
         case .never: "never"
         }
     }
+
+    public var displayName: String {
+        switch self {
+        case .always: "Replace all"
+        case .ifChanged: "Replace changed"
+        case .ifNewer: "Replace older"
+        case .never: "Keep existing"
+        }
+    }
 }
 
 public enum LogLevel: String, Codable, CaseIterable, Sendable {

@@ -137,7 +137,7 @@ public struct ResticCommandBuilder: Sendable {
         }
         if request.dryRun {
             subcommand.append("--dry-run")
-            subcommand += ["--verbose", "2"]
+            subcommand.append("--verbose=2")
         }
 
         switch request.destination {
@@ -185,11 +185,13 @@ public struct ResticCommandBuilder: Sendable {
             ShellEscaper.singleQuoted(repository.keychainAccount)
         ].joined(separator: " ")
 
-        let globalArguments = [
+        var globalArguments = [
             "-r", repositoryURL,
             "--password-command", passwordCommand,
             "--cleanup-cache"
-        ] + extraGlobalArguments
+        ]
+        globalArguments += backendOptionArguments(for: repository)
+        globalArguments += extraGlobalArguments
 
         var environment = ProcessInfo.processInfo.environment
         environment["RESTIC_PROGRESS_FPS"] = "1"
@@ -216,5 +218,23 @@ public struct ResticCommandBuilder: Sendable {
             arguments += ["--limit-download", "\(downloadLimitKiB)"]
         }
         return arguments
+    }
+
+    private func backendOptionArguments(for repository: BackupRepository) -> [String] {
+        switch repository.backend {
+        case let .s3(_, _, _, region):
+            guard let region = region?.trimmingCharacters(in: .whitespacesAndNewlines), !region.isEmpty else {
+                return []
+            }
+            return ["-o", "s3.region=\(region)"]
+        case .rclone:
+            let rcloneURL = resticExecutableURL.deletingLastPathComponent().appendingPathComponent("rclone")
+            guard FileManager.default.isExecutableFile(atPath: rcloneURL.path) else {
+                return []
+            }
+            return ["-o", "rclone.program=\(rcloneURL.path)"]
+        default:
+            return []
+        }
     }
 }

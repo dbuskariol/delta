@@ -67,6 +67,27 @@ final class BackupCoordinatorPolicyTests: XCTestCase {
     func testMockedResticFailuresProduceUserFacingJobMessages() throws {
         let cases: [(String, ResticRunResult, JobStatus, ResticFailureKind, String)] = [
             (
+                "repository missing exit code",
+                ResticRunResult(exitCode: 10, standardOutput: "", standardError: ""),
+                .failed,
+                .repositoryMissing,
+                "not been prepared"
+            ),
+            (
+                "locked exit code",
+                ResticRunResult(exitCode: 11, standardOutput: "", standardError: ""),
+                .failed,
+                .lockedRepository,
+                "already in use"
+            ),
+            (
+                "wrong password exit code",
+                ResticRunResult(exitCode: 12, standardOutput: "", standardError: ""),
+                .failed,
+                .wrongPassword,
+                "encryption password"
+            ),
+            (
                 "locked",
                 ResticRunResult(exitCode: 1, standardOutput: "", standardError: "repository is already locked by PID 123"),
                 .failed,

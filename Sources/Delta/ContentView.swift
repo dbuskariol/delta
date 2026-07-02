@@ -308,7 +308,7 @@ struct RestoreView: View {
                     RestoreFormRow(title: "Conflicts") {
                         Picker("Conflicts", selection: $conflictPolicy) {
                             ForEach(RestoreConflictPolicy.allCases, id: \.self) { policy in
-                                Text(policy.resticValue).tag(policy)
+                                Text(policy.displayName).tag(policy)
                             }
                         }
                         .labelsHidden()
@@ -902,6 +902,7 @@ struct RepositoryEditorView: View {
     @State private var primary = ""
     @State private var secondary = ""
     @State private var tertiary = ""
+    @State private var quaternary = ""
     @State private var storageMode: SecretStorageMode = .appManagedKeychain
     @State private var passphrase = ""
     @State private var credentialValues: [String: String] = [:]
@@ -913,8 +914,8 @@ struct RepositoryEditorView: View {
                     .textFieldStyle(.roundedBorder)
             }
 
-            FieldRow(title: "Backend") {
-                Picker("Backend", selection: $kind) {
+            FieldRow(title: "Type") {
+                Picker("Type", selection: $kind) {
                     ForEach(RepositoryBackendKind.allCases, id: \.self) { kind in
                         Text(kind.displayName).tag(kind)
                     }
@@ -955,7 +956,7 @@ struct RepositoryEditorView: View {
                     dismiss()
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(name.isEmpty || primary.isEmpty)
+                .disabled(!canCreate)
             }
         }
         .onChange(of: kind) { _, newKind in
@@ -985,12 +986,14 @@ struct RepositoryEditorView: View {
             FieldRow(title: "Host") { TextField("nas.local", text: $primary).textFieldStyle(.roundedBorder) }
             FieldRow(title: "Path") { TextField("/absolute/destination/path", text: $secondary).textFieldStyle(.roundedBorder) }
             FieldRow(title: "Username") { TextField("Optional", text: $tertiary).textFieldStyle(.roundedBorder) }
+            FieldRow(title: "Port") { TextField("Optional", text: $quaternary).textFieldStyle(.roundedBorder) }
         case .rest:
             FieldRow(title: "URL") { TextField("https://backup.example.com/repo", text: $primary).textFieldStyle(.roundedBorder) }
         case .s3:
             FieldRow(title: "Bucket") { TextField("bucket", text: $primary).textFieldStyle(.roundedBorder) }
             FieldRow(title: "Path") { TextField("Optional", text: $secondary).textFieldStyle(.roundedBorder) }
             FieldRow(title: "Endpoint") { TextField("Optional", text: $tertiary).textFieldStyle(.roundedBorder) }
+            FieldRow(title: "Region") { TextField("Optional", text: $quaternary).textFieldStyle(.roundedBorder) }
         case .backblazeB2:
             FieldRow(title: "Bucket") { TextField("bucket", text: $primary).textFieldStyle(.roundedBorder) }
             FieldRow(title: "Path") { TextField("Optional", text: $secondary).textFieldStyle(.roundedBorder) }
@@ -1028,9 +1031,9 @@ struct RepositoryEditorView: View {
     private var backend: RepositoryBackend {
         switch kind {
         case .local: .local(path: primary)
-        case .sftp: .sftp(host: primary, path: secondary, username: tertiary.isEmpty ? nil : tertiary, port: nil)
+        case .sftp: .sftp(host: primary, path: secondary, username: tertiary.isEmpty ? nil : tertiary, port: parsedPort)
         case .rest: .rest(url: primary)
-        case .s3: .s3(endpoint: tertiary.isEmpty ? nil : tertiary, bucket: primary, path: secondary.isEmpty ? nil : secondary, region: nil)
+        case .s3: .s3(endpoint: tertiary.isEmpty ? nil : tertiary, bucket: primary, path: secondary.isEmpty ? nil : secondary, region: quaternary.isEmpty ? nil : quaternary)
         case .backblazeB2: .backblazeB2(bucket: primary, path: secondary.isEmpty ? nil : secondary)
         case .azureBlob: .azureBlob(container: primary, path: secondary.isEmpty ? nil : secondary)
         case .googleCloudStorage: .googleCloudStorage(bucket: primary, path: secondary.isEmpty ? nil : secondary)
@@ -1042,6 +1045,24 @@ struct RepositoryEditorView: View {
 
     private var sanitizedCredentialValues: [String: String] {
         credentialValues.filter { !$0.key.isEmpty && !$0.value.isEmpty }
+    }
+
+    private var canCreate: Bool {
+        guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
+        guard !primary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
+        if kind == .sftp && secondary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return false
+        }
+        if kind == .sftp && !quaternary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            guard let parsedPort, (1...65_535).contains(parsedPort) else { return false }
+        }
+        return true
+    }
+
+    private var parsedPort: Int? {
+        let value = quaternary.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else { return nil }
+        return Int(value)
     }
 
     private func credentialBinding(for key: String) -> Binding<String> {

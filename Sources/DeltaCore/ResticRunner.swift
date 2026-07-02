@@ -43,6 +43,7 @@ public struct ResticOutputEvent: Identifiable, Equatable, Sendable {
 }
 
 public enum ResticFailureKind: String, Codable, CaseIterable, Sendable {
+    case repositoryMissing
     case lockedRepository
     case wrongPassword
     case missingBackendCredentials
@@ -76,6 +77,17 @@ public enum ResticFailureClassifier {
             return nil
         }
 
+        switch exitCode {
+        case 10:
+            return .repositoryMissing
+        case 11:
+            return .lockedRepository
+        case 12:
+            return .wrongPassword
+        default:
+            break
+        }
+
         let text = "\(standardOutput)\n\(standardError)"
         if containsAny(text, ["repository is already locked", "unable to create lock", "already locked"]) {
             return .lockedRepository
@@ -105,6 +117,8 @@ public enum ResticFailureClassifier {
         standardError: String
     ) -> String {
         switch failureKind {
+        case .repositoryMissing:
+            return "The destination has not been prepared yet or cannot be found."
         case .lockedRepository:
             return "The destination is already in use by another backup or maintenance job. Try again after the current job finishes."
         case .wrongPassword:
