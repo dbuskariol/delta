@@ -35,6 +35,16 @@ fail() {
   exit "${2:-1}"
 }
 
+probe_writable_directory() {
+  local directory="$1"
+  local probe_file="$directory/.delta-write-probe.$$.$RANDOM"
+  if ! /usr/bin/printf "delta\n" >"$probe_file" 2>/dev/null; then
+    /bin/rm -f "$probe_file" 2>/dev/null || true
+    return 1
+  fi
+  /bin/rm -f "$probe_file" 2>/dev/null
+}
+
 case "$KIND" in
   mounted|sftp|s3)
     ;;
@@ -131,7 +141,7 @@ case "$KIND" in
         fail "Mounted acceptance path must live under /Volumes to prove SMB/NFS/external-drive behavior."
         ;;
     esac
-    [[ -w "$mounted_path" ]] || fail "Mounted acceptance path is not writable: $mounted_path"
+    probe_writable_directory "$mounted_path" || fail "Mounted acceptance path did not pass a write/delete probe: $mounted_path"
     repository_dir="$(/usr/bin/mktemp -d "$mounted_path/DeltaExternalAcceptance.XXXXXX")"
     CLEANUP_PATHS+=("$repository_dir")
     repository_url="$repository_dir"
