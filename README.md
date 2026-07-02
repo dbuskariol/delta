@@ -15,9 +15,10 @@ The product goal is simple: make serious backup practices approachable without h
 - **Scheduled backups** through a bundled `DeltaAgent` LaunchAgent registered with `SMAppService`.
 - **Power-aware scheduling** with battery and Low Power Mode controls.
 - **Retention maintenance** with scheduled forget/prune/check windows.
-- **Pause, resume, and cancel controls** for active backups. Pause stops restic safely, keeps the profile visibly paused, and Resume continues from already saved backup data.
+- **Pause, resume, and cancel controls** for active backups from the main window and macOS menu bar. Pause stops restic safely, keeps the profile visibly paused, and Resume continues from already saved backup data.
+- **Clear backup summaries** showing new, changed, unchanged, added, and checked data for each backup run.
 - **Full or browsed selected restore** with backup browsing, file/folder selection, dry-run preview, overwrite policies, verification, original-path restore, chosen-folder restore, and optional pre-restore backup.
-- **Streaming and saved backup logs** from restic stdout/stderr with source context, stable processed-file counters, fixed-height live panes, and expandable per-job audit history.
+- **Streaming and saved backup logs** from restic stdout/stderr with source context, stable processed-file counters, clean change summaries, fixed-height live panes, and expandable per-job audit history.
 - **Sparkle automatic updates** with generated appcast/update archive support.
 
 ## How It Works

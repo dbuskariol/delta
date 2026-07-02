@@ -109,7 +109,7 @@ Expected restic backup exit handling:
 | `12` | Wrong password |
 | other non-zero | Failed or cancelled when interruption text is present |
 
-Restic progress totals can change while it scans sources, so Delta does not render volatile live percentages as stable completion. The UI uses an indeterminate active-job bar with stable processed-file and processed-byte counters, backup jobs record source paths at job start, and saved logs are grouped by job with expandable full-log loading from SQLite.
+Restic progress totals can change while it scans sources, so Delta does not render volatile live percentages as stable completion. The UI uses an indeterminate active-job bar with stable processed-file and processed-byte counters, backup jobs record source paths at job start, and saved logs are grouped by job with expandable full-log loading from SQLite. Restic summary JSON is parsed into explicit new, changed, unchanged, added, and checked counts so unchanged successful runs are clearly distinguished from runs that created new backup data.
 
 ## Snapshots / Restore Points
 
@@ -201,7 +201,7 @@ Delta maps restic lock exit code `11` and lock-related stderr to a user-facing b
 
 `ResticRunner` streams stdout and stderr while the process is running. The coordinator records start, streamed output, and finish lines as per-job SQLite log entries, while the UI also receives the same live events for Activity output. Restic JSON status/error lines are formatted into readable messages before durable storage.
 
-Active backups expose Pause and Cancel controls. Pause sends restic a graceful interrupt, records the job as cancelled with a paused message, keeps the profile visibly paused, and shows Resume as the next primary action. Resume runs restic backup again, relying on restic's content-addressed storage so already written data is reused. Cancel uses the same safe interruption path for any active restic job and records a cancelled job instead of a failed job.
+Active backups expose Pause and Cancel controls in the main window and macOS menu bar. Pause sends restic a graceful interrupt, records the job as cancelled with a paused message, keeps the profile visibly paused, and shows Resume as the next primary action. Resume runs restic backup again, relying on restic's content-addressed storage so already written data is reused. Cancel uses the same safe interruption path for any active restic job and records a cancelled job instead of a failed job.
 
 Relevant files:
 

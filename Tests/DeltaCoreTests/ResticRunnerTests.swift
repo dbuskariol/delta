@@ -83,6 +83,35 @@ final class ResticRunnerTests: XCTestCase {
         XCTAssertEqual(message, "Processed 21 files · 1 MB · Current .../Projects/Delta/file.txt")
     }
 
+    func testLogFormatterShowsBackupSummaryChangeCounts() {
+        let message = ResticLogFormatter.displayMessage(for: """
+        {"message_type":"summary","files_new":2,"files_changed":3,"files_unmodified":95,"data_added":1048576,"total_files_processed":100,"total_bytes_processed":2097152}
+        """)
+        let summary = ResticLogFormatter.backupSummary(from: """
+        {"message_type":"status","files_done":100}
+        {"message_type":"summary","files_new":2,"files_changed":3,"files_unmodified":95,"data_added":1048576,"total_files_processed":100,"total_bytes_processed":2097152}
+        """)
+
+        XCTAssertEqual(message, "Backup summary · 2 new · 3 changed · 95 unchanged · 1 MB added")
+        XCTAssertEqual(summary?.conciseText, "2 new · 3 changed · 95 unchanged · 1 MB added")
+    }
+
+    func testLogFormatterCallsOutUnchangedBackups() {
+        let message = ResticLogFormatter.displayMessage(for: """
+        {"message_type":"summary","files_new":0,"files_changed":0,"files_unmodified":100,"data_added":0,"total_files_processed":100,"total_bytes_processed":2097152}
+        """)
+
+        XCTAssertEqual(message, "No changes detected · 0 new · 0 changed · 100 unchanged · 2.1 MB checked")
+    }
+
+    func testLogFormatterDoesNotTreatGenericSummaryAsBackupSummary() {
+        let message = ResticLogFormatter.displayMessage(for: """
+        {"message_type":"summary","total_files":12,"total_bytes":4096}
+        """)
+
+        XCTAssertEqual(message, "Operation summary · 12 files · 4 KB")
+    }
+
     func testLogFormatterTurnsResticErrorJSONIntoReadableItemMessage() {
         let message = ResticLogFormatter.displayMessage(for: """
         {"message_type":"error","message":"permission denied","item":"/Users/me/Library/Mail"}

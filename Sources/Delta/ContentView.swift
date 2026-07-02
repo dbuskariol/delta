@@ -933,6 +933,9 @@ struct ProfileRow: View {
                             MetadataBadge(text: scheduleSummary)
                             MetadataBadge(text: retentionSummary)
                         }
+                        if let latestBackupRun {
+                            BackupRunSummaryLine(job: latestBackupRun)
+                        }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -2490,15 +2493,49 @@ struct JobRow: View {
     var job: JobRun
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(alignment: .top, spacing: 12) {
             StatusPill(status: job.status)
-            Text(job.kind.displayName)
-                .font(.system(.body, design: .rounded))
+            VStack(alignment: .leading, spacing: 4) {
+                Text(job.kind.displayName)
+                    .font(.system(.body, design: .rounded))
+                BackupRunSummaryLine(job: job)
+            }
             Spacer()
             Text(job.startedAt.formatted(date: .abbreviated, time: .shortened))
                 .foregroundStyle(.secondary)
         }
         .padding(.vertical, 6)
+    }
+}
+
+struct BackupRunSummaryLine: View {
+    var job: JobRun
+
+    var body: some View {
+        if let summaryText {
+            Text(summaryText)
+                .font(.caption)
+                .foregroundStyle(summaryColor)
+                .lineLimit(1)
+                .truncationMode(.tail)
+        }
+    }
+
+    private var summaryText: String? {
+        guard job.kind == .backup else {
+            return nil
+        }
+        if let summary = ResticLogFormatter.backupSummary(from: job.message) {
+            return summary.conciseText
+        }
+        return job.message?.localizedCaseInsensitiveContains("paused") == true ? job.message : nil
+    }
+
+    private var summaryColor: Color {
+        guard let summary = ResticLogFormatter.backupSummary(from: job.message) else {
+            return .secondary
+        }
+        return summary.hasChanges ? .secondary : .orange
     }
 }
 

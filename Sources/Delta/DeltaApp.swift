@@ -6,7 +6,7 @@ struct DeltaApp: App {
     @StateObject private var softwareUpdateController = SoftwareUpdateController()
 
     var body: some Scene {
-        WindowGroup {
+        WindowGroup(id: "main") {
             ContentView()
                 .environmentObject(model)
                 .environmentObject(softwareUpdateController)
@@ -14,20 +14,14 @@ struct DeltaApp: App {
         }
         .windowStyle(.hiddenTitleBar)
 
-        MenuBarExtra("Delta", systemImage: "externaldrive.badge.checkmark") {
-            Button("Run Due Backups") {
-                model.runDueBackups()
-            }
-            Button("Refresh") {
-                model.reload()
-            }
-            Button("Check for Updates...") {
-                softwareUpdateController.checkForUpdates()
-            }
-            Divider()
-            Button("Quit Delta") {
-                NSApplication.shared.terminate(nil)
-            }
+        MenuBarExtra {
+            DeltaMenuBarView()
+                .environmentObject(model)
+                .environmentObject(softwareUpdateController)
+                .frame(width: 340)
+        } label: {
+            Label("Delta", systemImage: model.isWorking ? "arrow.triangle.2.circlepath" : "externaldrive.badge.checkmark")
         }
+        .menuBarExtraStyle(.window)
     }
 }

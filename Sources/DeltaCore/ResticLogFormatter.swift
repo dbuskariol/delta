@@ -25,6 +25,57 @@ public struct ResticProgressSnapshot: Equatable, Sendable {
     }
 }
 
+public struct ResticBackupSummary: Equatable, Sendable {
+    public var filesNew: Int
+    public var filesChanged: Int
+    public var filesUnmodified: Int
+    public var totalFilesProcessed: Int
+    public var totalBytesProcessed: Int64
+    public var dataAdded: Int64?
+
+    public init(
+        filesNew: Int = 0,
+        filesChanged: Int = 0,
+        filesUnmodified: Int = 0,
+        totalFilesProcessed: Int = 0,
+        totalBytesProcessed: Int64 = 0,
+        dataAdded: Int64? = nil
+    ) {
+        self.filesNew = filesNew
+        self.filesChanged = filesChanged
+        self.filesUnmodified = filesUnmodified
+        self.totalFilesProcessed = totalFilesProcessed
+        self.totalBytesProcessed = totalBytesProcessed
+        self.dataAdded = dataAdded
+    }
+
+    public var hasChanges: Bool {
+        filesNew > 0 || filesChanged > 0 || (dataAdded ?? 0) > 0
+    }
+
+    public var conciseText: String {
+        var parts = [
+            "\(filesNew.formatted()) new",
+            "\(filesChanged.formatted()) changed",
+            "\(filesUnmodified.formatted()) unchanged"
+        ]
+        if let dataAdded, dataAdded > 0 {
+            parts.append("\(Self.byteString(dataAdded)) added")
+        } else if totalBytesProcessed > 0 {
+            parts.append("\(Self.byteString(totalBytesProcessed)) checked")
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    public var logText: String {
+        hasChanges ? "Backup summary · \(conciseText)" : "No changes detected · \(conciseText)"
+    }
+
+    private static func byteString(_ bytes: Int64) -> String {
+        ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
+    }
+}
+
 public enum ResticLogFormatter {
     public static func displayMessage(for rawMessage: String) -> String {
         guard let object = jsonObject(from: rawMessage) else {
@@ -32,6 +83,22 @@ public enum ResticLogFormatter {
         }
 
         return displayMessage(from: object, fallback: rawMessage)
+    }
+
+    public static func backupSummary(from output: String?) -> ResticBackupSummary? {
+        guard let output else {
+            return nil
+        }
+        for line in output.split(whereSeparator: \.isNewline).reversed() {
+            guard
+                let object = jsonObject(from: String(line)),
+                object["message_type"] as? String == "summary"
+            else {
+                continue
+            }
+            return backupSummary(from: object)
+        }
+        return nil
     }
 
     public static func progressSnapshot(for rawMessage: String) -> ResticProgressSnapshot? {
@@ -107,12 +174,37 @@ public enum ResticLogFormatter {
     }
 
     private static func summaryMessage(from object: [String: Any]) -> String {
-        var parts = ["Backup summary"]
-        if let files = integer(object["total_files_processed"]) {
-            parts.append("\(files) files processed")
+        backupSummary(from: object)?.logText ?? genericSummaryMessage(from: object)
+    }
+
+    private static func backupSummary(from object: [String: Any]) -> ResticBackupSummary? {
+        guard object["message_type"] as? String == "summary" else {
+            return nil
         }
-        if let bytes = integer(object["total_bytes_processed"]) {
-            parts.append(ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file))
+        let hasBackupCounters = object["files_new"] != nil
+            || object["files_changed"] != nil
+            || object["files_unmodified"] != nil
+            || object["data_added"] != nil
+        guard hasBackupCounters else {
+            return nil
+        }
+        return ResticBackupSummary(
+            filesNew: integer(object["files_new"]) ?? 0,
+            filesChanged: integer(object["files_changed"]) ?? 0,
+            filesUnmodified: integer(object["files_unmodified"]) ?? 0,
+            totalFilesProcessed: integer(object["total_files_processed"]) ?? 0,
+            totalBytesProcessed: int64(object["total_bytes_processed"]) ?? 0,
+            dataAdded: int64(object["data_added"])
+        )
+    }
+
+    private static func genericSummaryMessage(from object: [String: Any]) -> String {
+        var parts = ["Operation summary"]
+        if let files = integer(object["total_files_processed"]) ?? integer(object["total_files"]) {
+            parts.append("\(files.formatted()) files")
+        }
+        if let bytes = int64(object["total_bytes_processed"]) ?? int64(object["total_bytes"]) {
+            parts.append(ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file))
         }
         return parts.joined(separator: " · ")
     }
@@ -146,6 +238,21 @@ public enum ResticLogFormatter {
             return Int(value)
         case let value as NSNumber:
             return value.intValue
+        default:
+            return nil
+        }
+    }
+
+    private static func int64(_ value: Any?) -> Int64? {
+        switch value {
+        case let value as Int:
+            return Int64(value)
+        case let value as Int64:
+            return value
+        case let value as Double:
+            return Int64(value)
+        case let value as NSNumber:
+            return value.int64Value
         default:
             return nil
         }
