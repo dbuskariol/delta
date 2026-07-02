@@ -511,12 +511,16 @@ else
     append_row "sparkle_update_install" "$(item_area sparkle_update_install)" "Failed" "Sparkle update artifact verification failed: $sparkle_output" "Run Scripts/verify-release.sh or Scripts/generate-appcast.sh, then perform an actual update install."
   fi
 
-  notarization_output="$(run_capture notarization /bin/sh -c "/usr/bin/codesign -dvv '$APP_PATH' 2>&1 | /usr/bin/grep -q '^Authority=Developer ID Application:' && /usr/bin/xcrun stapler validate '$APP_PATH' >/dev/null 2>&1 && /usr/sbin/spctl --assess --type execute '$APP_PATH' >/dev/null 2>&1")"
-  notarization_status="$(command_status notarization)"
-  if [[ "$notarization_status" -eq 0 ]]; then
-    append_row "developer_id_notarization" "$(item_area developer_id_notarization)" "Automated Pass" "Developer ID signature, stapled ticket, and Gatekeeper assessment passed." "Archive notarytool submission and log JSON with the release evidence."
+  if [[ "$authority" != Developer\ ID\ Application:* ]]; then
+    append_row "developer_id_notarization" "$(item_area developer_id_notarization)" "Manual Required" "Current local build is signed as '${authority:-Unknown}', not Developer ID. Developer ID signature, notarization submission, stapling, and Gatekeeper assessment are external release steps." "Sign with Developer ID, submit with notarytool, staple, archive notary logs, and rerun production readiness."
   else
-    append_row "developer_id_notarization" "$(item_area developer_id_notarization)" "Failed" "Developer ID signature, stapled ticket, or Gatekeeper assessment is missing. $notarization_output" "Sign with Developer ID, submit with notarytool, staple, and rerun production readiness."
+    notarization_output="$(run_capture notarization /bin/sh -c "/usr/bin/xcrun stapler validate '$APP_PATH' >/dev/null 2>&1 && /usr/sbin/spctl --assess --type execute '$APP_PATH' >/dev/null 2>&1")"
+    notarization_status="$(command_status notarization)"
+    if [[ "$notarization_status" -eq 0 ]]; then
+      append_row "developer_id_notarization" "$(item_area developer_id_notarization)" "Automated Pass" "Developer ID signature, stapled ticket, and Gatekeeper assessment passed." "Archive notarytool submission and log JSON with the release evidence."
+    else
+      append_row "developer_id_notarization" "$(item_area developer_id_notarization)" "Failed" "Developer ID signature is present, but stapled ticket or Gatekeeper assessment is missing. $notarization_output" "Submit with notarytool, staple, and rerun production readiness."
+    fi
   fi
 fi
 
