@@ -12,10 +12,40 @@ public struct ResticCommand: Equatable, Sendable {
     }
 
     public var redactedDescription: String {
-        ([executableURL.path] + arguments).map { argument in
-            argument.contains("password") ? "<redacted>" : ShellEscaper.singleQuoted(argument)
-        }.joined(separator: " ")
+        var redacted = [ShellEscaper.singleQuoted(executableURL.path)]
+        var shouldRedactNextArgument = false
+        for argument in arguments {
+            if shouldRedactNextArgument {
+                redacted.append("<redacted>")
+                shouldRedactNextArgument = false
+                continue
+            }
+
+            if Self.sensitiveOptionsRequiringValueRedaction.contains(argument) {
+                redacted.append(ShellEscaper.singleQuoted(argument))
+                shouldRedactNextArgument = true
+                continue
+            }
+
+            if Self.sensitiveInlineOptionPrefixes.contains(where: { argument.hasPrefix($0) }) {
+                redacted.append("<redacted>")
+                continue
+            }
+
+            redacted.append(ShellEscaper.singleQuoted(argument))
+        }
+        return redacted.joined(separator: " ")
     }
+
+    private static let sensitiveOptionsRequiringValueRedaction: Set<String> = [
+        "--password-command",
+        "--password-file"
+    ]
+
+    private static let sensitiveInlineOptionPrefixes = [
+        "--password-command=",
+        "--password-file="
+    ]
 }
 
 public struct ResticExecutableLocator: Sendable {

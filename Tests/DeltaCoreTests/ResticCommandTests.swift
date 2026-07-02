@@ -2,6 +2,23 @@ import XCTest
 @testable import DeltaCore
 
 final class ResticCommandTests: XCTestCase {
+    func testRedactedDescriptionHidesPasswordCommandValue() {
+        let command = ResticCommand(
+            executableURL: URL(fileURLWithPath: "/Applications/Delta.app/Contents/MacOS/restic"),
+            arguments: [
+                "-r", "/Volumes/Backup/Delta",
+                "--password-command", "'/Applications/Delta.app/Contents/MacOS/DeltaSecretBridge' 'repository-secret-account'",
+                "snapshots"
+            ]
+        )
+
+        let description = command.redactedDescription
+
+        XCTAssertTrue(description.contains("'--password-command' <redacted>"))
+        XCTAssertFalse(description.contains("DeltaSecretBridge"))
+        XCTAssertFalse(description.contains("repository-secret-account"))
+    }
+
     func testBackendURLBuilderSupportsPrimaryBackends() throws {
         let builder = ResticBackendURLBuilder()
 
