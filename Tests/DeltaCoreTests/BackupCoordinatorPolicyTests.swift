@@ -162,6 +162,82 @@ final class BackupCoordinatorPolicyTests: XCTestCase {
         XCTAssertEqual(jobs.filter { $0.kind == .backup && $0.status == .succeeded }.count, 1)
     }
 
+    func testRunBackupPreparesUnverifiedRemoteDestinationWhenProbeReportsMissingRepository() throws {
+        let fixture = try Fixture()
+        let remoteRepository = BackupRepository(
+            id: fixture.repository.id,
+            name: "Cloud",
+            backend: .rest(url: "https://backup.example.com/delta")
+        )
+        try fixture.database.saveRepository(remoteRepository)
+        let runner = MockResticRunner(results: [
+            ResticRunResult(
+                exitCode: 10,
+                standardOutput: "",
+                standardError: "Fatal: repository does not exist: unable to open config file"
+            ),
+            .success,
+            .success,
+            .emptySnapshotList
+        ])
+        let coordinator = fixture.makeCoordinator(runner: runner)
+        let profile = fixture.profile()
+
+        let job = try coordinator.runBackup(profile: profile, repository: remoteRepository)
+        let jobs = try fixture.database.fetchJobRuns(limit: 10)
+
+        XCTAssertEqual(job.status, .succeeded)
+        XCTAssertEqual(runner.commands.map(\.resticSubcommand), ["snapshots", "init", "backup", "snapshots"])
+        XCTAssertEqual(jobs.filter { $0.kind == .initializeRepository && $0.status == .succeeded }.count, 1)
+        XCTAssertEqual(jobs.filter { $0.kind == .backup && $0.status == .succeeded }.count, 1)
+    }
+
+    func testRunBackupReusesExistingUnverifiedRemoteDestinationWhenProbeSucceeds() throws {
+        let fixture = try Fixture()
+        let remoteRepository = BackupRepository(
+            id: fixture.repository.id,
+            name: "Cloud",
+            backend: .rest(url: "https://backup.example.com/delta")
+        )
+        try fixture.database.saveRepository(remoteRepository)
+        let runner = MockResticRunner(results: [
+            .emptySnapshotList,
+            .success,
+            .emptySnapshotList
+        ])
+        let coordinator = fixture.makeCoordinator(runner: runner)
+        let profile = fixture.profile()
+
+        let job = try coordinator.runBackup(profile: profile, repository: remoteRepository)
+        let storedRepository = try XCTUnwrap(fixture.database.fetchRepositories().first { $0.id == remoteRepository.id })
+
+        XCTAssertEqual(job.status, .succeeded)
+        XCTAssertEqual(runner.commands.map(\.resticSubcommand), ["snapshots", "backup", "snapshots"])
+        XCTAssertNotNil(storedRepository.lastVerifiedAt)
+    }
+
+    func testRunBackupStopsBeforeBackupWhenRemoteProbeFails() throws {
+        let fixture = try Fixture()
+        let remoteRepository = BackupRepository(
+            id: fixture.repository.id,
+            name: "Cloud",
+            backend: .rest(url: "https://backup.example.com/delta")
+        )
+        try fixture.database.saveRepository(remoteRepository)
+        let runner = MockResticRunner(results: [
+            ResticRunResult(exitCode: 12, standardOutput: "", standardError: "wrong password")
+        ])
+        let coordinator = fixture.makeCoordinator(runner: runner)
+        let profile = fixture.profile()
+
+        let job = try coordinator.runBackup(profile: profile, repository: remoteRepository)
+
+        XCTAssertEqual(job.status, .failed)
+        XCTAssertEqual(runner.commands.map(\.resticSubcommand), ["snapshots"])
+        XCTAssertTrue(job.message?.localizedCaseInsensitiveContains("could not check the destination") == true, job.message ?? "")
+        XCTAssertTrue(job.message?.localizedCaseInsensitiveContains("encryption password") == true, job.message ?? "")
+    }
+
     func testSuccessfulBackupRefreshesRestorePointCache() throws {
         let fixture = try Fixture()
         let snapshotID = "snapshot-\(UUID().uuidString)"

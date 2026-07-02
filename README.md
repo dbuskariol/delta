@@ -12,7 +12,7 @@ The product goal is simple: make serious backup practices approachable without h
 - **Per-profile extra exclusions** for large generated folders, transient files, disk images, or other paths that should not consume backup storage.
 - **Local and network destinations** including local paths, mounted SMB/NFS volumes, SFTP, REST server, S3-compatible storage, Backblaze B2, Azure Blob, Google Cloud Storage, OpenStack Swift, rclone remotes, and custom restic URLs.
 - **Destination validation before save** for required fields, new or changed writable local paths, REST URLs, SFTP paths/ports, S3 endpoint/bucket fields, and rclone remote syntax.
-- **Automatic destination preparation** after a destination is added, with a first-backup safety net for writable local or mounted destinations that still have no restic metadata.
+- **Automatic destination preparation** after a destination is added, with a first-backup safety net for writable local/mounted destinations and unverified remote destinations that still have no encrypted backup metadata.
 - **Scheduled backups** through Background Backups, a signed macOS Login Item helper registered with `SMAppService`, with helper-started jobs reflected back into the app and menu bar.
 - **Power-aware scheduling** with battery and Low Power Mode controls.
 - **Retention maintenance** with scheduled forget/prune/check windows.
@@ -63,7 +63,7 @@ Important implementation details:
 - **SQLite persistence** lives under Application Support through `AppDirectories.databaseURL()` with WAL mode and a busy timeout for app/agent concurrent access.
 - **Durable-state fail closed** behavior prevents backup, destination, and restore operations if the Application Support database cannot be opened. Delta shows a blocked state instead of continuing against throwaway state.
 - **Profile validation** normalizes source paths, schedule values, bandwidth limits, retention limits, cleanup windows, and exclude patterns before saving or running backups.
-- **Operation-aware destination checks** allow a first backup to prepare a writable new local destination, while restore, browse, check, and cleanup require the destination itself to be connected or mounted before restic is invoked.
+- **Operation-aware destination checks** allow a first backup to prepare a writable new local destination or an uninitialized remote destination, while restore, browse, check, and cleanup require an existing destination before restic is invoked.
 - **Keychain secrets** use `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly` and a trusted-application access list for the signed Delta app, agent, and secret bridge. Background secret reads fail closed instead of showing system prompts.
 - **Background secret repair** rewrites saved destination passwords and backend credentials through the current signed app identity if a development build or old local Keychain item would otherwise prompt during scheduled jobs.
 - **Destination credential forms** use provider-specific labels and only hide actual password/token fields; non-secret values such as account names and rclone config paths stay readable.
@@ -120,6 +120,8 @@ Notification Center alerts are also separate from Background Backups. When enabl
 Retention maintenance can run `forget`, `prune`, and optional `check` based on the profile maintenance schedule. Post-prune checks are returned to the agent so failed validation is visible in job status and process exit status.
 
 For local and mounted destinations, scheduled maintenance fails fast with a clear reconnect/remount message when the destination folder is absent. Delta does not launch restic for cleanup or check work against a missing drive.
+
+For remote destinations, Delta performs a one-time lightweight restore-point probe before the first backup if the destination has not been verified yet. If the remote already contains encrypted backup metadata, Delta uses it and caches the verified state. If restic reports that the destination is missing, Delta prepares it automatically before the backup starts. Password, credential, lock, or network failures stop before backup data is scanned.
 
 ## Restore Workflow
 

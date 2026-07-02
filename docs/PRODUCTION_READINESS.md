@@ -38,6 +38,7 @@ Record the app version, build number, macOS build, signing identity, date, and t
 | Mounted network drive | Test at least one SMB or NFS mounted path under `/Volumes`, disconnect it, confirm Delta reports destination unavailable without invoking restic, reconnect it, and confirm backup resumes. |
 | SFTP destination | Test a real SFTP destination with a non-root absolute path, wrong credential failure, corrected credential success, restore point refresh, and restore. |
 | S3-compatible destination | Test at least one S3-compatible provider with endpoint, bucket, optional region, missing credential failure, corrected credential success, backup, check, and restore. |
+| Remote first backup preparation | Add a new unprepared remote destination, start a backup without pressing Prepare first, and confirm Delta probes, prepares when missing, then runs the backup. Repeat with an existing remote destination and confirm Delta reuses it without reinitializing. |
 | Restore wizard | Test full restore, selected folder restore from the browser, selected file restore, dry-run preview, chosen-folder restore, original-path preview, original-path confirmation, and every overwrite policy. |
 | Restore defaults | Change Settings > Restore Defaults, reopen Restore, and confirm preview, verification, and overwrite policy defaults apply while remaining editable per restore. |
 | Browse restore points | Confirm restore points load when the Restore tab is selected, refresh returns all current points, pruned points disappear after cleanup, and newest points are listed first. |

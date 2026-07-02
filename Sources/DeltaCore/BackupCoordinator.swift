@@ -131,32 +131,8 @@ public final class BackupCoordinator: @unchecked Sendable {
             BackupSource(id: original.id, path: resolved.url.path, bookmarkData: original.bookmarkData, includeSubvolumes: original.includeSubvolumes)
         }
 
-        if localRepositoryNeedsPreparation(repository) {
-            let preparationRun = try initializeRepository(repository)
-            guard preparationRun.status == .succeeded || preparationRun.status == .warning else {
-                let message = preparationRun.status == .cancelled
-                    ? (preparationRun.message ?? "Backup was paused while preparing the destination.")
-                    : "Backup was not started because the destination could not be prepared."
-                let run = JobRun(
-                    profileID: validatedProfile.id,
-                    repositoryID: repository.id,
-                    kind: .backup,
-                    status: preparationRun.status == .cancelled ? .cancelled : .failed,
-                    finishedAt: Date(),
-                    message: message,
-                    stopReason: preparationRun.stopReason
-                )
-                try database.saveJobRun(run)
-                try database.appendEvent(EventLog(level: .error, message: message))
-                recordJobLog(
-                    jobID: run.id,
-                    profileID: validatedProfile.id,
-                    repositoryID: repository.id,
-                    stream: run.status == .cancelled ? .standardOutput : .standardError,
-                    message: message
-                )
-                return run
-            }
+        if let preparationFailure = try prepareRepositoryForBackupIfNeeded(repository, profileID: validatedProfile.id) {
+            return preparationFailure
         }
 
         let backupRun = try run(
@@ -383,6 +359,102 @@ public final class BackupCoordinator: @unchecked Sendable {
             .filter { $0.profileID == profile.id && $0.kind == .prune && $0.status != .queued }
             .compactMap { $0.finishedAt ?? $0.startedAt }
             .max()
+    }
+
+    private func prepareRepositoryForBackupIfNeeded(_ repository: BackupRepository, profileID: UUID) throws -> JobRun? {
+        if localRepositoryNeedsPreparation(repository) {
+            return try initializeRepositoryForBackup(repository, profileID: profileID)
+        }
+
+        guard try remoteRepositoryNeedsFirstUseProbe(repository) else {
+            return nil
+        }
+
+        let probeResult: ResticRunResult
+        do {
+            probeResult = try probeRemoteRepository(repository)
+        } catch {
+            return try failedBackupRun(
+                profileID: profileID,
+                repositoryID: repository.id,
+                message: "Backup was not started because Delta could not check the destination: \(error.localizedDescription)"
+            )
+        }
+
+        if probeResult.status == .succeeded || probeResult.status == .warning {
+            return nil
+        }
+
+        if probeResult.failureKind == .repositoryMissing {
+            return try initializeRepositoryForBackup(repository, profileID: profileID)
+        }
+
+        return try failedBackupRun(
+            profileID: profileID,
+            repositoryID: repository.id,
+            message: "Backup was not started because Delta could not check the destination: \(probeResult.userFacingMessage)"
+        )
+    }
+
+    private func initializeRepositoryForBackup(_ repository: BackupRepository, profileID: UUID) throws -> JobRun? {
+        let preparationRun = try initializeRepository(repository)
+        guard preparationRun.status == .succeeded || preparationRun.status == .warning else {
+            let message = preparationRun.status == .cancelled
+                ? (preparationRun.message ?? "Backup was paused while preparing the destination.")
+                : "Backup was not started because the destination could not be prepared."
+            let run = JobRun(
+                profileID: profileID,
+                repositoryID: repository.id,
+                kind: .backup,
+                status: preparationRun.status == .cancelled ? .cancelled : .failed,
+                finishedAt: Date(),
+                message: message,
+                stopReason: preparationRun.stopReason
+            )
+            try database.saveJobRun(run)
+            try database.appendEvent(EventLog(level: .error, message: message))
+            recordJobLog(
+                jobID: run.id,
+                profileID: profileID,
+                repositoryID: repository.id,
+                stream: run.status == .cancelled ? .standardOutput : .standardError,
+                message: message
+            )
+            return run
+        }
+        return nil
+    }
+
+    private func remoteRepositoryNeedsFirstUseProbe(_ repository: BackupRepository) throws -> Bool {
+        guard repository.backend.kind != .local else {
+            return false
+        }
+        if repository.lastVerifiedAt != nil {
+            return false
+        }
+        let storedRepository = try database.fetchRepositories().first { $0.id == repository.id }
+        return storedRepository?.lastVerifiedAt == nil
+    }
+
+    private func probeRemoteRepository(_ repository: BackupRepository) throws -> ResticRunResult {
+        guard let lock = try lockManager.acquire(repositoryID: repository.id) else {
+            return ResticRunResult(exitCode: 11, standardOutput: "", standardError: "destination is already locked")
+        }
+        defer { withExtendedLifetime(lock) {} }
+
+        let result = try runner.run(try commandBuilder.snapshots(repository: repository))
+        guard result.status == .succeeded || result.status == .warning else {
+            return result
+        }
+
+        do {
+            let snapshots = try parser.parseSnapshots(from: result.standardOutput)
+            try database.saveSnapshots(snapshots, repositoryID: repository.id)
+        } catch {
+            try? database.appendEvent(EventLog(level: .warning, message: "Destination check succeeded, but restore points could not be cached: \(error.localizedDescription)"))
+        }
+        try markRepositoryVerified(repositoryID: repository.id, at: Date())
+        return result
     }
 
     private func localRepositoryNeedsPreparation(_ repository: BackupRepository) -> Bool {
