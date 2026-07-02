@@ -12,6 +12,7 @@ APP_STRING_FILES=(
   "Sources/DeltaCore/DiagnosticReport.swift"
   "Sources/DeltaCore/KeychainSecretStore.swift"
   "Sources/DeltaCore/LaunchAgentController.swift"
+  "Sources/DeltaCore/SettingsSurfaceContract.swift"
 )
 
 UI_STRING_VIOLATIONS="$(

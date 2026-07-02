@@ -18,6 +18,7 @@ enum AcceptancePreferencesCommand {
 
         clearPreferences(in: store)
         try verifyRecommendedDefaults()
+        try verifySettingsSurfaceContract()
 
         writeInvalidPreferences(to: store)
         try verifyInvalidPreferencesNormalize()
@@ -34,7 +35,7 @@ enum AcceptancePreferencesCommand {
         - Preference suite: \(DeltaAppPreferences.sharedSuiteName)
         - Isolated app support: \(try AppDirectories.applicationSupportDirectory(fileManager: fileManager).path)
 
-        This verifies the installed Delta app reads Settings values from the shared preferences suite used by the UI and helper processes, normalizes unsafe values, applies backup defaults to newly created profiles, applies restore defaults, and restores any existing user preferences after the probe.
+        This verifies the installed Delta app reads Settings values from the shared preferences suite used by the UI and helper processes, exposes the required Settings categories and status summary contract, normalizes unsafe values, applies backup defaults to newly created profiles, applies restore defaults, and restores any existing user preferences after the probe.
 
         ## Result
 
@@ -42,6 +43,10 @@ enum AcceptancePreferencesCommand {
 
         - Recommended backup defaults: Verified
         - Recommended restore defaults: Verified
+        - Settings surface contract: Verified
+        - Settings categories: \(SettingsSurfaceContract.categoryTitles.joined(separator: ", "))
+        - Settings status summary: \(SettingsSurfaceContract.statusSummaryTitles.joined(separator: ", "))
+        - Settings manual coverage: \(SettingsSurfaceContract.requiredManualAcceptanceCoverage.joined(separator: ", "))
         - Invalid preference normalization: Verified
         - Custom backup defaults persisted to a new profile: Verified
         - Custom restore defaults: Verified
@@ -129,6 +134,11 @@ enum AcceptancePreferencesCommand {
         try require(!DeltaAppPreferences.bool(for: DeltaAppPreferenceKeys.pausesScheduledBackups, default: false), "Scheduled automation should default to running.")
         try require(DeltaAppPreferences.bool(for: DeltaAppPreferenceKeys.preventsIdleSleepDuringJobs, default: true), "Idle sleep protection should default to enabled.")
         try require(DeltaAppPreferences.bool(for: DeltaAppPreferenceKeys.showsMenuBarExtra, default: true), "Status menu should default to shown.")
+    }
+
+    private static func verifySettingsSurfaceContract() throws {
+        let failures = SettingsSurfaceContract.validationFailures()
+        try require(failures.isEmpty, failures.joined(separator: " "))
     }
 
     private static func verifyInvalidPreferencesNormalize() throws {

@@ -71,6 +71,9 @@ if ! /usr/bin/grep -Fq "Installed preferences acceptance passed." "$OUTPUT"; the
 fi
 for expected in \
   "Recommended backup defaults: Verified" \
+  "Settings surface contract: Verified" \
+  "Settings categories: General, Defaults, Updates, Advanced" \
+  "Settings status summary: System Access, Schedules, Passwords, Updates, Notifications, Status Menu, Backup Tools" \
   "Invalid preference normalization: Verified" \
   "Custom backup defaults persisted to a new profile: Verified" \
   "Custom restore defaults: Verified" \

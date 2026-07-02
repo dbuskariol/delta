@@ -1222,13 +1222,26 @@ private enum ActivityLogDetail: String, CaseIterable, Identifiable {
 }
 
 struct SettingsView: View {
-    private enum SettingsCategory: String, CaseIterable, Identifiable {
-        case essentials = "General"
-        case defaults = "Defaults"
-        case updates = "Updates"
-        case support = "Advanced"
+    private enum SettingsCategory: CaseIterable, Identifiable {
+        case essentials
+        case defaults
+        case updates
+        case support
 
-        var id: String { rawValue }
+        var id: String { title }
+
+        var title: String {
+            switch self {
+            case .essentials:
+                return SettingsSurfaceContract.categoryGeneral
+            case .defaults:
+                return SettingsSurfaceContract.categoryDefaults
+            case .updates:
+                return SettingsSurfaceContract.categoryUpdates
+            case .support:
+                return SettingsSurfaceContract.categoryAdvanced
+            }
+        }
     }
 
     @EnvironmentObject private var model: DeltaAppModel
@@ -1398,7 +1411,7 @@ struct SettingsView: View {
 
             Picker("Settings Group", selection: $settingsCategory) {
                 ForEach(SettingsCategory.allCases) { category in
-                    Text(category.rawValue).tag(category)
+                    Text(category.title).tag(category)
                 }
             }
             .pickerStyle(.segmented)
@@ -2339,49 +2352,49 @@ struct SettingsView: View {
     private var settingsStatusItems: [SettingsStatusItem] {
         [
             SettingsStatusItem(
-                title: "System Access",
+                title: SettingsSurfaceContract.statusSummaryTitles[0],
                 value: fullDiskAccessStatusText,
                 symbol: "lock.shield",
                 color: fullDiskAccessStatusColor,
                 detail: model.fullDiskAccessStatus.hasLikelyFullDiskAccess ? "Protected folders readable" : "Action required"
             ),
             SettingsStatusItem(
-                title: "Schedules",
+                title: SettingsSurfaceContract.statusSummaryTitles[1],
                 value: backgroundBackupsPresentation.statusText,
                 symbol: "clock.badge.checkmark",
                 color: backgroundBackupsStatusColor,
                 detail: backgroundBackupsPresentation.statusDetail
             ),
             SettingsStatusItem(
-                title: "Passwords",
+                title: SettingsSurfaceContract.statusSummaryTitles[2],
                 value: backgroundSecretAccessSummary.displayName,
                 symbol: "key.horizontal",
                 color: backgroundSecretAccessStatusColor,
                 detail: backgroundSecretAccessSummary.detail
             ),
             SettingsStatusItem(
-                title: "Updates",
+                title: SettingsSurfaceContract.statusSummaryTitles[3],
                 value: automaticUpdatesStatusText,
                 symbol: "arrow.down.circle",
                 color: automaticUpdatesStatusColor,
                 detail: automaticUpdatesSummaryDetail
             ),
             SettingsStatusItem(
-                title: "Notifications",
+                title: SettingsSurfaceContract.statusSummaryTitles[4],
                 value: notificationStatusText,
                 symbol: "bell.badge",
                 color: notificationStatusColor,
                 detail: sendsJobNotifications ? "Job alerts configured" : "Alerts disabled"
             ),
             SettingsStatusItem(
-                title: "Status Menu",
+                title: SettingsSurfaceContract.statusSummaryTitles[5],
                 value: showsMenuBarExtra ? "Shown" : "Hidden",
                 symbol: "menubar.rectangle",
                 color: showsMenuBarExtra ? .green : .secondary,
                 detail: model.appLoginItemStatus == .enabled ? "Starts at login" : "Login optional"
             ),
             SettingsStatusItem(
-                title: "Backup Tools",
+                title: SettingsSurfaceContract.statusSummaryTitles[6],
                 value: backupToolStatusText,
                 symbol: "externaldrive.badge.checkmark",
                 color: backupToolStatusColor,
