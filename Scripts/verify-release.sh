@@ -15,6 +15,7 @@ cd "$ROOT_DIR"
   "$ROOT_DIR/Scripts/create-manual-acceptance-report.sh" \
   "$ROOT_DIR/Scripts/verify-installed-app.sh" \
   "$ROOT_DIR/Scripts/verify-manual-acceptance.sh" \
+  "$ROOT_DIR/Scripts/run-external-backend-acceptance.sh" \
   "$ROOT_DIR/Scripts/run-installed-local-backup-acceptance.sh" \
   "$ROOT_DIR/Scripts/run-local-acceptance-probe.sh" \
   "$ROOT_DIR/Scripts/verify-production-readiness.sh"
@@ -44,6 +45,10 @@ if [[ ! -x "$ROOT_DIR/Scripts/run-local-acceptance-probe.sh" ]]; then
 fi
 if [[ ! -x "$ROOT_DIR/Scripts/run-installed-local-backup-acceptance.sh" ]]; then
   printf "Scripts/run-installed-local-backup-acceptance.sh must be executable.\n" >&2
+  exit 1
+fi
+if [[ ! -x "$ROOT_DIR/Scripts/run-external-backend-acceptance.sh" ]]; then
+  printf "Scripts/run-external-backend-acceptance.sh must be executable.\n" >&2
   exit 1
 fi
 if [[ ! -x "$ROOT_DIR/Scripts/verify-production-readiness.sh" ]]; then

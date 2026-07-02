@@ -43,7 +43,23 @@ For a faster local readiness picture, run:
 Scripts/run-local-acceptance-probe.sh
 ```
 
-The probe writes `dist/local-acceptance/latest.md`. It also runs `Scripts/run-installed-local-backup-acceptance.sh`, which uses the app bundle's own restic binary to initialize a temporary encrypted local destination, run first and deduplicated second backups, restore a full restore point, restore a selected folder, check, prune, and run a post-prune check. The probe only marks machine-verifiable evidence as automated or partial evidence. It intentionally keeps Full Disk Access, closed-window schedule behavior, real SMB/NFS/SFTP/S3 targets, menu bar interaction, notifications, Sparkle install flow, and notarization as explicit manual follow-up where a shell process would give weak or misleading evidence.
+The probe writes `dist/local-acceptance/latest.md`. It also runs `Scripts/run-installed-local-backup-acceptance.sh`, which uses the app bundle's own restic binary to initialize a temporary encrypted local destination, run first and deduplicated second backups, restore a full restore point, restore a selected folder, check, prune, and run a post-prune check.
+
+External backend evidence is opt-in because it needs real infrastructure. Configure these variables before running the local probe when those targets are available:
+
+```sh
+DELTA_ACCEPTANCE_MOUNTED_PATH=/Volumes/BackupShare
+DELTA_ACCEPTANCE_SFTP_REPOSITORY='sftp:user@example.com:/srv/backups/delta-acceptance'
+DELTA_ACCEPTANCE_SFTP_PRIVATE_KEY="$HOME/.ssh/id_ed25519" # optional
+DELTA_ACCEPTANCE_SFTP_BAD_REPOSITORY='sftp:user@example.com:/srv/backups/delta-acceptance-bad' # optional failure probe
+DELTA_ACCEPTANCE_S3_REPOSITORY='s3:https://s3.example.com/bucket/delta-acceptance'
+AWS_ACCESS_KEY_ID=...
+AWS_SECRET_ACCESS_KEY=...
+```
+
+The external harness requires remote URLs to include `delta-acceptance` unless `DELTA_ACCEPTANCE_ALLOW_EXISTING_REMOTE=1` is set after a human confirms the target is safe. It proves unprepared-destination failure, preparation, existing-destination reuse, first backup, deduplicated no-change backup, full restore, selected-folder restore, check, prune, and post-prune check. S3 acceptance also proves missing-credential failure; SFTP can prove wrong-target or wrong-credential failure when `DELTA_ACCEPTANCE_SFTP_BAD_REPOSITORY` is configured.
+
+The probe only marks machine-verifiable evidence as automated or partial evidence. It intentionally keeps Full Disk Access, closed-window schedule behavior, UI disconnect/reconnect behavior, menu bar interaction, notifications, Sparkle install flow, and notarization as explicit manual follow-up where a shell process would give weak or misleading evidence.
 
 After manual acceptance, Developer ID notarization, and local installation of the exact release candidate, run the external distribution gate:
 

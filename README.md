@@ -253,6 +253,22 @@ Run the installed app bundle's local backup lifecycle directly:
 Scripts/run-installed-local-backup-acceptance.sh
 ```
 
+Run configured external backend lifecycles directly:
+
+```sh
+DELTA_ACCEPTANCE_MOUNTED_PATH=/Volumes/BackupShare \
+Scripts/run-external-backend-acceptance.sh mounted
+
+DELTA_ACCEPTANCE_SFTP_REPOSITORY='sftp:user@example.com:/srv/backups/delta-acceptance' \
+DELTA_ACCEPTANCE_SFTP_PRIVATE_KEY="$HOME/.ssh/id_ed25519" \
+Scripts/run-external-backend-acceptance.sh sftp
+
+DELTA_ACCEPTANCE_S3_REPOSITORY='s3:https://s3.example.com/bucket/delta-acceptance' \
+AWS_ACCESS_KEY_ID=... \
+AWS_SECRET_ACCESS_KEY=... \
+Scripts/run-external-backend-acceptance.sh s3
+```
+
 Create and verify the manual macOS acceptance report:
 
 ```sh
@@ -267,7 +283,7 @@ After Developer ID notarization and installing the exact release candidate, run 
 Scripts/verify-production-readiness.sh
 ```
 
-The local acceptance probe writes `dist/local-acceptance/latest.md` and separates automated evidence from human-only checks. It also runs `Scripts/run-installed-local-backup-acceptance.sh`, which uses the exact installed app bundle's restic binary to initialize a temporary encrypted local destination, run first and deduplicated second backups, restore a full restore point, restore a selected folder, check, prune, and run a post-prune check. New manual reports copy that local evidence into the Evidence / Notes column while keeping every Result as `Not run`. It is useful release evidence, but it does not replace the manual macOS acceptance matrix for Full Disk Access, closed-window scheduling, real SMB/NFS/SFTP/S3 destinations, menu bar interaction, notifications, Sparkle update installation, or notarization.
+The local acceptance probe writes `dist/local-acceptance/latest.md` and separates automated evidence from human-only checks. It also runs `Scripts/run-installed-local-backup-acceptance.sh`, which uses the exact installed app bundle's restic binary to initialize a temporary encrypted local destination, run first and deduplicated second backups, restore a full restore point, restore a selected folder, check, prune, and run a post-prune check. When configured with `DELTA_ACCEPTANCE_MOUNTED_PATH`, `DELTA_ACCEPTANCE_SFTP_REPOSITORY`, or `DELTA_ACCEPTANCE_S3_REPOSITORY`, it also runs real external backend lifecycle checks through `Scripts/run-external-backend-acceptance.sh`. Remote acceptance URLs must point at dedicated paths containing `delta-acceptance` unless `DELTA_ACCEPTANCE_ALLOW_EXISTING_REMOTE=1` is set after a human confirms the target is safe. New manual reports copy that local evidence into the Evidence / Notes column while keeping every Result as `Not run`. It is useful release evidence, but it does not replace the manual macOS acceptance matrix for Full Disk Access, closed-window scheduling UI, disconnect/reconnect behavior, menu bar interaction, notifications, Sparkle update installation, or notarization.
 
 The release evidence report is written under `dist/release-evidence/` and records the app version, git commit, signing details, helper/tool smoke output, Sparkle artifacts, automated gate status, local acceptance probe output, installed app smoke output, notarization ticket status, and manual acceptance report verification. `Scripts/verify-production-readiness.sh` fails unless that evidence, the current manual acceptance report, notarization, Gatekeeper, and the installed app all prove the same current git commit is ready for external distribution.
 

@@ -220,6 +220,48 @@ else
     installed_local_evidence="Installed-bundle local backup acceptance failed: $installed_local_output"
   fi
 
+  mounted_acceptance_status="not_configured"
+  mounted_acceptance_evidence=""
+  if [[ -n "${DELTA_ACCEPTANCE_MOUNTED_PATH:-}" ]]; then
+    mounted_output="$(run_capture external_mounted "$ROOT_DIR/Scripts/run-external-backend-acceptance.sh" mounted "$APP_PATH")"
+    mounted_status="$(command_status external_mounted)"
+    if [[ "$mounted_status" -eq 0 ]]; then
+      mounted_acceptance_status="passed"
+      mounted_acceptance_evidence="External mounted-destination acceptance passed using configured /Volumes target: $mounted_output"
+    else
+      mounted_acceptance_status="failed"
+      mounted_acceptance_evidence="External mounted-destination acceptance failed: $mounted_output"
+    fi
+  fi
+
+  sftp_acceptance_status="not_configured"
+  sftp_acceptance_evidence=""
+  if [[ -n "${DELTA_ACCEPTANCE_SFTP_REPOSITORY:-}" ]]; then
+    sftp_output="$(run_capture external_sftp "$ROOT_DIR/Scripts/run-external-backend-acceptance.sh" sftp "$APP_PATH")"
+    sftp_status="$(command_status external_sftp)"
+    if [[ "$sftp_status" -eq 0 ]]; then
+      sftp_acceptance_status="passed"
+      sftp_acceptance_evidence="External SFTP acceptance passed with non-interactive authentication: $sftp_output"
+    else
+      sftp_acceptance_status="failed"
+      sftp_acceptance_evidence="External SFTP acceptance failed: $sftp_output"
+    fi
+  fi
+
+  s3_acceptance_status="not_configured"
+  s3_acceptance_evidence=""
+  if [[ -n "${DELTA_ACCEPTANCE_S3_REPOSITORY:-}" ]]; then
+    s3_output="$(run_capture external_s3 "$ROOT_DIR/Scripts/run-external-backend-acceptance.sh" s3 "$APP_PATH")"
+    s3_status="$(command_status external_s3)"
+    if [[ "$s3_status" -eq 0 ]]; then
+      s3_acceptance_status="passed"
+      s3_acceptance_evidence="External S3-compatible acceptance passed with missing-credential failure and corrected-credential success: $s3_output"
+    else
+      s3_acceptance_status="failed"
+      s3_acceptance_evidence="External S3-compatible acceptance failed: $s3_output"
+    fi
+  fi
+
   automated_gate_status="$(gate_status_value status)"
   automated_gate_commit="$(gate_status_value git_commit)"
   if [[ "$automated_gate_status" == "Passed" && "$automated_gate_commit" == "$git_commit" ]]; then
@@ -248,10 +290,62 @@ else
     append_row "diagnostics_redaction" "$(item_area diagnostics_redaction)" "Failed" "$gate_evidence" "Run Scripts/verify-release.sh, then export diagnostics from Settings."
   fi
 
-  append_row "mounted_network_drive" "$(item_area mounted_network_drive)" "Manual Required" "No mounted SMB/NFS target is configured for non-interactive verification." "Test a mounted /Volumes destination, disconnect, confirm Delta fails before invoking restic, reconnect, and resume."
-  append_row "sftp_destination" "$(item_area sftp_destination)" "Manual Required" "No real SFTP server/key pair is configured for non-interactive verification." "Test wrong and corrected credentials, backup, restore-point refresh, and restore against SFTP."
-  append_row "s3_destination" "$(item_area s3_destination)" "Manual Required" "No S3-compatible provider credentials are configured for non-interactive verification." "Test missing and corrected credentials, backup, check, restore-point refresh, and restore against S3-compatible storage."
-  append_row "remote_first_backup_preparation" "$(item_area remote_first_backup_preparation)" "Manual Required" "Remote destination preparation needs a real unprepared remote and an existing remote to avoid false confidence." "Start backup on new unprepared remote and existing remote; confirm init happens only when needed."
+  case "$mounted_acceptance_status" in
+    passed)
+      append_row "mounted_network_drive" "$(item_area mounted_network_drive)" "Partial" "$mounted_acceptance_evidence" "Disconnect and reconnect the mounted destination in the installed app UI; confirm Delta fails before invoking restic while disconnected and resumes after reconnect."
+      ;;
+    failed)
+      append_row "mounted_network_drive" "$(item_area mounted_network_drive)" "Failed" "$mounted_acceptance_evidence" "Fix the configured mounted /Volumes acceptance target and rerun."
+      ;;
+    *)
+      append_row "mounted_network_drive" "$(item_area mounted_network_drive)" "Manual Required" "No mounted SMB/NFS target is configured for non-interactive verification. Set DELTA_ACCEPTANCE_MOUNTED_PATH to run external backend acceptance." "Test a mounted /Volumes destination, disconnect, confirm Delta fails before invoking restic, reconnect, and resume."
+      ;;
+  esac
+
+  case "$sftp_acceptance_status" in
+    passed)
+      append_row "sftp_destination" "$(item_area sftp_destination)" "Partial" "$sftp_acceptance_evidence" "Repeat through the installed app UI and confirm restore-point refresh, restore, and wrong credential/key behavior if DELTA_ACCEPTANCE_SFTP_BAD_REPOSITORY was not configured."
+      ;;
+    failed)
+      append_row "sftp_destination" "$(item_area sftp_destination)" "Failed" "$sftp_acceptance_evidence" "Fix the configured SFTP acceptance target and rerun."
+      ;;
+    *)
+      append_row "sftp_destination" "$(item_area sftp_destination)" "Manual Required" "No real SFTP server/key pair is configured for non-interactive verification. Set DELTA_ACCEPTANCE_SFTP_REPOSITORY and optional DELTA_ACCEPTANCE_SFTP_PRIVATE_KEY to run external backend acceptance." "Test wrong and corrected credentials, backup, restore-point refresh, and restore against SFTP."
+      ;;
+  esac
+
+  case "$s3_acceptance_status" in
+    passed)
+      append_row "s3_destination" "$(item_area s3_destination)" "Partial" "$s3_acceptance_evidence" "Repeat through the installed app UI and confirm provider-specific credential entry, backup, check, restore-point refresh, and restore."
+      ;;
+    failed)
+      append_row "s3_destination" "$(item_area s3_destination)" "Failed" "$s3_acceptance_evidence" "Fix the configured S3-compatible acceptance target and rerun."
+      ;;
+    *)
+      append_row "s3_destination" "$(item_area s3_destination)" "Manual Required" "No S3-compatible provider credentials are configured for non-interactive verification. Set DELTA_ACCEPTANCE_S3_REPOSITORY plus AWS credentials to run external backend acceptance." "Test missing and corrected credentials, backup, check, restore-point refresh, and restore against S3-compatible storage."
+      ;;
+  esac
+
+  remote_evidence_parts=()
+  remote_failed_parts=()
+  if [[ "$sftp_acceptance_status" == "passed" ]]; then
+    remote_evidence_parts+=("SFTP external acceptance proved unprepared-destination probe, prepare, reuse probe, backup, restore, check, and prune.")
+  elif [[ "$sftp_acceptance_status" == "failed" ]]; then
+    remote_failed_parts+=("$sftp_acceptance_evidence")
+  fi
+  if [[ "$s3_acceptance_status" == "passed" ]]; then
+    remote_evidence_parts+=("S3-compatible external acceptance proved unprepared-destination probe, prepare, reuse probe, backup, restore, check, and prune.")
+  elif [[ "$s3_acceptance_status" == "failed" ]]; then
+    remote_failed_parts+=("$s3_acceptance_evidence")
+  fi
+
+  if [[ "${#remote_failed_parts[@]}" -gt 0 ]]; then
+    append_row "remote_first_backup_preparation" "$(item_area remote_first_backup_preparation)" "Failed" "${remote_failed_parts[*]}" "Fix configured external remote acceptance targets and rerun."
+  elif [[ "${#remote_evidence_parts[@]}" -gt 0 ]]; then
+    append_row "remote_first_backup_preparation" "$(item_area remote_first_backup_preparation)" "Partial" "${remote_evidence_parts[*]}" "Repeat through the installed app UI with a new unprepared remote and an existing remote; confirm init happens only when needed."
+  else
+    append_row "remote_first_backup_preparation" "$(item_area remote_first_backup_preparation)" "Manual Required" "Remote destination preparation needs a real unprepared remote and an existing remote to avoid false confidence. Configure SFTP or S3 external acceptance to automate the backend lifecycle." "Start backup on new unprepared remote and existing remote; confirm init happens only when needed."
+  fi
   append_row "menu_bar" "$(item_area menu_bar)" "Manual Required" "Native status item presentation and persistent popover behavior require visual macOS interaction." "Enable/disable the menu bar item and verify ready/running/attention states plus all popover actions."
   append_row "notifications" "$(item_area notifications)" "Manual Required" "Notification Center authorization and delivery require user approval and real macOS delivery." "Enable alerts, grant macOS permission, trigger warning/failed helper jobs, and verify success summaries only when opted in."
 

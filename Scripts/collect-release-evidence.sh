@@ -112,6 +112,11 @@ if [[ -x "$ROOT_DIR/Scripts/run-local-acceptance-probe.sh" ]]; then
   if [[ -f "$ROOT_DIR/dist/local-acceptance/installed-local-backup-latest.md" ]]; then
     append_command "Installed Local Backup Acceptance Report" /bin/cat "$ROOT_DIR/dist/local-acceptance/installed-local-backup-latest.md"
   fi
+  for external_report in "$ROOT_DIR"/dist/local-acceptance/external-*-acceptance-latest.md; do
+    if [[ -f "$external_report" ]]; then
+      append_command "External Backend Acceptance Report: $(/usr/bin/basename "$external_report")" /bin/cat "$external_report"
+    fi
+  done
 fi
 
 MANUAL_MATRIX_PASSED="No"
