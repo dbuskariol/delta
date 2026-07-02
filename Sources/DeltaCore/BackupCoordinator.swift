@@ -559,6 +559,9 @@ public final class BackupCoordinator: @unchecked Sendable {
         job.status = result.status
         job.finishedAt = Date()
         job.exitCode = result.exitCode
+        if kind == .backup {
+            job.backupSummary = ResticLogFormatter.backupSummary(from: result.standardOutput)
+        }
         job.message = result.userFacingMessage
         try database.saveJobRun(job)
         if result.status == .cancelled {

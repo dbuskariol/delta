@@ -445,6 +445,7 @@ public struct JobRun: Codable, Identifiable, Equatable, Sendable {
     public var finishedAt: Date?
     public var exitCode: Int32?
     public var message: String?
+    public var backupSummary: ResticBackupSummary?
 
     public init(
         id: UUID = UUID(),
@@ -455,7 +456,8 @@ public struct JobRun: Codable, Identifiable, Equatable, Sendable {
         startedAt: Date = Date(),
         finishedAt: Date? = nil,
         exitCode: Int32? = nil,
-        message: String? = nil
+        message: String? = nil,
+        backupSummary: ResticBackupSummary? = nil
     ) {
         self.id = id
         self.profileID = profileID
@@ -466,6 +468,34 @@ public struct JobRun: Codable, Identifiable, Equatable, Sendable {
         self.finishedAt = finishedAt
         self.exitCode = exitCode
         self.message = message
+        self.backupSummary = backupSummary
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case profileID
+        case repositoryID
+        case kind
+        case status
+        case startedAt
+        case finishedAt
+        case exitCode
+        case message
+        case backupSummary
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        profileID = try container.decodeIfPresent(UUID.self, forKey: .profileID)
+        repositoryID = try container.decode(UUID.self, forKey: .repositoryID)
+        kind = try container.decode(JobKind.self, forKey: .kind)
+        status = try container.decode(JobStatus.self, forKey: .status)
+        startedAt = try container.decode(Date.self, forKey: .startedAt)
+        finishedAt = try container.decodeIfPresent(Date.self, forKey: .finishedAt)
+        exitCode = try container.decodeIfPresent(Int32.self, forKey: .exitCode)
+        message = try container.decodeIfPresent(String.self, forKey: .message)
+        backupSummary = try container.decodeIfPresent(ResticBackupSummary.self, forKey: .backupSummary)
     }
 }
 

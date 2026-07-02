@@ -39,12 +39,16 @@ public struct ResticRunResult: Equatable, Sendable {
         } else {
             self.status = ResticExitCodeMapper.status(for: exitCode, standardError: standardError)
             self.failureKind = ResticFailureClassifier.kind(exitCode: exitCode, standardOutput: standardOutput, standardError: standardError)
-            self.userFacingMessage = ResticFailureClassifier.userFacingMessage(
-                status: status,
-                failureKind: failureKind,
-                standardOutput: standardOutput,
-                standardError: standardError
-            )
+            if failureKind == nil, let summaryMessage = ResticLogFormatter.finalSummaryMessage(from: standardOutput) {
+                self.userFacingMessage = summaryMessage
+            } else {
+                self.userFacingMessage = ResticFailureClassifier.userFacingMessage(
+                    status: status,
+                    failureKind: failureKind,
+                    standardOutput: standardOutput,
+                    standardError: standardError
+                )
+            }
         }
     }
 }

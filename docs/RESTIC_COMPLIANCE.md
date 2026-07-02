@@ -117,7 +117,7 @@ Expected restic backup exit handling:
 | `12` | Wrong password |
 | other non-zero | Failed or cancelled when interruption text is present |
 
-Restic progress totals can change while it scans sources, so Delta does not render volatile live percentages as stable completion. The UI uses an indeterminate active-job bar with stable processed-file and processed-byte counters, backup jobs record source paths at job start, and saved logs are grouped by job with expandable full-log loading from SQLite. Restic summary JSON is parsed into explicit new, changed, unchanged, added, and checked counts so unchanged successful runs are clearly distinguished from runs that created new backup data.
+Restic progress totals can change while it scans sources, so Delta does not render volatile live percentages as stable completion. The UI uses an indeterminate active-job bar with stable processed-file and processed-byte counters, backup jobs record source paths at job start, and saved logs are grouped by job with expandable full-log loading from SQLite. Restic summary JSON is parsed into explicit new, changed, unchanged, added, and checked counts so unchanged successful runs are clearly distinguished from runs that created new backup data. Delta stores those counts as compact structured job metadata, including restic `snapshot_id` when present, instead of storing the complete restic stdout stream in the job message.
 
 ## Snapshots / Restore Points
 

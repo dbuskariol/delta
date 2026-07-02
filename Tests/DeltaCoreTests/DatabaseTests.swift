@@ -53,7 +53,13 @@ final class DatabaseTests: XCTestCase {
             sources: [BackupSource(path: "/Users/me/Documents")],
             repositoryID: repository.id
         )
-        let job = JobRun(profileID: profile.id, repositoryID: repository.id, kind: .backup, status: .succeeded)
+        let job = JobRun(
+            profileID: profile.id,
+            repositoryID: repository.id,
+            kind: .backup,
+            status: .succeeded,
+            backupSummary: ResticBackupSummary(filesNew: 2, filesChanged: 1, snapshotID: "snapshot")
+        )
         let snapshot = ResticSnapshot(id: "snapshot", time: Date(), paths: ["/Users/me/Documents"])
 
         try database.saveRepository(repository)
@@ -75,6 +81,7 @@ final class DatabaseTests: XCTestCase {
         XCTAssertEqual(fetchedJob.id, job.id)
         XCTAssertEqual(fetchedJob.kind, .backup)
         XCTAssertEqual(fetchedJob.status, .succeeded)
+        XCTAssertEqual(fetchedJob.backupSummary, job.backupSummary)
 
         let snapshotsByRepository = try database.fetchSnapshotsByRepository()
         XCTAssertEqual(snapshotsByRepository[repository.id]?.first?.id, "snapshot")

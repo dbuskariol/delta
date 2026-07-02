@@ -135,16 +135,31 @@ final class ResticRunnerTests: XCTestCase {
 
     func testLogFormatterShowsBackupSummaryChangeCounts() {
         let message = ResticLogFormatter.displayMessage(for: """
-        {"message_type":"summary","files_new":2,"files_changed":3,"files_unmodified":95,"data_added":1048576,"total_files_processed":100,"total_bytes_processed":2097152}
+        {"message_type":"summary","files_new":2,"files_changed":3,"files_unmodified":95,"data_added":1048576,"total_files_processed":100,"total_bytes_processed":2097152,"snapshot_id":"snapshot-id"}
         """)
         let summary = ResticLogFormatter.backupSummary(from: """
         {"message_type":"status","files_done":100}
-        {"message_type":"summary","files_new":2,"files_changed":3,"files_unmodified":95,"data_added":1048576,"total_files_processed":100,"total_bytes_processed":2097152}
+        {"message_type":"summary","files_new":2,"files_changed":3,"files_unmodified":95,"data_added":1048576,"total_files_processed":100,"total_bytes_processed":2097152,"snapshot_id":"snapshot-id"}
         """)
+        let finalSummaryMessage = ResticLogFormatter.finalSummaryMessage(from: """
+        {"message_type":"status","files_done":100}
+        {"message_type":"summary","files_new":2,"files_changed":3,"files_unmodified":95,"data_added":1048576,"total_files_processed":100,"total_bytes_processed":2097152,"snapshot_id":"snapshot-id"}
+        """)
+        let result = ResticRunResult(
+            exitCode: 0,
+            standardOutput: """
+            {"message_type":"status","files_done":100}
+            {"message_type":"summary","files_new":2,"files_changed":3,"files_unmodified":95,"data_added":1048576,"total_files_processed":100,"total_bytes_processed":2097152,"snapshot_id":"snapshot-id"}
+            """,
+            standardError: ""
+        )
 
         XCTAssertEqual(message, "Backup summary · 2 new · 3 changed · 95 unchanged · 1 MB added")
         XCTAssertEqual(summary?.conciseText, "2 new · 3 changed · 1 MB added")
         XCTAssertEqual(summary?.detailedText, "2 new · 3 changed · 95 unchanged · 1 MB added")
+        XCTAssertEqual(summary?.snapshotID, "snapshot-id")
+        XCTAssertEqual(finalSummaryMessage, "Backup summary · 2 new · 3 changed · 95 unchanged · 1 MB added")
+        XCTAssertEqual(result.userFacingMessage, "Backup summary · 2 new · 3 changed · 95 unchanged · 1 MB added")
     }
 
     func testLogFormatterCallsOutUnchangedBackups() {

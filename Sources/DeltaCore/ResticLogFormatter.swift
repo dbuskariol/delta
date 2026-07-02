@@ -25,13 +25,14 @@ public struct ResticProgressSnapshot: Equatable, Sendable {
     }
 }
 
-public struct ResticBackupSummary: Equatable, Sendable {
+public struct ResticBackupSummary: Codable, Equatable, Sendable {
     public var filesNew: Int
     public var filesChanged: Int
     public var filesUnmodified: Int
     public var totalFilesProcessed: Int
     public var totalBytesProcessed: Int64
     public var dataAdded: Int64?
+    public var snapshotID: String?
 
     public init(
         filesNew: Int = 0,
@@ -39,7 +40,8 @@ public struct ResticBackupSummary: Equatable, Sendable {
         filesUnmodified: Int = 0,
         totalFilesProcessed: Int = 0,
         totalBytesProcessed: Int64 = 0,
-        dataAdded: Int64? = nil
+        dataAdded: Int64? = nil,
+        snapshotID: String? = nil
     ) {
         self.filesNew = filesNew
         self.filesChanged = filesChanged
@@ -47,6 +49,7 @@ public struct ResticBackupSummary: Equatable, Sendable {
         self.totalFilesProcessed = totalFilesProcessed
         self.totalBytesProcessed = totalBytesProcessed
         self.dataAdded = dataAdded
+        self.snapshotID = snapshotID
     }
 
     public var hasChanges: Bool {
@@ -126,6 +129,22 @@ public enum ResticLogFormatter {
                 continue
             }
             return backupSummary(from: object)
+        }
+        return nil
+    }
+
+    public static func finalSummaryMessage(from output: String?) -> String? {
+        guard let output else {
+            return nil
+        }
+        for line in output.split(whereSeparator: \.isNewline).reversed() {
+            guard
+                let object = jsonObject(from: String(line)),
+                object["message_type"] as? String == "summary"
+            else {
+                continue
+            }
+            return displayMessage(from: object, fallback: String(line))
         }
         return nil
     }
@@ -223,7 +242,8 @@ public enum ResticLogFormatter {
             filesUnmodified: integer(object["files_unmodified"]) ?? 0,
             totalFilesProcessed: integer(object["total_files_processed"]) ?? 0,
             totalBytesProcessed: int64(object["total_bytes_processed"]) ?? 0,
-            dataAdded: int64(object["data_added"])
+            dataAdded: int64(object["data_added"]),
+            snapshotID: string(object["snapshot_id"])
         )
     }
 
@@ -285,6 +305,14 @@ public enum ResticLogFormatter {
         default:
             return nil
         }
+    }
+
+    private static func string(_ value: Any?) -> String? {
+        guard let value = value as? String else {
+            return nil
+        }
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 
     private static func currentPath(from object: [String: Any]) -> String? {

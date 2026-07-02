@@ -297,11 +297,21 @@ struct RestoreView: View {
                         Picker("Restore Point", selection: $snapshotID) {
                             Text("Choose").tag("")
                             ForEach(repositorySnapshots) { snapshot in
-                                Text("\(snapshot.time.formatted(date: .abbreviated, time: .shortened))  \(snapshot.id.prefix(8))").tag(snapshot.id)
+                                Text(restorePointLabel(for: snapshot)).tag(snapshot.id)
                             }
                         }
                         .labelsHidden()
                         .frame(width: 420, alignment: .leading)
+                    }
+
+                    if let selectedRestorePointSummary {
+                        RestoreFormRow(title: "") {
+                            Text(selectedRestorePointSummary)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .truncationMode(.tail)
+                        }
                     }
                 }
             }
@@ -433,6 +443,28 @@ struct RestoreView: View {
         repositorySnapshots.first { $0.id == snapshotID }
     }
 
+    private var backupSummariesBySnapshotID: [String: ResticBackupSummary] {
+        var summaries: [String: ResticBackupSummary] = [:]
+        for job in model.jobs.sorted(by: { $0.startedAt > $1.startedAt }) where job.kind == .backup {
+            guard
+                let summary = job.backupSummary ?? ResticLogFormatter.backupSummary(from: job.message),
+                let snapshotID = summary.snapshotID,
+                summaries[snapshotID] == nil
+            else {
+                continue
+            }
+            summaries[snapshotID] = summary
+        }
+        return summaries
+    }
+
+    private var selectedRestorePointSummary: String? {
+        guard let selectedSnapshot, let summary = backupSummariesBySnapshotID[selectedSnapshot.id] else {
+            return nil
+        }
+        return "Backup changes: \(summary.detailedText)"
+    }
+
     private var currentBrowserDirectory: String? {
         browserPathStack.last
     }
@@ -520,6 +552,14 @@ struct RestoreView: View {
             preRestoreBackupProfileID: preRestoreProfileID
         )
         model.runRestore(repository: repository, request: request)
+    }
+
+    private func restorePointLabel(for snapshot: ResticSnapshot) -> String {
+        let base = "\(snapshot.time.formatted(date: .abbreviated, time: .shortened)) · \(snapshot.id.prefix(8))"
+        guard let summary = backupSummariesBySnapshotID[snapshot.id] else {
+            return base
+        }
+        return "\(base) · \(summary.conciseText)"
     }
 
     private func refreshRestorePointsForSelectedRepository() {
@@ -3082,10 +3122,24 @@ struct BackupRunSummaryLine: View {
         guard job.kind == .backup else {
             return nil
         }
+        if let summary = job.backupSummary {
+            return summary.conciseText
+        }
         if let summary = ResticLogFormatter.backupSummary(from: job.message) {
             return summary.conciseText
         }
-        return job.message?.localizedCaseInsensitiveContains("paused") == true ? job.message : nil
+        guard let message = job.message, !message.isEmpty else {
+            return nil
+        }
+        if message.localizedCaseInsensitiveContains("paused") {
+            return message
+        }
+        if message.localizedCaseInsensitiveContains("backup summary") || message.localizedCaseInsensitiveContains("no changes detected") {
+            return message
+                .replacingOccurrences(of: "Backup summary · ", with: "")
+                .replacingOccurrences(of: "No changes detected · ", with: "")
+        }
+        return nil
     }
 }
 

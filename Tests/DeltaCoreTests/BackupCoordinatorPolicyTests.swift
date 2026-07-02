@@ -188,6 +188,31 @@ final class BackupCoordinatorPolicyTests: XCTestCase {
         XCTAssertEqual(snapshots.map(\.id), [snapshotID])
     }
 
+    func testSuccessfulBackupPersistsStructuredSummaryWithoutFullStdout() throws {
+        let fixture = try Fixture()
+        let snapshotID = "snapshot-\(UUID().uuidString)"
+        let backupOutput = """
+        {"message_type":"status","files_done":12,"total_files":100}
+        {"message_type":"summary","files_new":4,"files_changed":2,"files_unmodified":94,"data_added":2048,"total_files_processed":100,"total_bytes_processed":4096,"snapshot_id":"\(snapshotID)"}
+        """
+        let runner = MockResticRunner(results: [
+            ResticRunResult(exitCode: 0, standardOutput: backupOutput, standardError: ""),
+            .emptySnapshotList
+        ])
+        let coordinator = fixture.makeCoordinator(runner: runner)
+        let profile = fixture.profile()
+
+        let job = try coordinator.runBackup(profile: profile, repository: fixture.repository)
+        let storedJob = try XCTUnwrap(try fixture.database.fetchJobRuns(limit: 10).first { $0.id == job.id })
+
+        XCTAssertEqual(job.status, .succeeded)
+        XCTAssertEqual(storedJob.backupSummary?.filesNew, 4)
+        XCTAssertEqual(storedJob.backupSummary?.filesChanged, 2)
+        XCTAssertEqual(storedJob.backupSummary?.snapshotID, snapshotID)
+        XCTAssertEqual(storedJob.message, "Backup summary · 4 new · 2 changed · 94 unchanged · 2 KB added")
+        XCTAssertFalse(storedJob.message?.contains("files_done") == true)
+    }
+
     func testRunBackupReportsCancelledWhenPreparationIsPaused() throws {
         let fixture = try Fixture(repositoryPrepared: false)
         let runner = MockResticRunner(results: [
