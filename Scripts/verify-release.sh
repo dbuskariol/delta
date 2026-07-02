@@ -26,6 +26,7 @@ cd "$ROOT_DIR"
   "$ROOT_DIR/Scripts/run-external-backend-acceptance.sh" \
   "$ROOT_DIR/Scripts/run-installed-diagnostics-acceptance.sh" \
   "$ROOT_DIR/Scripts/run-installed-keychain-access-acceptance.sh" \
+  "$ROOT_DIR/Scripts/run-installed-local-sftp-acceptance.sh" \
   "$ROOT_DIR/Scripts/run-installed-local-backup-acceptance.sh" \
   "$ROOT_DIR/Scripts/run-installed-preferences-acceptance.sh" \
   "$ROOT_DIR/Scripts/run-installed-rclone-local-acceptance.sh" \
@@ -91,6 +92,10 @@ if [[ ! -x "$ROOT_DIR/Scripts/run-local-acceptance-probe.sh" ]]; then
 fi
 if [[ ! -x "$ROOT_DIR/Scripts/run-installed-local-backup-acceptance.sh" ]]; then
   printf "Scripts/run-installed-local-backup-acceptance.sh must be executable.\n" >&2
+  exit 1
+fi
+if [[ ! -x "$ROOT_DIR/Scripts/run-installed-local-sftp-acceptance.sh" ]]; then
+  printf "Scripts/run-installed-local-sftp-acceptance.sh must be executable.\n" >&2
   exit 1
 fi
 if [[ ! -x "$ROOT_DIR/Scripts/run-installed-preferences-acceptance.sh" ]]; then
@@ -293,6 +298,7 @@ fi
 "$ROOT_DIR/Scripts/run-installed-preferences-acceptance.sh" "$ROOT_DIR/dist/Delta.app"
 "$ROOT_DIR/Scripts/run-installed-scheduled-agent-acceptance.sh" "$ROOT_DIR/dist/Delta.app"
 "$ROOT_DIR/Scripts/run-installed-run-control-acceptance.sh" "$ROOT_DIR/dist/Delta.app"
+"$ROOT_DIR/Scripts/run-installed-local-sftp-acceptance.sh" "$ROOT_DIR/dist/Delta.app"
 "$ROOT_DIR/Scripts/run-installed-rclone-local-acceptance.sh" "$ROOT_DIR/dist/Delta.app"
 
 DELTA_SKIP_BUILD=1 "$ROOT_DIR/Scripts/package-update.sh"

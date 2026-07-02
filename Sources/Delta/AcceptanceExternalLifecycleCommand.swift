@@ -91,7 +91,8 @@ enum AcceptanceExternalLifecycleCommand {
             resticExecutableURL: resticURL,
             secretBridgeURL: executableURL,
             secretBridgeArguments: ["--secret-bridge"],
-            credentialResolver: credentialResolver
+            credentialResolver: credentialResolver,
+            baseEnvironment: environment
         )
         let coordinator = BackupCoordinator(
             database: database,

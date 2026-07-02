@@ -265,6 +265,13 @@ else
   else
     installed_run_control_evidence="Installed app run-control acceptance failed: $installed_run_control_output"
   fi
+  installed_sftp_local_output="$(run_capture installed_sftp_local "$ROOT_DIR/Scripts/run-installed-local-sftp-acceptance.sh" "$APP_PATH")"
+  installed_sftp_local_status="$(command_status installed_sftp_local)"
+  if [[ "$installed_sftp_local_status" -eq 0 ]]; then
+    installed_sftp_local_evidence="Installed app localhost SFTP lifecycle acceptance passed through Delta coordinator using an ephemeral sshd, temporary host key, temporary client key, and non-interactive known_hosts: wrong-target probe, automatic destination preparation, existing-destination reuse, no-change backup, incremental backup, restore-point cache, backup browser listing, full restore, selected folder restore, destination check, cleanup, and post-cleanup check. $installed_sftp_local_output"
+  else
+    installed_sftp_local_evidence="Installed app localhost SFTP lifecycle acceptance failed: $installed_sftp_local_output"
+  fi
   installed_rclone_local_output="$(run_capture installed_rclone_local "$ROOT_DIR/Scripts/run-installed-rclone-local-acceptance.sh" "$APP_PATH")"
   installed_rclone_local_status="$(command_status installed_rclone_local)"
   if [[ "$installed_rclone_local_status" -eq 0 ]]; then
@@ -299,6 +306,12 @@ else
       sftp_acceptance_status="failed"
       sftp_acceptance_evidence="External SFTP acceptance failed: $sftp_output"
     fi
+  elif [[ "$installed_sftp_local_status" -eq 0 ]]; then
+    sftp_acceptance_status="passed"
+    sftp_acceptance_evidence="$installed_sftp_local_evidence"
+  else
+    sftp_acceptance_status="failed"
+    sftp_acceptance_evidence="$installed_sftp_local_evidence"
   fi
 
   s3_acceptance_status="not_configured"

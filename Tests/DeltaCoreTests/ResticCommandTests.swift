@@ -368,6 +368,7 @@ final class ResticCommandTests: XCTestCase {
         let optionValue = try XCTUnwrap(optionValues(in: command.arguments).first { $0.hasPrefix("sftp.args=") })
 
         XCTAssertTrue(optionValue.contains("BatchMode=yes"))
+        XCTAssertTrue(optionValue.contains("StrictHostKeyChecking=accept-new"))
         XCTAssertTrue(optionValue.contains("ServerAliveInterval=60"))
         XCTAssertTrue(optionValue.contains("ServerAliveCountMax=240"))
         XCTAssertFalse(optionValue.contains("-i "))
@@ -390,6 +391,33 @@ final class ResticCommandTests: XCTestCase {
 
         XCTAssertTrue(optionValue.contains("-i '/Users/me/.ssh/delta backup'"))
         XCTAssertTrue(optionValue.contains("IdentitiesOnly=yes"))
+        XCTAssertTrue(optionValue.contains("BatchMode=yes"))
+    }
+
+    func testSFTPCommandCanPinKnownHostsFileForNonInteractiveAcceptance() throws {
+        let repository = BackupRepository(
+            name: "SFTP",
+            backend: .sftp(
+                host: "nas.local",
+                path: "/tank/delta",
+                username: "me",
+                port: nil,
+                identityFilePath: nil
+            )
+        )
+        let builder = ResticCommandBuilder(
+            resticExecutableURL: URL(fileURLWithPath: "/Applications/Delta.app/Contents/MacOS/restic"),
+            secretBridgeURL: URL(fileURLWithPath: "/Applications/Delta.app/Contents/MacOS/Delta"),
+            baseEnvironment: [
+                "DELTA_SFTP_KNOWN_HOSTS_FILE": "/tmp/delta known_hosts",
+                "PATH": "/usr/bin:/bin"
+            ]
+        )
+
+        let command = try builder.snapshots(repository: repository)
+        let optionValue = try XCTUnwrap(optionValues(in: command.arguments).first { $0.hasPrefix("sftp.args=") })
+
+        XCTAssertTrue(optionValue.contains("'UserKnownHostsFile=/tmp/delta known_hosts'"))
         XCTAssertTrue(optionValue.contains("BatchMode=yes"))
     }
 

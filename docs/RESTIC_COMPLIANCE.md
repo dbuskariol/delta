@@ -85,7 +85,7 @@ S3 region is passed as an explicit restic backend option:
 SFTP destinations are always run with non-interactive SSH arguments:
 
 ```text
--o sftp.args="-o BatchMode=yes -o ServerAliveInterval=60 -o ServerAliveCountMax=240"
+-o sftp.args="-o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=60 -o ServerAliveCountMax=240"
 ```
 
 If the user chooses an SSH private key file, Delta adds:
@@ -94,7 +94,7 @@ If the user chooses an SSH private key file, Delta adds:
 -i <identity-file> -o IdentitiesOnly=yes
 ```
 
-This follows restic's SFTP guidance that automatic backups require passwordless SSH authentication. The identity file path is destination configuration, not a backend password; passphrase-protected keys must already be available through ssh-agent or the configured SSH environment.
+This follows restic's SFTP guidance that automatic backups require passwordless SSH authentication. The `accept-new` host-key policy allows first-time scheduled connections to avoid interactive prompts while still rejecting changed host keys. The identity file path is destination configuration, not a backend password; passphrase-protected keys must already be available through ssh-agent or the configured SSH environment.
 
 rclone is pinned to the bundled executable when available:
 

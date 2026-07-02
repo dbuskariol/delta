@@ -378,9 +378,16 @@ public struct ResticCommandBuilder: Sendable {
     private func sftpBackendOptionArguments(identityFilePath: String?) -> [String] {
         var arguments = [
             "-o", "BatchMode=yes",
+            "-o", "StrictHostKeyChecking=accept-new",
             "-o", "ServerAliveInterval=60",
             "-o", "ServerAliveCountMax=240"
         ]
+
+        if let knownHostsFilePath = normalizedLocalPath(baseEnvironment["DELTA_SFTP_KNOWN_HOSTS_FILE"]) {
+            arguments += [
+                "-o", "UserKnownHostsFile=\(knownHostsFilePath)"
+            ]
+        }
 
         if let identityFilePath = normalizedLocalPath(identityFilePath) {
             arguments += [

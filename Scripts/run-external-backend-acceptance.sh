@@ -18,6 +18,7 @@ Environment:
     DELTA_ACCEPTANCE_SFTP_REPOSITORY=sftp:user@example.com:/absolute/delta-acceptance-path
     DELTA_ACCEPTANCE_SFTP_PRIVATE_KEY=/path/to/key   optional; ssh-agent/config also works
     DELTA_ACCEPTANCE_SFTP_BAD_REPOSITORY=...         optional; must fail before success
+    DELTA_SFTP_KNOWN_HOSTS_FILE=/path/to/known_hosts optional; useful for isolated harnesses
 
   rest:
     DELTA_ACCEPTANCE_REST_REPOSITORY=rest:https://rest.example.com/delta-acceptance
