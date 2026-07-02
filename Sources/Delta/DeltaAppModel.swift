@@ -48,6 +48,7 @@ final class DeltaAppModel: ObservableObject {
     @Published private(set) var snapshotEntryCache: [String: [ResticSnapshotEntry]] = [:]
     @Published private(set) var snapshotEntryLoadingKey: String?
     @Published var events: [EventLog] = []
+    @Published private(set) var sourceHealthWarnings: [DashboardHealthWarning] = []
     @Published var fullDiskAccessStatus = FullDiskAccessProbe().check()
     @Published var isWorking = false
     @Published var alertMessage: String?
@@ -100,6 +101,7 @@ final class DeltaAppModel: ObservableObject {
 
     func reload() {
         guard reopenPersistentStoreIfNeeded() else {
+            sourceHealthWarnings = []
             fullDiskAccessStatus = FullDiskAccessProbe().check()
             launchAgentStatus = LaunchAgentController.status()
             appLoginItemStatus = AppLoginItemController.status()
@@ -121,6 +123,7 @@ final class DeltaAppModel: ObservableObject {
             snapshots = try database.fetchSnapshots()
             snapshotsByRepository = try database.fetchSnapshotsByRepository()
             events = try database.fetchEvents(limit: 200)
+            sourceHealthWarnings = DashboardHealthEvaluator().sourceWarnings(profiles: storedProfiles)
             fullDiskAccessStatus = FullDiskAccessProbe().check()
             launchAgentStatus = LaunchAgentController.status()
             appLoginItemStatus = AppLoginItemController.status()

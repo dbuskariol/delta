@@ -224,7 +224,7 @@ struct DashboardView: View {
     }
 
     private var sourceHealthWarnings: [DashboardHealthWarning] {
-        DashboardHealthEvaluator().sourceWarnings(profiles: model.profiles)
+        model.sourceHealthWarnings
     }
 }
 
