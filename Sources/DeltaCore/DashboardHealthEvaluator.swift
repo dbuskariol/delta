@@ -14,11 +14,79 @@ public struct DashboardHealthWarning: Identifiable, Equatable, Sendable {
     }
 }
 
+public struct BackupSourceHealthEvaluator: Sendable {
+    public var bookmarkStore: SecurityScopedBookmarkStore
+    public var sourceAccessChecker: BackupSourceAccessChecker
+
+    public init(
+        bookmarkStore: SecurityScopedBookmarkStore = SecurityScopedBookmarkStore(),
+        sourceAccessChecker: BackupSourceAccessChecker = BackupSourceAccessChecker()
+    ) {
+        self.bookmarkStore = bookmarkStore
+        self.sourceAccessChecker = sourceAccessChecker
+    }
+
+    public func warnings(
+        profiles: [BackupProfile],
+        limit: Int = 4
+    ) -> [DashboardHealthWarning] {
+        profiles
+            .compactMap { warning(for: $0) }
+            .prefix(limit)
+            .map { $0 }
+    }
+
+    private func warning(for profile: BackupProfile) -> DashboardHealthWarning? {
+        let resolvedSources: [ResolvedSecurityScopedURL]
+        do {
+            resolvedSources = try profile.sources.map { try bookmarkStore.resolve($0) }
+        } catch {
+            return DashboardHealthWarning(
+                id: "\(profile.id.uuidString)-source-access",
+                title: "\(profile.name) source needs access",
+                detail: "Delta cannot access one of this profile's selected sources. Rechoose the folder or check Full Disk Access.",
+                isCritical: true
+            )
+        }
+        defer {
+            for source in resolvedSources {
+                source.stopAccessing()
+            }
+        }
+
+        let resolvedBackupSources = zip(profile.sources, resolvedSources).map { original, resolved in
+            BackupSource(
+                id: original.id,
+                path: resolved.url.path,
+                bookmarkData: original.bookmarkData,
+                includeSubvolumes: original.includeSubvolumes
+            )
+        }
+
+        do {
+            try sourceAccessChecker.validate(resolvedBackupSources)
+            return nil
+        } catch {
+            return DashboardHealthWarning(
+                id: "\(profile.id.uuidString)-source-access",
+                title: "\(profile.name) source needs attention",
+                detail: error.localizedDescription,
+                isCritical: true
+            )
+        }
+    }
+}
+
 public struct DashboardHealthEvaluator: Sendable {
     public var availabilityChecker: RepositoryAvailabilityChecker
+    public var sourceHealthEvaluator: BackupSourceHealthEvaluator
 
-    public init(availabilityChecker: RepositoryAvailabilityChecker = RepositoryAvailabilityChecker()) {
+    public init(
+        availabilityChecker: RepositoryAvailabilityChecker = RepositoryAvailabilityChecker(),
+        sourceHealthEvaluator: BackupSourceHealthEvaluator = BackupSourceHealthEvaluator()
+    ) {
         self.availabilityChecker = availabilityChecker
+        self.sourceHealthEvaluator = sourceHealthEvaluator
     }
 
     public func backupWarnings(
@@ -45,6 +113,13 @@ public struct DashboardHealthEvaluator: Sendable {
             .compactMap { warning(for: $0, threshold: threshold, now: now) }
             .prefix(limit)
             .map { $0 }
+    }
+
+    public func sourceWarnings(
+        profiles: [BackupProfile],
+        limit: Int = 4
+    ) -> [DashboardHealthWarning] {
+        sourceHealthEvaluator.warnings(profiles: profiles, limit: limit)
     }
 
     private func warning(

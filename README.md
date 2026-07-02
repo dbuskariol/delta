@@ -20,7 +20,7 @@ The product goal is simple: make serious backup practices approachable without h
 - **Retention maintenance** with scheduled forget/prune/check windows.
 - **Pause, resume, and cancel controls** for active backups from the main window and macOS menu bar, including scheduled jobs started by Background Backups. Pause stops restic safely, keeps the profile visibly paused, and Resume continues from already saved backup data.
 - **Clear backup summaries** showing new, changed, unchanged, added, and checked data for each backup run.
-- **Backup health monitoring** with configurable freshness and destination-verification warnings for scheduled profiles with no completed backup, stale restore points, failed runs, stopped runs, unchecked destinations, stale destination checks, or unavailable local/mounted destinations.
+- **Backup health monitoring** with source-access warnings, configurable freshness and destination-verification warnings for scheduled profiles with no completed backup, stale restore points, failed runs, stopped runs, unchecked destinations, stale destination checks, or unavailable local/mounted destinations.
 - **Notification Center alerts** for failed or warning jobs, with optional successful-backup summaries. The signed background helper uses the same notification policy for scheduled runs.
 - **Full or browsed selected restore** with backup browsing, file/folder selection, configurable dry-run and verification defaults, overwrite policies, original-path restore, chosen-folder restore, and optional pre-restore backup.
 - **Streaming and saved backup logs** from restic stdout/stderr with source context, stable processed-file counters, clean change summaries, fixed-height live panes, and expandable per-job audit history.

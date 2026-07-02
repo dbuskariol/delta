@@ -145,6 +145,84 @@ final class DashboardHealthEvaluatorTests: XCTestCase {
         ])
         XCTAssertEqual(warnings.map(\.isCritical), [true, false, false])
     }
+
+    func testSourceWarningsCallOutUnavailableInvalidAndUnreadableSources() throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanUp() }
+        let readable = fixture.directory.appendingPathComponent("readable", isDirectory: true)
+        try FileManager.default.createDirectory(at: readable, withIntermediateDirectories: true)
+        let fileURL = fixture.directory.appendingPathComponent("not-a-folder.txt")
+        try Data("content".utf8).write(to: fileURL)
+        let missing = fixture.directory.appendingPathComponent("missing", isDirectory: true)
+        let unreadable = fixture.directory.appendingPathComponent("unreadable", isDirectory: true)
+        try FileManager.default.createDirectory(at: unreadable, withIntermediateDirectories: true)
+        try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: unreadable.path)
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: unreadable.path)
+        }
+        let repositoryID = UUID()
+
+        let healthy = BackupProfile(
+            name: "Healthy",
+            sourceMode: .customFolders,
+            sources: [BackupSource(path: readable.path)],
+            repositoryID: repositoryID
+        )
+        let missingProfile = BackupProfile(
+            name: "Missing",
+            sourceMode: .customFolders,
+            sources: [BackupSource(path: missing.path)],
+            repositoryID: repositoryID
+        )
+        let fileProfile = BackupProfile(
+            name: "File",
+            sourceMode: .customFolders,
+            sources: [BackupSource(path: fileURL.path)],
+            repositoryID: repositoryID
+        )
+        let unreadableProfile = BackupProfile(
+            name: "Unreadable",
+            sourceMode: .customFolders,
+            sources: [BackupSource(path: unreadable.path)],
+            repositoryID: repositoryID
+        )
+
+        let warnings = DashboardHealthEvaluator().sourceWarnings(
+            profiles: [healthy, missingProfile, fileProfile, unreadableProfile]
+        )
+
+        XCTAssertEqual(warnings.map(\.title), [
+            "Missing source needs attention",
+            "File source needs attention",
+            "Unreadable source needs attention"
+        ])
+        XCTAssertEqual(warnings.map(\.isCritical), [true, true, true])
+        XCTAssertTrue(warnings[0].detail.contains("no longer available"))
+        XCTAssertTrue(warnings[1].detail.contains("not a folder"))
+        XCTAssertTrue(warnings[2].detail.contains("cannot read"))
+    }
+
+    func testSourceWarningsCallOutInvalidPersistentAccess() {
+        let repositoryID = UUID()
+        let profile = BackupProfile(
+            name: "Protected",
+            sourceMode: .customFolders,
+            sources: [
+                BackupSource(
+                    path: "/private/protected",
+                    bookmarkData: Data([0x00, 0x01, 0x02]),
+                    includeSubvolumes: true
+                )
+            ],
+            repositoryID: repositoryID
+        )
+
+        let warnings = DashboardHealthEvaluator().sourceWarnings(profiles: [profile])
+
+        XCTAssertEqual(warnings.map(\.title), ["Protected source needs access"])
+        XCTAssertTrue(warnings[0].detail.contains("Rechoose the folder"))
+        XCTAssertTrue(warnings[0].isCritical)
+    }
 }
 
 private struct Fixture {

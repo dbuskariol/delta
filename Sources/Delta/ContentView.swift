@@ -140,6 +140,17 @@ struct DashboardView: View {
                 )
             }
 
+            let sourceWarnings = sourceHealthWarnings
+            if !sourceWarnings.isEmpty {
+                DashboardHealthCard(
+                    title: "Source Attention",
+                    symbol: "folder.badge.questionmark",
+                    warnings: sourceWarnings
+                ) {
+                    model.selectedSection = .backups
+                }
+            }
+
             let backupWarnings = backupHealthWarnings
             if !backupWarnings.isEmpty {
                 DashboardHealthCard(
@@ -210,6 +221,10 @@ struct DashboardView: View {
             repositories: model.repositories,
             threshold: threshold
         )
+    }
+
+    private var sourceHealthWarnings: [DashboardHealthWarning] {
+        DashboardHealthEvaluator().sourceWarnings(profiles: model.profiles)
     }
 }
 
