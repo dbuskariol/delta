@@ -48,12 +48,23 @@ public final class DeltaDatabase: @unchecked Sendable {
         try fetchAll(table: "repositories")
     }
 
+    public func deleteRepository(id: UUID) throws {
+        try queue.write { db in
+            try db.execute(sql: "DELETE FROM repositories WHERE id = ?", arguments: [id.uuidString])
+            try db.execute(sql: "DELETE FROM snapshots WHERE repository_id = ?", arguments: [id.uuidString])
+        }
+    }
+
     public func saveProfile(_ profile: BackupProfile) throws {
         try save(profile, id: profile.id.uuidString, table: "backup_profiles")
     }
 
     public func fetchProfiles() throws -> [BackupProfile] {
         try fetchAll(table: "backup_profiles")
+    }
+
+    public func deleteProfile(id: UUID) throws {
+        try delete(id: id.uuidString, table: "backup_profiles")
     }
 
     public func saveJobRun(_ run: JobRun) throws {
@@ -122,6 +133,12 @@ public final class DeltaDatabase: @unchecked Sendable {
             for table in Self.payloadTables {
                 try db.execute(sql: "DELETE FROM \(table)")
             }
+        }
+    }
+
+    private func delete(id: String, table: String) throws {
+        try queue.write { db in
+            try db.execute(sql: "DELETE FROM \(table) WHERE id = ?", arguments: [id])
         }
     }
 

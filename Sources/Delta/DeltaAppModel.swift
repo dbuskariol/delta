@@ -164,6 +164,34 @@ final class DeltaAppModel: ObservableObject {
         }
     }
 
+    func deleteProfile(_ profile: BackupProfile) {
+        do {
+            try database.deleteProfile(id: profile.id)
+            try database.appendEvent(EventLog(level: .info, message: "Backup profile '\(profile.name)' was removed."))
+            reload()
+        } catch {
+            alertMessage = error.localizedDescription
+        }
+    }
+
+    func deleteRepository(_ repository: BackupRepository) {
+        do {
+            let currentProfiles = try database.fetchProfiles()
+            guard !currentProfiles.contains(where: { $0.repositoryID == repository.id }) else {
+                throw DeltaUIError.message("This destination is still used by one or more backup profiles.")
+            }
+            try secretStore.delete(account: repository.keychainAccount)
+            for reference in repository.credentialReferences {
+                try secretStore.delete(account: reference.keychainAccount)
+            }
+            try database.deleteRepository(id: repository.id)
+            try database.appendEvent(EventLog(level: .info, message: "Destination '\(repository.name)' was removed from Delta."))
+            reload()
+        } catch {
+            alertMessage = error.localizedDescription
+        }
+    }
+
     func runNow(profile: BackupProfile) {
         guard let repository = repositories.first(where: { $0.id == profile.repositoryID }) else {
             alertMessage = "Destination for this profile no longer exists."

@@ -92,4 +92,43 @@ final class DatabaseTests: XCTestCase {
         XCTAssertEqual(fetchedProfile.retention, profile.retention)
         XCTAssertEqual(fetchedProfile.sources, profile.sources)
     }
+
+    func testDeletesProfileWithoutDeletingRepository() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let database = try DeltaDatabase(url: directory.appendingPathComponent("Delta.sqlite"))
+        let repository = BackupRepository(name: "Local", backend: .local(path: "/repo"))
+        let profile = BackupProfile(
+            name: "Documents",
+            sourceMode: .customFolders,
+            sources: [BackupSource(path: "/Users/me/Documents")],
+            repositoryID: repository.id
+        )
+        try database.saveRepository(repository)
+        try database.saveProfile(profile)
+
+        try database.deleteProfile(id: profile.id)
+
+        XCTAssertTrue(try database.fetchProfiles().isEmpty)
+        XCTAssertEqual(try database.fetchRepositories().first?.id, repository.id)
+    }
+
+    func testDeletesRepositoryAndCachedSnapshots() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let database = try DeltaDatabase(url: directory.appendingPathComponent("Delta.sqlite"))
+        let repository = BackupRepository(name: "Local", backend: .local(path: "/repo"))
+        let snapshot = ResticSnapshot(id: "snapshot", time: Date(), paths: ["/Users/me/Documents"])
+        try database.saveRepository(repository)
+        try database.saveSnapshot(snapshot, repositoryID: repository.id)
+
+        try database.deleteRepository(id: repository.id)
+
+        XCTAssertTrue(try database.fetchRepositories().isEmpty)
+        XCTAssertTrue(try database.fetchSnapshots(repositoryID: repository.id).isEmpty)
+    }
 }

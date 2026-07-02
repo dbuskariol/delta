@@ -500,6 +500,7 @@ struct ProfileRow: View {
     @EnvironmentObject private var model: DeltaAppModel
     var profile: BackupProfile
     @State private var isPresentingEditor = false
+    @State private var isConfirmingDelete = false
 
     var body: some View {
         Card {
@@ -533,12 +534,24 @@ struct ProfileRow: View {
                     model.prune(profile: profile)
                 }
                 .disabled(model.isWorking)
+                IconButton(symbol: "trash", help: "Delete profile") {
+                    isConfirmingDelete = true
+                }
+                .disabled(model.isWorking)
             }
         }
         .sheet(isPresented: $isPresentingEditor) {
             ProfileEditorView(profile: profile)
                 .environmentObject(model)
                 .frame(width: ModalMetrics.sheetWidth, height: 680)
+        }
+        .confirmationDialog("Delete Backup Profile?", isPresented: $isConfirmingDelete) {
+            Button("Delete", role: .destructive) {
+                model.deleteProfile(profile)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This removes the profile from Delta. Existing restore points in the destination are not deleted.")
         }
     }
 
@@ -582,6 +595,7 @@ struct RepositoryRow: View {
     @EnvironmentObject private var model: DeltaAppModel
     var repository: BackupRepository
     @State private var isPresentingEditor = false
+    @State private var isConfirmingDelete = false
 
     var body: some View {
         Card {
@@ -617,12 +631,24 @@ struct RepositoryRow: View {
                     model.refreshSnapshots(repository: repository)
                 }
                 .disabled(model.isWorking)
+                IconButton(symbol: "trash", help: "Remove destination") {
+                    isConfirmingDelete = true
+                }
+                .disabled(model.isWorking)
             }
         }
         .sheet(isPresented: $isPresentingEditor) {
             RepositoryEditorView(repository: repository)
                 .environmentObject(model)
                 .frame(width: ModalMetrics.sheetWidth)
+        }
+        .confirmationDialog("Remove Destination?", isPresented: $isConfirmingDelete) {
+            Button("Remove", role: .destructive) {
+                model.deleteRepository(repository)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This removes the destination from Delta and deletes cached restore point metadata. Backup data at the destination is not deleted.")
         }
     }
 
