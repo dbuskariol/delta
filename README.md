@@ -323,6 +323,8 @@ Scripts/run-installed-rclone-local-acceptance.sh
 Run configured external backend lifecycles through the installed Delta coordinator:
 
 ```sh
+Scripts/preflight-external-backend-acceptance.sh all
+
 DELTA_ACCEPTANCE_MOUNTED_PATH=/Volumes/BackupShare \
 Scripts/run-external-backend-acceptance.sh mounted
 
@@ -362,6 +364,8 @@ Scripts/run-external-backend-acceptance.sh rest
 ```
 
 `DELTA_ACCEPTANCE_MOUNTED_PATH` must point to a mounted network filesystem under `/Volumes`, such as SMB or NFS. Local external disks are covered by the installed local lifecycle acceptance, and deterministic mounted-volume behavior is covered by `Scripts/run-installed-mounted-volume-acceptance.sh`; neither replaces real SMB/NFS disconnect and reconnect acceptance.
+
+`Scripts/preflight-external-backend-acceptance.sh` validates configured external acceptance URLs, required provider credentials, readable key/config files, and mounted-network path mapping without initializing repositories or writing backup data. Use `all` for a redacted readiness matrix or a backend name such as `s3` when a single backend must be ready before running the full lifecycle.
 
 Create and verify the manual macOS acceptance report:
 

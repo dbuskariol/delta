@@ -23,6 +23,7 @@ cd "$ROOT_DIR"
   "$ROOT_DIR/Scripts/verify-manual-acceptance-self-test.sh" \
   "$ROOT_DIR/Scripts/verify-manual-acceptance.sh" \
   "$ROOT_DIR/Scripts/verify-sparkle-update-artifacts.sh" \
+  "$ROOT_DIR/Scripts/preflight-external-backend-acceptance.sh" \
   "$ROOT_DIR/Scripts/run-external-backend-acceptance.sh" \
   "$ROOT_DIR/Scripts/run-installed-diagnostics-acceptance.sh" \
   "$ROOT_DIR/Scripts/run-installed-keychain-access-acceptance.sh" \
@@ -136,6 +137,10 @@ if [[ ! -x "$ROOT_DIR/Scripts/run-installed-scheduled-agent-acceptance.sh" ]]; t
 fi
 if [[ ! -x "$ROOT_DIR/Scripts/run-external-backend-acceptance.sh" ]]; then
   printf "Scripts/run-external-backend-acceptance.sh must be executable.\n" >&2
+  exit 1
+fi
+if [[ ! -x "$ROOT_DIR/Scripts/preflight-external-backend-acceptance.sh" ]]; then
+  printf "Scripts/preflight-external-backend-acceptance.sh must be executable.\n" >&2
   exit 1
 fi
 if [[ ! -x "$ROOT_DIR/Scripts/run-installed-keychain-access-acceptance.sh" ]]; then

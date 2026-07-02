@@ -11,6 +11,156 @@ public enum ExternalBackendAcceptanceError: Error, Equatable, LocalizedError {
     }
 }
 
+public enum ExternalBackendPreflightState: String, Equatable, Sendable {
+    case ready = "Ready"
+    case notConfigured = "Not Configured"
+    case invalid = "Invalid"
+}
+
+public struct ExternalBackendPreflightResult: Equatable, Sendable {
+    public var kind: AcceptanceExternalKind
+    public var state: ExternalBackendPreflightState
+    public var repository: String?
+    public var credentialKeys: [String]
+    public var message: String
+
+    public init(
+        kind: AcceptanceExternalKind,
+        state: ExternalBackendPreflightState,
+        repository: String?,
+        credentialKeys: [String],
+        message: String
+    ) {
+        self.kind = kind
+        self.state = state
+        self.repository = repository
+        self.credentialKeys = credentialKeys
+        self.message = message
+    }
+}
+
+public enum ExternalBackendAcceptancePreflight {
+    public static func results(
+        environment: [String: String],
+        fileManager: FileManager = .default
+    ) throws -> [ExternalBackendPreflightResult] {
+        try requestedKinds(environment: environment).map { kind in
+            result(for: kind, environment: environment, fileManager: fileManager)
+        }
+    }
+
+    public static func markdownReport(
+        environment: [String: String],
+        fileManager: FileManager = .default,
+        generatedAt: Date = Date()
+    ) throws -> String {
+        let results = try results(environment: environment, fileManager: fileManager)
+        let generated = ISO8601DateFormatter().string(from: generatedAt)
+        let readyCount = results.filter { $0.state == .ready }.count
+        let invalidCount = results.filter { $0.state == .invalid }.count
+        let notConfiguredCount = results.filter { $0.state == .notConfigured }.count
+
+        var lines = [
+            "# Delta External Backend Acceptance Preflight",
+            "",
+            "- Generated: \(generated)",
+            "- Ready: \(readyCount)",
+            "- Not configured: \(notConfiguredCount)",
+            "- Invalid: \(invalidCount)",
+            "",
+            "| Backend | State | Repository | Credential Keys | Message |",
+            "| --- | --- | --- | --- | --- |"
+        ]
+
+        for result in results {
+            lines.append(
+                "| \(cell(result.kind.displayName)) | \(cell(result.state.rawValue)) | \(cell(result.repository ?? "-")) | \(cell(result.credentialKeys.isEmpty ? "-" : result.credentialKeys.joined(separator: ", "))) | \(cell(result.message)) |"
+            )
+        }
+        lines.append("")
+        return lines.joined(separator: "\n")
+    }
+
+    public static func hasInvalidConfiguration(_ results: [ExternalBackendPreflightResult]) -> Bool {
+        results.contains { $0.state == .invalid }
+    }
+
+    public static func hasUnreadyRequestedConfiguration(
+        _ results: [ExternalBackendPreflightResult],
+        environment: [String: String]
+    ) -> Bool {
+        requestedKindValue(environment: environment) != nil
+            && results.contains { $0.state != .ready }
+    }
+
+    private static func requestedKinds(environment: [String: String]) throws -> [AcceptanceExternalKind] {
+        if let requested = requestedKindValue(environment: environment) {
+            return [try AcceptanceExternalKind(environmentValue: requested)]
+        }
+        return AcceptanceExternalKind.allCases
+    }
+
+    private static func requestedKindValue(environment: [String: String]) -> String? {
+        guard let value = environment["DELTA_EXTERNAL_ACCEPTANCE_KIND"]?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else {
+            return nil
+        }
+        return value
+    }
+
+    private static func result(
+        for kind: AcceptanceExternalKind,
+        environment: [String: String],
+        fileManager: FileManager
+    ) -> ExternalBackendPreflightResult {
+        guard hasValue(for: kind.repositoryEnvironmentKey, environment: environment) else {
+            return ExternalBackendPreflightResult(
+                kind: kind,
+                state: .notConfigured,
+                repository: nil,
+                credentialKeys: [],
+                message: "Set \(kind.repositoryEnvironmentKey) to run \(kind.displayName) acceptance."
+            )
+        }
+
+        do {
+            let backend = try kind.backend(environment: environment)
+            let credentials = try kind.credentials(environment: environment, fileManager: fileManager)
+            let repository = try ResticBackendURLBuilder().repositoryURL(for: backend)
+            return ExternalBackendPreflightResult(
+                kind: kind,
+                state: .ready,
+                repository: SensitiveLogRedactor.redact(repository),
+                credentialKeys: credentials.keys.sorted(),
+                message: "Backend URL and required credential policy are valid."
+            )
+        } catch {
+            return ExternalBackendPreflightResult(
+                kind: kind,
+                state: .invalid,
+                repository: nil,
+                credentialKeys: [],
+                message: error.localizedDescription
+            )
+        }
+    }
+
+    private static func hasValue(for key: String, environment: [String: String]) -> Bool {
+        guard let value = environment[key]?.trimmingCharacters(in: .whitespacesAndNewlines) else {
+            return false
+        }
+        return !value.isEmpty
+    }
+
+    private static func cell(_ value: String) -> String {
+        value
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "|", with: "\\|")
+            .replacingOccurrences(of: "\r", with: " ")
+            .replacingOccurrences(of: "\n", with: " ")
+            .replacingOccurrences(of: "\t", with: " ")
+    }
+}
+
 public enum AcceptanceExternalKind: String, CaseIterable, Sendable {
     case mounted
     case sftp
@@ -45,6 +195,21 @@ public enum AcceptanceExternalKind: String, CaseIterable, Sendable {
         case .swift: "OpenStack Swift"
         case .rclone: "rclone"
         case .custom: "Custom"
+        }
+    }
+
+    public var repositoryEnvironmentKey: String {
+        switch self {
+        case .mounted: "DELTA_ACCEPTANCE_MOUNTED_REPOSITORY_PATH"
+        case .sftp: "DELTA_ACCEPTANCE_SFTP_REPOSITORY"
+        case .rest: "DELTA_ACCEPTANCE_REST_REPOSITORY"
+        case .s3: "DELTA_ACCEPTANCE_S3_REPOSITORY"
+        case .b2: "DELTA_ACCEPTANCE_B2_REPOSITORY"
+        case .azure: "DELTA_ACCEPTANCE_AZURE_REPOSITORY"
+        case .gcs: "DELTA_ACCEPTANCE_GCS_REPOSITORY"
+        case .swift: "DELTA_ACCEPTANCE_SWIFT_REPOSITORY"
+        case .rclone: "DELTA_ACCEPTANCE_RCLONE_REPOSITORY"
+        case .custom: "DELTA_ACCEPTANCE_CUSTOM_REPOSITORY"
         }
     }
 

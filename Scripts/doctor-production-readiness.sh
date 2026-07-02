@@ -250,17 +250,21 @@ else
 fi
 
 printf "\n## External Backend Acceptance Environment\n\n"
+configured_external_backends=0
 if [[ -n "${DELTA_ACCEPTANCE_MOUNTED_PATH:-}" ]]; then
+  configured_external_backends=$((configured_external_backends + 1))
   pass "Mounted network destination acceptance is configured."
 else
   warn "Mounted SMB/NFS destination acceptance is not configured: set DELTA_ACCEPTANCE_MOUNTED_PATH."
 fi
 if [[ -n "${DELTA_ACCEPTANCE_SFTP_REPOSITORY:-}" ]]; then
+  configured_external_backends=$((configured_external_backends + 1))
   pass "SFTP destination acceptance is configured."
 else
   warn "SFTP destination acceptance is not configured: set DELTA_ACCEPTANCE_SFTP_REPOSITORY."
 fi
 if [[ -n "${DELTA_ACCEPTANCE_S3_REPOSITORY:-}" ]]; then
+  configured_external_backends=$((configured_external_backends + 1))
   pass "S3-compatible destination acceptance is configured."
 else
   warn "S3-compatible destination acceptance is not configured: set DELTA_ACCEPTANCE_S3_REPOSITORY plus provider credentials."
@@ -277,6 +281,7 @@ for key in \
   DELTA_ACCEPTANCE_CUSTOM_REPOSITORY
 do
   if [[ -n "${!key:-}" ]]; then
+    configured_external_backends=$((configured_external_backends + 1))
     additional_backends=$((additional_backends + 1))
   fi
 done
@@ -284,6 +289,17 @@ if [[ "$additional_backends" -gt 0 ]]; then
   pass "$additional_backends additional restic backend acceptance target(s) configured."
 else
   warn "No additional restic backend acceptance targets are configured."
+fi
+
+if [[ "$configured_external_backends" -gt 0 ]]; then
+  if "$ROOT_DIR/Scripts/preflight-external-backend-acceptance.sh" all "$APP_PATH" >/tmp/delta-external-preflight-doctor.$$ 2>&1; then
+    preflight_report="$(/usr/bin/sed -n 's/^Wrote external backend preflight to //p' /tmp/delta-external-preflight-doctor.$$ | /usr/bin/head -n 1)"
+    pass "Configured external backend preflight passed${preflight_report:+: $preflight_report}."
+  else
+    preflight_output="$(/bin/cat /tmp/delta-external-preflight-doctor.$$ 2>/dev/null || true)"
+    block "Configured external backend preflight failed. ${preflight_output}"
+  fi
+  /bin/rm -f /tmp/delta-external-preflight-doctor.$$
 fi
 
 printf "\n## Summary\n\n"

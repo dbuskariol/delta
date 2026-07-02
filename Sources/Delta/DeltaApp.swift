@@ -51,6 +51,8 @@ struct DeltaApp: App {
             runAcceptanceRunControl()
         case "--acceptance-external-lifecycle":
             runAcceptanceExternalLifecycle()
+        case "--acceptance-external-preflight":
+            runAcceptanceExternalPreflight()
         case "--acceptance-preferences":
             runAcceptancePreferences()
         case "--acceptance-menu-bar-surface":
@@ -237,6 +239,28 @@ struct DeltaApp: App {
             exit(0)
         } catch {
             fputs("Delta external lifecycle acceptance error: \(error.localizedDescription)\n", stderr)
+            exit(1)
+        }
+    }
+
+    private static func runAcceptanceExternalPreflight() -> Never {
+        guard ProcessInfo.processInfo.environment["DELTA_ENABLE_EXTERNAL_PREFLIGHT_ACCEPTANCE"] == "1" else {
+            fputs("Delta external preflight acceptance command is disabled.\n", stderr)
+            exit(64)
+        }
+
+        do {
+            let environment = ProcessInfo.processInfo.environment
+            let results = try ExternalBackendAcceptancePreflight.results(environment: environment)
+            let report = try ExternalBackendAcceptancePreflight.markdownReport(environment: environment)
+            print(report, terminator: report.hasSuffix("\n") ? "" : "\n")
+            if ExternalBackendAcceptancePreflight.hasInvalidConfiguration(results)
+                || ExternalBackendAcceptancePreflight.hasUnreadyRequestedConfiguration(results, environment: environment) {
+                exit(1)
+            }
+            exit(0)
+        } catch {
+            fputs("Delta external preflight acceptance error: \(error.localizedDescription)\n", stderr)
             exit(1)
         }
     }

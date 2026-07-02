@@ -323,6 +323,86 @@ final class ExternalBackendAcceptanceContractTests: XCTestCase {
         )
     }
 
+    func testPreflightReportsAllBackendsWithoutTreatingMissingConfigurationAsInvalid() throws {
+        let results = try ExternalBackendAcceptancePreflight.results(environment: [:])
+
+        XCTAssertEqual(results.map(\.kind), AcceptanceExternalKind.allCases)
+        XCTAssertTrue(results.allSatisfy { $0.state == .notConfigured })
+        XCTAssertFalse(ExternalBackendAcceptancePreflight.hasInvalidConfiguration(results))
+        XCTAssertFalse(
+            ExternalBackendAcceptancePreflight.hasUnreadyRequestedConfiguration(
+                results,
+                environment: [:]
+            )
+        )
+        XCTAssertEqual(
+            results.first?.message,
+            "Set DELTA_ACCEPTANCE_MOUNTED_REPOSITORY_PATH to run Mounted acceptance."
+        )
+    }
+
+    func testPreflightReportsRequestedKindOnlyAndRequiresItToBeReady() throws {
+        let missing = try ExternalBackendAcceptancePreflight.results(environment: [
+            "DELTA_EXTERNAL_ACCEPTANCE_KIND": "s3"
+        ])
+
+        XCTAssertEqual(missing.map(\.kind), [.s3])
+        XCTAssertEqual(missing.first?.state, .notConfigured)
+        XCTAssertTrue(
+            ExternalBackendAcceptancePreflight.hasUnreadyRequestedConfiguration(
+                missing,
+                environment: ["DELTA_EXTERNAL_ACCEPTANCE_KIND": "s3"]
+            )
+        )
+
+        let ready = try ExternalBackendAcceptancePreflight.results(environment: [
+            "DELTA_EXTERNAL_ACCEPTANCE_KIND": "s3",
+            "DELTA_ACCEPTANCE_S3_REPOSITORY": "s3:https://s3.example.com/bucket/delta-acceptance",
+            "AWS_ACCESS_KEY_ID": "id",
+            "AWS_SECRET_ACCESS_KEY": "secret"
+        ])
+
+        XCTAssertEqual(ready.map(\.kind), [.s3])
+        XCTAssertEqual(ready.first?.state, .ready)
+        XCTAssertEqual(ready.first?.repository, "s3:https://s3.example.com/bucket/delta-acceptance")
+        XCTAssertEqual(ready.first?.credentialKeys, ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"])
+        XCTAssertFalse(
+            ExternalBackendAcceptancePreflight.hasUnreadyRequestedConfiguration(
+                ready,
+                environment: ["DELTA_EXTERNAL_ACCEPTANCE_KIND": "s3"]
+            )
+        )
+    }
+
+    func testPreflightDetectsInvalidConfiguredBackendWithoutLeakingCredentialValues() throws {
+        let results = try ExternalBackendAcceptancePreflight.results(environment: [
+            "DELTA_ACCEPTANCE_S3_REPOSITORY": "s3:https://s3.example.com/bucket/delta-acceptance",
+            "AWS_ACCESS_KEY_ID": "id-only"
+        ])
+        let s3 = try XCTUnwrap(results.first { $0.kind == .s3 })
+
+        XCTAssertEqual(s3.state, .invalid)
+        XCTAssertEqual(s3.message, "AWS_SECRET_ACCESS_KEY is required.")
+        XCTAssertNil(s3.repository)
+        XCTAssertTrue(ExternalBackendAcceptancePreflight.hasInvalidConfiguration(results))
+
+        let report = try ExternalBackendAcceptancePreflight.markdownReport(
+            environment: [
+                "DELTA_EXTERNAL_ACCEPTANCE_KIND": "rest",
+                "DELTA_ACCEPTANCE_REST_REPOSITORY": "rest:https://user:secret@example.com/delta-acceptance",
+                "RESTIC_REST_USERNAME": "delta",
+                "RESTIC_REST_PASSWORD": "super-secret"
+            ],
+            generatedAt: Date(timeIntervalSince1970: 0)
+        )
+
+        XCTAssertTrue(report.contains("1970-01-01T00:00:00Z"))
+        XCTAssertTrue(report.contains("RESTIC_REST_PASSWORD"))
+        XCTAssertTrue(report.contains("rest:https://<redacted>@example.com/delta-acceptance"))
+        XCTAssertFalse(report.contains("super-secret"))
+        XCTAssertFalse(report.contains("user:secret"))
+    }
+
     private func assertAcceptanceError(
         _ expression: () throws -> Any,
         _ expectedMessage: String,
