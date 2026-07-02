@@ -21,8 +21,13 @@ let package = Package(
         .target(
             name: "DeltaCore",
             dependencies: [
+                "DeltaSecurity",
                 .product(name: "GRDB", package: "GRDB.swift")
             ]
+        ),
+        .target(
+            name: "DeltaSecurity",
+            publicHeadersPath: "include"
         ),
         .executableTarget(
             name: "Delta",

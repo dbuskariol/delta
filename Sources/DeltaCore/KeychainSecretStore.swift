@@ -1,4 +1,5 @@
 import Foundation
+import DeltaSecurity
 import LocalAuthentication
 import Security
 
@@ -140,21 +141,37 @@ public struct KeychainSecretStore: Sendable {
             return nil
         }
 
-        let trustedApplications = try paths.map { path in
-            var application: SecTrustedApplication?
-            let status = path.withCString { SecTrustedApplicationCreateFromPath($0, &application) }
-            guard status == errSecSuccess, let application else {
-                throw KeychainSecretError.unexpectedStatus(status)
+        let duplicatedPaths = try paths.map { path in
+            guard let duplicatedPath = strdup(path) else {
+                throw KeychainSecretError.unexpectedStatus(errSecAllocate)
             }
-            return application
+            return duplicatedPath
+        }
+        defer {
+            for path in duplicatedPaths {
+                free(path)
+            }
         }
 
-        var access: SecAccess?
-        let status = SecAccessCreate(Self.accessPromptName as CFString, trustedApplications as CFArray, &access)
+        let pathPointers = UnsafeMutablePointer<UnsafePointer<CChar>>.allocate(capacity: duplicatedPaths.count)
+        defer {
+            pathPointers.deallocate()
+        }
+        for index in duplicatedPaths.indices {
+            pathPointers[index] = UnsafePointer(duplicatedPaths[index])
+        }
+
+        var unmanagedAccess: Unmanaged<SecAccess>?
+        let status = DeltaCreateTrustedApplicationAccess(
+            pathPointers,
+            duplicatedPaths.count,
+            Self.accessPromptName as CFString,
+            &unmanagedAccess
+        )
         guard status == errSecSuccess else {
             throw KeychainSecretError.unexpectedStatus(status)
         }
-        return access
+        return unmanagedAccess?.takeRetainedValue()
     }
 
     private func apply(_ authenticationPolicy: KeychainAuthenticationPolicy, to query: inout [String: Any]) {

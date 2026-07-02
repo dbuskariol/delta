@@ -65,7 +65,7 @@ Important implementation details:
 - **Durable-state fail closed** behavior prevents backup, destination, and restore operations if the Application Support database cannot be opened. Delta shows a blocked state instead of continuing against throwaway state.
 - **Profile validation** normalizes source paths, schedule values, bandwidth limits, retention limits, cleanup windows, and exclude patterns before saving or running backups.
 - **Operation-aware destination checks** allow a first backup to prepare a writable new local destination or an uninitialized remote destination, while restore, browse, check, and cleanup require an existing destination before restic is invoked.
-- **Keychain secrets** use `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly` and a trusted-application access list for the signed Delta app, agent, and secret bridge. Background secret reads fail closed instead of showing system prompts.
+- **Keychain secrets** use `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly` and a trusted-application access list for the signed Delta app, agent, and secret bridge. Background secret reads fail closed instead of showing system prompts. The file-keychain access-list calls are isolated in `DeltaSecurity`, a tiny audited compatibility shim, because the modern data-protection keychain access-group path requires valid signed entitlements that are only appropriate for a fully provisioned Developer ID distribution setup.
 - **Background secret repair** rewrites saved destination passwords and backend credentials through the current signed app identity if a development build or old local Keychain item would otherwise prompt during scheduled jobs.
 - **Destination credential forms** use provider-specific labels and only hide actual password/token fields; non-secret values such as account names and rclone config paths stay readable.
 - **SFTP authentication** uses SSH config, ssh-agent, or an optional destination-level private-key path. Delta forces SSH batch mode for scheduled safety and does not rely on interactive SSH password prompts.
@@ -252,7 +252,7 @@ Scripts/generate-appcast.sh
 
 ## Release And Signing
 
-Local development builds prefer `DELTA_CODESIGN_IDENTITY` when set. If it is unset, the build script automatically uses the first available `Developer ID Application` or `Apple Development` signing identity before falling back to ad-hoc signing. Stable signing matters for macOS privacy permissions such as Full Disk Access; changing the signing identity changes the app identity macOS trusts. The release verifier rejects ad-hoc-signed app bundles because they are not production-ready and can invalidate privacy approvals between installs.
+Local development builds prefer `DELTA_CODESIGN_IDENTITY` when set. If it is unset, the build script automatically uses the first available `Developer ID Application` or `Apple Development` signing identity before falling back to ad-hoc signing. Stable signing matters for macOS privacy permissions such as Full Disk Access; changing the signing identity changes the app identity macOS trusts. The release verifier rejects ad-hoc-signed app bundles because they are not production-ready and can invalidate privacy approvals between installs. It also fails the production app build if compiler warnings are emitted.
 
 Developer ID distribution should use:
 

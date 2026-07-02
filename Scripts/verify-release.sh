@@ -24,7 +24,18 @@ DELTA_RESTIC_INTEGRATION=1 \
 RESTIC_BINARY="$ROOT_DIR/Resources/Tools/bin/restic" \
 /usr/bin/swift test --filter ResticIntegrationTests
 
-"$ROOT_DIR/Scripts/build-app.sh"
+BUILD_LOG="$(/usr/bin/mktemp -t delta-build-app.XXXXXX)"
+if ! "$ROOT_DIR/Scripts/build-app.sh" 2>&1 | /usr/bin/tee "$BUILD_LOG"; then
+  /bin/rm -f "$BUILD_LOG"
+  exit 1
+fi
+if /usr/bin/grep -q "warning:" "$BUILD_LOG"; then
+  printf "Production app build emitted compiler warnings.\n" >&2
+  /usr/bin/grep "warning:" "$BUILD_LOG" >&2
+  /bin/rm -f "$BUILD_LOG"
+  exit 1
+fi
+/bin/rm -f "$BUILD_LOG"
 /usr/bin/codesign --verify --strict --deep --verbose=2 "$ROOT_DIR/dist/Delta.app"
 
 SIGNING_DETAILS="$(/usr/bin/codesign -dv "$ROOT_DIR/dist/Delta.app" 2>&1)"
@@ -165,7 +176,7 @@ if [[ "$SECRET_BRIDGE_EXTRA_STATUS" -ne 64 || "$SECRET_BRIDGE_EXTRA_OUTPUT" != *
   exit 1
 fi
 
-"$ROOT_DIR/Scripts/package-update.sh"
+DELTA_SKIP_BUILD=1 "$ROOT_DIR/Scripts/package-update.sh"
 "$ROOT_DIR/Scripts/generate-appcast.sh"
 
 SHORT_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$ROOT_DIR/dist/Delta.app/Contents/Info.plist")"
