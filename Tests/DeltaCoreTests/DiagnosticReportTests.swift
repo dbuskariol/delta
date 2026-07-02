@@ -15,6 +15,7 @@ final class DiagnosticReportTests: XCTestCase {
             logPath: "/Users/me/Library/Application Support/Delta/Logs",
             fullDiskAccessStatus: "Ready",
             backgroundBackupsStatus: "Enabled",
+            appLoginItemStatus: "Enabled",
             notificationStatus: "Enabled",
             menuBarStatus: "Shown",
             restoreDefaultsStatus: "Preview first, verify files, Replace changed",
@@ -44,6 +45,7 @@ final class DiagnosticReportTests: XCTestCase {
         XCTAssertTrue(report.contains("- Version: 0.1 (1)"))
         XCTAssertTrue(report.contains("- Full Disk Access: Ready"))
         XCTAssertTrue(report.contains("- Background Scheduling: Enabled"))
+        XCTAssertTrue(report.contains("- Start at Login: Enabled"))
         XCTAssertTrue(report.contains("- Notifications: Enabled"))
         XCTAssertTrue(report.contains("- Menu Bar: Shown"))
         XCTAssertTrue(report.contains("- Restore Defaults: Preview first, verify files, Replace changed"))
@@ -69,6 +71,7 @@ final class DiagnosticReportTests: XCTestCase {
             logPath: "/support/Logs",
             fullDiskAccessStatus: "Needs Access",
             backgroundBackupsStatus: "Not Registered",
+            appLoginItemStatus: "Not Registered",
             notificationStatus: "Disabled",
             menuBarStatus: "Hidden",
             restoreDefaultsStatus: "Preview first, verify files, Replace changed",

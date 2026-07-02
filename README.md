@@ -22,7 +22,7 @@ The product goal is simple: make serious backup practices approachable without h
 - **Notification Center alerts** for failed or warning jobs, with optional successful-backup summaries. The signed background helper uses the same notification policy for scheduled runs.
 - **Full or browsed selected restore** with backup browsing, file/folder selection, configurable dry-run and verification defaults, overwrite policies, original-path restore, chosen-folder restore, and optional pre-restore backup.
 - **Streaming and saved backup logs** from restic stdout/stderr with source context, stable processed-file counters, clean change summaries, fixed-height live panes, and expandable per-job audit history.
-- **Settings and diagnostics** with a top health summary for system access, schedules, updates, notifications, and bundled backup tools, plus controls for new-backup defaults, restore safety defaults, menu bar visibility, Activity log detail, app version, helper status, tool paths, profile/destination counts, recent jobs, and local support paths.
+- **Settings and diagnostics** with a top health summary for system access, schedules, updates, notifications, and bundled backup tools, plus controls for new-backup defaults, restore safety defaults, menu bar visibility, start-at-login, Activity log detail, app version, helper status, tool paths, profile/destination counts, recent jobs, and local support paths.
 - **Sparkle automatic updates** with generated appcast/update archive support.
 
 ## How It Works
@@ -119,7 +119,7 @@ On each check, Background Scheduling evaluates:
 
 When an enabled scheduled profile is saved, Delta requests Background Scheduling registration automatically. If macOS still requires approval, Delta shows an action-needed scheduled-backup card on the dashboard and a detailed status in Settings. macOS may require manual approval in Login Items; apps cannot approve their own background items.
 
-The visible menu bar dropdown is separate from Background Scheduling. Users can show or hide the menu bar item from Settings without changing scheduled backup execution. The menu bar item provides quick access to Back Up Now, Run Due Backups, Pause, Stop, Activity, update checks, and last-backup status.
+The visible menu bar dropdown and Start at Login setting are separate from Background Scheduling. Users can show or hide the menu bar item and choose whether Delta opens after sign-in without changing scheduled backup execution. The menu bar item provides quick access to Back Up Now, Run Due Backups, Pause, Stop, Activity, update checks, and last-backup status.
 
 Notification Center alerts are also separate from Background Scheduling. When enabled in Settings and allowed by macOS, Delta alerts on failed or warning jobs from either the app or the signed helper. Successful backup summaries are available as a separate opt-in.
 
@@ -157,7 +157,7 @@ The browser loads source roots from the selected restore point immediately and a
 - Destination passwords and backend credentials are stored in Keychain under Delta's destination-secret namespace.
 - New user-managed encryption passphrases must be entered twice before the destination can be saved.
 - Restic receives the destination password through a short-lived password command, not a long-lived plaintext environment variable.
-- Command redaction hides password-command values from logs/descriptions.
+- Command, stream, and final-message redaction hides destination URLs, repository-file paths, password-command values, and common backend secret assignments from logs/descriptions.
 - Backend credentials are injected only into a curated child-process environment for the restic run; Delta does not forward arbitrary ambient environment secrets.
 - Empty-password restic repositories are not used.
 

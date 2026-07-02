@@ -33,7 +33,7 @@ Record the app version, build number, macOS build, signing identity, date, and t
 | Area | Required evidence |
 | --- | --- |
 | Install identity | Install `/Applications/Delta.app`, launch it, quit, relaunch, and confirm macOS privacy prompts remain stable across rebuilds signed by the same identity. |
-| Settings surface | Confirm Settings shows plain-language Background Scheduling, not raw LaunchAgent status; the top status summary matches Full Disk Access, schedules, updates, notifications, and bundled backup-tool state; reset buttons restore recommended backup and restore defaults. |
+| Settings surface | Confirm Settings shows plain-language Background Scheduling, not raw LaunchAgent status; the top status summary matches Full Disk Access, schedules, updates, notifications, and bundled backup-tool state; Start at Login uses macOS Login Items separately from scheduled backups; reset buttons restore recommended backup and restore defaults. |
 | Full Disk Access | From Settings, open Privacy & Security, add Delta manually when required, recheck access, and confirm the dashboard only shows Readiness when action is needed. |
 | Background Scheduling | Create an enabled scheduled profile, approve Delta in Login Items if macOS asks, quit the main window, wait for the helper interval, and confirm the scheduled run appears in Dashboard, Activity, and menu bar state after relaunch. |
 | Keychain background access | Use an app-managed destination and a destination with backend credentials. Confirm a scheduled backup does not show interactive Keychain prompts after Repair Password Access has been run when needed. |

@@ -59,6 +59,7 @@ final class DeltaAppModel: ObservableObject {
     @Published var activeStopRequest: ResticRunStopReason?
     @Published private(set) var persistentStoreErrorMessage: String?
     @Published private(set) var launchAgentStatus = LaunchAgentController.status()
+    @Published private(set) var appLoginItemStatus = AppLoginItemController.status()
 
     var isPersistentStoreAvailable: Bool {
         persistentStoreErrorMessage == nil
@@ -100,6 +101,7 @@ final class DeltaAppModel: ObservableObject {
         guard reopenPersistentStoreIfNeeded() else {
             fullDiskAccessStatus = FullDiskAccessProbe().check()
             launchAgentStatus = LaunchAgentController.status()
+            appLoginItemStatus = AppLoginItemController.status()
             return
         }
         do {
@@ -119,6 +121,7 @@ final class DeltaAppModel: ObservableObject {
             events = try database.fetchEvents(limit: 200)
             fullDiskAccessStatus = FullDiskAccessProbe().check()
             launchAgentStatus = LaunchAgentController.status()
+            appLoginItemStatus = AppLoginItemController.status()
             reconcileObservedActiveJob(
                 jobs: storedJobs,
                 jobLogs: storedJobLogs,
@@ -647,6 +650,28 @@ final class DeltaAppModel: ObservableObject {
         }
     }
 
+    func registerAppLoginItem() {
+        do {
+            try AppLoginItemController.register()
+            appLoginItemStatus = AppLoginItemController.status()
+            alertMessage = appLoginItemRegistrationMessage(for: appLoginItemStatus)
+        } catch {
+            appLoginItemStatus = AppLoginItemController.status()
+            alertMessage = error.localizedDescription
+        }
+    }
+
+    func unregisterAppLoginItem() {
+        do {
+            try AppLoginItemController.unregister()
+            appLoginItemStatus = AppLoginItemController.status()
+            alertMessage = "Delta will no longer open automatically when you sign in."
+        } catch {
+            appLoginItemStatus = AppLoginItemController.status()
+            alertMessage = error.localizedDescription
+        }
+    }
+
     func repairBackgroundSecretAccess() {
         guardPersistentStoreAvailable()
         guard isPersistentStoreAvailable else { return }
@@ -719,6 +744,23 @@ final class DeltaAppModel: ObservableObject {
             return "Background Scheduling is unavailable on this macOS version."
         case let .unknown(rawValue):
             return "Background Scheduling returned an unknown macOS status: \(rawValue)"
+        }
+    }
+
+    private func appLoginItemRegistrationMessage(for status: LaunchAgentRegistrationStatus) -> String {
+        switch status {
+        case .enabled:
+            return "Delta will open automatically when you sign in."
+        case .requiresApproval:
+            return "Delta was added to Login Items. Approve it in macOS Settings if macOS asks."
+        case .notRegistered:
+            return "Delta is not set to open at login yet. Turn it on again or approve it in Login Items if macOS is waiting for approval."
+        case .notFound:
+            return "Delta could not be added to Login Items because macOS could not find the app bundle."
+        case .unavailable:
+            return "Start at login is unavailable on this macOS version."
+        case let .unknown(rawValue):
+            return "Start at login returned an unknown macOS status: \(rawValue)"
         }
     }
 
@@ -836,6 +878,7 @@ final class DeltaAppModel: ObservableObject {
             logPath: diagnosticPath { try AppDirectories.logDirectory() },
             fullDiskAccessStatus: fullDiskAccessStatus.hasLikelyFullDiskAccess ? "Ready" : "Needs Access",
             backgroundBackupsStatus: launchAgentStatus.displayName,
+            appLoginItemStatus: appLoginItemStatus.displayName,
             notificationStatus: DeltaAppPreferences.bool(for: DeltaAppPreferenceKeys.sendsJobNotifications, default: false) ? "Enabled" : "Disabled",
             menuBarStatus: DeltaAppPreferences.bool(for: DeltaAppPreferenceKeys.showsMenuBarExtra, default: true) ? "Shown" : "Hidden",
             restoreDefaultsStatus: restoreDefaultsDiagnosticStatus(),

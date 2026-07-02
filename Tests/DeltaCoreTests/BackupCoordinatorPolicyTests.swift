@@ -857,6 +857,9 @@ final class BackupCoordinatorPolicyTests: XCTestCase {
 
     func testRunPersistsStreamingJobLogsAndForwardsLiveEvents() throws {
         let fixture = try Fixture()
+        var repository = fixture.repository
+        repository.backend = .custom(repository: "rest:https://user:secret@example.com/repo")
+        repository.lastVerifiedAt = Date()
         let event = ResticOutputEvent(
             date: Date(timeIntervalSince1970: 1_800),
             stream: .standardOutput,
@@ -869,13 +872,16 @@ final class BackupCoordinatorPolicyTests: XCTestCase {
         }
         let profile = fixture.profile()
 
-        let job = try coordinator.runBackup(profile: profile, repository: fixture.repository)
+        let job = try coordinator.runBackup(profile: profile, repository: repository)
         let logs = try fixture.database.fetchJobLogs(jobID: job.id)
         let messages = logs.map(\.message)
+        let startMessage = try XCTUnwrap(messages.first { $0.hasPrefix("Starting Backup:") })
 
         XCTAssertEqual(job.status, .succeeded)
         XCTAssertTrue(messages.contains("Source: \(fixture.source.path)"))
-        XCTAssertTrue(messages.contains { $0.hasPrefix("Starting Backup:") && $0.contains("<redacted>") })
+        XCTAssertTrue(startMessage.contains("<redacted>"))
+        XCTAssertFalse(startMessage.contains("user:secret"))
+        XCTAssertFalse(startMessage.contains("example.com/repo"))
         XCTAssertTrue(messages.contains("Processed 21 files · 1 MB"))
         XCTAssertTrue(messages.contains("Finished Backup with status succeeded."))
         XCTAssertTrue(recorder.events.contains { $0.jobID == job.id && $0.event.message == "Source: \(fixture.source.path)" })

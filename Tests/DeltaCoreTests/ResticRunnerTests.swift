@@ -186,6 +186,36 @@ final class ResticRunnerTests: XCTestCase {
         XCTAssertEqual(message, "permission denied: /Users/me/Library/Mail")
     }
 
+    func testLogFormatterRedactsCredentialsFromPlainAndJSONMessages() {
+        let plainMessage = ResticLogFormatter.displayMessage(
+            for: "Fatal: unable to open rest:https://user:secret@example.com/repo AWS_SECRET_ACCESS_KEY=abc123"
+        )
+        let jsonMessage = ResticLogFormatter.displayMessage(for: """
+        {"message_type":"error","message":"failed for rest:https://user:secret@example.com/repo","item":"OS_PASSWORD=hunter2"}
+        """)
+
+        XCTAssertTrue(plainMessage.contains("rest:https://<redacted>@example.com/repo"))
+        XCTAssertTrue(plainMessage.contains("AWS_SECRET_ACCESS_KEY=<redacted>"))
+        XCTAssertFalse(plainMessage.contains("user:secret"))
+        XCTAssertFalse(plainMessage.contains("abc123"))
+        XCTAssertTrue(jsonMessage.contains("rest:https://<redacted>@example.com/repo"))
+        XCTAssertTrue(jsonMessage.contains("OS_PASSWORD=<redacted>"))
+        XCTAssertFalse(jsonMessage.contains("hunter2"))
+    }
+
+    func testRunResultRedactsCredentialsFromFallbackUserFacingMessage() {
+        let result = ResticRunResult(
+            exitCode: 1,
+            standardOutput: "",
+            standardError: "Fatal: unable to open rest:https://user:secret@example.com/repo B2_ACCOUNT_KEY=abc123"
+        )
+
+        XCTAssertTrue(result.userFacingMessage.contains("rest:https://<redacted>@example.com/repo"))
+        XCTAssertTrue(result.userFacingMessage.contains("B2_ACCOUNT_KEY=<redacted>"))
+        XCTAssertFalse(result.userFacingMessage.contains("user:secret"))
+        XCTAssertFalse(result.userFacingMessage.contains("abc123"))
+    }
+
     func testExitCodeThreeMapsToUnreadableSourceWarningWithoutOutputText() {
         let result = ResticRunResult(exitCode: 3, standardOutput: "", standardError: "")
 

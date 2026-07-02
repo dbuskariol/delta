@@ -6,7 +6,7 @@ final class ResticCommandTests: XCTestCase {
         let command = ResticCommand(
             executableURL: URL(fileURLWithPath: "/Applications/Delta.app/Contents/MacOS/restic"),
             arguments: [
-                "-r", "/Volumes/Backup/Delta",
+                "-r", "rest:https://user:secret@example.com/repo",
                 "--password-command", "'/Applications/Delta.app/Contents/MacOS/DeltaSecretBridge' 'repository-secret-account'",
                 "snapshots"
             ]
@@ -14,9 +14,32 @@ final class ResticCommandTests: XCTestCase {
 
         let description = command.redactedDescription
 
+        XCTAssertTrue(description.contains("'-r' <redacted>"))
         XCTAssertTrue(description.contains("'--password-command' <redacted>"))
+        XCTAssertFalse(description.contains("user:secret"))
         XCTAssertFalse(description.contains("DeltaSecretBridge"))
         XCTAssertFalse(description.contains("repository-secret-account"))
+    }
+
+    func testRedactedDescriptionHidesDestinationValuesFromLongAndInlineRepoOptions() {
+        let command = ResticCommand(
+            executableURL: URL(fileURLWithPath: "/Applications/Delta.app/Contents/MacOS/restic"),
+            arguments: [
+                "--repo", "sftp://user:secret@example.com//srv/delta",
+                "--repo=rest:https://user:secret@example.com/repo",
+                "--repository-file", "/Users/me/.delta/repository-url",
+                "--repository-file=/Users/me/.delta/repository-url",
+                "snapshots"
+            ]
+        )
+
+        let description = command.redactedDescription
+
+        XCTAssertTrue(description.contains("'--repo' <redacted>"))
+        XCTAssertTrue(description.contains("'--repository-file' <redacted>"))
+        XCTAssertFalse(description.contains("user:secret"))
+        XCTAssertFalse(description.contains("/Users/me/.delta/repository-url"))
+        XCTAssertEqual(description.components(separatedBy: "<redacted>").count - 1, 4)
     }
 
     func testBackendURLBuilderSupportsPrimaryBackends() throws {

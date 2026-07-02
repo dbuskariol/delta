@@ -80,6 +80,7 @@ public struct DiagnosticReportSnapshot: Equatable, Sendable {
     public var logPath: String
     public var fullDiskAccessStatus: String
     public var backgroundBackupsStatus: String
+    public var appLoginItemStatus: String
     public var notificationStatus: String
     public var menuBarStatus: String
     public var restoreDefaultsStatus: String
@@ -105,6 +106,7 @@ public struct DiagnosticReportSnapshot: Equatable, Sendable {
         logPath: String,
         fullDiskAccessStatus: String,
         backgroundBackupsStatus: String,
+        appLoginItemStatus: String,
         notificationStatus: String,
         menuBarStatus: String,
         restoreDefaultsStatus: String,
@@ -129,6 +131,7 @@ public struct DiagnosticReportSnapshot: Equatable, Sendable {
         self.logPath = logPath
         self.fullDiskAccessStatus = fullDiskAccessStatus
         self.backgroundBackupsStatus = backgroundBackupsStatus
+        self.appLoginItemStatus = appLoginItemStatus
         self.notificationStatus = notificationStatus
         self.menuBarStatus = menuBarStatus
         self.restoreDefaultsStatus = restoreDefaultsStatus
@@ -167,6 +170,7 @@ public struct DiagnosticReportBuilder: Sendable {
             "## Status",
             "- Full Disk Access: \(snapshot.fullDiskAccessStatus)",
             "- Background Scheduling: \(snapshot.backgroundBackupsStatus)",
+            "- Start at Login: \(snapshot.appLoginItemStatus)",
             "- Notifications: \(snapshot.notificationStatus)",
             "- Menu Bar: \(snapshot.menuBarStatus)",
             "- Restore Defaults: \(snapshot.restoreDefaultsStatus)",

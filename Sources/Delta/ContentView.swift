@@ -1091,7 +1091,7 @@ struct SettingsView: View {
 
             SettingsSectionLabel(
                 title: "Scheduled Backups",
-                subtitle: "Keep scheduled protection running without keeping the main Delta window open."
+                subtitle: "Keep scheduled protection running separately from the main window and menu bar."
             )
 
             SettingsCard(
@@ -1113,7 +1113,7 @@ struct SettingsView: View {
                 SettingsNotice(
                     symbol: "clock.arrow.circlepath",
                     title: "What this does",
-                    text: "Delta uses macOS Login Items to run a signed per-user scheduler. It wakes for short schedule checks, starts due backups when policy allows it, then exits. It is not an admin service.",
+                    text: "Delta installs a signed per-user scheduler through macOS Login Items. It wakes for short checks, starts due backups when policy allows it, then exits. It is not an admin service and does not require Delta's window to stay open.",
                     color: .blue
                 )
 
@@ -1216,10 +1216,10 @@ struct SettingsView: View {
 
             SettingsCard(
                 symbol: "menubar.rectangle",
-                title: "Menu Bar",
-                subtitle: "Show quick backup actions and current status in the macOS menu bar.",
-                statusText: showsMenuBarExtra ? "Shown" : "Hidden",
-                statusColor: showsMenuBarExtra ? .green : .secondary
+                title: "Menu Bar & Login",
+                subtitle: "Keep Delta's quick actions visible and optionally open the app at sign-in.",
+                statusText: menuBarAndLoginStatusText,
+                statusColor: menuBarAndLoginStatusColor
             ) {
                 SettingsControlRow(
                     title: "Status menu",
@@ -1230,9 +1230,50 @@ struct SettingsView: View {
                         .toggleStyle(.switch)
                 }
 
+                SettingsControlRow(
+                    title: "Start Delta at login",
+                    detail: "Open the Delta app after you sign in so the menu bar controls and dashboard are immediately available."
+                ) {
+                    Toggle("", isOn: appLoginItemBinding)
+                        .labelsHidden()
+                        .toggleStyle(.switch)
+                }
+
+                SettingsFactGrid(items: [
+                    SettingsFact(title: "Menu bar", value: showsMenuBarExtra ? "Shown" : "Hidden"),
+                    SettingsFact(title: "Start at login", value: appLoginItemStatusText),
+                    SettingsFact(title: "Scheduled backups", value: "Separate")
+                ])
+
                 SettingsDescription(
-                    text: "This controls only Delta's visible menu bar item. Scheduled backups use Background Scheduling above and continue according to their own setting."
+                    text: "Start at login opens Delta for convenience. Background Scheduling above is what actually runs scheduled backups when the window is closed."
                 )
+
+                if model.appLoginItemStatus == .requiresApproval {
+                    SettingsNotice(
+                        symbol: "person.crop.circle.badge.exclamationmark",
+                        title: "Login Items approval required",
+                        text: "macOS may ask you to approve Delta before it can open automatically at sign-in.",
+                        color: .orange
+                    )
+                }
+
+                HStack(spacing: 8) {
+                    Button {
+                        model.openLoginItemsSettings()
+                    } label: {
+                        Label("Open Login Items", systemImage: "gearshape")
+                    }
+                    .deltaTooltip("Open macOS Login Items to approve or inspect Delta startup.")
+                    Button {
+                        model.reload()
+                    } label: {
+                        Label("Refresh Status", systemImage: "arrow.clockwise")
+                    }
+                    .deltaTooltip("Recheck Delta's menu bar and login status.")
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
             }
 
             SettingsCard(
@@ -1680,6 +1721,52 @@ struct SettingsView: View {
         }
     }
 
+    private var appLoginItemStatusText: String {
+        switch model.appLoginItemStatus {
+        case .enabled:
+            return "On"
+        case .requiresApproval:
+            return "Needs Approval"
+        case .notRegistered:
+            return "Off"
+        case .notFound:
+            return "Missing App"
+        case .unavailable:
+            return "Unavailable"
+        case .unknown:
+            return "Unknown"
+        }
+    }
+
+    private var menuBarAndLoginStatusText: String {
+        if model.appLoginItemStatus == .requiresApproval {
+            return "Needs Approval"
+        }
+        if showsMenuBarExtra && model.appLoginItemStatus == .enabled {
+            return "On"
+        }
+        if showsMenuBarExtra {
+            return "Menu Shown"
+        }
+        if model.appLoginItemStatus == .enabled {
+            return "Starts at Login"
+        }
+        return "Off"
+    }
+
+    private var menuBarAndLoginStatusColor: Color {
+        switch model.appLoginItemStatus {
+        case .requiresApproval:
+            return .orange
+        case .notFound, .unknown:
+            return .red
+        case .enabled:
+            return .green
+        case .notRegistered, .unavailable:
+            return showsMenuBarExtra ? .green : .secondary
+        }
+    }
+
     private var notificationStatusText: String {
         guard sendsJobNotifications else {
             return "Off"
@@ -1846,6 +1933,19 @@ struct SettingsView: View {
                     model.registerAgent()
                 } else {
                     model.unregisterAgent()
+                }
+            }
+        )
+    }
+
+    private var appLoginItemBinding: Binding<Bool> {
+        Binding(
+            get: { model.appLoginItemStatus == .enabled || model.appLoginItemStatus == .requiresApproval },
+            set: { enabled in
+                if enabled {
+                    model.registerAppLoginItem()
+                } else {
+                    model.unregisterAppLoginItem()
                 }
             }
         )

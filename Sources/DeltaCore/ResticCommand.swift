@@ -38,11 +38,17 @@ public struct ResticCommand: Equatable, Sendable {
     }
 
     private static let sensitiveOptionsRequiringValueRedaction: Set<String> = [
+        "-r",
+        "--repo",
+        "--repository-file",
         "--password-command",
         "--password-file"
     ]
 
     private static let sensitiveInlineOptionPrefixes = [
+        "-r=",
+        "--repo=",
+        "--repository-file=",
         "--password-command=",
         "--password-file="
     ]

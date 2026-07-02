@@ -17,7 +17,7 @@ Resources/Tools/bin/rclone version
 
 Delta uses restic `--password-command`.
 
-The command points at `DeltaSecretBridge`, which reads the destination password from Keychain and writes it to stdout for restic. Delta does not pass destination passwords through long-lived environment variables or command-line literals.
+The command points at `DeltaSecretBridge`, which reads the destination password from Keychain and writes it to stdout for restic. Delta does not pass destination passwords through long-lived environment variables or command-line literals. Job logs use the command's redacted description, which hides destination URL arguments, repository-file paths, and password-command values before persisting the start line. Streamed restic output and fallback final job messages are also redacted for URL-embedded credentials and common backend secret assignments before they are displayed or stored.
 
 `DeltaSecretBridge` accepts exactly one keychain account argument and exits with usage status for missing or extra arguments. This keeps the password bridge fail-closed if restic or a caller invokes it with an unexpected command line.
 

@@ -111,10 +111,10 @@ public struct ResticBackupSummary: Codable, Equatable, Sendable {
 public enum ResticLogFormatter {
     public static func displayMessage(for rawMessage: String) -> String {
         guard let object = jsonObject(from: rawMessage) else {
-            return rawMessage.trimmingCharacters(in: .whitespacesAndNewlines)
+            return SensitiveLogRedactor.redact(rawMessage.trimmingCharacters(in: .whitespacesAndNewlines))
         }
 
-        return displayMessage(from: object, fallback: rawMessage)
+        return SensitiveLogRedactor.redact(displayMessage(from: object, fallback: rawMessage))
     }
 
     public static func backupSummary(from output: String?) -> ResticBackupSummary? {
@@ -164,7 +164,7 @@ public enum ResticLogFormatter {
             totalFiles: integer(object["total_files"]),
             bytesDone: integer(object["bytes_done"]),
             currentPath: currentPath(from: object),
-            displayMessage: statusMessage(from: object)
+            displayMessage: SensitiveLogRedactor.redact(statusMessage(from: object))
         )
     }
 
@@ -335,5 +335,35 @@ public enum ResticLogFormatter {
             return trimmed
         }
         return ".../" + components.suffix(3).joined(separator: "/")
+    }
+}
+
+public enum SensitiveLogRedactor {
+    public static func redact(_ message: String) -> String {
+        var redacted = replace(
+            pattern: #"\b([A-Za-z][A-Za-z0-9+.-]*://)([^/\s:@]+):([^@\s/]+)@"#,
+            in: message,
+            with: "$1<redacted>@"
+        )
+        redacted = replace(
+            pattern: #"\b(AWS_SECRET_ACCESS_KEY|AWS_SESSION_TOKEN|B2_ACCOUNT_KEY|AZURE_ACCOUNT_KEY|AZURE_ACCOUNT_SAS|GOOGLE_ACCESS_TOKEN|OS_PASSWORD|OS_APPLICATION_CREDENTIAL_SECRET|OS_AUTH_TOKEN|ST_KEY|RESTIC_REST_PASSWORD|RCLONE_CONFIG_PASS)\s*([=:])\s*([^,\s;]+)"#,
+            in: redacted,
+            with: "$1$2<redacted>",
+            options: [.caseInsensitive]
+        )
+        return redacted
+    }
+
+    private static func replace(
+        pattern: String,
+        in message: String,
+        with replacement: String,
+        options: NSRegularExpression.Options = []
+    ) -> String {
+        guard let expression = try? NSRegularExpression(pattern: pattern, options: options) else {
+            return message
+        }
+        let range = NSRange(message.startIndex..<message.endIndex, in: message)
+        return expression.stringByReplacingMatches(in: message, range: range, withTemplate: replacement)
     }
 }

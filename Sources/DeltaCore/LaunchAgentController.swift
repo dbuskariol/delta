@@ -117,6 +117,44 @@ public enum LaunchAgentController {
     }
 }
 
+public enum AppLoginItemController {
+    public static func register() throws {
+        #if canImport(ServiceManagement)
+        if #available(macOS 13.0, *) {
+            try SMAppService.mainApp.register()
+        }
+        #endif
+    }
+
+    public static func unregister() throws {
+        #if canImport(ServiceManagement)
+        if #available(macOS 13.0, *) {
+            try SMAppService.mainApp.unregister()
+        }
+        #endif
+    }
+
+    public static func status() -> LaunchAgentRegistrationStatus {
+        #if canImport(ServiceManagement)
+        if #available(macOS 13.0, *) {
+            switch SMAppService.mainApp.status {
+            case .enabled:
+                return .enabled
+            case .requiresApproval:
+                return .requiresApproval
+            case .notRegistered:
+                return .notRegistered
+            case .notFound:
+                return .notFound
+            @unknown default:
+                return LaunchAgentRegistrationStatus.parse("\(SMAppService.mainApp.status)")
+            }
+        }
+        #endif
+        return .unavailable
+    }
+}
+
 public enum FullDiskAccessGuide {
     public static let settingsURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")!
 }

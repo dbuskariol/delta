@@ -181,10 +181,10 @@ public enum ResticFailureClassifier {
             return "The job was interrupted. Delta can continue from existing backup data on the next run."
         case .unknown:
             let message = standardError.isEmpty ? standardOutput : standardError
-            return message.isEmpty ? "The backup tool reported an unknown error." : message
+            return message.isEmpty ? "The backup tool reported an unknown error." : SensitiveLogRedactor.redact(message)
         case .none:
             let message = standardError.isEmpty ? standardOutput : standardError
-            return message.isEmpty ? status.rawValue.capitalized : message
+            return message.isEmpty ? status.rawValue.capitalized : SensitiveLogRedactor.redact(message)
         }
     }
 
