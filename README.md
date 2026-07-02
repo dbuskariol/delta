@@ -9,6 +9,7 @@ The product goal is simple: make serious backup practices approachable without h
 - **Encrypted backups by default** using restic repositories. There is no unencrypted backup mode.
 - **Incremental restore points** with content-addressed deduplication, metadata tracking, and `--skip-if-unchanged`.
 - **Full-volume or custom-folder protection** with macOS-safe excludes and destination self-exclusion.
+- **Per-profile extra exclusions** for large generated folders, transient files, disk images, or other paths that should not consume backup storage.
 - **Local and network destinations** including local paths, mounted SMB/NFS volumes, SFTP, REST server, S3-compatible storage, Backblaze B2, Azure Blob, Google Cloud Storage, OpenStack Swift, rclone remotes, and custom restic URLs.
 - **Destination validation before save** for required fields, new or changed writable local paths, REST URLs, SFTP paths/ports, and rclone remote syntax.
 - **Automatic destination preparation** after a destination is added, with a first-backup safety net for writable local or mounted destinations that still have no restic metadata.
@@ -85,6 +86,8 @@ For full-volume profiles, Delta uses:
 - profile/restic tags
 
 Custom-folder profiles use the selected source folders and stored security-scoped bookmarks where available.
+
+Each profile keeps Delta's default macOS-safe excludes and can add extra restic exclude patterns. Extra excludes are saved with the profile and passed to restic as additional `--exclude` arguments.
 
 ## Scheduling And Maintenance
 

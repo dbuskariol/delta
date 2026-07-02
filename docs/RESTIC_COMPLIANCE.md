@@ -100,6 +100,8 @@ The UI stores full-volume sources as volume roots (`/` or `/Volumes/<name>`). Ch
 
 Delta adds macOS-safe excludes and excludes the local destination path when the destination is inside a local filesystem path.
 
+Per-profile extra exclusions are merged with Delta's default macOS-safe exclusions and forwarded as additional `--exclude` arguments. The profile editor stores only the user's extra patterns in the visible field; the command builder always keeps the built-in safety patterns.
+
 Expected restic backup exit handling:
 
 | Exit code | Delta state |

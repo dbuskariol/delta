@@ -89,6 +89,24 @@ final class ResticCommandTests: XCTestCase {
         XCTAssertFalse(command.arguments.contains("~/DeltaBackups"))
     }
 
+    func testBackupCommandIncludesCustomProfileExcludes() throws {
+        let repository = BackupRepository(name: "Local", backend: .local(path: "/repo"))
+        let profile = BackupProfile(
+            name: "Mac",
+            sourceMode: .customFolders,
+            sources: [BackupSource(path: "/Users/me/Documents")],
+            repositoryID: repository.id,
+            excludePatterns: BackupExcludePatternParser.mergingDefaults(
+                with: ["/Users/me/Downloads", "*.iso"]
+            )
+        )
+
+        let command = try makeBuilder().backup(profile: profile, repository: repository)
+
+        XCTAssertTrue(command.arguments.contains("/Users/me/Downloads"))
+        XCTAssertTrue(command.arguments.contains("*.iso"))
+    }
+
     func testRetentionCommandUsesSmartPresetArguments() throws {
         let repository = BackupRepository(name: "Local", backend: .local(path: "/repo"))
         let profile = BackupProfile(

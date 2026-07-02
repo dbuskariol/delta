@@ -316,7 +316,8 @@ final class DeltaAppModel: ObservableObject {
         sources: [BackupSource],
         repositoryID: UUID,
         schedule: BackupSchedule,
-        retention: RetentionPolicy = RetentionPolicy()
+        retention: RetentionPolicy = RetentionPolicy(),
+        excludePatterns: [String] = BackupExcludePolicy.defaultMacOSExcludes
     ) {
         guardPersistentStoreAvailable()
         guard isPersistentStoreAvailable else { return }
@@ -330,7 +331,8 @@ final class DeltaAppModel: ObservableObject {
                 sources: sources,
                 repositoryID: repositoryID,
                 schedule: schedule,
-                retention: retention
+                retention: retention,
+                excludePatterns: excludePatterns
             )
             try database.saveProfile(profile)
             try database.appendEvent(EventLog(level: .info, message: "Backup profile '\(profile.name)' was created."))

@@ -206,7 +206,7 @@ struct BackupsView: View {
         .sheet(isPresented: $isPresentingProfileSheet) {
             ProfileEditorView()
                 .environmentObject(model)
-                .frame(width: ModalMetrics.sheetWidth, height: 680)
+                .frame(width: ModalMetrics.sheetWidth, height: 720)
         }
     }
 }
@@ -1057,7 +1057,7 @@ struct ProfileRow: View {
                         .accessibilityLabel(primaryActionTitle)
 
                         HStack(spacing: 8) {
-                            IconButton(symbol: "pencil", help: "Edit sources, destination, schedule, and retention") {
+                            IconButton(symbol: "pencil", help: "Edit sources, exclusions, destination, schedule, and retention") {
                                 isPresentingEditor = true
                             }
                             .disabled(model.isWorking || !model.isPersistentStoreAvailable)
@@ -1089,7 +1089,7 @@ struct ProfileRow: View {
         .sheet(isPresented: $isPresentingEditor) {
             ProfileEditorView(profile: profile)
                 .environmentObject(model)
-                .frame(width: ModalMetrics.sheetWidth, height: 680)
+                .frame(width: ModalMetrics.sheetWidth, height: 720)
         }
         .confirmationDialog("Delete Backup Profile?", isPresented: $isConfirmingDelete) {
             Button("Delete", role: .destructive) {
@@ -1305,6 +1305,7 @@ struct ProfileEditorView: View {
     @State private var mode: BackupSourceMode = .customFolders
     @State private var sources: [BackupSource] = []
     @State private var repositoryID: UUID?
+    @State private var customExcludePatternsText = ""
     @State private var scheduleKind: ScheduleEditorKind = .daily
     @State private var hour = 20
     @State private var minute = 0
@@ -1339,6 +1340,7 @@ struct ProfileEditorView: View {
         _mode = State(initialValue: profile?.sourceMode ?? .customFolders)
         _sources = State(initialValue: profile?.sources ?? [])
         _repositoryID = State(initialValue: profile?.repositoryID)
+        _customExcludePatternsText = State(initialValue: BackupExcludePatternParser.displayText(for: profile?.excludePatterns ?? BackupExcludePolicy.defaultMacOSExcludes))
         _scheduleKind = State(initialValue: scheduleState.kind)
         _hour = State(initialValue: scheduleState.hour)
         _minute = State(initialValue: scheduleState.minute)
@@ -1416,6 +1418,11 @@ struct ProfileEditorView: View {
                         .truncationMode(.middle)
                         .frame(maxWidth: 460, alignment: .leading)
                 }
+            }
+
+            FieldRow(title: "Extra excludes") {
+                ExclusionPatternEditor(text: $customExcludePatternsText)
+                    .frame(width: ModalMetrics.primaryControlWidth)
             }
 
             FieldRow(title: "Destination") {
@@ -1637,6 +1644,12 @@ struct ProfileEditorView: View {
         )
     }
 
+    private var selectedExcludePatterns: [String] {
+        BackupExcludePatternParser.mergingDefaults(
+            with: BackupExcludePatternParser.parse(customExcludePatternsText)
+        )
+    }
+
     private func saveProfile(repositoryID: UUID) {
         if var profile = existingProfile {
             profile.name = name
@@ -1645,6 +1658,7 @@ struct ProfileEditorView: View {
             profile.repositoryID = repositoryID
             profile.schedule = selectedSchedule
             profile.retention = selectedRetention
+            profile.excludePatterns = selectedExcludePatterns
             profile.updatedAt = Date()
             model.saveProfile(profile)
         } else {
@@ -1654,7 +1668,8 @@ struct ProfileEditorView: View {
                 sources: sources,
                 repositoryID: repositoryID,
                 schedule: selectedSchedule,
-                retention: selectedRetention
+                retention: selectedRetention,
+                excludePatterns: selectedExcludePatterns
             )
         }
     }
@@ -2215,6 +2230,36 @@ struct FieldRow<Content: View>: View {
                 .frame(width: ModalMetrics.contentWidth, alignment: .leading)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+struct ExclusionPatternEditor: View {
+    @Binding var text: String
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            RoundedRectangle(cornerRadius: 6)
+                .fill(Color(nsColor: .textBackgroundColor).opacity(0.18))
+            TextEditor(text: $text)
+                .font(.system(.caption, design: .monospaced))
+                .scrollContentBackground(.hidden)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 4)
+                .frame(height: 84)
+            if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Text("One path or pattern per line")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .padding(.top, 9)
+                    .padding(.leading, 10)
+                    .allowsHitTesting(false)
+            }
+        }
+        .frame(height: 84)
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(DeltaTheme.border, lineWidth: 1)
+        )
     }
 }
 

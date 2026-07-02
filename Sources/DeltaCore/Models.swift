@@ -405,6 +405,34 @@ public struct BackupProfile: Codable, Identifiable, Equatable, Sendable {
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case sourceMode
+        case sources
+        case repositoryID
+        case schedule
+        case retention
+        case excludePatterns
+        case createdAt
+        case updatedAt
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        sourceMode = try container.decode(BackupSourceMode.self, forKey: .sourceMode)
+        sources = try container.decode([BackupSource].self, forKey: .sources)
+        repositoryID = try container.decode(UUID.self, forKey: .repositoryID)
+        schedule = try container.decode(BackupSchedule.self, forKey: .schedule)
+        retention = try container.decode(RetentionPolicy.self, forKey: .retention)
+        excludePatterns = try container.decodeIfPresent([String].self, forKey: .excludePatterns)
+            ?? BackupExcludePolicy.defaultMacOSExcludes
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        updatedAt = try container.decode(Date.self, forKey: .updatedAt)
+    }
 }
 
 public struct JobRun: Codable, Identifiable, Equatable, Sendable {

@@ -20,6 +20,26 @@ final class DatabaseTests: XCTestCase {
         XCTAssertEqual(policy.maintenanceSchedule, RetentionMaintenanceSchedule())
     }
 
+    func testBackupProfileDecodesOldPayloadWithDefaultExcludes() throws {
+        let repositoryID = UUID()
+        let profile = BackupProfile(
+            name: "Documents",
+            sourceMode: .customFolders,
+            sources: [BackupSource(path: "/Users/me/Documents")],
+            repositoryID: repositoryID,
+            excludePatterns: ["/custom"]
+        )
+        let encodedProfile = try JSONEncoder().encode(profile)
+        var payload = try XCTUnwrap(JSONSerialization.jsonObject(with: encodedProfile) as? [String: Any])
+        payload.removeValue(forKey: "excludePatterns")
+        let oldPayload = try JSONSerialization.data(withJSONObject: payload)
+
+        let decodedProfile = try JSONDecoder().decode(BackupProfile.self, from: oldPayload)
+
+        XCTAssertEqual(decodedProfile.repositoryID, repositoryID)
+        XCTAssertEqual(decodedProfile.excludePatterns, BackupExcludePolicy.defaultMacOSExcludes)
+    }
+
     func testDatabaseRoundTripsRepositoryProfileAndJob() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
