@@ -13,6 +13,8 @@ if [[ ! -d "$UPDATES_DIR" || -z "$(find "$UPDATES_DIR" -maxdepth 1 -name 'Delta-
   "$ROOT_DIR/Scripts/package-update.sh"
 fi
 
+rm -f "$UPDATES_DIR/appcast.xml"
+
 "$GENERATE_APPCAST" \
   --download-url-prefix "https://github.com/dbuskariol/delta/releases/latest/download/" \
   --auto-prune-update-files \

@@ -12,7 +12,12 @@ BUILD_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP/Conte
 ARCHIVE="$UPDATES_DIR/Delta-$SHORT_VERSION-$BUILD_VERSION.zip"
 
 mkdir -p "$UPDATES_DIR"
-rm -f "$ARCHIVE"
+find "$UPDATES_DIR" -maxdepth 1 -type f \
+  \( -name "Delta-*-$BUILD_VERSION.zip" -o -name "Delta-*-$BUILD_VERSION.md" \) \
+  ! -name "Delta-$SHORT_VERSION-$BUILD_VERSION.zip" \
+  ! -name "Delta-$SHORT_VERSION-$BUILD_VERSION.md" \
+  -delete
+rm -f "$ARCHIVE" "${ARCHIVE%.zip}.md"
 
 (cd "$ROOT_DIR/dist" && /usr/bin/ditto -c -k --sequesterRsrc --keepParent "Delta.app" "$ARCHIVE")
 
