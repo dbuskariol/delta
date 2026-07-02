@@ -173,8 +173,18 @@ else
 
   language_output="$(run_capture product_language "$ROOT_DIR/Scripts/verify-product-language.sh")"
   language_status="$(command_status product_language)"
-  if [[ "$language_status" -eq 0 ]]; then
-    append_row "settings_surface" "$(item_area settings_surface)" "Partial" "Product-language verifier passed; raw Repository/LaunchAgent terminology is blocked from user-facing strings." "Open Settings and confirm visual grouping, status summary, Run Due Now scheduler action, Sparkle automatic check/download controls, idle-sleep protection, reset controls, backup freshness warnings, source-access warnings, destination-check warning controls, and activity history retention in the running app."
+  installed_diagnostics_output="$(run_capture installed_diagnostics "$ROOT_DIR/Scripts/run-installed-diagnostics-acceptance.sh" "$APP_PATH")"
+  installed_diagnostics_status="$(command_status installed_diagnostics)"
+  if [[ "$installed_diagnostics_status" -eq 0 ]]; then
+    installed_diagnostics_evidence="Installed diagnostics acceptance passed: isolated installed-app diagnostic export generated a redacted report, proved Background Password Access was Ready, and proved seeded destination/backend credential values were absent. $installed_diagnostics_output"
+  else
+    installed_diagnostics_evidence="Installed diagnostics acceptance failed: $installed_diagnostics_output"
+  fi
+
+  if [[ "$language_status" -eq 0 && "$installed_diagnostics_status" -eq 0 ]]; then
+    append_row "settings_surface" "$(item_area settings_surface)" "Partial" "Product-language verifier passed; raw Repository/LaunchAgent terminology is blocked from user-facing strings. Installed diagnostics reported Background Password Access as Ready." "Open Settings and confirm visual grouping, status summary, Run Due Now scheduler action, Sparkle automatic check/download controls, idle-sleep protection, reset controls, backup freshness warnings, source-access warnings, destination-check warning controls, and activity history retention in the running app."
+  elif [[ "$language_status" -eq 0 ]]; then
+    append_row "settings_surface" "$(item_area settings_surface)" "Failed" "Product-language verifier passed, but installed diagnostics did not prove Background Password Access: $installed_diagnostics_evidence" "Fix installed diagnostics and background password-access health before manual Settings acceptance."
   else
     append_row "settings_surface" "$(item_area settings_surface)" "Failed" "Product-language verifier failed: $language_output" "Fix user-facing terminology and rerun."
   fi
@@ -207,8 +217,10 @@ else
     bridge_status="$(command_status secret_bridge)"
     installed_keychain_output="$(run_capture installed_keychain_access "$ROOT_DIR/Scripts/run-installed-keychain-access-acceptance.sh" "$APP_PATH")"
     installed_keychain_status="$(command_status installed_keychain_access)"
-    if [[ "$bridge_status" -eq 0 && "$installed_keychain_status" -eq 0 ]]; then
-      append_row "keychain_background_access" "$(item_area keychain_background_access)" "Partial" "Secret bridge fail-closed argument behavior passed, and installed Keychain access acceptance proved a throwaway destination password can be read by Delta --secret-bridge without interaction: $bridge_output $installed_keychain_output" "Run scheduled backups against saved app-managed and credentialed destinations and confirm Keychain does not prompt."
+    if [[ "$bridge_status" -eq 0 && "$installed_keychain_status" -eq 0 && "$installed_diagnostics_status" -eq 0 ]]; then
+      append_row "keychain_background_access" "$(item_area keychain_background_access)" "Partial" "Secret bridge fail-closed argument behavior passed, installed Keychain access acceptance proved a throwaway destination password can be read by Delta --secret-bridge without interaction, and installed diagnostics proved Background Password Access as Ready for a destination with backend credentials: $bridge_output $installed_keychain_output $installed_diagnostics_output" "Run scheduled backups against saved app-managed and credentialed destinations and confirm Keychain does not prompt."
+    elif [[ "$bridge_status" -eq 0 && "$installed_keychain_status" -eq 0 ]]; then
+      append_row "keychain_background_access" "$(item_area keychain_background_access)" "Failed" "Secret bridge and installed Keychain access acceptance passed, but installed diagnostics did not prove Background Password Access readiness: $installed_diagnostics_evidence" "Fix background password-access diagnostics before scheduled-secret testing."
     elif [[ "$bridge_status" -eq 0 ]]; then
       append_row "keychain_background_access" "$(item_area keychain_background_access)" "Failed" "Secret bridge fail-closed argument behavior passed, but installed non-interactive Keychain access failed: $installed_keychain_output" "Fix the Keychain trusted-app access list or signed app identity before scheduled-secret testing."
     else
@@ -224,14 +236,6 @@ else
     installed_local_evidence="Installed app local lifecycle acceptance passed through Delta coordinator: automatic destination preparation, first backup, no-change backup, incremental backup, restore-point cache, browser listing, full restore, selected folder restore, selected file restore, check, cleanup, and post-cleanup check. $installed_local_output"
   else
     installed_local_evidence="Installed app local lifecycle acceptance failed: $installed_local_output"
-  fi
-
-  installed_diagnostics_output="$(run_capture installed_diagnostics "$ROOT_DIR/Scripts/run-installed-diagnostics-acceptance.sh" "$APP_PATH")"
-  installed_diagnostics_status="$(command_status installed_diagnostics)"
-  if [[ "$installed_diagnostics_status" -eq 0 ]]; then
-    installed_diagnostics_evidence="Installed diagnostics acceptance passed: isolated installed-app diagnostic export generated a redacted report and proved seeded destination/backend credential values were absent. $installed_diagnostics_output"
-  else
-    installed_diagnostics_evidence="Installed diagnostics acceptance failed: $installed_diagnostics_output"
   fi
 
   mounted_acceptance_status="not_configured"
