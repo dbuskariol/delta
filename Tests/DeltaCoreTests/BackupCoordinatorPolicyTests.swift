@@ -127,6 +127,28 @@ final class BackupCoordinatorPolicyTests: XCTestCase {
         }
     }
 
+    func testListSnapshotEntriesUsesResticLsAndParsesEntries() throws {
+        let fixture = try Fixture()
+        let output = """
+        {"name":"source","type":"dir","path":"\(fixture.source.path)","message_type":"node","struct_type":"node"}
+        {"name":"file.txt","type":"file","path":"\(fixture.source.appendingPathComponent("file.txt").path)","size":128,"message_type":"node","struct_type":"node"}
+        """
+        let runner = MockResticRunner(results: [ResticRunResult(exitCode: 0, standardOutput: output, standardError: "")])
+        let coordinator = fixture.makeCoordinator(runner: runner)
+
+        let entries = try coordinator.listSnapshotEntries(
+            repository: fixture.repository,
+            snapshotID: "abc123",
+            directoryPath: fixture.source.path
+        )
+
+        XCTAssertEqual(runner.commands.map(\.resticSubcommand), ["ls"])
+        XCTAssertTrue(runner.commands[0].arguments.contains(fixture.source.path))
+        XCTAssertEqual(entries.count, 2)
+        XCTAssertEqual(entries[1].name, "file.txt")
+        XCTAssertEqual(entries[1].type, .file)
+    }
+
     func testScheduledMaintenanceRunsCleanupAndCheckWhenDue() throws {
         let fixture = try Fixture()
         let runner = MockResticRunner(results: [.success, .success, .success])
@@ -595,7 +617,7 @@ private extension ResticRunResult {
 
 private extension ResticCommand {
     var resticSubcommand: String? {
-        arguments.first { ["backup", "forget", "check", "restore", "snapshots", "init"].contains($0) }
+        arguments.first { ["backup", "forget", "check", "restore", "snapshots", "init", "ls"].contains($0) }
     }
 }
 

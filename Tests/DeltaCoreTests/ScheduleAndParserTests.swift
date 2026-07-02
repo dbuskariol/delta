@@ -105,6 +105,24 @@ final class ScheduleAndParserTests: XCTestCase {
         XCTAssertEqual(snapshots[0].tags, ["delta"])
     }
 
+    func testSnapshotEntryParserDecodesResticLsJSONLines() throws {
+        let jsonLines = """
+        {"time":"2026-07-02T08:30:00.123456789+10:00","paths":["/Users/me/Documents"],"id":"snapshot-id","message_type":"snapshot","struct_type":"snapshot"}
+        {"name":"Documents","type":"dir","path":"/Users/me/Documents","mtime":"2026-07-02T08:30:00.123456789+10:00","message_type":"node","struct_type":"node"}
+        {"name":"Budget.numbers","type":"file","path":"/Users/me/Documents/Budget.numbers","size":2048,"mtime":"2026-07-02T08:31:00+10:00","message_type":"node","struct_type":"node"}
+        """
+
+        let entries = try ResticJSONParser().parseSnapshotEntries(from: jsonLines)
+
+        XCTAssertEqual(entries.count, 2)
+        XCTAssertEqual(entries[0].path, "/Users/me/Documents")
+        XCTAssertEqual(entries[0].type, .directory)
+        XCTAssertEqual(entries[1].name, "Budget.numbers")
+        XCTAssertEqual(entries[1].size, 2048)
+        XCTAssertEqual(entries[1].type, .file)
+        XCTAssertNotNil(entries[1].modifiedAt)
+    }
+
     private func components(_ calendar: Calendar, year: Int, month: Int, day: Int, hour: Int, minute: Int) -> Date {
         calendar.date(from: DateComponents(year: year, month: month, day: day, hour: hour, minute: minute, second: 0))!
     }

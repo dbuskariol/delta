@@ -497,6 +497,44 @@ public struct ResticSnapshot: Codable, Identifiable, Equatable, Sendable {
     }
 }
 
+public enum ResticSnapshotEntryType: String, Codable, Equatable, Sendable {
+    case directory = "dir"
+    case file
+    case symlink
+    case other
+
+    public init(resticType: String) {
+        self = Self(rawValue: resticType) ?? .other
+    }
+
+    public var isDirectory: Bool {
+        self == .directory
+    }
+}
+
+public struct ResticSnapshotEntry: Codable, Identifiable, Equatable, Sendable {
+    public var id: String { path }
+    public var name: String
+    public var path: String
+    public var type: ResticSnapshotEntryType
+    public var size: Int64?
+    public var modifiedAt: Date?
+
+    public init(
+        name: String,
+        path: String,
+        type: ResticSnapshotEntryType,
+        size: Int64? = nil,
+        modifiedAt: Date? = nil
+    ) {
+        self.name = name
+        self.path = path
+        self.type = type
+        self.size = size
+        self.modifiedAt = modifiedAt
+    }
+}
+
 public struct RestoreRequest: Codable, Identifiable, Equatable, Sendable {
     public var id: UUID
     public var repositoryID: UUID

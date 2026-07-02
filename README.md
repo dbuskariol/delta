@@ -16,7 +16,7 @@ The product goal is simple: make serious backup practices approachable without h
 - **Power-aware scheduling** with battery and Low Power Mode controls.
 - **Retention maintenance** with scheduled forget/prune/check windows.
 - **Pause, resume, and cancel controls** for active backups. Pause stops restic safely, keeps the profile visibly paused, and Resume continues from already saved backup data.
-- **Full or selected restore** with dry-run preview, overwrite policies, verification, original-path restore, chosen-folder restore, and optional pre-restore backup.
+- **Full or browsed selected restore** with backup browsing, file/folder selection, dry-run preview, overwrite policies, verification, original-path restore, chosen-folder restore, and optional pre-restore backup.
 - **Streaming and saved backup logs** from restic stdout/stderr with source context, stable processed-file counters, fixed-height live panes, and expandable per-job audit history.
 - **Sparkle automatic updates** with generated appcast/update archive support.
 
@@ -101,7 +101,7 @@ Restore is intentionally explicit:
 
 1. Choose a Destination.
 2. Refresh and choose a Restore Point.
-3. Restore the full restore point or selected paths.
+3. Restore the full restore point, or browse backed-up source folders and select specific files/folders.
 4. Choose a target folder or original paths.
 5. Choose conflict behavior:
    - Replace all
@@ -112,7 +112,7 @@ Restore is intentionally explicit:
 7. Optionally verify restored files.
 8. Confirm in-place restore when restoring to original paths. Delta enforces this confirmation before any non-preview original-path restore can run.
 
-Selected-path restore uses restic snapshot path syntax for one selected path, and include filters for multiple selected paths.
+The browser loads source roots from the selected restore point immediately and asks restic for one folder's contents at a time with `ls --json`, so full-volume backups do not need to be expanded into memory before selection. Selected-path restore uses restic snapshot path syntax for one selected path, and include filters for multiple selected paths.
 
 ## Security Model
 

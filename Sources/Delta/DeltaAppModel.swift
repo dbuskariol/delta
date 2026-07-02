@@ -44,6 +44,8 @@ final class DeltaAppModel: ObservableObject {
     @Published var jobLogs: [JobLogEntry] = []
     @Published var snapshots: [ResticSnapshot] = []
     @Published var snapshotsByRepository: [UUID: [ResticSnapshot]] = [:]
+    @Published private(set) var snapshotEntryCache: [String: [ResticSnapshotEntry]] = [:]
+    @Published private(set) var snapshotEntryLoadingKey: String?
     @Published var events: [EventLog] = []
     @Published var fullDiskAccessStatus = FullDiskAccessProbe().check()
     @Published var isWorking = false
@@ -350,6 +352,58 @@ final class DeltaAppModel: ObservableObject {
             )
         ) {
             _ = try coordinator.refreshSnapshots(repository: repository)
+        }
+    }
+
+    func snapshotEntryCacheKey(repositoryID: UUID, snapshotID: String, directoryPath: String?) -> String {
+        "\(repositoryID.uuidString)|\(snapshotID)|\(directoryPath ?? "")"
+    }
+
+    func snapshotEntries(repositoryID: UUID, snapshotID: String, directoryPath: String?) -> [ResticSnapshotEntry]? {
+        snapshotEntryCache[snapshotEntryCacheKey(repositoryID: repositoryID, snapshotID: snapshotID, directoryPath: directoryPath)]
+    }
+
+    func isLoadingSnapshotEntries(repositoryID: UUID, snapshotID: String, directoryPath: String?) -> Bool {
+        snapshotEntryLoadingKey == snapshotEntryCacheKey(repositoryID: repositoryID, snapshotID: snapshotID, directoryPath: directoryPath)
+    }
+
+    func loadSnapshotEntries(repository: BackupRepository, snapshotID: String, directoryPath: String?, force: Bool = false) {
+        guard !snapshotID.isEmpty else {
+            return
+        }
+        guard !isWorking else {
+            alertMessage = "Wait for the current Delta job to finish before browsing restore point contents."
+            return
+        }
+        let key = snapshotEntryCacheKey(repositoryID: repository.id, snapshotID: snapshotID, directoryPath: directoryPath)
+        if !force, snapshotEntryCache[key] != nil {
+            return
+        }
+        snapshotEntryLoadingKey = key
+        let coordinator = makeCoordinator()
+        Task.detached(priority: .userInitiated) {
+            do {
+                let entries = try coordinator.listSnapshotEntries(
+                    repository: repository,
+                    snapshotID: snapshotID,
+                    directoryPath: directoryPath
+                )
+                await MainActor.run {
+                    guard self.snapshotEntryLoadingKey == key else {
+                        return
+                    }
+                    self.snapshotEntryCache[key] = entries
+                    self.snapshotEntryLoadingKey = nil
+                }
+            } catch {
+                await MainActor.run {
+                    guard self.snapshotEntryLoadingKey == key else {
+                        return
+                    }
+                    self.snapshotEntryLoadingKey = nil
+                    self.alertMessage = error.localizedDescription
+                }
+            }
         }
     }
 

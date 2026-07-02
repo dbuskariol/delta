@@ -121,6 +121,14 @@ snapshots --json
 
 The JSON parser is covered by unit tests.
 
+Delta browses files and folders inside a selected restore point with:
+
+```text
+ls --json --sort name <snapshot-id> <absolute-directory-path>
+```
+
+The UI starts from the restore point's backed-up source roots and loads one directory at a time. Delta does not recursively dump a full-volume backup into app memory just to render the browser. `ls --json` output is parsed as newline-delimited restic node records; non-node records are ignored.
+
 ## Restore
 
 Delta restore commands use:
@@ -146,7 +154,7 @@ Single selected path restore uses restic snapshot path syntax:
 <snapshot-id>:/path/to/restore
 ```
 
-Multiple selected paths use repeated include filters:
+Multiple selected paths from the browser use repeated include filters:
 
 ```text
 --include /path/one

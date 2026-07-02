@@ -132,6 +132,21 @@ final class ResticCommandTests: XCTestCase {
         XCTAssertTrue(command.arguments.contains("abc123:/Users/me/Documents"))
     }
 
+    func testListSnapshotEntriesCommandUsesResticJSONAndDirectoryFilter() throws {
+        let repository = BackupRepository(name: "Local", backend: .local(path: "/repo"))
+
+        let command = try makeBuilder().listSnapshotEntries(
+            repository: repository,
+            snapshotID: "abc123",
+            directoryPath: "/Users/me/Documents"
+        )
+
+        XCTAssertEqual(
+            Array(command.arguments.suffix(6)),
+            ["ls", "--json", "--sort", "name", "abc123", "/Users/me/Documents"]
+        )
+    }
+
     func testS3RegionIsPassedAsResticBackendOption() throws {
         let repository = BackupRepository(
             name: "S3",

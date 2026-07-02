@@ -155,6 +155,25 @@ public final class BackupCoordinator: @unchecked Sendable {
         return snapshots
     }
 
+    public func listSnapshotEntries(repository: BackupRepository, snapshotID: String, directoryPath: String? = nil) throws -> [ResticSnapshotEntry] {
+        guard let lock = try lockManager.acquire(repositoryID: repository.id) else {
+            throw BackupCoordinatorError.destinationBusy
+        }
+        defer { withExtendedLifetime(lock) {} }
+
+        let result = try runner.run(
+            try commandBuilder.listSnapshotEntries(
+                repository: repository,
+                snapshotID: snapshotID,
+                directoryPath: directoryPath
+            )
+        )
+        guard result.status == .succeeded || result.status == .warning else {
+            throw BackupCoordinatorError.resticFailed(result.userFacingMessage)
+        }
+        return try parser.parseSnapshotEntries(from: result.standardOutput)
+    }
+
     @discardableResult
     public func restore(request: RestoreRequest, repository: BackupRepository) throws -> JobRun {
         try database.saveRestoreRequest(request)

@@ -216,7 +216,8 @@ struct RestoreView: View {
     @EnvironmentObject private var model: DeltaAppModel
     @State private var repositoryID: UUID?
     @State private var snapshotID = ""
-    @State private var selectedPaths = ""
+    @State private var selectedRestorePaths: Set<String> = []
+    @State private var browserPathStack: [String] = []
     @State private var destinationPath = ""
     @State private var restoreOriginalPaths = false
     @State private var conflictPolicy: RestoreConflictPolicy = .ifChanged
@@ -267,18 +268,19 @@ struct RestoreView: View {
             }
 
             RestoreStepCard(number: 2, title: "Scope", subtitle: "Restore everything from that point, or limit recovery to selected paths.") {
-                RestoreForm {
-                    RestoreFormRow(title: "Paths") {
-                        VStack(alignment: .leading, spacing: 8) {
-                            TextField("Leave empty to restore everything, or enter comma-separated paths", text: $selectedPaths)
-                                .textFieldStyle(.roundedBorder)
-                            Text(selectedPaths.isEmpty ? "Everything from this restore point is selected." : "Only matching paths will be restored.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                }
+                SnapshotBrowserPanel(
+                    entries: browserEntries,
+                    selectedPaths: $selectedRestorePaths,
+                    currentPath: currentBrowserDirectory,
+                    selectedCount: normalizedSelectedRestorePaths.count,
+                    isLoading: isLoadingBrowserEntries,
+                    canBrowse: canBrowseSnapshot,
+                    emptyMessage: browserEmptyMessage,
+                    onOpen: openBrowserDirectory,
+                    onBack: navigateBrowserBack,
+                    onRefresh: refreshCurrentBrowserDirectory,
+                    onClearSelection: clearRestoreSelection
+                )
             }
 
             RestoreStepCard(number: 3, title: "Destination", subtitle: "Preview by default, then restore to a chosen folder or original paths.") {
@@ -361,6 +363,13 @@ struct RestoreView: View {
         .onAppear {
             repositoryID = repositoryID ?? model.repositories.first?.id
         }
+        .onChange(of: repositoryID) { _, _ in
+            snapshotID = ""
+            resetBrowser()
+        }
+        .onChange(of: snapshotID) { _, _ in
+            resetBrowser()
+        }
     }
 
     private var selectedRepository: BackupRepository? {
@@ -373,6 +382,76 @@ struct RestoreView: View {
         return model.snapshotsByRepository[repositoryID] ?? []
     }
 
+    private var selectedSnapshot: ResticSnapshot? {
+        repositorySnapshots.first { $0.id == snapshotID }
+    }
+
+    private var currentBrowserDirectory: String? {
+        browserPathStack.last
+    }
+
+    private var canBrowseSnapshot: Bool {
+        selectedRepository != nil && selectedSnapshot != nil && !model.isWorking
+    }
+
+    private var isLoadingBrowserEntries: Bool {
+        guard let repositoryID, !snapshotID.isEmpty, let currentBrowserDirectory else {
+            return false
+        }
+        return model.isLoadingSnapshotEntries(
+            repositoryID: repositoryID,
+            snapshotID: snapshotID,
+            directoryPath: currentBrowserDirectory
+        )
+    }
+
+    private var browserEntries: [ResticSnapshotEntry] {
+        guard let selectedSnapshot else {
+            return []
+        }
+        guard let currentBrowserDirectory else {
+            return selectedSnapshot.paths
+                .map { path in
+                    ResticSnapshotEntry(
+                        name: Self.displayName(for: path),
+                        path: path,
+                        type: .directory
+                    )
+                }
+                .sortedForBrowser()
+        }
+        guard let repositoryID else {
+            return []
+        }
+        return (model.snapshotEntries(
+            repositoryID: repositoryID,
+            snapshotID: snapshotID,
+            directoryPath: currentBrowserDirectory
+        ) ?? [])
+        .filter { Self.normalizedPath($0.path) != Self.normalizedPath(currentBrowserDirectory) }
+        .sortedForBrowser()
+    }
+
+    private var browserEmptyMessage: String {
+        if selectedRepository == nil {
+            return "Choose a destination first."
+        }
+        if snapshotID.isEmpty {
+            return "Choose a restore point to browse its contents."
+        }
+        if currentBrowserDirectory == nil {
+            return "This restore point does not list any backed-up source roots."
+        }
+        if isLoadingBrowserEntries {
+            return "Loading folder contents..."
+        }
+        return "No files or folders were found here."
+    }
+
+    private var normalizedSelectedRestorePaths: [String] {
+        Self.normalizedRestorePaths(Array(selectedRestorePaths))
+    }
+
     private var canRestore: Bool {
         let destinationIsValid = restoreOriginalPaths || !destinationPath.isEmpty
         let inPlaceIsAcknowledged = !restoreOriginalPaths || dryRun || acknowledgedInPlaceRestore
@@ -381,10 +460,7 @@ struct RestoreView: View {
 
     private func runRestore() {
         guard let repository = selectedRepository else { return }
-        let paths = selectedPaths
-            .split(separator: ",")
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
+        let paths = normalizedSelectedRestorePaths
         let request = RestoreRequest(
             repositoryID: repository.id,
             snapshotID: snapshotID,
@@ -397,6 +473,293 @@ struct RestoreView: View {
             preRestoreBackupProfileID: preRestoreProfileID
         )
         model.runRestore(repository: repository, request: request)
+    }
+
+    private func openBrowserDirectory(_ path: String) {
+        guard let repository = selectedRepository, !snapshotID.isEmpty else {
+            return
+        }
+        browserPathStack.append(path)
+        model.loadSnapshotEntries(repository: repository, snapshotID: snapshotID, directoryPath: path)
+    }
+
+    private func navigateBrowserBack() {
+        guard !browserPathStack.isEmpty else {
+            return
+        }
+        browserPathStack.removeLast()
+    }
+
+    private func refreshCurrentBrowserDirectory() {
+        guard let repository = selectedRepository, !snapshotID.isEmpty, let currentBrowserDirectory else {
+            return
+        }
+        model.loadSnapshotEntries(
+            repository: repository,
+            snapshotID: snapshotID,
+            directoryPath: currentBrowserDirectory,
+            force: true
+        )
+    }
+
+    private func clearRestoreSelection() {
+        selectedRestorePaths.removeAll()
+    }
+
+    private func resetBrowser() {
+        selectedRestorePaths.removeAll()
+        browserPathStack.removeAll()
+    }
+
+    private static func normalizedRestorePaths(_ paths: [String]) -> [String] {
+        let normalized = Set(paths.map(normalizedPath).filter { !$0.isEmpty })
+        return normalized
+            .filter { path in
+                !normalized.contains { candidate in
+                    candidate != path && path.hasPrefix(candidate == "/" ? "/" : "\(candidate)/")
+                }
+            }
+            .sorted()
+    }
+
+    private static func normalizedPath(_ path: String) -> String {
+        let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return ""
+        }
+        if trimmed == "/" {
+            return "/"
+        }
+        return trimmed.hasSuffix("/") ? String(trimmed.dropLast()) : trimmed
+    }
+
+    private static func displayName(for path: String) -> String {
+        if path == "/" {
+            return "System volume (/)"
+        }
+        let name = URL(fileURLWithPath: path).lastPathComponent
+        return name.isEmpty ? path : name
+    }
+}
+
+struct SnapshotBrowserPanel: View {
+    var entries: [ResticSnapshotEntry]
+    @Binding var selectedPaths: Set<String>
+    var currentPath: String?
+    var selectedCount: Int
+    var isLoading: Bool
+    var canBrowse: Bool
+    var emptyMessage: String
+    var onOpen: (String) -> Void
+    var onBack: () -> Void
+    var onRefresh: () -> Void
+    var onClearSelection: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 10) {
+                Label(currentTitle, systemImage: currentPath == nil ? "externaldrive" : "folder")
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+                Spacer()
+                if selectedCount > 0 {
+                    Text("\(selectedCount) selected")
+                        .font(.caption.weight(.semibold))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(.blue.opacity(0.16))
+                        .foregroundStyle(.blue)
+                        .clipShape(Capsule())
+                }
+                Button {
+                    onClearSelection()
+                } label: {
+                    Image(systemName: "xmark.circle")
+                }
+                .disabled(selectedPaths.isEmpty)
+                .deltaTooltip("Clear selected files and folders")
+
+                Button {
+                    onRefresh()
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                }
+                .disabled(!canBrowse || currentPath == nil || isLoading)
+                .deltaTooltip("Reload this folder")
+            }
+
+            if let currentPath {
+                HStack(spacing: 8) {
+                    Button {
+                        onBack()
+                    } label: {
+                        Label("Back", systemImage: "chevron.left")
+                    }
+                    .buttonStyle(.borderless)
+                    .disabled(isLoading)
+
+                    Text(currentPath)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+            }
+
+            browserBody
+                .frame(height: 280)
+
+            Text(selectedCount == 0 ? "No files or folders selected. Delta will restore everything from this restore point." : "Delta will restore only the selected files and folders.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private var browserBody: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 8)
+                .fill(DeltaTheme.logPaneBackground)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(DeltaTheme.border, lineWidth: 1)
+                )
+
+            if isLoading && entries.isEmpty {
+                VStack(spacing: 10) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("Loading folder contents...")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            } else if entries.isEmpty {
+                CompactEmptyRow(text: emptyMessage)
+                    .padding()
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(entries) { entry in
+                            SnapshotBrowserRow(
+                                entry: entry,
+                                isSelected: selectionBinding(for: entry.path),
+                                canOpen: canBrowse && entry.type.isDirectory,
+                                onOpen: { onOpen(entry.path) }
+                            )
+                            if entry.id != entries.last?.id {
+                                Divider()
+                                    .padding(.leading, 42)
+                            }
+                        }
+                    }
+                    .padding(8)
+                }
+            }
+        }
+    }
+
+    private var currentTitle: String {
+        currentPath == nil ? "Backed-up sources" : "Folder contents"
+    }
+
+    private func selectionBinding(for path: String) -> Binding<Bool> {
+        Binding(
+            get: { selectedPaths.contains(path) },
+            set: { selected in
+                if selected {
+                    selectedPaths.insert(path)
+                } else {
+                    selectedPaths.remove(path)
+                }
+            }
+        )
+    }
+}
+
+struct SnapshotBrowserRow: View {
+    var entry: ResticSnapshotEntry
+    @Binding var isSelected: Bool
+    var canOpen: Bool
+    var onOpen: () -> Void
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Toggle("", isOn: $isSelected)
+                .toggleStyle(.checkbox)
+                .labelsHidden()
+                .frame(width: 20)
+
+            Image(systemName: entry.type.isDirectory ? "folder.fill" : iconName)
+                .foregroundStyle(entry.type.isDirectory ? .blue : .secondary)
+                .frame(width: 18)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(entry.name)
+                    .font(.subheadline.weight(.medium))
+                    .lineLimit(1)
+                Text(entry.path)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+
+            Spacer(minLength: 12)
+
+            if let sizeText {
+                Text(sizeText)
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
+
+            if canOpen {
+                Button {
+                    onOpen()
+                } label: {
+                    Image(systemName: "chevron.right")
+                }
+                .buttonStyle(.borderless)
+                .deltaTooltip("Browse folder")
+            } else {
+                Color.clear
+                    .frame(width: 18, height: 18)
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 7)
+        .contentShape(Rectangle())
+    }
+
+    private var iconName: String {
+        switch entry.type {
+        case .directory:
+            return "folder.fill"
+        case .file:
+            return "doc"
+        case .symlink:
+            return "arrowshape.turn.up.right"
+        case .other:
+            return "questionmark.square"
+        }
+    }
+
+    private var sizeText: String? {
+        guard let size = entry.size, !entry.type.isDirectory else {
+            return nil
+        }
+        return ByteCountFormatter.string(fromByteCount: size, countStyle: .file)
+    }
+}
+
+private extension Array where Element == ResticSnapshotEntry {
+    func sortedForBrowser() -> [ResticSnapshotEntry] {
+        sorted {
+            if $0.type.isDirectory != $1.type.isDirectory {
+                return $0.type.isDirectory
+            }
+            return $0.name.localizedStandardCompare($1.name) == .orderedAscending
+        }
     }
 }
 

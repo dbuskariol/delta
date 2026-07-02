@@ -68,6 +68,18 @@ final class ResticIntegrationTests: XCTestCase {
         XCTAssertEqual(createdSnapshots.count, snapshotCountAfterUnchangedRun + 1)
         let latestSnapshot = try XCTUnwrap(createdSnapshots.max(by: { $0.time < $1.time }))
 
+        let listingResult = try runner.run(
+            try builder.listSnapshotEntries(
+                repository: repository,
+                snapshotID: latestSnapshot.id,
+                directoryPath: source.path
+            )
+        )
+        XCTAssertEqual(listingResult.status, .succeeded)
+        let listedEntries = try ResticJSONParser().parseSnapshotEntries(from: listingResult.standardOutput)
+        XCTAssertTrue(listedEntries.contains { $0.path == nested.path && $0.type == .directory })
+        XCTAssertTrue(listedEntries.contains { $0.path == source.appendingPathComponent("file.txt").path && $0.type == .file })
+
         let fullRestoreRequest = RestoreRequest(
             repositoryID: repository.id,
             snapshotID: latestSnapshot.id,

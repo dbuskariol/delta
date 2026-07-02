@@ -144,6 +144,14 @@ public struct ResticCommandBuilder: Sendable {
         try command(repository: repository, subcommand: ["snapshots", "--json"])
     }
 
+    public func listSnapshotEntries(repository: BackupRepository, snapshotID: String, directoryPath: String? = nil) throws -> ResticCommand {
+        var subcommand = ["ls", "--json", "--sort", "name", snapshotID]
+        if let directoryPath = directoryPath?.trimmingCharacters(in: .whitespacesAndNewlines), !directoryPath.isEmpty {
+            subcommand.append(directoryPath)
+        }
+        return try command(repository: repository, subcommand: subcommand)
+    }
+
     public func restore(request: RestoreRequest, repository: BackupRepository) throws -> ResticCommand {
         var snapshotArgument = request.snapshotID
         var subcommand = [
