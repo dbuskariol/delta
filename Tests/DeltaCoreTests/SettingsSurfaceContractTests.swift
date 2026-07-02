@@ -28,12 +28,13 @@ final class SettingsSurfaceContractTests: XCTestCase {
         XCTAssertTrue(SettingsSurfaceContract.controlTitles.contains("Activity log detail"))
         XCTAssertTrue(SettingsSurfaceContract.controlTitles.contains("History retention"))
         XCTAssertTrue(SettingsSurfaceContract.actionTitles.contains("Run Due Now"))
+        XCTAssertTrue(SettingsSurfaceContract.actionTitles.contains("How Scheduled Backups Work"))
         XCTAssertTrue(SettingsSurfaceContract.actionTitles.contains("Repair Password Access"))
         XCTAssertTrue(SettingsSurfaceContract.actionTitles.contains("Restore Recommended"))
         XCTAssertTrue(SettingsSurfaceContract.actionTitles.contains("Check Now"))
         XCTAssertTrue(SettingsSurfaceContract.actionTitles.contains("Send Test Alert"))
         XCTAssertTrue(SettingsSurfaceContract.actionTitles.contains("Copy Report"))
-        XCTAssertTrue(SettingsSurfaceContract.capabilityTitles.contains("Signed Login Item"))
+        XCTAssertTrue(SettingsSurfaceContract.capabilityTitles.contains("Approved by macOS"))
     }
 
     func testSettingsSurfaceContractUsesProductLanguage() {
@@ -53,6 +54,7 @@ final class SettingsSurfaceContractTests: XCTestCase {
         XCTAssertTrue(SettingsSurfaceContract.requiredManualAcceptanceCoverage.contains("Password access repair"))
         XCTAssertTrue(SettingsSurfaceContract.requiredManualAcceptanceCoverage.contains("Compact status summary"))
         XCTAssertTrue(SettingsSurfaceContract.requiredManualAcceptanceCoverage.contains("Run Due Now scheduler action"))
+        XCTAssertTrue(SettingsSurfaceContract.requiredManualAcceptanceCoverage.contains("Expandable Scheduled Backups explanation"))
         XCTAssertTrue(SettingsSurfaceContract.requiredManualAcceptanceCoverage.contains("Sparkle automatic check and download controls"))
         XCTAssertTrue(SettingsSurfaceContract.requiredManualAcceptanceCoverage.contains("Idle-sleep protection"))
         XCTAssertTrue(SettingsSurfaceContract.requiredManualAcceptanceCoverage.contains("Reset controls for recommended backup and restore defaults"))

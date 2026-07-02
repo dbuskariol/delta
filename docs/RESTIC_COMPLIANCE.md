@@ -283,6 +283,8 @@ This runs:
 - codesign verification
 - minimal hardened-runtime entitlement checks for Delta, DeltaAgent, DeltaSecretBridge, restic, and rclone
 - same-executable scheduled password resolution and non-interactive password-bridge acceptance
+- installed REST-server lifecycle acceptance through a temporary local `rclone serve restic` endpoint with Keychain-backed REST credentials
+- installed SFTP, S3-compatible, and rclone backend lifecycle acceptance through deterministic localhost/local rclone harnesses
 - Sparkle framework checks and signed appcast/update metadata
 - scheduler smoke checks
 - bundled restic/rclone version checks

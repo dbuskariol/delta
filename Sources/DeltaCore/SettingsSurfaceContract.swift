@@ -81,6 +81,7 @@ public enum SettingsSurfaceContract {
     public static let actionTitles = [
         "Run Due Now",
         "Review Login Items",
+        "How Scheduled Backups Work",
         "Refresh",
         "Repair Password Access",
         "Open Privacy Settings",
@@ -105,7 +106,7 @@ public enum SettingsSurfaceContract {
     ]
 
     public static let capabilityTitles = [
-        "Signed Login Item",
+        "Approved by macOS",
         "Runs while Delta is closed",
         "No admin privileges",
         "Checks policy first"
@@ -119,6 +120,7 @@ public enum SettingsSurfaceContract {
         "Start at Login separate from Scheduled Backups",
         "Sparkle automatic check and download controls",
         "Idle-sleep protection",
+        "Expandable Scheduled Backups explanation",
         "Reset controls for recommended backup and restore defaults",
         "Backup freshness warning control",
         "Source access warning visibility through dashboard health",
@@ -163,6 +165,7 @@ public enum SettingsSurfaceContract {
         require(controlTitles, contains: "Activity log detail", in: "controls", failures: &failures)
         require(controlTitles, contains: "History retention", in: "controls", failures: &failures)
         require(actionTitles, contains: "Run Due Now", in: "actions", failures: &failures)
+        require(actionTitles, contains: "How Scheduled Backups Work", in: "actions", failures: &failures)
         require(actionTitles, contains: "Repair Password Access", in: "actions", failures: &failures)
         require(actionTitles, contains: "Restore Recommended", in: "actions", failures: &failures)
         require(actionTitles, contains: "Check Now", in: "actions", failures: &failures)
@@ -171,6 +174,7 @@ public enum SettingsSurfaceContract {
         require(requiredManualAcceptanceCoverage, contains: "Source access warning visibility through dashboard health", in: "manual coverage", failures: &failures)
         require(requiredManualAcceptanceCoverage, contains: "Password access repair", in: "manual coverage", failures: &failures)
         require(requiredManualAcceptanceCoverage, contains: "Destination free-space warning control", in: "manual coverage", failures: &failures)
+        require(requiredManualAcceptanceCoverage, contains: "Expandable Scheduled Backups explanation", in: "manual coverage", failures: &failures)
 
         let visibleStrings = allVisibleStrings()
         for term in forbiddenVisibleTerms where visibleStrings.contains(where: { $0.localizedCaseInsensitiveContains(term) }) {

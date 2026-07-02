@@ -293,6 +293,13 @@ else
   else
     installed_s3_local_evidence="Installed app local S3-compatible lifecycle acceptance failed: $installed_s3_local_output"
   fi
+  installed_rest_local_output="$(run_capture installed_rest_local "$ROOT_DIR/Scripts/run-installed-local-rest-acceptance.sh" "$APP_PATH")"
+  installed_rest_local_status="$(command_status installed_rest_local)"
+  if [[ "$installed_rest_local_status" -eq 0 ]]; then
+    installed_rest_local_evidence="Installed app local REST-server lifecycle acceptance passed through Delta coordinator using bundled rclone serve restic with Keychain-backed REST credentials: automatic destination preparation, existing-destination reuse, no-change backup, incremental backup, restore-point cache, backup browser listing, full restore, selected folder restore, destination check, cleanup, and post-cleanup check. $installed_rest_local_output"
+  else
+    installed_rest_local_evidence="Installed app local REST-server lifecycle acceptance failed: $installed_rest_local_output"
+  fi
   installed_rclone_local_output="$(run_capture installed_rclone_local "$ROOT_DIR/Scripts/run-installed-rclone-local-acceptance.sh" "$APP_PATH")"
   installed_rclone_local_status="$(command_status installed_rclone_local)"
   if [[ "$installed_rclone_local_status" -eq 0 ]]; then
@@ -396,6 +403,12 @@ else
         additional_remote_statuses+=("failed")
         additional_remote_evidence+=("External $name acceptance failed: $output")
       fi
+    elif [[ "$kind" == "rest" && "$installed_rest_local_status" -eq 0 ]]; then
+      additional_remote_statuses+=("passed")
+      additional_remote_evidence+=("$installed_rest_local_evidence")
+    elif [[ "$kind" == "rest" && "$installed_rest_local_status" -ne 0 ]]; then
+      additional_remote_statuses+=("failed")
+      additional_remote_evidence+=("$installed_rest_local_evidence")
     elif [[ "$kind" == "rclone" && "$installed_rclone_local_status" -eq 0 ]]; then
       additional_remote_statuses+=("passed")
       additional_remote_evidence+=("$installed_rclone_local_evidence")

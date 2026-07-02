@@ -1279,6 +1279,7 @@ struct SettingsView: View {
     @EnvironmentObject private var model: DeltaAppModel
     @EnvironmentObject private var softwareUpdateController: SoftwareUpdateController
     @State private var settingsCategory: SettingsCategory = .essentials
+    @State private var showsScheduledBackupsDetails = false
     @AppStorage(
         DeltaAppPreferenceKeys.updateCheckIntervalSeconds,
         store: DeltaAppPreferences.sharedStore()
@@ -1460,105 +1461,103 @@ struct SettingsView: View {
                     statusText: backgroundBackupsPresentation.statusText,
                     statusColor: backgroundBackupsStatusColor
                 ) {
-                SettingsControlRow(
-                    title: "Allow scheduled backups",
-                    detail: backgroundBackupsPresentation.controlDetail
-                ) {
-                    Toggle("", isOn: backgroundBackupsBinding)
-                        .labelsHidden()
-                        .toggleStyle(.switch)
-                }
-
-                SettingsControlRow(
-                    title: "Pause automatic runs",
-                    detail: "Temporarily stop hourly, daily, weekly, monthly, and custom due runs without editing profiles or removing macOS approval."
-                ) {
-                    Toggle("", isOn: $pausesScheduledBackups)
-                        .labelsHidden()
-                        .toggleStyle(.switch)
-                }
-
-                SettingsNotice(
-                    symbol: "clock.arrow.circlepath",
-                    title: "What scheduled backups do",
-                    text: BackgroundBackupServicePresentation.purposeText,
-                    color: .blue
-                )
-
-                SettingsCapabilityList(items: [
-                    SettingsCapability(symbol: "checkmark.seal", title: "Signed Login Item", detail: "macOS approves Delta's bundled scheduler through Login Items before unattended runs are allowed."),
-                    SettingsCapability(symbol: "moon.zzz", title: "Runs while Delta is closed", detail: "Scheduled profiles can run after sign-in without keeping the main window open."),
-                    SettingsCapability(symbol: "person.crop.circle", title: "No admin privileges", detail: "The scheduler runs as your user account with the same file permissions granted to Delta."),
-                    SettingsCapability(symbol: "bolt.badge.checkmark", title: "Checks policy first", detail: "Battery, Low Power Mode, speed limits, destination availability, and locking are checked before work starts.")
-                ])
-
-                SettingsFactGrid(items: [
-                    SettingsFact(title: "Scheduled profiles", value: "\(scheduledProfileCount)"),
-                    SettingsFact(title: "Automation", value: pausesScheduledBackups ? "Paused" : "Running"),
-                    SettingsFact(title: "Passwords", value: backgroundSecretAccessSummary.displayName),
-                    SettingsFact(title: "Check cadence", value: "5 minutes"),
-                    SettingsFact(title: "Sign-in check", value: "On"),
-                    SettingsFact(title: "Runs as", value: "Your user"),
-                    SettingsFact(title: "Admin access", value: "Never"),
-                    SettingsFact(title: "macOS approval", value: backgroundBackupsPresentation.approvalText)
-                ])
-
-                if backgroundBackupsPresentation.needsAttention {
-                    SettingsNotice(
-                        symbol: "person.crop.circle.badge.exclamationmark",
-                        title: backgroundBackupsPresentation.attentionTitle ?? "Scheduled backups need attention",
-                        text: backgroundBackupsPresentation.attentionText ?? "Review Scheduled Backups before relying on scheduled runs.",
-                        color: .orange
-                    )
-                }
-
-                if backgroundSecretAccessSummary.needsRepair {
-                    SettingsNotice(
-                        symbol: "key.horizontal",
-                        title: "Password access needs repair",
-                        text: "\(backgroundSecretAccessSummary.detail) Repair access so scheduled backups can read saved destination passwords without Keychain prompts.",
-                        color: .orange
-                    )
-                }
-
-                if scheduledProfileCount == 0 && !backgroundBackupsPresentation.needsAttention && !backgroundSecretAccessSummary.needsRepair {
-                    SettingsNotice(
-                        symbol: "calendar.badge.plus",
-                        title: "No scheduled profiles",
-                        text: "Create an hourly, daily, weekly, monthly, or custom scheduled backup profile before automatic scheduled backups are needed.",
-                        color: .secondary
-                    )
-                }
-
-                SettingsActionBar {
-                    Button {
-                        model.runDueBackups()
-                    } label: {
-                        Label("Run Due Now", systemImage: "play.fill")
+                    SettingsControlRow(
+                        title: "Allow scheduled backups",
+                        detail: backgroundBackupsPresentation.controlDetail
+                    ) {
+                        Toggle("", isOn: backgroundBackupsBinding)
+                            .labelsHidden()
+                            .toggleStyle(.switch)
                     }
-                    .disabled(model.profiles.isEmpty || model.isWorking || pausesScheduledBackups || !model.isPersistentStoreAvailable)
-                    .deltaTooltip(pausesScheduledBackups ? "Automatic scheduled runs are paused. Resume them here or run a manual profile backup." : "Run every backup profile that is currently due using the same rules as automatic scheduled runs.")
-                    Button {
-                        model.openLoginItemsSettings()
-                    } label: {
-                        Label("Review Login Items", systemImage: "gearshape")
+
+                    SettingsControlRow(
+                        title: "Pause automatic runs",
+                        detail: "Temporarily stop hourly, daily, weekly, monthly, and custom due runs without editing profiles or removing macOS approval."
+                    ) {
+                        Toggle("", isOn: $pausesScheduledBackups)
+                            .labelsHidden()
+                            .toggleStyle(.switch)
                     }
-                    .deltaTooltip("Open macOS Login Items to approve or inspect Delta scheduled backups.")
-                    Button {
-                        model.reload()
-                    } label: {
-                        Label("Refresh", systemImage: "arrow.clockwise")
+
+                    SettingsFactGrid(items: [
+                        SettingsFact(title: "Scheduled profiles", value: "\(scheduledProfileCount)"),
+                        SettingsFact(title: "Automation", value: pausesScheduledBackups ? "Paused" : "Running"),
+                        SettingsFact(title: "Password access", value: backgroundSecretAccessSummary.displayName),
+                        SettingsFact(title: "Check interval", value: "Every 5 min"),
+                        SettingsFact(title: "Runs as", value: "Your user"),
+                        SettingsFact(title: "macOS approval", value: backgroundBackupsPresentation.approvalText)
+                    ])
+
+                    if backgroundBackupsPresentation.needsAttention {
+                        SettingsNotice(
+                            symbol: "person.crop.circle.badge.exclamationmark",
+                            title: backgroundBackupsPresentation.attentionTitle ?? "Scheduled backups need attention",
+                            text: backgroundBackupsPresentation.attentionText ?? "Review Scheduled Backups before relying on scheduled runs.",
+                            color: .orange
+                        )
                     }
-                    .deltaTooltip("Recheck scheduled backup and system access status.")
-                    Button {
-                        model.repairBackgroundSecretAccess()
-                    } label: {
-                        Label("Repair Password Access", systemImage: "key")
+
+                    if backgroundSecretAccessSummary.needsRepair {
+                        SettingsNotice(
+                            symbol: "key.horizontal",
+                            title: "Password access needs repair",
+                            text: "\(backgroundSecretAccessSummary.detail) Repair access so scheduled backups can read saved destination passwords without Keychain prompts.",
+                            color: .orange
+                        )
                     }
-                    .disabled(model.repositories.isEmpty || model.isWorking || !model.isPersistentStoreAvailable)
-                    .deltaTooltip("Refresh saved destination passwords so scheduled backups can read them without interactive Keychain prompts.")
+
+                    if scheduledProfileCount == 0 && !backgroundBackupsPresentation.needsAttention && !backgroundSecretAccessSummary.needsRepair {
+                        SettingsNotice(
+                            symbol: "calendar.badge.plus",
+                            title: "No scheduled profiles",
+                            text: "Create an hourly, daily, weekly, monthly, or custom scheduled backup profile before automatic scheduled backups are needed.",
+                            color: .secondary
+                        )
+                    }
+
+                    SettingsDisclosure(
+                        title: "How Scheduled Backups Work",
+                        symbol: "questionmark.circle",
+                        isExpanded: $showsScheduledBackupsDetails
+                    ) {
+                        SettingsDescription(text: BackgroundBackupServicePresentation.purposeText)
+                        SettingsCapabilityList(items: [
+                            SettingsCapability(symbol: "checkmark.seal", title: "Approved by macOS", detail: "macOS approves Delta's bundled scheduler in Login Items before unattended runs are allowed."),
+                            SettingsCapability(symbol: "moon.zzz", title: "Runs while Delta is closed", detail: "Scheduled profiles can run after sign-in without keeping the main window open."),
+                            SettingsCapability(symbol: "person.crop.circle", title: "No admin privileges", detail: "The scheduler runs as your user account with the same file permissions granted to Delta."),
+                            SettingsCapability(symbol: "bolt.badge.checkmark", title: "Checks policy first", detail: "Battery, Low Power Mode, speed limits, destination availability, and locking are checked before work starts.")
+                        ])
+                    }
+
+                    SettingsActionBar {
+                        Button {
+                            model.runDueBackups()
+                        } label: {
+                            Label("Run Due Now", systemImage: "play.fill")
+                        }
+                        .disabled(model.profiles.isEmpty || model.isWorking || pausesScheduledBackups || !model.isPersistentStoreAvailable)
+                        .deltaTooltip(pausesScheduledBackups ? "Automatic scheduled runs are paused. Resume them here or run a manual profile backup." : "Run every backup profile that is currently due using the same rules as automatic scheduled runs.")
+                        Button {
+                            model.openLoginItemsSettings()
+                        } label: {
+                            Label("Review Login Items", systemImage: "gearshape")
+                        }
+                        .deltaTooltip("Open macOS Login Items to approve or inspect Delta scheduled backups.")
+                        Button {
+                            model.reload()
+                        } label: {
+                            Label("Refresh", systemImage: "arrow.clockwise")
+                        }
+                        .deltaTooltip("Recheck scheduled backup and system access status.")
+                        Button {
+                            model.repairBackgroundSecretAccess()
+                        } label: {
+                            Label("Repair Password Access", systemImage: "key")
+                        }
+                        .disabled(model.repositories.isEmpty || model.isWorking || !model.isPersistentStoreAvailable)
+                        .deltaTooltip("Refresh saved destination passwords so scheduled backups can read them without interactive Keychain prompts.")
+                    }
                 }
-            }
 
                 SettingsCard(
                     symbol: "key.horizontal",
@@ -4632,6 +4631,61 @@ struct SettingsNotice: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(DeltaTheme.badge.opacity(0.55))
         .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+}
+
+struct SettingsDisclosure<Content: View>: View {
+    var title: String
+    var symbol: String
+    @Binding var isExpanded: Bool
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.16)) {
+                    isExpanded.toggle()
+                }
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: symbol)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 20, height: 20)
+                        .background(DeltaTheme.badge.opacity(0.75))
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+
+                    Text(title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.primary)
+
+                    Spacer(minLength: 12)
+
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(.secondary)
+                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                        .animation(.easeInOut(duration: 0.16), value: isExpanded)
+                }
+                .padding(.vertical, 9)
+                .padding(.horizontal, 10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(DeltaTheme.badge.opacity(0.55))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(title)
+            .accessibilityValue(isExpanded ? "Expanded" : "Collapsed")
+
+            if isExpanded {
+                VStack(alignment: .leading, spacing: 10) {
+                    content
+                }
+                .padding(.leading, 2)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
