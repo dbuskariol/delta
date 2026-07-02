@@ -22,6 +22,35 @@ final class ResticRunnerTests: XCTestCase {
         XCTAssertEqual(result.standardError, "stderr-line\n")
     }
 
+    func testRunnerCanPauseRunningProcess() throws {
+        let controller = ResticRunController()
+        let runner = ResticRunner(runController: controller)
+        let command = ResticCommand(
+            executableURL: URL(fileURLWithPath: "/bin/sh"),
+            arguments: ["-c", "trap 'echo interrupted >&2; exit 130' INT; while true; do sleep 1; done"]
+        )
+        let completion = DispatchSemaphore(value: 0)
+        let box = ResultBox()
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                box.result = try runner.run(command)
+            } catch {
+                box.error = error
+            }
+            completion.signal()
+        }
+
+        Thread.sleep(forTimeInterval: 0.25)
+        controller.requestStop(.pause)
+
+        XCTAssertEqual(completion.wait(timeout: .now() + 5), .success)
+        XCTAssertNil(box.error)
+        XCTAssertEqual(box.result?.status, .cancelled)
+        XCTAssertEqual(box.result?.failureKind, .interrupted)
+        XCTAssertTrue(box.result?.userFacingMessage.localizedCaseInsensitiveContains("paused") == true)
+    }
+
     func testLogFormatterTurnsResticStatusJSONIntoReadableProgress() {
         let message = ResticLogFormatter.displayMessage(for: """
         {"message_type":"status","percent_done":0.42,"files_done":21,"total_files":50,"bytes_done":1048576}
@@ -77,5 +106,37 @@ private final class OutputRecorder: @unchecked Sendable {
         lock.lock()
         recordedEvents.append(event)
         lock.unlock()
+    }
+}
+
+private final class ResultBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storedResult: ResticRunResult?
+    private var storedError: Error?
+
+    var result: ResticRunResult? {
+        get {
+            lock.lock()
+            defer { lock.unlock() }
+            return storedResult
+        }
+        set {
+            lock.lock()
+            storedResult = newValue
+            lock.unlock()
+        }
+    }
+
+    var error: Error? {
+        get {
+            lock.lock()
+            defer { lock.unlock() }
+            return storedError
+        }
+        set {
+            lock.lock()
+            storedError = newValue
+            lock.unlock()
+        }
     }
 }

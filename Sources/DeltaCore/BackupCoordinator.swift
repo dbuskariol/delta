@@ -104,12 +104,14 @@ public final class BackupCoordinator: @unchecked Sendable {
         if localRepositoryNeedsPreparation(repository) {
             let preparationRun = try initializeRepository(repository)
             guard preparationRun.status == .succeeded || preparationRun.status == .warning else {
-                let message = "Backup was not started because the destination could not be prepared."
+                let message = preparationRun.status == .cancelled
+                    ? (preparationRun.message ?? "Backup was paused while preparing the destination.")
+                    : "Backup was not started because the destination could not be prepared."
                 let run = JobRun(
                     profileID: profile.id,
                     repositoryID: repository.id,
                     kind: .backup,
-                    status: .failed,
+                    status: preparationRun.status == .cancelled ? .cancelled : .failed,
                     finishedAt: Date(),
                     message: message
                 )
@@ -119,7 +121,7 @@ public final class BackupCoordinator: @unchecked Sendable {
                     jobID: run.id,
                     profileID: profile.id,
                     repositoryID: repository.id,
-                    stream: .standardError,
+                    stream: run.status == .cancelled ? .standardOutput : .standardError,
                     message: message
                 )
                 return run
@@ -419,6 +421,15 @@ public final class BackupCoordinator: @unchecked Sendable {
         job.exitCode = result.exitCode
         job.message = result.userFacingMessage
         try database.saveJobRun(job)
+        if result.status == .cancelled {
+            recordJobLog(
+                jobID: job.id,
+                profileID: profileID,
+                repositoryID: repositoryID,
+                stream: .standardOutput,
+                message: result.userFacingMessage
+            )
+        }
         recordJobLog(
             jobID: job.id,
             profileID: profileID,

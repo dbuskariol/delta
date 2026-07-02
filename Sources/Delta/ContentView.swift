@@ -85,7 +85,10 @@ struct DashboardView: View {
                 ActiveOperationBanner(
                     operation: operation,
                     progress: model.activeProgress,
-                    latestMessage: model.liveLogLines.last?.message
+                    latestMessage: model.liveLogLines.last?.message,
+                    stopRequest: model.activeStopRequest,
+                    onPause: operation.kind == .backup ? { model.pauseActiveBackup() } : nil,
+                    onCancel: { model.cancelActiveJob() }
                 )
             }
 
@@ -586,7 +589,10 @@ struct ProfileRow: View {
                 if isActiveBackup && showsInlineProgress {
                     InlineBackupProgress(
                         progress: model.activeProgress,
-                        latestMessage: model.liveLogLines.last?.message
+                        latestMessage: model.liveLogLines.last?.message,
+                        stopRequest: model.activeStopRequest,
+                        onPause: model.pauseActiveBackup,
+                        onCancel: model.cancelActiveJob
                     )
                 }
             }
@@ -682,7 +688,7 @@ struct RepositoryRow: View {
                         isPresentingEditor = true
                     }
                     .disabled(model.isWorking)
-                    IconButton(symbol: "shippingbox.and.arrow.backward", help: "Prepare this destination for encrypted backups") {
+                    IconButton(symbol: "shippingbox.and.arrow.backward", help: "Retry destination preparation") {
                         model.initializeRepository(repository)
                     }
                     .disabled(model.isWorking)
@@ -1686,6 +1692,9 @@ struct ActiveOperationBanner: View {
     var operation: ActiveOperation
     var progress: ResticProgressSnapshot?
     var latestMessage: String?
+    var stopRequest: ResticRunStopReason?
+    var onPause: (() -> Void)?
+    var onCancel: () -> Void
 
     var body: some View {
         Card {
@@ -1700,9 +1709,18 @@ struct ActiveOperationBanner: View {
                     Text(operation.detail)
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    InlineBackupProgress(progress: progress, latestMessage: latestMessage)
+                    InlineBackupProgress(
+                        progress: progress,
+                        latestMessage: latestMessage,
+                        stopRequest: stopRequest
+                    )
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+                ActiveOperationControls(
+                    stopRequest: stopRequest,
+                    onPause: onPause,
+                    onCancel: onCancel
+                )
             }
         }
     }
@@ -1711,6 +1729,9 @@ struct ActiveOperationBanner: View {
 struct InlineBackupProgress: View {
     var progress: ResticProgressSnapshot?
     var latestMessage: String?
+    var stopRequest: ResticRunStopReason?
+    var onPause: (() -> Void)?
+    var onCancel: (() -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -1723,6 +1744,13 @@ struct InlineBackupProgress: View {
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .truncationMode(.middle)
+            if onPause != nil || onCancel != nil {
+                ActiveOperationControls(
+                    stopRequest: stopRequest,
+                    onPause: onPause,
+                    onCancel: onCancel
+                )
+            }
         }
         .padding(10)
         .background(DeltaTheme.badge.opacity(0.65))
@@ -1738,6 +1766,46 @@ struct InlineBackupProgress: View {
             return latestMessage
         }
         return "Scanning sources and preparing backup data..."
+    }
+}
+
+struct ActiveOperationControls: View {
+    var stopRequest: ResticRunStopReason?
+    var onPause: (() -> Void)?
+    var onCancel: (() -> Void)?
+
+    var body: some View {
+        HStack(spacing: 8) {
+            if let stopRequest {
+                Label(stopRequest == .pause ? "Pausing" : "Cancelling", systemImage: "hourglass")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .fixedSize()
+            } else {
+                if let onPause {
+                    Button {
+                        onPause()
+                    } label: {
+                        Label("Pause", systemImage: "pause.fill")
+                    }
+                    .controlSize(.small)
+                    .buttonStyle(.bordered)
+                    .fixedSize()
+                    .deltaTooltip("Pause this backup. Run it again to continue from saved backup data.")
+                }
+                if let onCancel {
+                    Button(role: .destructive) {
+                        onCancel()
+                    } label: {
+                        Label("Cancel", systemImage: "xmark")
+                    }
+                    .controlSize(.small)
+                    .buttonStyle(.bordered)
+                    .fixedSize()
+                    .deltaTooltip("Stop the current job safely.")
+                }
+            }
+        }
     }
 }
 

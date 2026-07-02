@@ -51,12 +51,14 @@ final class DeltaAppModel: ObservableObject {
     @Published var liveLogLines: [ResticOutputEvent] = []
     @Published var activeOperation: ActiveOperation?
     @Published var activeProgress: ResticProgressSnapshot?
+    @Published var activeStopRequest: ResticRunStopReason?
 
     private let database: DeltaDatabase
     private let secretStore = KeychainSecretStore()
     private let credentialResolver = RepositoryCredentialResolver()
     private let bookmarkStore = SecurityScopedBookmarkStore()
     private let repositoryValidator = BackupRepositoryValidator()
+    private let runController = ResticRunController()
     private var lastLiveLogWasStatus = false
 
     init() {
@@ -122,6 +124,7 @@ final class DeltaAppModel: ObservableObject {
             try database.saveRepository(repository)
             try database.appendEvent(EventLog(level: .info, message: "Destination '\(repository.name)' was created."))
             reload()
+            initializeRepository(repository)
             return true
         } catch {
             alertMessage = error.localizedDescription
@@ -247,6 +250,20 @@ final class DeltaAppModel: ObservableObject {
         ) {
             _ = try coordinator.runBackup(profile: profile, repository: repository)
         }
+    }
+
+    func pauseActiveBackup() {
+        guard isWorking, activeOperation?.kind == .backup, activeStopRequest == nil else {
+            return
+        }
+        requestActiveStop(.pause)
+    }
+
+    func cancelActiveJob() {
+        guard isWorking, activeOperation != nil, activeStopRequest == nil else {
+            return
+        }
+        requestActiveStop(.cancel)
     }
 
     func initializeRepository(_ repository: BackupRepository) {
@@ -398,8 +415,10 @@ final class DeltaAppModel: ObservableObject {
     }
 
     private func performBackgroundWork(activeOperation: ActiveOperation, _ operation: @escaping @Sendable () throws -> Void) {
+        runController.reset()
         isWorking = true
         self.activeOperation = activeOperation
+        activeStopRequest = nil
         activeProgress = nil
         liveLogLines.removeAll()
         lastLiveLogWasStatus = false
@@ -409,14 +428,18 @@ final class DeltaAppModel: ObservableObject {
                 await MainActor.run {
                     self.isWorking = false
                     self.activeOperation = nil
+                    self.activeStopRequest = nil
                     self.activeProgress = nil
+                    self.runController.reset()
                     self.reload()
                 }
             } catch {
                 await MainActor.run {
                     self.isWorking = false
                     self.activeOperation = nil
+                    self.activeStopRequest = nil
                     self.activeProgress = nil
+                    self.runController.reset()
                     self.alertMessage = error.localizedDescription
                     self.reload()
                 }
@@ -431,13 +454,20 @@ final class DeltaAppModel: ObservableObject {
                 resticExecutableURL: ResticExecutableLocator().locate(),
                 secretBridgeURL: Self.secretBridgeURL()
             ),
-            runner: ResticRunner(),
+            runner: ResticRunner(runController: runController),
             outputHandler: { [weak self] _, event in
                 Task { @MainActor [weak self] in
                     self?.appendLiveLog(event)
                 }
             }
         )
+    }
+
+    private func requestActiveStop(_ reason: ResticRunStopReason) {
+        activeStopRequest = reason
+        let event = ResticOutputEvent(stream: .standardOutput, message: reason.requestMessage)
+        appendLiveLog(event)
+        runController.requestStop(reason)
     }
 
     private func appendLiveLog(_ event: ResticOutputEvent) {

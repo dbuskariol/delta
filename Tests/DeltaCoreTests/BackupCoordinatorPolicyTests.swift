@@ -93,6 +93,26 @@ final class BackupCoordinatorPolicyTests: XCTestCase {
         XCTAssertEqual(jobs.filter { $0.kind == .backup && $0.status == .succeeded }.count, 1)
     }
 
+    func testRunBackupReportsCancelledWhenPreparationIsPaused() throws {
+        let fixture = try Fixture(repositoryPrepared: false)
+        let runner = MockResticRunner(results: [
+            ResticRunResult(exitCode: 130, standardOutput: "", standardError: "", stopReason: .pause)
+        ])
+        let coordinator = fixture.makeCoordinator(runner: runner)
+        let profile = fixture.profile()
+
+        let job = try coordinator.runBackup(profile: profile, repository: fixture.repository)
+        let jobs = try fixture.database.fetchJobRuns(limit: 10)
+        let logs = try fixture.database.fetchJobLogs(jobID: job.id)
+
+        XCTAssertEqual(job.status, .cancelled)
+        XCTAssertTrue(job.message?.localizedCaseInsensitiveContains("paused") == true, job.message ?? "")
+        XCTAssertEqual(runner.commands.map(\.resticSubcommand), ["init"])
+        XCTAssertEqual(jobs.filter { $0.kind == .initializeRepository && $0.status == .cancelled }.count, 1)
+        XCTAssertEqual(jobs.filter { $0.kind == .backup && $0.status == .cancelled }.count, 1)
+        XCTAssertTrue(logs.contains { $0.message.localizedCaseInsensitiveContains("paused") })
+    }
+
     func testRefreshSnapshotsUsesFriendlyRepositoryMissingMessage() throws {
         let fixture = try Fixture()
         let rawError = """

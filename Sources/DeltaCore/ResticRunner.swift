@@ -1,4 +1,24 @@
+import Darwin
 import Foundation
+
+public enum ResticRunStopReason: String, Codable, Equatable, Sendable {
+    case pause
+    case cancel
+
+    public var requestMessage: String {
+        switch self {
+        case .pause: "Pause requested. Stopping the current backup safely..."
+        case .cancel: "Cancel requested. Stopping the current job safely..."
+        }
+    }
+
+    public var userFacingMessage: String {
+        switch self {
+        case .pause: "Backup paused. Run it again to continue from already saved backup data."
+        case .cancel: "Job cancelled. Any incomplete restic work is safe to retry on the next run."
+        }
+    }
+}
 
 public struct ResticRunResult: Equatable, Sendable {
     public var exitCode: Int32
@@ -8,18 +28,24 @@ public struct ResticRunResult: Equatable, Sendable {
     public var failureKind: ResticFailureKind?
     public var userFacingMessage: String
 
-    public init(exitCode: Int32, standardOutput: String, standardError: String) {
+    public init(exitCode: Int32, standardOutput: String, standardError: String, stopReason: ResticRunStopReason? = nil) {
         self.exitCode = exitCode
         self.standardOutput = standardOutput
         self.standardError = standardError
-        self.status = ResticExitCodeMapper.status(for: exitCode, standardError: standardError)
-        self.failureKind = ResticFailureClassifier.kind(exitCode: exitCode, standardOutput: standardOutput, standardError: standardError)
-        self.userFacingMessage = ResticFailureClassifier.userFacingMessage(
-            status: status,
-            failureKind: failureKind,
-            standardOutput: standardOutput,
-            standardError: standardError
-        )
+        if let stopReason {
+            self.status = .cancelled
+            self.failureKind = .interrupted
+            self.userFacingMessage = stopReason.userFacingMessage
+        } else {
+            self.status = ResticExitCodeMapper.status(for: exitCode, standardError: standardError)
+            self.failureKind = ResticFailureClassifier.kind(exitCode: exitCode, standardOutput: standardOutput, standardError: standardError)
+            self.userFacingMessage = ResticFailureClassifier.userFacingMessage(
+                status: status,
+                failureKind: failureKind,
+                standardOutput: standardOutput,
+                standardError: standardError
+            )
+        }
     }
 }
 
@@ -155,11 +181,89 @@ public protocol ResticStreamingRunning: ResticRunning {
     func run(_ command: ResticCommand, outputHandler: (@Sendable (ResticOutputEvent) -> Void)?) throws -> ResticRunResult
 }
 
+public final class ResticRunController: @unchecked Sendable {
+    private let lock = NSLock()
+    private var process: Process?
+    private var stopReason: ResticRunStopReason?
+
+    public init() {}
+
+    public var requestedStopReason: ResticRunStopReason? {
+        lock.lock()
+        defer { lock.unlock() }
+        return stopReason
+    }
+
+    public func reset() {
+        lock.lock()
+        process = nil
+        stopReason = nil
+        lock.unlock()
+    }
+
+    public func attach(_ process: Process) {
+        let reason: ResticRunStopReason?
+        lock.lock()
+        self.process = process
+        reason = stopReason
+        lock.unlock()
+        if reason != nil {
+            stop(process)
+        }
+    }
+
+    public func detach(_ process: Process) {
+        lock.lock()
+        if self.process === process {
+            self.process = nil
+        }
+        lock.unlock()
+    }
+
+    public func requestStop(_ reason: ResticRunStopReason) {
+        let runningProcess: Process?
+        lock.lock()
+        if stopReason == nil {
+            stopReason = reason
+        }
+        runningProcess = process
+        lock.unlock()
+
+        if let runningProcess {
+            stop(runningProcess)
+        }
+    }
+
+    private func stop(_ process: Process) {
+        guard process.isRunning else {
+            return
+        }
+        process.interrupt()
+        DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 10) { [weak process] in
+            guard let process, process.isRunning else {
+                return
+            }
+            process.terminate()
+            DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 10) { [weak process] in
+                guard let process, process.isRunning else {
+                    return
+                }
+                kill(process.processIdentifier, SIGKILL)
+            }
+        }
+    }
+}
+
 public final class ResticRunner: ResticRunning, @unchecked Sendable {
     private let outputHandler: (@Sendable (ResticOutputEvent) -> Void)?
+    private let runController: ResticRunController?
 
-    public init(outputHandler: (@Sendable (ResticOutputEvent) -> Void)? = nil) {
+    public init(
+        outputHandler: (@Sendable (ResticOutputEvent) -> Void)? = nil,
+        runController: ResticRunController? = nil
+    ) {
         self.outputHandler = outputHandler
+        self.runController = runController
     }
 
     public func run(_ command: ResticCommand) throws -> ResticRunResult {
@@ -202,7 +306,9 @@ public final class ResticRunner: ResticRunning, @unchecked Sendable {
         }
 
         try process.run()
+        runController?.attach(process)
         process.waitUntilExit()
+        runController?.detach(process)
 
         stdoutPipe.fileHandleForReading.readabilityHandler = nil
         stderrPipe.fileHandleForReading.readabilityHandler = nil
@@ -212,7 +318,8 @@ public final class ResticRunner: ResticRunning, @unchecked Sendable {
         return ResticRunResult(
             exitCode: process.terminationStatus,
             standardOutput: stdoutCollector.stringValue,
-            standardError: stderrCollector.stringValue
+            standardError: stderrCollector.stringValue,
+            stopReason: runController?.requestedStopReason
         )
     }
 

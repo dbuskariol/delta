@@ -49,7 +49,7 @@ URL construction is covered by `ResticCommandTests`.
 
 Delta validates destination inputs before saving them. The validator trims persisted fields, requires writable new or changed local destinations or writable parents, rejects relative local paths in the native destination form, requires absolute SFTP paths and valid ports, validates REST URLs as `http` or `https`, and rejects rclone remote names that already include a colon. Advanced raw restic URLs remain available through the custom destination type.
 
-For local and mounted destinations, Delta automatically runs `restic init` before the first backup when the destination is writable but has no restic `config` file yet.
+After a destination is created, Delta starts a prepare job that runs `restic init` with the saved encryption secret and backend credentials. The destination row action remains available as a retry path. For local and mounted destinations, Delta also keeps a first-backup safety net: if the writable destination has no restic `config` file yet, it runs `restic init` before starting backup.
 
 ## Backend Credentials
 
@@ -192,6 +192,8 @@ Delta maps restic lock exit code `11` and lock-related stderr to a user-facing b
 ## Streaming Logs
 
 `ResticRunner` streams stdout and stderr while the process is running. The coordinator records start, streamed output, and finish lines as per-job SQLite log entries, while the UI also receives the same live events for Activity output. Restic JSON status/error lines are formatted into readable messages before durable storage.
+
+Active backups expose Pause and Cancel controls. Pause sends restic a graceful interrupt, records the job as cancelled with a paused message, and relies on restic's content-addressed storage so the next backup run continues from data already written. Cancel uses the same safe interruption path for any active restic job and records a cancelled job instead of a failed job.
 
 Relevant files:
 
