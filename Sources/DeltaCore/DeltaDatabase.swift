@@ -130,15 +130,22 @@ public final class DeltaDatabase: @unchecked Sendable {
     }
 
     public func saveSnapshot(_ snapshot: ResticSnapshot, repositoryID: UUID) throws {
-        try save(snapshot, id: snapshot.id, table: "snapshots", repositoryID: repositoryID.uuidString)
+        let payload = try encodedPayload(snapshot, table: "snapshots")
+        let timestamp = Self.timestampString(Date())
+        try queue.write { db in
+            try upsertSnapshot(
+                id: snapshot.id,
+                repositoryID: repositoryID.uuidString,
+                payload: payload,
+                timestamp: timestamp,
+                db: db
+            )
+        }
     }
 
     public func saveSnapshots(_ snapshots: [ResticSnapshot], repositoryID: UUID) throws {
         let encodedSnapshots = try snapshots.map { snapshot in
-            let payloadData = try encoder.encode(snapshot)
-            guard let payload = String(data: payloadData, encoding: .utf8) else {
-                throw DeltaDatabaseError.invalidPayload("snapshots")
-            }
+            let payload = try encodedPayload(snapshot, table: "snapshots")
             return (id: snapshot.id, payload: payload)
         }
         let timestamp = Self.timestampString(Date())
@@ -147,12 +154,12 @@ public final class DeltaDatabase: @unchecked Sendable {
         try queue.write { db in
             try db.execute(sql: "DELETE FROM snapshots WHERE repository_id = ?", arguments: [repositoryIDString])
             for snapshot in encodedSnapshots {
-                try db.execute(
-                    sql: """
-                    INSERT INTO snapshots (id, repository_id, payload, created_at, updated_at)
-                    VALUES (?, ?, ?, ?, ?)
-                    """,
-                    arguments: [snapshot.id, repositoryIDString, snapshot.payload, timestamp, timestamp]
+                try upsertSnapshot(
+                    id: snapshot.id,
+                    repositoryID: repositoryIDString,
+                    payload: snapshot.payload,
+                    timestamp: timestamp,
+                    db: db
                 )
             }
         }
@@ -222,7 +229,7 @@ public final class DeltaDatabase: @unchecked Sendable {
 
     private func migrate() throws {
         try queue.write { db in
-            for table in Self.payloadTables {
+            for table in Self.genericPayloadTables {
                 try db.execute(sql: """
                 CREATE TABLE IF NOT EXISTS \(table) (
                     id TEXT PRIMARY KEY NOT NULL,
@@ -235,6 +242,7 @@ public final class DeltaDatabase: @unchecked Sendable {
                 try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_\(table)_repository_id ON \(table)(repository_id)")
                 try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_\(table)_updated_at ON \(table)(updated_at)")
             }
+            try Self.ensureSnapshotsTable(db)
             try db.execute(sql: """
             CREATE TABLE IF NOT EXISTS job_logs (
                 id TEXT PRIMARY KEY NOT NULL,
@@ -250,16 +258,67 @@ public final class DeltaDatabase: @unchecked Sendable {
         }
     }
 
+    private static func ensureSnapshotsTable(_ db: Database) throws {
+        let rows = try Row.fetchAll(db, sql: "PRAGMA table_info(snapshots)")
+        if rows.isEmpty {
+            try createSnapshotsTable(db)
+            return
+        }
+
+        let primaryKeyColumns = rows
+            .compactMap { row -> (position: Int, name: String)? in
+                let position: Int = row["pk"]
+                guard position > 0 else {
+                    return nil
+                }
+                let name: String = row["name"]
+                return (position, name)
+            }
+            .sorted { $0.position < $1.position }
+            .map(\.name)
+
+        guard primaryKeyColumns != ["id", "repository_id"] else {
+            try createSnapshotsIndexes(db)
+            return
+        }
+
+        try db.execute(sql: "ALTER TABLE snapshots RENAME TO snapshots_legacy")
+        try createSnapshotsTable(db)
+        try db.execute(sql: """
+            INSERT OR REPLACE INTO snapshots (id, repository_id, payload, created_at, updated_at)
+            SELECT id, repository_id, payload, created_at, updated_at
+            FROM snapshots_legacy
+            WHERE repository_id IS NOT NULL
+            """)
+        try db.execute(sql: "DROP TABLE snapshots_legacy")
+    }
+
+    private static func createSnapshotsTable(_ db: Database) throws {
+        try db.execute(sql: """
+            CREATE TABLE IF NOT EXISTS snapshots (
+                id TEXT NOT NULL,
+                repository_id TEXT NOT NULL,
+                payload TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (id, repository_id)
+            )
+            """)
+        try createSnapshotsIndexes(db)
+    }
+
+    private static func createSnapshotsIndexes(_ db: Database) throws {
+        try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_snapshots_repository_id ON snapshots(repository_id)")
+        try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_snapshots_updated_at ON snapshots(updated_at)")
+    }
+
     private func save<T: Encodable>(
         _ value: T,
         id: String,
         table: String,
         repositoryID: String? = nil
     ) throws {
-        let payloadData = try encoder.encode(value)
-        guard let payload = String(data: payloadData, encoding: .utf8) else {
-            throw DeltaDatabaseError.invalidPayload(table)
-        }
+        let payload = try encodedPayload(value, table: table)
         let now = Self.timestampString(Date())
 
         try queue.write { db in
@@ -275,6 +334,33 @@ public final class DeltaDatabase: @unchecked Sendable {
                 arguments: [id, repositoryID, payload, now, now]
             )
         }
+    }
+
+    private func upsertSnapshot(
+        id: String,
+        repositoryID: String,
+        payload: String,
+        timestamp: String,
+        db: Database
+    ) throws {
+        try db.execute(
+            sql: """
+            INSERT INTO snapshots (id, repository_id, payload, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(id, repository_id) DO UPDATE SET
+                payload = excluded.payload,
+                updated_at = excluded.updated_at
+            """,
+            arguments: [id, repositoryID, payload, timestamp, timestamp]
+        )
+    }
+
+    private func encodedPayload<T: Encodable>(_ value: T, table: String) throws -> String {
+        let payloadData = try encoder.encode(value)
+        guard let payload = String(data: payloadData, encoding: .utf8) else {
+            throw DeltaDatabaseError.invalidPayload(table)
+        }
+        return payload
     }
 
     private func fetchAll<T: Decodable>(
@@ -310,14 +396,15 @@ public final class DeltaDatabase: @unchecked Sendable {
         }
     }
 
-    private static let payloadTables = [
+    private static let genericPayloadTables = [
         "repositories",
         "backup_profiles",
         "job_runs",
-        "snapshots",
         "restore_jobs",
         "event_logs"
     ]
+
+    private static let payloadTables = genericPayloadTables + ["snapshots"]
 
     private static func timestampString(_ date: Date) -> String {
         let formatter = ISO8601DateFormatter()

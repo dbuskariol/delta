@@ -290,6 +290,35 @@ final class DatabaseTests: XCTestCase {
         XCTAssertEqual(snapshotsByRepository[primaryRepository.id]?.map(\.id), ["newer-primary", "older-primary"])
         XCTAssertEqual(snapshotsByRepository[secondaryRepository.id]?.map(\.id), ["secondary"])
     }
+
+    func testSnapshotIDsAreScopedToRepository() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let database = try DeltaDatabase(url: directory.appendingPathComponent("Delta.sqlite"))
+        let primaryRepository = BackupRepository(name: "Primary", backend: .local(path: "/primary"))
+        let secondaryRepository = BackupRepository(name: "Secondary", backend: .local(path: "/secondary"))
+        let sharedSnapshotID = "shared-restic-snapshot-id"
+        try database.saveRepository(primaryRepository)
+        try database.saveRepository(secondaryRepository)
+
+        try database.saveSnapshot(
+            ResticSnapshot(id: sharedSnapshotID, time: Date(timeIntervalSince1970: 10), paths: ["/Users/me/Documents"]),
+            repositoryID: primaryRepository.id
+        )
+        try database.saveSnapshot(
+            ResticSnapshot(id: sharedSnapshotID, time: Date(timeIntervalSince1970: 20), paths: ["/Users/me/Desktop"]),
+            repositoryID: secondaryRepository.id
+        )
+
+        XCTAssertEqual(try database.fetchSnapshots(repositoryID: primaryRepository.id).map(\.paths), [["/Users/me/Documents"]])
+        XCTAssertEqual(try database.fetchSnapshots(repositoryID: secondaryRepository.id).map(\.paths), [["/Users/me/Desktop"]])
+
+        let snapshotsByRepository = try database.fetchSnapshotsByRepository()
+        XCTAssertEqual(snapshotsByRepository[primaryRepository.id]?.map(\.id), [sharedSnapshotID])
+        XCTAssertEqual(snapshotsByRepository[secondaryRepository.id]?.map(\.id), [sharedSnapshotID])
+    }
 }
 
 private final class ErrorRecorder: @unchecked Sendable {
