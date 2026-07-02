@@ -45,6 +45,16 @@ final class ResticCommandTests: XCTestCase {
         XCTAssertEqual(try builder.repositoryURL(for: .swiftObjectStorage(container: "delta", path: nil)), "swift:delta:")
     }
 
+    func testBackendURLBuilderRequiresS3Endpoint() {
+        XCTAssertThrowsError(
+            try ResticBackendURLBuilder().repositoryURL(
+                for: .s3(endpoint: nil, bucket: "delta", path: nil, region: nil)
+            )
+        ) { error in
+            XCTAssertEqual(error as? ResticBackendError, .emptyRequiredField("S3 endpoint"))
+        }
+    }
+
     func testBackendURLBuilderExpandsTypedLocalHomePath() throws {
         let builder = ResticBackendURLBuilder()
         let expected = ("~/DeltaBackups" as NSString).expandingTildeInPath
@@ -208,7 +218,7 @@ final class ResticCommandTests: XCTestCase {
 
         let repository = BackupRepository(
             name: "S3",
-            backend: .s3(endpoint: nil, bucket: "bucket", path: nil, region: nil),
+            backend: .s3(endpoint: "s3.amazonaws.com", bucket: "bucket", path: nil, region: nil),
             credentialReferences: [
                 RepositoryCredentialReference(environmentKey: "AWS_SECRET_ACCESS_KEY", keychainAccount: account)
             ]
@@ -277,7 +287,7 @@ final class ResticCommandTests: XCTestCase {
         let repository = BackupRepository(
             id: repositoryID,
             name: "S3",
-            backend: .s3(endpoint: nil, bucket: "bucket", path: nil, region: nil),
+            backend: .s3(endpoint: "s3.amazonaws.com", bucket: "bucket", path: nil, region: nil),
             credentialReferences: updated
         )
 

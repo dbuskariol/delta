@@ -95,7 +95,7 @@ public struct BackupRepositoryValidator: Sendable {
 
         case let .s3(endpoint, bucket, path, region):
             return .s3(
-                endpoint: optional(endpoint),
+                endpoint: try required(endpoint, field: "S3 endpoint"),
                 bucket: try required(bucket, field: "S3 bucket"),
                 path: optional(path),
                 region: optional(region)
@@ -151,6 +151,10 @@ public struct BackupRepositoryValidator: Sendable {
             throw BackupRepositoryValidationError.emptyField(field)
         }
         return trimmed
+    }
+
+    private func required(_ value: String?, field: String) throws -> String {
+        try required(value ?? "", field: field)
     }
 
     private func optional(_ value: String?) -> String? {

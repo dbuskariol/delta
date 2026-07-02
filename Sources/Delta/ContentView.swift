@@ -859,62 +859,42 @@ struct ActivityView: View {
     }
 }
 
+private enum UpdateCheckInterval: Int, CaseIterable, Identifiable {
+    case daily = 86_400
+    case weekly = 604_800
+    case monthly = 2_592_000
+
+    var id: Int { rawValue }
+
+    var title: String {
+        switch self {
+        case .daily: "Daily"
+        case .weekly: "Weekly"
+        case .monthly: "Monthly"
+        }
+    }
+
+    static func normalized(_ rawValue: Int) -> UpdateCheckInterval {
+        UpdateCheckInterval(rawValue: rawValue) ?? .daily
+    }
+}
+
 struct SettingsView: View {
     @EnvironmentObject private var model: DeltaAppModel
     @EnvironmentObject private var softwareUpdateController: SoftwareUpdateController
+    @AppStorage("Delta.updateCheckIntervalSeconds") private var updateCheckIntervalSeconds = UpdateCheckInterval.daily.rawValue
     @State private var automaticallyChecksForUpdates = true
 
     var body: some View {
-        PageScaffold(title: "Settings", subtitle: "Updates, permissions, and background scheduling") {
-            SettingsCard(symbol: "arrow.down.circle", title: "Automatic Updates") {
-                Toggle("Automatically check for updates", isOn: $automaticallyChecksForUpdates)
-                    .toggleStyle(.checkbox)
-                    .onChange(of: automaticallyChecksForUpdates) { _, newValue in
-                        softwareUpdateController.automaticallyChecksForUpdates = newValue
-                    }
-                ActionLine(
-                    description: "Delta verifies signed update packages before installing them.",
-                    buttonTitle: "Check Now",
-                    symbol: "arrow.clockwise",
-                    action: softwareUpdateController.checkForUpdates
-                )
-            }
-
-            SettingsCard(symbol: "lock.shield", title: "Full Disk Access") {
-                HStack {
-                    StateBadge(
-                        text: model.fullDiskAccessStatus.hasLikelyFullDiskAccess ? "Ready" : "Needs Access",
-                        color: model.fullDiskAccessStatus.hasLikelyFullDiskAccess ? .green : .orange
-                    )
-                    Text(model.fullDiskAccessStatus.hasLikelyFullDiskAccess ? "Protected locations look readable." : "Protected locations are not readable yet.")
-                        .foregroundStyle(.secondary)
-                }
-                ActionLine(
-                    description: "macOS requires you to add Delta manually if it is not already listed.",
-                    buttonTitle: "Open Privacy Settings",
-                    symbol: "arrow.up.forward.app",
-                    action: model.openFullDiskAccessSettings
-                )
-                ActionLine(
-                    description: "Use this when Privacy & Security asks you to choose the app with the + button.",
-                    buttonTitle: "Show Delta",
-                    symbol: "folder",
-                    action: model.revealInstalledAppInFinder
-                )
-                Button {
-                    model.reload()
-                } label: {
-                    Label("Recheck Access", systemImage: "arrow.clockwise")
-                }
-            }
-
+        PageScaffold(title: "Settings", subtitle: "System access, background backups, updates, and diagnostics") {
             if let persistentStoreErrorMessage = model.persistentStoreErrorMessage {
-                SettingsCard(symbol: "externaldrive.badge.exclamationmark", title: "App Data Storage") {
-                    HStack {
-                        StateBadge(text: "Blocked", color: .red)
-                        Text("Backup and restore actions are disabled.")
-                            .foregroundStyle(.secondary)
-                    }
+                SettingsCard(
+                    symbol: "externaldrive.badge.exclamationmark",
+                    title: "Local App Data",
+                    subtitle: "Delta cannot open its local database.",
+                    statusText: "Blocked",
+                    statusColor: .red
+                ) {
                     Text(persistentStoreErrorMessage)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -926,43 +906,146 @@ struct SettingsView: View {
                 }
             }
 
-            SettingsCard(symbol: "clock.badge.checkmark", title: "Background Backups") {
-                Toggle("Run scheduled backups in the background", isOn: backgroundBackupsBinding)
-                    .toggleStyle(.checkbox)
-                HStack(spacing: 8) {
-                    StateBadge(text: model.launchAgentStatus.displayName, color: launchAgentStatusColor)
-                    Text(model.launchAgentStatus.detail)
-                        .foregroundStyle(.secondary)
+            SettingsCard(
+                symbol: "clock.badge.checkmark",
+                title: "Background Backups",
+                subtitle: "Run scheduled backups even when the main Delta window is closed.",
+                statusText: backgroundBackupsStatusText,
+                statusColor: launchAgentStatusColor
+            ) {
+                SettingsControlRow(
+                    title: "Scheduled runs",
+                    detail: "Allow Delta's background service to evaluate schedules and start due backups."
+                ) {
+                    Toggle("", isOn: backgroundBackupsBinding)
+                        .labelsHidden()
+                        .toggleStyle(.switch)
                 }
-                ActionLine(
-                    description: "Approve Delta in Login Items if macOS is waiting for confirmation.",
-                    buttonTitle: "Open Login Items",
-                    symbol: "gearshape",
-                    action: model.openLoginItemsSettings
+
+                SettingsDescription(
+                    text: "This uses the macOS Login Items service. The helper wakes every five minutes, checks due profiles, destination availability, battery and Low Power policies, and retention maintenance, then exits."
                 )
-                Button {
-                    model.reload()
-                } label: {
-                    Label("Refresh Status", systemImage: "arrow.clockwise")
+
+                HStack(spacing: 8) {
+                    Button {
+                        model.openLoginItemsSettings()
+                    } label: {
+                        Label("Open Login Items", systemImage: "gearshape")
+                    }
+                    Button {
+                        model.reload()
+                    } label: {
+                        Label("Refresh Status", systemImage: "arrow.clockwise")
+                    }
                 }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
             }
 
-            SettingsCard(symbol: "folder.badge.gearshape", title: "App Data") {
+            SettingsCard(
+                symbol: "lock.shield",
+                title: "Full Disk Access",
+                subtitle: "Allow Delta to read protected folders during full-volume and user-folder backups.",
+                statusText: fullDiskAccessStatusText,
+                statusColor: model.fullDiskAccessStatus.hasLikelyFullDiskAccess ? .green : .orange
+            ) {
+                SettingsDescription(
+                    text: model.fullDiskAccessStatus.hasLikelyFullDiskAccess
+                        ? "Protected locations look readable."
+                        : "Protected locations are not readable yet. macOS requires adding Delta manually in Privacy & Security."
+                )
+
+                HStack(spacing: 8) {
+                    Button {
+                        model.openFullDiskAccessSettings()
+                    } label: {
+                        Label("Open Privacy Settings", systemImage: "arrow.up.forward.app")
+                    }
+                    Button {
+                        model.revealInstalledAppInFinder()
+                    } label: {
+                        Label("Show Delta", systemImage: "folder")
+                    }
+                    Button {
+                        model.reload()
+                    } label: {
+                        Label("Recheck", systemImage: "arrow.clockwise")
+                    }
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
+
+            SettingsCard(
+                symbol: "arrow.down.circle",
+                title: "Automatic Updates",
+                subtitle: "Check for signed Delta releases using Sparkle.",
+                statusText: automaticallyChecksForUpdates ? "On" : "Off",
+                statusColor: automaticallyChecksForUpdates ? .green : .secondary
+            ) {
+                SettingsControlRow(
+                    title: "Automatic checks",
+                    detail: "Delta verifies signed update packages before installing them."
+                ) {
+                    Toggle("", isOn: $automaticallyChecksForUpdates)
+                        .labelsHidden()
+                        .toggleStyle(.switch)
+                        .onChange(of: automaticallyChecksForUpdates) { _, _ in
+                            applyUpdatePreferences()
+                        }
+                }
+
+                SettingsControlRow(
+                    title: "Check interval",
+                    detail: "How often Delta asks Sparkle to check for a newer build."
+                ) {
+                    Picker("", selection: $updateCheckIntervalSeconds) {
+                        ForEach(UpdateCheckInterval.allCases) { interval in
+                            Text(interval.title).tag(interval.rawValue)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.segmented)
+                    .frame(width: 250)
+                    .disabled(!automaticallyChecksForUpdates)
+                    .onChange(of: updateCheckIntervalSeconds) { _, _ in
+                        applyUpdatePreferences()
+                    }
+                }
+
+                Button {
+                    softwareUpdateController.checkForUpdates()
+                } label: {
+                    Label("Check Now", systemImage: "arrow.clockwise")
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
+
+            SettingsCard(
+                symbol: "folder.badge.gearshape",
+                title: "Local Data",
+                subtitle: "Open Delta's local support folders for troubleshooting."
+            ) {
                 ActionLine(
-                    description: "Open Delta's local database, lock, control, and support files.",
+                    description: "Database, locks, background control state, and support files.",
                     buttonTitle: "Show App Data",
                     symbol: "folder",
                     action: model.revealApplicationSupportFolder
                 )
                 ActionLine(
-                    description: "Open saved job output for troubleshooting backup and restore runs.",
+                    description: "Saved backup, restore, check, and prune output.",
                     buttonTitle: "Show Logs",
                     symbol: "doc.text.magnifyingglass",
                     action: model.revealLogFolder
                 )
             }
 
-            SettingsCard(symbol: "stethoscope", title: "Diagnostics") {
+            SettingsCard(
+                symbol: "stethoscope",
+                title: "Diagnostics",
+                subtitle: "Generate sanitized support information without secrets."
+            ) {
                 ActionLine(
                     description: "Copy a sanitized report with app, helper, destination, profile, and recent job state.",
                     buttonTitle: "Copy Report",
@@ -979,8 +1062,30 @@ struct SettingsView: View {
         }
         .onAppear {
             automaticallyChecksForUpdates = softwareUpdateController.automaticallyChecksForUpdates
-            softwareUpdateController.updateCheckInterval = 86_400
+            applyUpdatePreferences()
         }
+    }
+
+    private var backgroundBackupsStatusText: String {
+        switch model.launchAgentStatus {
+        case .enabled:
+            return "On"
+        default:
+            return model.launchAgentStatus.displayName
+        }
+    }
+
+    private var fullDiskAccessStatusText: String {
+        model.fullDiskAccessStatus.hasLikelyFullDiskAccess ? "Ready" : "Needs Access"
+    }
+
+    private func applyUpdatePreferences() {
+        let interval = UpdateCheckInterval.normalized(updateCheckIntervalSeconds)
+        if updateCheckIntervalSeconds != interval.rawValue {
+            updateCheckIntervalSeconds = interval.rawValue
+        }
+        softwareUpdateController.automaticallyChecksForUpdates = automaticallyChecksForUpdates
+        softwareUpdateController.updateCheckInterval = TimeInterval(interval.rawValue)
     }
 
     private var launchAgentStatusColor: Color {
@@ -1895,7 +2000,7 @@ struct RepositoryEditorView: View {
         case .s3:
             FieldRow(title: "Bucket") { TextField("bucket", text: $primary).textFieldStyle(.roundedBorder) }
             FieldRow(title: "Path") { TextField("Optional", text: $secondary).textFieldStyle(.roundedBorder) }
-            FieldRow(title: "Endpoint") { TextField("Optional", text: $tertiary).textFieldStyle(.roundedBorder) }
+            FieldRow(title: "Endpoint") { TextField("s3.us-east-1.amazonaws.com or https://server:port", text: $tertiary).textFieldStyle(.roundedBorder) }
             FieldRow(title: "Region") { TextField("Optional", text: $quaternary).textFieldStyle(.roundedBorder) }
         case .backblazeB2:
             FieldRow(title: "Bucket") { TextField("bucket", text: $primary).textFieldStyle(.roundedBorder) }
@@ -1954,6 +2059,9 @@ struct RepositoryEditorView: View {
         guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
         guard !primary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
         if kind == .sftp && secondary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return false
+        }
+        if kind == .s3 && tertiary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return false
         }
         if kind == .sftp && !quaternary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -2212,19 +2320,91 @@ struct SurfaceSection<Content: View>: View {
 struct SettingsCard<Content: View>: View {
     var symbol: String
     var title: String
+    var subtitle: String?
+    var statusText: String?
+    var statusColor: Color
     @ViewBuilder var content: Content
+
+    init(
+        symbol: String,
+        title: String,
+        subtitle: String? = nil,
+        statusText: String? = nil,
+        statusColor: Color = .secondary,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.symbol = symbol
+        self.title = title
+        self.subtitle = subtitle
+        self.statusText = statusText
+        self.statusColor = statusColor
+        self.content = content()
+    }
 
     var body: some View {
         Card {
             HStack(alignment: .top, spacing: 14) {
                 StatusIcon(symbol: symbol, color: .blue)
-                VStack(alignment: .leading, spacing: 10) {
-                    Text(title)
-                        .font(.headline)
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(alignment: .top, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(title)
+                                .font(.headline)
+                            if let subtitle {
+                                Text(subtitle)
+                                    .font(.callout)
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                        if let statusText {
+                            StateBadge(text: statusText, color: statusColor)
+                        }
+                    }
+
                     content
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
+    }
+}
+
+struct SettingsControlRow<Control: View>: View {
+    var title: String
+    var detail: String
+    @ViewBuilder var control: Control
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 16) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                Text(detail)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            control
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+struct SettingsDescription: View {
+    var text: String
+
+    var body: some View {
+        Text(text)
+            .font(.callout)
+            .foregroundStyle(.secondary)
+            .lineLimit(3)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -2677,15 +2857,20 @@ struct ActionLine: View {
     var action: () -> Void
 
     var body: some View {
-        HStack(alignment: .center, spacing: 12) {
+        HStack(alignment: .center, spacing: 16) {
             Text(description)
+                .font(.callout)
                 .foregroundStyle(.secondary)
-                .lineLimit(2)
+                .lineLimit(3)
+                .fixedSize(horizontal: false, vertical: true)
             Spacer()
             Button(action: action) {
                 Label(buttonTitle, systemImage: symbol)
             }
+            .controlSize(.small)
         }
+        .buttonStyle(.bordered)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

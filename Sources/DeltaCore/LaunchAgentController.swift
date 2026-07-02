@@ -60,6 +60,18 @@ public enum LaunchAgentRegistrationStatus: Equatable, Sendable {
         case "unavailable":
             return .unavailable
         default:
+            if normalized.contains("rawvalue: 0") || normalized == "0" {
+                return .notRegistered
+            }
+            if normalized.contains("rawvalue: 1") || normalized == "1" {
+                return .enabled
+            }
+            if normalized.contains("rawvalue: 2") || normalized == "2" {
+                return .requiresApproval
+            }
+            if normalized.contains("rawvalue: 3") || normalized == "3" {
+                return .notFound
+            }
             return .unknown(rawValue)
         }
     }
@@ -87,7 +99,18 @@ public enum LaunchAgentController {
     public static func status(plistName: String = defaultPlistName) -> LaunchAgentRegistrationStatus {
         #if canImport(ServiceManagement)
         if #available(macOS 13.0, *) {
-            return LaunchAgentRegistrationStatus.parse("\(SMAppService.agent(plistName: plistName).status)")
+            switch SMAppService.agent(plistName: plistName).status {
+            case .enabled:
+                return .enabled
+            case .requiresApproval:
+                return .requiresApproval
+            case .notRegistered:
+                return .notRegistered
+            case .notFound:
+                return .notFound
+            @unknown default:
+                return LaunchAgentRegistrationStatus.parse("\(SMAppService.agent(plistName: plistName).status)")
+            }
         }
         #endif
         return .unavailable

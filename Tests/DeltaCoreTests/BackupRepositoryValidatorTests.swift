@@ -103,6 +103,17 @@ final class BackupRepositoryValidatorTests: XCTestCase {
         }
     }
 
+    func testRejectsS3WithoutEndpoint() {
+        XCTAssertThrowsError(
+            try BackupRepositoryValidator().validate(
+                name: "Cloud",
+                backend: .s3(endpoint: nil, bucket: "delta", path: nil, region: nil)
+            )
+        ) { error in
+            XCTAssertEqual(error as? BackupRepositoryValidationError, .emptyField("S3 endpoint"))
+        }
+    }
+
     func testNormalizesRemoteBackendFields() throws {
         let result = try BackupRepositoryValidator().validate(
             name: "  S3  ",

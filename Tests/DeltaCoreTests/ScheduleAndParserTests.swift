@@ -132,6 +132,13 @@ final class ScheduleAndParserTests: XCTestCase {
         XCTAssertEqual(LaunchAgentRegistrationStatus.parse("futureState"), .unknown("futureState"))
     }
 
+    func testLaunchAgentStatusParserHandlesRawServiceManagementStates() {
+        XCTAssertEqual(LaunchAgentRegistrationStatus.parse("SMAppServiceStatus(rawValue: 0)"), .notRegistered)
+        XCTAssertEqual(LaunchAgentRegistrationStatus.parse("SMAppServiceStatus(rawValue: 1)"), .enabled)
+        XCTAssertEqual(LaunchAgentRegistrationStatus.parse("SMAppServiceStatus(rawValue: 2)"), .requiresApproval)
+        XCTAssertEqual(LaunchAgentRegistrationStatus.parse("SMAppServiceStatus(rawValue: 3)"), .notFound)
+    }
+
     private func components(_ calendar: Calendar, year: Int, month: Int, day: Int, hour: Int, minute: Int) -> Date {
         calendar.date(from: DateComponents(year: year, month: month, day: day, hour: hour, minute: minute, second: 0))!
     }

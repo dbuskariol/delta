@@ -39,12 +39,13 @@ public struct ResticBackendURLBuilder: Sendable {
             return "rest:\(url)"
 
         case let .s3(endpoint, bucket, path, _):
+            guard let endpoint else {
+                throw ResticBackendError.emptyRequiredField("S3 endpoint")
+            }
+            try require(endpoint, "S3 endpoint")
             try require(bucket, "S3 bucket")
             let prefix = normalizedObjectPath(path)
-            if let endpoint, !endpoint.isEmpty {
-                return "s3:\(normalizedEndpoint(endpoint))/\(bucket)\(prefix)"
-            }
-            return "s3:\(bucket)\(prefix)"
+            return "s3:\(normalizedEndpoint(endpoint))/\(bucket)\(prefix)"
 
         case let .backblazeB2(bucket, path):
             try require(bucket, "Backblaze B2 bucket")

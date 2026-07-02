@@ -11,7 +11,7 @@ The product goal is simple: make serious backup practices approachable without h
 - **Full-volume or custom-folder protection** with macOS-safe excludes and destination self-exclusion.
 - **Per-profile extra exclusions** for large generated folders, transient files, disk images, or other paths that should not consume backup storage.
 - **Local and network destinations** including local paths, mounted SMB/NFS volumes, SFTP, REST server, S3-compatible storage, Backblaze B2, Azure Blob, Google Cloud Storage, OpenStack Swift, rclone remotes, and custom restic URLs.
-- **Destination validation before save** for required fields, new or changed writable local paths, REST URLs, SFTP paths/ports, and rclone remote syntax.
+- **Destination validation before save** for required fields, new or changed writable local paths, REST URLs, SFTP paths/ports, S3 endpoint/bucket fields, and rclone remote syntax.
 - **Automatic destination preparation** after a destination is added, with a first-backup safety net for writable local or mounted destinations that still have no restic metadata.
 - **Scheduled backups** through a bundled `DeltaAgent` LaunchAgent registered with `SMAppService`, with agent-started jobs reflected back into the app and menu bar.
 - **Power-aware scheduling** with battery and Low Power Mode controls.
@@ -93,7 +93,7 @@ Each profile keeps Delta's default macOS-safe excludes and can add extra restic 
 
 ## Scheduling And Maintenance
 
-`DeltaAgent` is packaged as a LaunchAgent and runs periodically. Each run evaluates:
+`DeltaAgent` is Delta's background backup service. It is packaged as a macOS LaunchAgent registered through `SMAppService` and Login Items so scheduled profiles can run while the main Delta window is closed. It runs as the signed-in user, not as a privileged admin helper, and wakes periodically to evaluate:
 
 - backup schedule: hourly, daily, weekly, monthly, or custom interval
 - missed-run catchup policy
