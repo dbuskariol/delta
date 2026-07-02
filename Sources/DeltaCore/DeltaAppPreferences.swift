@@ -2,6 +2,7 @@ import Foundation
 
 public enum DeltaAppPreferenceKeys {
     public static let activityLogDetail = "Delta.activityLogDetail"
+    public static let backupFreshnessWarningHours = "Delta.backupFreshnessWarningHours"
     public static let defaultProfileCatchUpMissedRuns = "Delta.defaultProfileCatchUpMissedRuns"
     public static let defaultProfileCheckAfterPrune = "Delta.defaultProfileCheckAfterPrune"
     public static let defaultProfileDownloadLimitKiB = "Delta.defaultProfileDownloadLimitKiB"
@@ -76,5 +77,35 @@ public enum AppUpdateCheckInterval: Int, CaseIterable, Identifiable, Sendable {
 
     public static func normalized(_ rawValue: Int) -> AppUpdateCheckInterval {
         AppUpdateCheckInterval(rawValue: rawValue) ?? .daily
+    }
+}
+
+public enum BackupFreshnessWarningThreshold: Int, CaseIterable, Identifiable, Sendable {
+    case oneDay = 24
+    case threeDays = 72
+    case oneWeek = 168
+    case thirtyDays = 720
+
+    public var id: Int { rawValue }
+
+    public var title: String {
+        switch self {
+        case .oneDay: "1 day"
+        case .threeDays: "3 days"
+        case .oneWeek: "1 week"
+        case .thirtyDays: "30 days"
+        }
+    }
+
+    public var summaryText: String {
+        "Warn after \(title)"
+    }
+
+    public var timeInterval: TimeInterval {
+        TimeInterval(rawValue) * 3_600
+    }
+
+    public static func normalized(_ rawValue: Int) -> BackupFreshnessWarningThreshold {
+        BackupFreshnessWarningThreshold(rawValue: rawValue) ?? .threeDays
     }
 }

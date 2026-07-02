@@ -19,10 +19,11 @@ The product goal is simple: make serious backup practices approachable without h
 - **Retention maintenance** with scheduled forget/prune/check windows.
 - **Pause, resume, and cancel controls** for active backups from the main window and macOS menu bar, including scheduled jobs started by Background Backups. Pause stops restic safely, keeps the profile visibly paused, and Resume continues from already saved backup data.
 - **Clear backup summaries** showing new, changed, unchanged, added, and checked data for each backup run.
+- **Backup health monitoring** with configurable freshness warnings for scheduled profiles that have no completed backup, stale restore points, failed runs, or stopped runs.
 - **Notification Center alerts** for failed or warning jobs, with optional successful-backup summaries. The signed background helper uses the same notification policy for scheduled runs.
 - **Full or browsed selected restore** with backup browsing, file/folder selection, configurable dry-run and verification defaults, overwrite policies, original-path restore, chosen-folder restore, and optional pre-restore backup.
 - **Streaming and saved backup logs** from restic stdout/stderr with source context, stable processed-file counters, clean change summaries, fixed-height live panes, and expandable per-job audit history.
-- **Settings and diagnostics** with a compact health summary for system access, schedules, updates, notifications, and bundled backup tools, plus controls for new-backup defaults, restore safety defaults, menu bar visibility, start-at-login, Activity log detail, app version, helper status, tool paths, profile/destination counts, recent jobs, and local support paths.
+- **Settings and diagnostics** with a compact health summary for system access, schedules, updates, notifications, and bundled backup tools, plus controls for new-backup defaults, backup freshness warnings, restore safety defaults, menu bar visibility, start-at-login, Activity log detail, app version, helper status, tool paths, profile/destination counts, recent jobs, and local support paths.
 - **Sparkle automatic updates** with generated appcast/update archive support.
 
 ## How It Works

@@ -174,7 +174,7 @@ else
   language_output="$(run_capture product_language "$ROOT_DIR/Scripts/verify-product-language.sh")"
   language_status="$(command_status product_language)"
   if [[ "$language_status" -eq 0 ]]; then
-    append_row "settings_surface" "$(item_area settings_surface)" "Partial" "Product-language verifier passed; raw Repository/LaunchAgent terminology is blocked from user-facing strings." "Open Settings and confirm visual grouping, status summary, and reset controls in the running app."
+    append_row "settings_surface" "$(item_area settings_surface)" "Partial" "Product-language verifier passed; raw Repository/LaunchAgent terminology is blocked from user-facing strings." "Open Settings and confirm visual grouping, status summary, reset controls, and backup freshness warning controls in the running app."
   else
     append_row "settings_surface" "$(item_area settings_surface)" "Failed" "Product-language verifier failed: $language_output" "Fix user-facing terminology and rerun."
   fi
@@ -276,7 +276,7 @@ else
       append_row "local_drive_destination" "$(item_area local_drive_destination)" "Failed" "$installed_local_evidence" "Fix installed-bundle local backup acceptance, then repeat through the installed app UI."
       append_row "restore_wizard" "$(item_area restore_wizard)" "Failed" "$installed_local_evidence" "Fix installed-bundle restore acceptance, then exercise the installed Restore wizard UI."
     fi
-    append_row "new_backup_defaults" "$(item_area new_backup_defaults)" "Partial" "Automated release gate passed backup-default preference and schedule policy tests for commit $git_commit." "Change defaults in Settings and confirm newly-created UI profiles inherit them without mutating existing profiles."
+    append_row "new_backup_defaults" "$(item_area new_backup_defaults)" "Partial" "Automated release gate passed backup-default preference, freshness-threshold normalization, and schedule policy tests for commit $git_commit." "Change defaults in Settings and confirm newly-created UI profiles inherit them without mutating existing profiles. Confirm the freshness threshold changes dashboard attention timing without mutating profiles."
     append_row "restore_defaults" "$(item_area restore_defaults)" "Partial" "Automated release gate passed restore-default preference normalization, shared-settings reads, diagnostic summaries, and restore command safety coverage for commit $git_commit." "Change Settings > Restore Defaults, reopen Restore, and confirm defaults apply while remaining editable."
     append_row "browse_restore_points" "$(item_area browse_restore_points)" "Partial" "Automated release gate passed restore-point parsing, cache replacement, newest-first reads, and browser path command validation for commit $git_commit." "Open Restore, confirm restore points load on tab selection, refresh returns all current points, and pruned points disappear."
     append_row "pause_resume_cancel" "$(item_area pause_resume_cancel)" "Partial" "Automated release gate passed durable run-control and stopped-job model coverage for commit $git_commit." "Pause, resume, and cancel a real large backup from the main app and menu bar."

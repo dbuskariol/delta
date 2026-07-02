@@ -889,6 +889,14 @@ final class DeltaAppModel: ObservableObject {
             appLoginItemStatus: appLoginItemStatus.displayName,
             notificationStatus: DeltaAppPreferences.bool(for: DeltaAppPreferenceKeys.sendsJobNotifications, default: false) ? "Enabled" : "Disabled",
             menuBarStatus: DeltaAppPreferences.bool(for: DeltaAppPreferenceKeys.showsMenuBarExtra, default: true) ? "Shown" : "Hidden",
+            backupFreshnessStatus: BackupFreshnessWarningThreshold
+                .normalized(
+                    DeltaAppPreferences.integer(
+                        for: DeltaAppPreferenceKeys.backupFreshnessWarningHours,
+                        default: BackupFreshnessWarningThreshold.threeDays.rawValue
+                    )
+                )
+                .summaryText,
             restoreDefaultsStatus: restoreDefaultsDiagnosticStatus(),
             activeOperation: activeOperation.map { "\($0.kind.displayName): \($0.title)" },
             profileCount: profiles.count,

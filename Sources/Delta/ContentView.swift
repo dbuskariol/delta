@@ -58,6 +58,10 @@ struct ContentView: View {
 
 struct DashboardView: View {
     @EnvironmentObject private var model: DeltaAppModel
+    @AppStorage(
+        DeltaAppPreferenceKeys.backupFreshnessWarningHours,
+        store: DeltaAppPreferences.sharedStore()
+    ) private var backupFreshnessWarningHours = BackupFreshnessWarningThreshold.threeDays.rawValue
 
     var body: some View {
         PageScaffold(
@@ -132,6 +136,13 @@ struct DashboardView: View {
                 )
             }
 
+            let warnings = backupHealthWarnings
+            if !warnings.isEmpty {
+                BackupHealthCard(warnings: warnings) {
+                    model.selectedSection = .backups
+                }
+            }
+
             if !model.fullDiskAccessStatus.hasLikelyFullDiskAccess {
                 Card {
                     HStack(alignment: .top, spacing: 14) {
@@ -163,6 +174,73 @@ struct DashboardView: View {
                 }
             }
         }
+    }
+
+    private var backupHealthWarnings: [BackupHealthWarning] {
+        let threshold = BackupFreshnessWarningThreshold.normalized(backupFreshnessWarningHours)
+        let now = Date()
+        return model.profiles
+            .filter { $0.schedule.isEnabled }
+            .compactMap { warning(for: $0, threshold: threshold, now: now) }
+            .prefix(4)
+            .map { $0 }
+    }
+
+    private func warning(
+        for profile: BackupProfile,
+        threshold: BackupFreshnessWarningThreshold,
+        now: Date
+    ) -> BackupHealthWarning? {
+        let profileJobs = model.jobs.filter { $0.profileID == profile.id && $0.kind == .backup }
+        let latestBackup = profileJobs.max { $0.startedAt < $1.startedAt }
+        let latestCompleted = profileJobs
+            .filter { $0.status == .succeeded || $0.status == .warning }
+            .max { ($0.finishedAt ?? $0.startedAt) < ($1.finishedAt ?? $1.startedAt) }
+
+        if latestBackup?.status == .failed {
+            return BackupHealthWarning(
+                id: "\(profile.id.uuidString)-failed",
+                title: "\(profile.name) failed",
+                detail: latestBackup?.message ?? "The most recent backup did not complete.",
+                isCritical: true
+            )
+        }
+
+        if latestBackup?.status == .cancelled && latestBackup?.stopReason != .pause {
+            return BackupHealthWarning(
+                id: "\(profile.id.uuidString)-stopped",
+                title: "\(profile.name) was stopped",
+                detail: "Run the backup again when the destination is available.",
+                isCritical: false
+            )
+        }
+
+        guard let latestCompleted else {
+            return BackupHealthWarning(
+                id: "\(profile.id.uuidString)-missing",
+                title: "\(profile.name) has no completed backup",
+                detail: "Run this profile once to create its first restore point.",
+                isCritical: false
+            )
+        }
+
+        let completedAt = latestCompleted.finishedAt ?? latestCompleted.startedAt
+        guard now.timeIntervalSince(completedAt) > threshold.timeInterval else {
+            return nil
+        }
+
+        return BackupHealthWarning(
+            id: "\(profile.id.uuidString)-stale",
+            title: "\(profile.name) is stale",
+            detail: "Last completed backup was \(relativeTime(from: completedAt, to: now)).",
+            isCritical: false
+        )
+    }
+
+    private func relativeTime(from date: Date, to referenceDate: Date) -> String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .full
+        return formatter.localizedString(for: date, relativeTo: referenceDate)
     }
 }
 
@@ -209,6 +287,58 @@ struct BackupsView: View {
                 .environmentObject(model)
                 .frame(width: ModalMetrics.sheetWidth, height: 720)
         }
+    }
+}
+
+private struct BackupHealthWarning: Identifiable {
+    var id: String
+    var title: String
+    var detail: String
+    var isCritical: Bool
+}
+
+private struct BackupHealthCard: View {
+    var warnings: [BackupHealthWarning]
+    var action: () -> Void
+
+    var body: some View {
+        Card {
+            HStack(alignment: .top, spacing: 14) {
+                StatusIcon(symbol: "exclamationmark.arrow.triangle.2.circlepath", color: primaryColor)
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 8) {
+                        Text("Backup Attention")
+                            .font(.headline)
+                        StateBadge(text: "\(warnings.count)", color: primaryColor)
+                    }
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(warnings) { warning in
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(warning.title)
+                                    .font(.subheadline.weight(.semibold))
+                                Text(warning.detail)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(2)
+                            }
+                        }
+                    }
+                }
+                Spacer(minLength: 12)
+                Button {
+                    action()
+                } label: {
+                    Label("Review", systemImage: "arrow.right")
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .deltaTooltip("Open backup profiles to review stale, failed, or missing backups.")
+            }
+        }
+    }
+
+    private var primaryColor: Color {
+        warnings.contains(where: \.isCritical) ? .red : .orange
     }
 }
 
@@ -1045,6 +1175,10 @@ struct SettingsView: View {
         store: DeltaAppPreferences.sharedStore()
     ) private var activityLogDetailRawValue = ActivityLogDetail.standard.rawValue
     @AppStorage(
+        DeltaAppPreferenceKeys.backupFreshnessWarningHours,
+        store: DeltaAppPreferences.sharedStore()
+    ) private var backupFreshnessWarningHours = BackupFreshnessWarningThreshold.threeDays.rawValue
+    @AppStorage(
         DeltaAppPreferenceKeys.previewsRestoresByDefault,
         store: DeltaAppPreferences.sharedStore()
     ) private var previewsRestoresByDefault = true
@@ -1471,6 +1605,23 @@ struct SettingsView: View {
                 }
 
                 SettingsControlRow(
+                    title: "Freshness warning",
+                    detail: "Show dashboard attention when a scheduled profile has no completed backup or its last completed backup is older than this."
+                ) {
+                    Picker("", selection: $backupFreshnessWarningHours) {
+                        ForEach(BackupFreshnessWarningThreshold.allCases) { threshold in
+                            Text(threshold.title).tag(threshold.rawValue)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.segmented)
+                    .frame(width: 300)
+                    .onChange(of: backupFreshnessWarningHours) { _, _ in
+                        normalizeBackupDefaults()
+                    }
+                }
+
+                SettingsControlRow(
                     title: "Automatic cleanup",
                     detail: "Create new profiles with scheduled cleanup for old restore points."
                 ) {
@@ -1495,6 +1646,7 @@ struct SettingsView: View {
                     SettingsFact(title: "Schedule", value: "Daily 20:00"),
                     SettingsFact(title: "Retention", value: "24h / 30d / 12w / 12m"),
                     SettingsFact(title: "Bandwidth", value: defaultBandwidthSummary),
+                    SettingsFact(title: "Freshness", value: backupFreshnessThreshold.summaryText),
                     SettingsFact(title: "Cleanup", value: defaultCleanupSummary),
                     SettingsFact(title: "Destination locks", value: "Automatic"),
                     SettingsFact(title: "Backup type", value: "Incremental"),
@@ -2047,6 +2199,7 @@ struct SettingsView: View {
             || !defaultProfileCheckAfterPrune
             || defaultProfileUploadLimitKiB > 0
             || defaultProfileDownloadLimitKiB > 0
+            || backupFreshnessThreshold != .threeDays
             || !defaultProfileMaintenanceEnabled
             || defaultProfileMaintenanceIntervalDays != 7
             || defaultProfileMaintenanceHour != 2
@@ -2146,6 +2299,10 @@ struct SettingsView: View {
         return "Every \(defaultProfileMaintenanceIntervalDays)d at \(twoDigit(defaultProfileMaintenanceHour)):\(twoDigit(defaultProfileMaintenanceMinute))"
     }
 
+    private var backupFreshnessThreshold: BackupFreshnessWarningThreshold {
+        BackupFreshnessWarningThreshold.normalized(backupFreshnessWarningHours)
+    }
+
     private func applyUpdatePreferences() {
         let interval = AppUpdateCheckInterval.normalized(updateCheckIntervalSeconds)
         if updateCheckIntervalSeconds != interval.rawValue {
@@ -2167,6 +2324,10 @@ struct SettingsView: View {
         defaultProfileMaintenanceIntervalDays = clamped(defaultProfileMaintenanceIntervalDays, to: 1...90)
         defaultProfileMaintenanceHour = clamped(defaultProfileMaintenanceHour, to: 0...23)
         defaultProfileMaintenanceMinute = clamped(defaultProfileMaintenanceMinute, to: 0...59)
+        let normalizedFreshness = backupFreshnessThreshold.rawValue
+        if backupFreshnessWarningHours != normalizedFreshness {
+            backupFreshnessWarningHours = normalizedFreshness
+        }
     }
 
     private func resetBackupDefaults() {
@@ -2177,6 +2338,7 @@ struct SettingsView: View {
         defaultProfileCheckAfterPrune = true
         defaultProfileUploadLimitKiB = 0
         defaultProfileDownloadLimitKiB = 0
+        backupFreshnessWarningHours = BackupFreshnessWarningThreshold.threeDays.rawValue
         defaultProfileMaintenanceEnabled = true
         defaultProfileMaintenanceIntervalDays = 7
         defaultProfileMaintenanceHour = 2
