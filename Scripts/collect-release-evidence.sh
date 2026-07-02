@@ -44,6 +44,11 @@ gate_status_value() {
   /usr/bin/awk -F= -v key="$key" '$1 == key { print $2; exit }' "$GATE_STATUS_FILE" 2>/dev/null || true
 }
 
+manual_report_value() {
+  local key="$1"
+  /usr/bin/awk -F': ' -v key="- $key" '$1 == key { print $2; exit }' "$MANUAL_ACCEPTANCE_REPORT" 2>/dev/null || true
+}
+
 AUTOMATED_GATE_STATUS="${DELTA_AUTOMATED_GATE_STATUS:-}"
 if [[ -z "$AUTOMATED_GATE_STATUS" && -f "$GATE_STATUS_FILE" ]]; then
   if [[ "$(gate_status_value git_commit)" == "$GIT_COMMIT" ]]; then
@@ -95,6 +100,7 @@ fi
 append_command "Bundled Backup Engine" "$APP_PATH/Contents/MacOS/restic" version
 append_command "Bundled Cloud Helper" "$APP_PATH/Contents/MacOS/rclone" version
 append_command "Secret Bridge Fail-Closed Check" /bin/sh -c "'$APP_PATH/Contents/MacOS/DeltaSecretBridge' 2>&1; test \$? -eq 64"
+append_command "Manual Acceptance Matrix Consistency" "$ROOT_DIR/Scripts/verify-manual-acceptance-matrix.sh"
 
 if [[ -d "$ROOT_DIR/dist/updates" ]]; then
   append_command "Sparkle Update Artifacts" /bin/sh -c "ls -la '$ROOT_DIR/dist/updates' && test -f '$ROOT_DIR/dist/updates/appcast.xml' && grep -E 'sparkle:(version|shortVersionString)|sparkle:edSignature' '$ROOT_DIR/dist/updates/appcast.xml'"
@@ -123,7 +129,11 @@ if [[ -x "$ROOT_DIR/Scripts/run-local-acceptance-probe.sh" ]]; then
 fi
 
 MANUAL_MATRIX_PASSED="No"
+MANUAL_REPORT_CURRENT="No"
 if [[ -f "$MANUAL_ACCEPTANCE_REPORT" ]]; then
+  if [[ "$(manual_report_value "Git Commit")" == "$GIT_COMMIT" ]]; then
+    MANUAL_REPORT_CURRENT="Yes"
+  fi
   MANUAL_ACCEPTANCE_OUTPUT="$(/usr/bin/mktemp -t delta-manual-acceptance.XXXXXX)"
   set +e
   "$ROOT_DIR/Scripts/verify-manual-acceptance.sh" "$MANUAL_ACCEPTANCE_REPORT" >"$MANUAL_ACCEPTANCE_OUTPUT" 2>&1
@@ -153,7 +163,11 @@ EOF
 fi
 
 READY_FOR_EXTERNAL_DISTRIBUTION="No"
-if [[ "$AUTOMATED_GATE_STATUS" == "Passed" && "$MANUAL_MATRIX_PASSED" == "Yes" && "$NOTARIZATION_COMPLETE" == "Yes" ]]; then
+if [[ "$AUTOMATED_GATE_STATUS" == "Passed" \
+  && "$MANUAL_MATRIX_PASSED" == "Yes" \
+  && "$MANUAL_REPORT_CURRENT" == "Yes" \
+  && "$NOTARIZATION_COMPLETE" == "Yes" ]]
+then
   READY_FOR_EXTERNAL_DISTRIBUTION="Yes"
 fi
 
@@ -161,11 +175,13 @@ cat >>"$OUTPUT" <<EOF
 ## Manual macOS Acceptance Evidence
 
 Manual acceptance report: $MANUAL_ACCEPTANCE_REPORT
+Manual report matches git commit: $MANUAL_REPORT_CURRENT
 Manual matrix passed: $MANUAL_MATRIX_PASSED
 
 ## Release Decision
 
 - Automated gate passed: $AUTOMATED_GATE_STATUS
+- Manual report matches git commit: $MANUAL_REPORT_CURRENT
 - Manual matrix passed: $MANUAL_MATRIX_PASSED
 - Developer ID notarization complete: $NOTARIZATION_COMPLETE
 - Ready for external distribution: $READY_FOR_EXTERNAL_DISTRIBUTION
