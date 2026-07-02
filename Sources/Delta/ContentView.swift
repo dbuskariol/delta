@@ -961,7 +961,7 @@ struct SettingsView: View {
             LazyVGrid(columns: DeltaTheme.statColumns, spacing: 12) {
                 SettingsStatusTile(
                     symbol: "clock.badge.checkmark",
-                    title: "Background",
+                    title: "Automation",
                     value: backgroundBackupsStatusText,
                     detail: backgroundBackupsSummary,
                     color: launchAgentStatusColor
@@ -1006,13 +1006,13 @@ struct SettingsView: View {
                 }
 
                 SettingsDescription(
-                    text: "Under the hood this is Delta's signed macOS LaunchAgent: a lightweight Login Item helper that wakes periodically, checks due profiles, destination availability, battery and Low Power policies, retention maintenance, then exits."
+                    text: "Background Backups is Delta's signed macOS Login Item helper. It runs as your user account, wakes periodically, checks due profiles, destination availability, battery and Low Power policies, and retention maintenance, then exits."
                 )
 
                 SettingsFactGrid(items: [
                     SettingsFact(title: "Scheduled profiles", value: "\(scheduledProfileCount)"),
                     SettingsFact(title: "Check cadence", value: "Every 5 min"),
-                    SettingsFact(title: "Runs as", value: "Current user")
+                    SettingsFact(title: "Privileges", value: "Current user")
                 ])
 
                 SettingsDescription(
@@ -1071,6 +1071,36 @@ struct SettingsView: View {
                         model.reload()
                     } label: {
                         Label("Recheck", systemImage: "arrow.clockwise")
+                    }
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
+
+            SettingsCard(
+                symbol: "slider.horizontal.3",
+                title: "Backup Controls",
+                subtitle: "Global safety controls live here; schedule, retention, power, bandwidth, and exclusions are configured per backup profile."
+            ) {
+                SettingsFactGrid(items: [
+                    SettingsFact(title: "Schedule", value: "Per profile"),
+                    SettingsFact(title: "Power policy", value: "Per profile"),
+                    SettingsFact(title: "Bandwidth", value: "Per profile"),
+                    SettingsFact(title: "Retention", value: "Per profile"),
+                    SettingsFact(title: "Destination locks", value: "Automatic"),
+                    SettingsFact(title: "Restore safety", value: "Wizard")
+                ])
+
+                HStack(spacing: 8) {
+                    Button {
+                        model.selectedSection = .backups
+                    } label: {
+                        Label("Manage Profiles", systemImage: "externaldrive.badge.plus")
+                    }
+                    Button {
+                        model.selectedSection = .repositories
+                    } label: {
+                        Label("Manage Destinations", systemImage: "externaldrive.connected.to.line.below")
                     }
                 }
                 .buttonStyle(.bordered)
@@ -1175,29 +1205,37 @@ struct SettingsView: View {
         switch model.launchAgentStatus {
         case .enabled:
             return "On"
-        default:
-            return model.launchAgentStatus.displayName
+        case .requiresApproval:
+            return "Needs Approval"
+        case .notRegistered:
+            return "Off"
+        case .notFound:
+            return "Missing Helper"
+        case .unavailable:
+            return "Unavailable"
+        case .unknown:
+            return "Unknown"
         }
     }
 
     private var backgroundBackupsSummary: String {
         if scheduledProfileCount == 0 {
-            return "No scheduled profiles"
+            return model.launchAgentStatus == .enabled ? "Ready for schedules" : "No scheduled profiles"
         }
         if model.launchAgentStatus == .enabled {
             return "\(scheduledProfileCount) scheduled \(scheduledProfileCount == 1 ? "profile" : "profiles") ready"
         }
-        return "Action needed for schedules"
+        return model.launchAgentStatus.detail
     }
 
     private var backgroundBackupsControlDetail: String {
         if scheduledProfileCount == 0 {
-            return "Keep the background helper ready for profiles that use hourly, daily, weekly, monthly, or custom schedules."
+            return "Keep background automation ready for profiles that use hourly, daily, weekly, monthly, or custom schedules."
         }
         if model.launchAgentStatus == .enabled {
             return "Allow \(scheduledProfileCount) scheduled \(scheduledProfileCount == 1 ? "profile" : "profiles") to run while Delta's window is closed."
         }
-        return "Enable and approve Delta in Login Items so scheduled backups can run automatically."
+        return model.launchAgentStatus.detail
     }
 
     private var fullDiskAccessStatusText: String {
@@ -2518,7 +2556,7 @@ struct SettingsCard<Content: View>: View {
     var body: some View {
         Card {
             HStack(alignment: .top, spacing: 14) {
-                StatusIcon(symbol: symbol, color: .blue)
+                StatusIcon(symbol: symbol, color: statusText == nil ? .blue : statusColor)
                 VStack(alignment: .leading, spacing: 12) {
                     HStack(alignment: .top, spacing: 12) {
                         VStack(alignment: .leading, spacing: 3) {

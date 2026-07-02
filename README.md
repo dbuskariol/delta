@@ -13,10 +13,10 @@ The product goal is simple: make serious backup practices approachable without h
 - **Local and network destinations** including local paths, mounted SMB/NFS volumes, SFTP, REST server, S3-compatible storage, Backblaze B2, Azure Blob, Google Cloud Storage, OpenStack Swift, rclone remotes, and custom restic URLs.
 - **Destination validation before save** for required fields, new or changed writable local paths, REST URLs, SFTP paths/ports, S3 endpoint/bucket fields, and rclone remote syntax.
 - **Automatic destination preparation** after a destination is added, with a first-backup safety net for writable local or mounted destinations that still have no restic metadata.
-- **Scheduled backups** through a bundled `DeltaAgent` LaunchAgent registered with `SMAppService`, with agent-started jobs reflected back into the app and menu bar.
+- **Scheduled backups** through Background Backups, a signed macOS Login Item helper registered with `SMAppService`, with helper-started jobs reflected back into the app and menu bar.
 - **Power-aware scheduling** with battery and Low Power Mode controls.
 - **Retention maintenance** with scheduled forget/prune/check windows.
-- **Pause, resume, and cancel controls** for active backups from the main window and macOS menu bar, including scheduled jobs started by `DeltaAgent`. Pause stops restic safely, keeps the profile visibly paused, and Resume continues from already saved backup data.
+- **Pause, resume, and cancel controls** for active backups from the main window and macOS menu bar, including scheduled jobs started by Background Backups. Pause stops restic safely, keeps the profile visibly paused, and Resume continues from already saved backup data.
 - **Clear backup summaries** showing new, changed, unchanged, added, and checked data for each backup run.
 - **Full or browsed selected restore** with backup browsing, file/folder selection, dry-run preview, overwrite policies, verification, original-path restore, chosen-folder restore, and optional pre-restore backup.
 - **Streaming and saved backup logs** from restic stdout/stderr with source context, stable processed-file counters, clean change summaries, fixed-height live panes, and expandable per-job audit history.
@@ -96,7 +96,7 @@ Each profile keeps Delta's default macOS-safe excludes and can add extra restic 
 
 ## Scheduling And Maintenance
 
-Background Backups let scheduled profiles run while the main Delta window is closed. The macOS implementation is `DeltaAgent`, a signed LaunchAgent registered through `SMAppService` and Login Items. It runs as the signed-in user, not as a privileged admin helper, and wakes periodically to evaluate:
+Background Backups let scheduled profiles run while the main Delta window is closed. The macOS implementation is `DeltaAgent`, a signed Login Item helper registered through `SMAppService` and implemented as a per-user LaunchAgent. It runs as the signed-in user, not as a privileged admin helper, and wakes periodically to evaluate:
 
 - backup schedule: hourly, daily, weekly, monthly, or custom interval
 - missed-run catchup policy
@@ -107,7 +107,7 @@ Background Backups let scheduled profiles run while the main Delta window is clo
 - per-destination lock state
 - scheduled retention maintenance
 
-If any enabled backup profile needs background scheduling and macOS reports that the helper is not enabled, Delta shows an action-needed Background Backups card on the dashboard and a detailed status in Settings. macOS may require manual approval in Login Items; apps cannot approve their own background items.
+When an enabled scheduled profile is saved, Delta requests Background Backups registration automatically. If macOS still requires approval, Delta shows an action-needed Background Backups card on the dashboard and a detailed status in Settings. macOS may require manual approval in Login Items; apps cannot approve their own background items.
 
 Retention maintenance can run `forget`, `prune`, and optional `check` based on the profile maintenance schedule. Post-prune checks are returned to the agent so failed validation is visible in job status and process exit status.
 
