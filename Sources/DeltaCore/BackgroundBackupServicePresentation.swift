@@ -20,7 +20,7 @@ public struct BackgroundBackupServicePresentation: Equatable, Sendable {
         attentionTitle != nil && attentionText != nil
     }
 
-    public static let purposeText = "Scheduled Backups check for due profiles after you sign in, start only work allowed by each profile's power and destination rules, then exit when there is no work. They use macOS Login Items approval, run as your user account, and do not use admin privileges."
+    public static let purposeText = "Scheduled Backups use Delta's signed macOS Login Item scheduler. macOS starts it after you sign in so it can check for due profiles, run allowed backups while the main window is closed, then exit. It runs as your user account and never uses admin privileges."
 
     public static func make(
         status: LaunchAgentRegistrationStatus,

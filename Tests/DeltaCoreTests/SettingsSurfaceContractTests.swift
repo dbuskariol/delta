@@ -33,6 +33,7 @@ final class SettingsSurfaceContractTests: XCTestCase {
         XCTAssertTrue(SettingsSurfaceContract.actionTitles.contains("Check Now"))
         XCTAssertTrue(SettingsSurfaceContract.actionTitles.contains("Send Test Alert"))
         XCTAssertTrue(SettingsSurfaceContract.actionTitles.contains("Copy Report"))
+        XCTAssertTrue(SettingsSurfaceContract.capabilityTitles.contains("Signed Login Item"))
     }
 
     func testSettingsSurfaceContractUsesProductLanguage() {

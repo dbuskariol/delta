@@ -105,6 +105,7 @@ public enum SettingsSurfaceContract {
     ]
 
     public static let capabilityTitles = [
+        "Signed Login Item",
         "Runs while Delta is closed",
         "No admin privileges",
         "Checks policy first"

@@ -1486,6 +1486,7 @@ struct SettingsView: View {
                 )
 
                 SettingsCapabilityList(items: [
+                    SettingsCapability(symbol: "checkmark.seal", title: "Signed Login Item", detail: "macOS approves Delta's bundled scheduler through Login Items before unattended runs are allowed."),
                     SettingsCapability(symbol: "moon.zzz", title: "Runs while Delta is closed", detail: "Scheduled profiles can run after sign-in without keeping the main window open."),
                     SettingsCapability(symbol: "person.crop.circle", title: "No admin privileges", detail: "The scheduler runs as your user account with the same file permissions granted to Delta."),
                     SettingsCapability(symbol: "bolt.badge.checkmark", title: "Checks policy first", detail: "Battery, Low Power Mode, speed limits, destination availability, and locking are checked before work starts.")
@@ -2331,50 +2332,75 @@ struct SettingsView: View {
     }
 
     private var settingsCategorySelector: some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 190), spacing: 10)], spacing: 10) {
-            ForEach(SettingsCategory.allCases) { category in
-                let isSelected = settingsCategory == category
-                Button {
-                    settingsCategory = category
-                } label: {
-                    HStack(alignment: .top, spacing: 10) {
-                        Image(systemName: category.symbol)
-                            .font(.system(size: 13, weight: .semibold))
-                            .frame(width: 24, height: 24)
-                            .foregroundStyle(isSelected ? Color.accentColor : .secondary)
-                            .background((isSelected ? Color.accentColor : Color(nsColor: .secondaryLabelColor)).opacity(0.14))
-                            .clipShape(RoundedRectangle(cornerRadius: 7))
-
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(category.title)
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(.primary)
-                            Text(category.subtitle)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(2)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    .padding(.vertical, 10)
-                    .padding(.horizontal, 12)
-                    .frame(maxWidth: .infinity, minHeight: 64, alignment: .topLeading)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(isSelected ? Color.accentColor.opacity(0.12) : DeltaTheme.panel)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(isSelected ? Color.accentColor.opacity(0.55) : DeltaTheme.border, lineWidth: 1)
-                    )
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 4) {
+                ForEach(SettingsCategory.allCases) { category in
+                    settingsCategoryButton(for: category, compact: true)
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel(category.title)
-                .accessibilityValue(isSelected ? "Selected" : category.subtitle)
+            }
+            .padding(4)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(DeltaTheme.panel)
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(DeltaTheme.border, lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 190), spacing: 10)], spacing: 10) {
+                ForEach(SettingsCategory.allCases) { category in
+                    settingsCategoryButton(for: category, compact: false)
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func settingsCategoryButton(for category: SettingsCategory, compact: Bool) -> some View {
+        let isSelected = settingsCategory == category
+        return Button {
+            settingsCategory = category
+        } label: {
+            HStack(alignment: .center, spacing: 8) {
+                Image(systemName: category.symbol)
+                    .font(.system(size: 12, weight: .semibold))
+                    .frame(width: 22, height: 22)
+                    .foregroundStyle(isSelected ? Color.accentColor : .secondary)
+                    .background((isSelected ? Color.accentColor : Color(nsColor: .secondaryLabelColor)).opacity(0.14))
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(category.title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+
+                    if !compact {
+                        Text(category.subtitle)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.vertical, compact ? 7 : 10)
+            .padding(.horizontal, 10)
+            .frame(maxWidth: .infinity, minHeight: compact ? 38 : 64, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(isSelected ? Color.accentColor.opacity(0.12) : Color.clear)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(isSelected ? Color.accentColor.opacity(0.55) : Color.clear, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .deltaTooltip(category.subtitle)
+        .accessibilityLabel(category.title)
+        .accessibilityValue(isSelected ? "Selected" : category.subtitle)
     }
 
     private var backgroundSecretAccessSummary: BackgroundSecretAccessSummary {

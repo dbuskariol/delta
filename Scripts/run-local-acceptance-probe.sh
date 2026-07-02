@@ -258,6 +258,13 @@ else
   else
     installed_local_evidence="Installed app local lifecycle acceptance failed: $installed_local_output"
   fi
+  installed_mounted_volume_output="$(run_capture installed_mounted_volume "$ROOT_DIR/Scripts/run-installed-mounted-volume-acceptance.sh" "$APP_PATH")"
+  installed_mounted_volume_status="$(command_status installed_mounted_volume)"
+  if [[ "$installed_mounted_volume_status" -eq 0 ]]; then
+    installed_mounted_volume_evidence="Installed app mounted-volume lifecycle acceptance passed through Delta coordinator using a temporary APFS volume mounted under /Volumes: automatic destination preparation, existing-destination reuse, no-change backup, incremental backup, restore-point cache, backup browser listing, full restore, selected folder restore, destination check, cleanup, post-cleanup check, and disappearance after unmount. $installed_mounted_volume_output"
+  else
+    installed_mounted_volume_evidence="Installed app mounted-volume lifecycle acceptance failed: $installed_mounted_volume_output"
+  fi
   installed_run_control_output="$(run_capture installed_run_control "$ROOT_DIR/Scripts/run-installed-run-control-acceptance.sh" "$APP_PATH")"
   installed_run_control_status="$(command_status installed_run_control)"
   if [[ "$installed_run_control_status" -eq 0 ]]; then
@@ -299,6 +306,12 @@ else
       mounted_acceptance_status="failed"
       mounted_acceptance_evidence="External mounted-destination acceptance failed: $mounted_output"
     fi
+  elif [[ "$installed_mounted_volume_status" -eq 0 ]]; then
+    mounted_acceptance_status="passed"
+    mounted_acceptance_evidence="$installed_mounted_volume_evidence Real SMB/NFS acceptance is still required before external distribution."
+  else
+    mounted_acceptance_status="failed"
+    mounted_acceptance_evidence="$installed_mounted_volume_evidence"
   fi
 
   sftp_acceptance_status="not_configured"
