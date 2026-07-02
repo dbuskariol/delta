@@ -59,7 +59,7 @@ Important implementation details:
 - **Per-destination locks** prevent overlapping backup, restore, prune, and check jobs across app/agent processes.
 - **Per-job output logs** persist formatted restic progress, warnings, errors, start lines, and finish lines for troubleshooting after relaunch or scheduled agent runs.
 - **Bundled tools** are pinned and checksum-verified through `Scripts/bootstrap-tools.sh`.
-- **Packaged app verification** checks signatures, Sparkle embedding, helper smoke tests, and bundled restic/rclone versions.
+- **Packaged app verification** checks signatures, Sparkle embedding, LaunchAgent plist integrity, helper smoke tests, Sparkle update metadata, and bundled restic/rclone versions.
 
 ## Backup Behavior
 

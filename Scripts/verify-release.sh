@@ -24,6 +24,25 @@ if [[ ! -f "$ROOT_DIR/dist/Delta.app/Contents/Frameworks/Sparkle.framework/Versi
   printf "Delta.app is missing the embedded Sparkle framework binary.\n" >&2
   exit 1
 fi
+LAUNCH_AGENT_PLIST="$ROOT_DIR/dist/Delta.app/Contents/Library/LaunchAgents/com.delta.backup.agent.plist"
+if [[ ! -f "$LAUNCH_AGENT_PLIST" ]]; then
+  printf "Delta.app is missing the bundled LaunchAgent plist.\n" >&2
+  exit 1
+fi
+/usr/bin/plutil -lint "$LAUNCH_AGENT_PLIST" >/dev/null
+AGENT_BUNDLE_PROGRAM="$(/usr/libexec/PlistBuddy -c 'Print :BundleProgram' "$LAUNCH_AGENT_PLIST")"
+if [[ ! -x "$ROOT_DIR/dist/Delta.app/$AGENT_BUNDLE_PROGRAM" ]]; then
+  printf "LaunchAgent BundleProgram is not executable: %s\n" "$AGENT_BUNDLE_PROGRAM" >&2
+  exit 1
+fi
+AGENT_RUN_AT_LOAD="$(/usr/libexec/PlistBuddy -c 'Print :RunAtLoad' "$LAUNCH_AGENT_PLIST")"
+AGENT_START_INTERVAL="$(/usr/libexec/PlistBuddy -c 'Print :StartInterval' "$LAUNCH_AGENT_PLIST")"
+if [[ "$AGENT_RUN_AT_LOAD" != "true" || "$AGENT_START_INTERVAL" -lt 60 ]]; then
+  printf "LaunchAgent schedule is invalid. RunAtLoad=%s StartInterval=%s\n" "$AGENT_RUN_AT_LOAD" "$AGENT_START_INTERVAL" >&2
+  exit 1
+fi
+/usr/bin/codesign --verify --strict --verbose=2 "$ROOT_DIR/dist/Delta.app/$AGENT_BUNDLE_PROGRAM"
+/usr/bin/codesign --verify --strict --verbose=2 "$ROOT_DIR/dist/Delta.app/Contents/MacOS/DeltaSecretBridge"
 
 LAUNCH_LOG="$(/usr/bin/mktemp -t delta-launch-smoke.XXXXXX)"
 "$ROOT_DIR/dist/Delta.app/Contents/MacOS/Delta" >"$LAUNCH_LOG" 2>&1 &
