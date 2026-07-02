@@ -64,6 +64,8 @@ AWS_ACCESS_KEY_ID=...
 AWS_SECRET_ACCESS_KEY=...
 ```
 
+`DELTA_ACCEPTANCE_MOUNTED_PATH` must be a mounted network filesystem under `/Volumes`, such as SMB or NFS. Local external disks are covered by installed local lifecycle acceptance and do not satisfy the mounted-network acceptance row.
+
 The external harness requires remote URLs to include `delta-acceptance` unless `DELTA_ACCEPTANCE_ALLOW_EXISTING_REMOTE=1` is set after a human confirms the target is safe. It launches the installed Delta app in external lifecycle acceptance mode, then proves the coordinator, isolated SQLite store, Keychain password command, bundled restic, automatic destination preparation, existing-destination reuse, first backup, deduplicated no-change backup, restore-point cache, restore browser listing, full restore, selected-folder restore, check, prune, and post-prune check against the configured mounted, SFTP, or S3-compatible backend. S3 acceptance stores throwaway backend credentials as Delta Keychain credential references and proves missing-credential failure; SFTP can prove wrong-target or wrong-credential failure when `DELTA_ACCEPTANCE_SFTP_BAD_REPOSITORY` is configured.
 
 The probe only marks machine-verifiable evidence as automated or partial evidence. It can record the installed app's own Full Disk Access diagnostic result, but it intentionally keeps Full Disk Access approval, macOS Login Items approval, closed-window schedule visibility, UI disconnect/reconnect behavior, menu bar visual interaction, Notification Center delivery, Sparkle install flow, and notarization as explicit manual follow-up where a shell process would give weak or misleading evidence.

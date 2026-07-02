@@ -292,6 +292,8 @@ AWS_SECRET_ACCESS_KEY=... \
 Scripts/run-external-backend-acceptance.sh s3
 ```
 
+`DELTA_ACCEPTANCE_MOUNTED_PATH` must point to a mounted network filesystem under `/Volumes`, such as SMB or NFS. Local external disks are covered by the installed local lifecycle acceptance instead.
+
 Create and verify the manual macOS acceptance report:
 
 ```sh

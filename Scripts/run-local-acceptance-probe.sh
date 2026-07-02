@@ -329,10 +329,10 @@ else
       append_row "mounted_network_drive" "$(item_area mounted_network_drive)" "Partial" "$mounted_acceptance_evidence" "Disconnect and reconnect the mounted destination in the installed app UI; confirm Delta fails before invoking restic while disconnected and resumes after reconnect."
       ;;
     failed)
-      append_row "mounted_network_drive" "$(item_area mounted_network_drive)" "Failed" "$mounted_acceptance_evidence" "Fix the configured mounted /Volumes acceptance target and rerun."
+      append_row "mounted_network_drive" "$(item_area mounted_network_drive)" "Failed" "$mounted_acceptance_evidence" "Fix the configured mounted SMB/NFS/WebDAV/AFP/SSHFS acceptance target and rerun."
       ;;
     *)
-      append_row "mounted_network_drive" "$(item_area mounted_network_drive)" "Manual Required" "No mounted SMB/NFS target is configured for non-interactive verification. Set DELTA_ACCEPTANCE_MOUNTED_PATH to run external backend acceptance. Automated local tests cover missing and unwritable local destination preflight with a real write/delete probe." "Test a mounted /Volumes destination, disconnect, confirm Delta fails before invoking restic, reconnect, resume, then repeat with an unwritable mount."
+      append_row "mounted_network_drive" "$(item_area mounted_network_drive)" "Manual Required" "No mounted network target is configured for non-interactive verification. Set DELTA_ACCEPTANCE_MOUNTED_PATH to a mounted SMB/NFS/WebDAV/AFP/SSHFS path under /Volumes to run external backend acceptance. Automated local tests cover missing and unwritable local destination preflight with a real write/delete probe." "Test a mounted /Volumes network destination, disconnect, confirm Delta fails before invoking restic, reconnect, resume, then repeat with an unwritable mount."
       ;;
   esac
 

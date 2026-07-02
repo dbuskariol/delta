@@ -12,7 +12,7 @@ usage: Scripts/run-external-backend-acceptance.sh <mounted|sftp|s3> [Delta.app]
 
 Environment:
   mounted:
-    DELTA_ACCEPTANCE_MOUNTED_PATH=/Volumes/YourMountedShare
+    DELTA_ACCEPTANCE_MOUNTED_PATH=/Volumes/YourMountedShare  must be a mounted network filesystem such as SMB or NFS
 
   sftp:
     DELTA_ACCEPTANCE_SFTP_REPOSITORY=sftp:user@example.com:/absolute/delta-acceptance-path
@@ -43,6 +43,35 @@ probe_writable_directory() {
     return 1
   fi
   /bin/rm -f "$probe_file" 2>/dev/null
+}
+
+mount_record_for_path() {
+  local directory="$1"
+  local line
+  while IFS= read -r line; do
+    case "$line" in
+      *" on $directory ("*)
+        printf "%s" "$line"
+        return
+        ;;
+    esac
+  done < <(/sbin/mount)
+}
+
+mount_filesystem_type() {
+  local mount_record="$1"
+  printf "%s" "$mount_record" | /usr/bin/sed -E 's/^.* \(([^,)]*).*$/\1/'
+}
+
+is_network_mount_type() {
+  case "$1" in
+    smbfs|nfs|nfs4|afpfs|webdav|fusefs.sshfs|sshfs)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
 }
 
 require_acceptance_remote() {
@@ -122,9 +151,15 @@ case "$KIND" in
       /Volumes/*)
         ;;
       *)
-        fail "Mounted acceptance path must live under /Volumes to prove SMB/NFS/external-drive behavior."
+        fail "Mounted acceptance path must live under /Volumes to prove mounted network-drive behavior."
         ;;
     esac
+    mount_record="$(mount_record_for_path "$mounted_path")"
+    [[ -n "$mount_record" ]] || fail "Mounted acceptance path was not found in the system mount table: $mounted_path"
+    mount_type="$(mount_filesystem_type "$mount_record")"
+    if ! is_network_mount_type "$mount_type"; then
+      fail "Mounted acceptance path must be a network filesystem such as SMB or NFS. Found '$mount_type' for $mounted_path. Use local-drive acceptance for local external disks."
+    fi
     probe_writable_directory "$mounted_path" || fail "Mounted acceptance path did not pass a write/delete probe: $mounted_path"
     repository_dir="$(/usr/bin/mktemp -d "$mounted_path/DeltaExternalAcceptance.XXXXXX")"
     CLEANUP_PATHS+=("$repository_dir")
