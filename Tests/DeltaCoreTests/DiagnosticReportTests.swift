@@ -19,6 +19,7 @@ final class DiagnosticReportTests: XCTestCase {
             notificationStatus: "Enabled",
             menuBarStatus: "Shown",
             backupFreshnessStatus: "Warn after 3 days",
+            destinationVerificationStatus: "Warn after 30 days",
             restoreDefaultsStatus: "Preview first, verify files, Replace changed",
             activeOperation: "Backup: Backing up Mac",
             profileCount: 1,
@@ -50,6 +51,7 @@ final class DiagnosticReportTests: XCTestCase {
         XCTAssertTrue(report.contains("- Notifications: Enabled"))
         XCTAssertTrue(report.contains("- Menu Bar: Shown"))
         XCTAssertTrue(report.contains("- Backup Freshness: Warn after 3 days"))
+        XCTAssertTrue(report.contains("- Destination Verification: Warn after 30 days"))
         XCTAssertTrue(report.contains("- Restore Defaults: Preview first, verify files, Replace changed"))
         XCTAssertTrue(report.contains("- restic: executable at /Applications/Delta.app/Contents/MacOS/restic"))
         XCTAssertTrue(report.contains("- rclone: missing at /Applications/Delta.app/Contents/MacOS/rclone"))
@@ -77,6 +79,7 @@ final class DiagnosticReportTests: XCTestCase {
             notificationStatus: "Disabled",
             menuBarStatus: "Hidden",
             backupFreshnessStatus: "Warn after 3 days",
+            destinationVerificationStatus: "Warn after 30 days",
             restoreDefaultsStatus: "Preview first, verify files, Replace changed",
             activeOperation: nil,
             profileCount: 0,

@@ -124,6 +124,13 @@ final class DeltaAppPreferencesTests: XCTestCase {
         XCTAssertEqual(BackupFreshnessWarningThreshold.threeDays.summaryText, "Warn after 3 days")
     }
 
+    func testDestinationVerificationWarningThresholdNormalizesUnsupportedValues() {
+        XCTAssertEqual(DestinationVerificationWarningThreshold.normalized(DestinationVerificationWarningThreshold.oneWeek.rawValue), .oneWeek)
+        XCTAssertEqual(DestinationVerificationWarningThreshold.normalized(DestinationVerificationWarningThreshold.ninetyDays.rawValue), .ninetyDays)
+        XCTAssertEqual(DestinationVerificationWarningThreshold.normalized(-1), .thirtyDays)
+        XCTAssertEqual(DestinationVerificationWarningThreshold.thirtyDays.summaryText, "Warn after 30 days")
+    }
+
     func testBackupProfileDefaultsUseRecommendedPolicyWhenUnset() {
         withClearedBackupProfileDefaults {
             let schedule = BackupProfileDefaults.schedule()
@@ -246,7 +253,6 @@ final class DeltaAppPreferencesTests: XCTestCase {
             DeltaAppPreferenceKeys.defaultProfileCheckAfterPrune,
             DeltaAppPreferenceKeys.defaultProfileUploadLimitKiB,
             DeltaAppPreferenceKeys.defaultProfileDownloadLimitKiB,
-            DeltaAppPreferenceKeys.backupFreshnessWarningHours,
             DeltaAppPreferenceKeys.defaultProfileMaintenanceEnabled,
             DeltaAppPreferenceKeys.defaultProfileMaintenanceIntervalDays,
             DeltaAppPreferenceKeys.defaultProfileMaintenanceHour,

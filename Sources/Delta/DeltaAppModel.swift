@@ -897,6 +897,14 @@ final class DeltaAppModel: ObservableObject {
                     )
                 )
                 .summaryText,
+            destinationVerificationStatus: DestinationVerificationWarningThreshold
+                .normalized(
+                    DeltaAppPreferences.integer(
+                        for: DeltaAppPreferenceKeys.destinationVerificationWarningHours,
+                        default: DestinationVerificationWarningThreshold.thirtyDays.rawValue
+                    )
+                )
+                .summaryText,
             restoreDefaultsStatus: restoreDefaultsDiagnosticStatus(),
             activeOperation: activeOperation.map { "\($0.kind.displayName): \($0.title)" },
             profileCount: profiles.count,

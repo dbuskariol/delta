@@ -62,6 +62,10 @@ struct DashboardView: View {
         DeltaAppPreferenceKeys.backupFreshnessWarningHours,
         store: DeltaAppPreferences.sharedStore()
     ) private var backupFreshnessWarningHours = BackupFreshnessWarningThreshold.threeDays.rawValue
+    @AppStorage(
+        DeltaAppPreferenceKeys.destinationVerificationWarningHours,
+        store: DeltaAppPreferences.sharedStore()
+    ) private var destinationVerificationWarningHours = DestinationVerificationWarningThreshold.thirtyDays.rawValue
 
     var body: some View {
         PageScaffold(
@@ -136,10 +140,25 @@ struct DashboardView: View {
                 )
             }
 
-            let warnings = backupHealthWarnings
-            if !warnings.isEmpty {
-                BackupHealthCard(warnings: warnings) {
+            let backupWarnings = backupHealthWarnings
+            if !backupWarnings.isEmpty {
+                DashboardHealthCard(
+                    title: "Backup Attention",
+                    symbol: "exclamationmark.arrow.triangle.2.circlepath",
+                    warnings: backupWarnings
+                ) {
                     model.selectedSection = .backups
+                }
+            }
+
+            let destinationWarnings = destinationHealthWarnings
+            if !destinationWarnings.isEmpty {
+                DashboardHealthCard(
+                    title: "Destination Attention",
+                    symbol: "externaldrive.badge.exclamationmark",
+                    warnings: destinationWarnings
+                ) {
+                    model.selectedSection = .repositories
                 }
             }
 
@@ -176,71 +195,21 @@ struct DashboardView: View {
         }
     }
 
-    private var backupHealthWarnings: [BackupHealthWarning] {
+    private var backupHealthWarnings: [DashboardHealthWarning] {
         let threshold = BackupFreshnessWarningThreshold.normalized(backupFreshnessWarningHours)
-        let now = Date()
-        return model.profiles
-            .filter { $0.schedule.isEnabled }
-            .compactMap { warning(for: $0, threshold: threshold, now: now) }
-            .prefix(4)
-            .map { $0 }
-    }
-
-    private func warning(
-        for profile: BackupProfile,
-        threshold: BackupFreshnessWarningThreshold,
-        now: Date
-    ) -> BackupHealthWarning? {
-        let profileJobs = model.jobs.filter { $0.profileID == profile.id && $0.kind == .backup }
-        let latestBackup = profileJobs.max { $0.startedAt < $1.startedAt }
-        let latestCompleted = profileJobs
-            .filter { $0.status == .succeeded || $0.status == .warning }
-            .max { ($0.finishedAt ?? $0.startedAt) < ($1.finishedAt ?? $1.startedAt) }
-
-        if latestBackup?.status == .failed {
-            return BackupHealthWarning(
-                id: "\(profile.id.uuidString)-failed",
-                title: "\(profile.name) failed",
-                detail: latestBackup?.message ?? "The most recent backup did not complete.",
-                isCritical: true
-            )
-        }
-
-        if latestBackup?.status == .cancelled && latestBackup?.stopReason != .pause {
-            return BackupHealthWarning(
-                id: "\(profile.id.uuidString)-stopped",
-                title: "\(profile.name) was stopped",
-                detail: "Run the backup again when the destination is available.",
-                isCritical: false
-            )
-        }
-
-        guard let latestCompleted else {
-            return BackupHealthWarning(
-                id: "\(profile.id.uuidString)-missing",
-                title: "\(profile.name) has no completed backup",
-                detail: "Run this profile once to create its first restore point.",
-                isCritical: false
-            )
-        }
-
-        let completedAt = latestCompleted.finishedAt ?? latestCompleted.startedAt
-        guard now.timeIntervalSince(completedAt) > threshold.timeInterval else {
-            return nil
-        }
-
-        return BackupHealthWarning(
-            id: "\(profile.id.uuidString)-stale",
-            title: "\(profile.name) is stale",
-            detail: "Last completed backup was \(relativeTime(from: completedAt, to: now)).",
-            isCritical: false
+        return DashboardHealthEvaluator().backupWarnings(
+            profiles: model.profiles,
+            jobs: model.jobs,
+            threshold: threshold
         )
     }
 
-    private func relativeTime(from date: Date, to referenceDate: Date) -> String {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .full
-        return formatter.localizedString(for: date, relativeTo: referenceDate)
+    private var destinationHealthWarnings: [DashboardHealthWarning] {
+        let threshold = DestinationVerificationWarningThreshold.normalized(destinationVerificationWarningHours)
+        return DashboardHealthEvaluator().destinationWarnings(
+            repositories: model.repositories,
+            threshold: threshold
+        )
     }
 }
 
@@ -290,24 +259,19 @@ struct BackupsView: View {
     }
 }
 
-private struct BackupHealthWarning: Identifiable {
-    var id: String
+private struct DashboardHealthCard: View {
     var title: String
-    var detail: String
-    var isCritical: Bool
-}
-
-private struct BackupHealthCard: View {
-    var warnings: [BackupHealthWarning]
+    var symbol: String
+    var warnings: [DashboardHealthWarning]
     var action: () -> Void
 
     var body: some View {
         Card {
             HStack(alignment: .top, spacing: 14) {
-                StatusIcon(symbol: "exclamationmark.arrow.triangle.2.circlepath", color: primaryColor)
+                StatusIcon(symbol: symbol, color: primaryColor)
                 VStack(alignment: .leading, spacing: 10) {
                     HStack(spacing: 8) {
-                        Text("Backup Attention")
+                        Text(title)
                             .font(.headline)
                         StateBadge(text: "\(warnings.count)", color: primaryColor)
                     }
@@ -332,7 +296,7 @@ private struct BackupHealthCard: View {
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
-                .deltaTooltip("Open backup profiles to review stale, failed, or missing backups.")
+                .deltaTooltip("Open the relevant page to review these health warnings.")
             }
         }
     }
@@ -1179,6 +1143,10 @@ struct SettingsView: View {
         store: DeltaAppPreferences.sharedStore()
     ) private var backupFreshnessWarningHours = BackupFreshnessWarningThreshold.threeDays.rawValue
     @AppStorage(
+        DeltaAppPreferenceKeys.destinationVerificationWarningHours,
+        store: DeltaAppPreferences.sharedStore()
+    ) private var destinationVerificationWarningHours = DestinationVerificationWarningThreshold.thirtyDays.rawValue
+    @AppStorage(
         DeltaAppPreferenceKeys.previewsRestoresByDefault,
         store: DeltaAppPreferences.sharedStore()
     ) private var previewsRestoresByDefault = true
@@ -1539,6 +1507,68 @@ struct SettingsView: View {
             )
 
             SettingsCard(
+                symbol: "heart.text.square",
+                title: "Health Monitoring",
+                subtitle: "Dashboard attention thresholds for missed backups and destination integrity checks.",
+                statusText: healthMonitoringStatusText,
+                statusColor: healthMonitoringStatusColor
+            ) {
+                SettingsControlRow(
+                    title: "Backup freshness",
+                    detail: "Show dashboard attention when a scheduled profile has no completed backup or its last completed backup is older than this."
+                ) {
+                    Picker("", selection: $backupFreshnessWarningHours) {
+                        ForEach(BackupFreshnessWarningThreshold.allCases) { threshold in
+                            Text(threshold.title).tag(threshold.rawValue)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.segmented)
+                    .frame(width: 300)
+                    .onChange(of: backupFreshnessWarningHours) { _, _ in
+                        normalizeHealthMonitoring()
+                    }
+                }
+
+                SettingsControlRow(
+                    title: "Destination checks",
+                    detail: "Show dashboard attention when a destination has never been checked, is unavailable locally, or its last check is older than this."
+                ) {
+                    Picker("", selection: $destinationVerificationWarningHours) {
+                        ForEach(DestinationVerificationWarningThreshold.allCases) { threshold in
+                            Text(threshold.title).tag(threshold.rawValue)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.segmented)
+                    .frame(width: 300)
+                    .onChange(of: destinationVerificationWarningHours) { _, _ in
+                        normalizeHealthMonitoring()
+                    }
+                }
+
+                SettingsFactGrid(items: [
+                    SettingsFact(title: "Backups", value: backupFreshnessThreshold.summaryText),
+                    SettingsFact(title: "Destinations", value: destinationVerificationThreshold.summaryText),
+                    SettingsFact(title: "Dashboard", value: "Attention only"),
+                    SettingsFact(title: "Profiles", value: "Unchanged")
+                ])
+
+                SettingsActionBar {
+                    Button {
+                        resetHealthMonitoringDefaults()
+                    } label: {
+                        Label("Restore Recommended", systemImage: "arrow.counterclockwise")
+                    }
+                    Button {
+                        model.selectedSection = .dashboard
+                    } label: {
+                        Label("Open Dashboard", systemImage: "rectangle.grid.2x2")
+                    }
+                }
+            }
+
+            SettingsCard(
                 symbol: "slider.horizontal.3",
                 title: "New Backup Defaults",
                 subtitle: "Defaults applied when creating a profile. Existing profiles keep their own settings.",
@@ -1605,23 +1635,6 @@ struct SettingsView: View {
                 }
 
                 SettingsControlRow(
-                    title: "Freshness warning",
-                    detail: "Show dashboard attention when a scheduled profile has no completed backup or its last completed backup is older than this."
-                ) {
-                    Picker("", selection: $backupFreshnessWarningHours) {
-                        ForEach(BackupFreshnessWarningThreshold.allCases) { threshold in
-                            Text(threshold.title).tag(threshold.rawValue)
-                        }
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.segmented)
-                    .frame(width: 300)
-                    .onChange(of: backupFreshnessWarningHours) { _, _ in
-                        normalizeBackupDefaults()
-                    }
-                }
-
-                SettingsControlRow(
                     title: "Automatic cleanup",
                     detail: "Create new profiles with scheduled cleanup for old restore points."
                 ) {
@@ -1646,7 +1659,6 @@ struct SettingsView: View {
                     SettingsFact(title: "Schedule", value: "Daily 20:00"),
                     SettingsFact(title: "Retention", value: "24h / 30d / 12w / 12m"),
                     SettingsFact(title: "Bandwidth", value: defaultBandwidthSummary),
-                    SettingsFact(title: "Freshness", value: backupFreshnessThreshold.summaryText),
                     SettingsFact(title: "Cleanup", value: defaultCleanupSummary),
                     SettingsFact(title: "Destination locks", value: "Automatic"),
                     SettingsFact(title: "Backup type", value: "Incremental"),
@@ -1885,6 +1897,7 @@ struct SettingsView: View {
         .onAppear {
             automaticallyChecksForUpdates = softwareUpdateController.automaticallyChecksForUpdates
             activityLogDetailRawValue = activityLogDetail.rawValue
+            normalizeHealthMonitoring()
             normalizeBackupDefaults()
             normalizeRestorePreferences()
             applyUpdatePreferences()
@@ -2191,6 +2204,16 @@ struct SettingsView: View {
         previewsRestoresByDefault && verifiesRestoresByDefault ? .green : .orange
     }
 
+    private var healthMonitoringStatusText: String {
+        backupFreshnessThreshold == .threeDays && destinationVerificationThreshold == .thirtyDays
+            ? "Recommended"
+            : "Custom"
+    }
+
+    private var healthMonitoringStatusColor: Color {
+        healthMonitoringStatusText == "Recommended" ? .green : .orange
+    }
+
     private var backupDefaultsStatusText: String {
         !defaultProfileCatchUpMissedRuns
             || !defaultProfileRunOnBattery
@@ -2199,7 +2222,6 @@ struct SettingsView: View {
             || !defaultProfileCheckAfterPrune
             || defaultProfileUploadLimitKiB > 0
             || defaultProfileDownloadLimitKiB > 0
-            || backupFreshnessThreshold != .threeDays
             || !defaultProfileMaintenanceEnabled
             || defaultProfileMaintenanceIntervalDays != 7
             || defaultProfileMaintenanceHour != 2
@@ -2303,6 +2325,10 @@ struct SettingsView: View {
         BackupFreshnessWarningThreshold.normalized(backupFreshnessWarningHours)
     }
 
+    private var destinationVerificationThreshold: DestinationVerificationWarningThreshold {
+        DestinationVerificationWarningThreshold.normalized(destinationVerificationWarningHours)
+    }
+
     private func applyUpdatePreferences() {
         let interval = AppUpdateCheckInterval.normalized(updateCheckIntervalSeconds)
         if updateCheckIntervalSeconds != interval.rawValue {
@@ -2318,16 +2344,28 @@ struct SettingsView: View {
         }
     }
 
+    private func normalizeHealthMonitoring() {
+        let normalizedBackupFreshness = backupFreshnessThreshold.rawValue
+        if backupFreshnessWarningHours != normalizedBackupFreshness {
+            backupFreshnessWarningHours = normalizedBackupFreshness
+        }
+        let normalizedDestinationVerification = destinationVerificationThreshold.rawValue
+        if destinationVerificationWarningHours != normalizedDestinationVerification {
+            destinationVerificationWarningHours = normalizedDestinationVerification
+        }
+    }
+
     private func normalizeBackupDefaults() {
         defaultProfileUploadLimitKiB = clamped(defaultProfileUploadLimitKiB, to: 0...1_048_576)
         defaultProfileDownloadLimitKiB = clamped(defaultProfileDownloadLimitKiB, to: 0...1_048_576)
         defaultProfileMaintenanceIntervalDays = clamped(defaultProfileMaintenanceIntervalDays, to: 1...90)
         defaultProfileMaintenanceHour = clamped(defaultProfileMaintenanceHour, to: 0...23)
         defaultProfileMaintenanceMinute = clamped(defaultProfileMaintenanceMinute, to: 0...59)
-        let normalizedFreshness = backupFreshnessThreshold.rawValue
-        if backupFreshnessWarningHours != normalizedFreshness {
-            backupFreshnessWarningHours = normalizedFreshness
-        }
+    }
+
+    private func resetHealthMonitoringDefaults() {
+        backupFreshnessWarningHours = BackupFreshnessWarningThreshold.threeDays.rawValue
+        destinationVerificationWarningHours = DestinationVerificationWarningThreshold.thirtyDays.rawValue
     }
 
     private func resetBackupDefaults() {
@@ -2338,7 +2376,6 @@ struct SettingsView: View {
         defaultProfileCheckAfterPrune = true
         defaultProfileUploadLimitKiB = 0
         defaultProfileDownloadLimitKiB = 0
-        backupFreshnessWarningHours = BackupFreshnessWarningThreshold.threeDays.rawValue
         defaultProfileMaintenanceEnabled = true
         defaultProfileMaintenanceIntervalDays = 7
         defaultProfileMaintenanceHour = 2
