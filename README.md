@@ -77,7 +77,7 @@ Important implementation details:
 - **Durable run controls** let the app request pause/cancel for an agent-owned restic process without relying on in-memory UI state.
 - **Abandoned-job recovery** marks stale running jobs interrupted after restart only when the per-destination lock proves no restic process still owns the destination.
 - **Bundled tools** are pinned and checksum-verified through `Scripts/bootstrap-tools.sh`.
-- **Packaged app verification** checks signatures, minimal hardened-runtime entitlements, Sparkle embedding, background helper plist integrity, helper smoke tests, signed Sparkle update metadata, bundled restic/rclone versions, and the restic command/flag surface Delta depends on.
+- **Packaged app verification** checks signatures, minimal hardened-runtime entitlements, Sparkle embedding, background helper plist integrity, helper smoke tests, signed Sparkle update metadata, bundled restic/rclone versions, the restic command/flag surface Delta depends on, and a real local dry-run restore that must not write files.
 - **Sanitized diagnostic reports** can be copied or exported from Settings without including destination passwords or backend credential values.
 - **Isolated app-data smoke tests** use `DELTA_APP_SUPPORT_DIR` so release verification can exercise the installed background helper's real due-backup path without touching a developer's personal Delta database.
 
@@ -143,8 +143,8 @@ Restore is intentionally explicit:
    - Replace changed
    - Replace older
    - Keep existing
-6. Preview or run the restore with the selected overwrite and verification policy.
-7. Optionally verify restored files.
+6. Preview or run the restore with the selected overwrite policy.
+7. Optionally verify files after a real restore writes data.
 8. Confirm in-place restore when restoring to original paths. Delta enforces this confirmation before any non-preview original-path restore can run.
 
 Settings include conservative restore defaults: preview first, verify restored files, and replace only changed files. Users can change those defaults in Settings and still override them for an individual restore.

@@ -12,11 +12,15 @@ final class ResticIntegrationTests: XCTestCase {
         let source = root.appendingPathComponent("source", isDirectory: true)
         let nested = source.appendingPathComponent("nested", isDirectory: true)
         let repo = root.appendingPathComponent("repo", isDirectory: true)
+        let dryRunRestore = root.appendingPathComponent("restore-dry-run", isDirectory: true)
         let fullRestore = root.appendingPathComponent("restore-full", isDirectory: true)
+        let selectedDryRunRestore = root.appendingPathComponent("restore-selected-dry-run", isDirectory: true)
         let selectedRestore = root.appendingPathComponent("restore-selected", isDirectory: true)
         let multiSelectedRestore = root.appendingPathComponent("restore-multi-selected", isDirectory: true)
         try FileManager.default.createDirectory(at: source, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: nested, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: dryRunRestore, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: selectedDryRunRestore, withIntermediateDirectories: true)
         try "hello".write(to: source.appendingPathComponent("file.txt"), atomically: true, encoding: .utf8)
         try "keep me".write(to: nested.appendingPathComponent("selected.txt"), atomically: true, encoding: .utf8)
         try "do not restore in selected test".write(to: source.appendingPathComponent("other.txt"), atomically: true, encoding: .utf8)
@@ -80,6 +84,17 @@ final class ResticIntegrationTests: XCTestCase {
         XCTAssertTrue(listedEntries.contains { $0.path == nested.path && $0.type == .directory })
         XCTAssertTrue(listedEntries.contains { $0.path == source.appendingPathComponent("file.txt").path && $0.type == .file })
 
+        let dryRunRestoreRequest = RestoreRequest(
+            repositoryID: repository.id,
+            snapshotID: latestSnapshot.id,
+            destination: .chosenFolder(dryRunRestore.path),
+            dryRun: true
+        )
+        let dryRunRestoreResult = try runner.run(try builder.restore(request: dryRunRestoreRequest, repository: repository))
+        XCTAssertEqual(dryRunRestoreResult.status, .succeeded)
+        XCTAssertNil(try firstFile(named: "file.txt", under: dryRunRestore))
+        XCTAssertNil(try firstFile(named: "selected.txt", under: dryRunRestore))
+
         let fullRestoreRequest = RestoreRequest(
             repositoryID: repository.id,
             snapshotID: latestSnapshot.id,
@@ -101,6 +116,18 @@ final class ResticIntegrationTests: XCTestCase {
         XCTAssertEqual(selectedRestoreResult.status, .succeeded)
         XCTAssertEqual(try contentsOfFirstFile(named: "selected.txt", under: selectedRestore), "selected-updated")
         XCTAssertNil(try firstFile(named: "other.txt", under: selectedRestore))
+
+        let selectedDryRunRestoreRequest = RestoreRequest(
+            repositoryID: repository.id,
+            snapshotID: latestSnapshot.id,
+            scope: .selectedPaths([nested.path]),
+            destination: .chosenFolder(selectedDryRunRestore.path),
+            dryRun: true
+        )
+        let selectedDryRunRestoreResult = try runner.run(try builder.restore(request: selectedDryRunRestoreRequest, repository: repository))
+        XCTAssertEqual(selectedDryRunRestoreResult.status, .succeeded)
+        XCTAssertNil(try firstFile(named: "selected.txt", under: selectedDryRunRestore))
+        XCTAssertNil(try firstFile(named: "other.txt", under: selectedDryRunRestore))
 
         let multiSelectedRestoreRequest = RestoreRequest(
             repositoryID: repository.id,

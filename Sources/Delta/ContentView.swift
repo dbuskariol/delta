@@ -382,10 +382,12 @@ struct RestoreView: View {
                         .labelsHidden()
                         .frame(width: 170, alignment: .leading)
 
-                        Toggle("Dry run", isOn: $dryRun)
+                        Toggle("Preview only", isOn: $dryRun)
                             .toggleStyle(.checkbox)
                         Toggle("Verify files", isOn: $verify)
                             .toggleStyle(.checkbox)
+                            .disabled(dryRun)
+                            .deltaTooltip(dryRun ? "Verification runs after a real restore writes files." : "Verify restored file contents after writing.")
                     }
 
                     RestoreFormRow(title: "Pre-restore backup") {
@@ -1437,7 +1439,7 @@ struct SettingsView: View {
             ) {
                 SettingsControlRow(
                     title: "Preview first",
-                    detail: "Open restores as a dry run so Delta shows what would happen before writing files."
+                    detail: "Open restores as a preview so Delta shows what would happen before writing files."
                 ) {
                     Toggle("", isOn: $previewsRestoresByDefault)
                         .labelsHidden()

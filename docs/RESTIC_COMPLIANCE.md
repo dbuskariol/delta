@@ -178,6 +178,8 @@ Optional restore flags:
 --verbose=2
 ```
 
+Delta never combines `--verify` with `--dry-run`. Preview-only restores do not write files, so there are no restored files for restic to verify; verification is applied only to real restores that write data.
+
 Single selected path restore uses restic snapshot path syntax:
 
 ```text
@@ -266,7 +268,7 @@ This runs:
 - unit tests
 - restic/rclone bootstrap and checksum verification
 - bundled restic command and flag surface verification
-- local restic integration test with real init/backup/restore
+- local restic integration test with real init/backup/restore, dry-run restore without writes, check, prune, and post-prune check
 - packaged app build
 - codesign verification
 - minimal hardened-runtime entitlement checks for Delta, DeltaAgent, DeltaSecretBridge, restic, and rclone

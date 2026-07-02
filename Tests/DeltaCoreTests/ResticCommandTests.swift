@@ -193,11 +193,27 @@ final class ResticCommandTests: XCTestCase {
         XCTAssertTrue(command.arguments.contains("--dry-run"))
         XCTAssertTrue(command.arguments.contains("--verbose=2"))
         XCTAssertFalse(command.arguments.contains("--verbose"))
-        XCTAssertTrue(command.arguments.contains("--verify"))
+        XCTAssertFalse(command.arguments.contains("--verify"))
         XCTAssertTrue(command.arguments.contains("--overwrite"))
         XCTAssertTrue(command.arguments.contains("never"))
         XCTAssertTrue(command.arguments.contains("/tmp/restore"))
         XCTAssertTrue(command.arguments.contains("abc123:/Users/me/Documents"))
+    }
+
+    func testRestoreCommandVerifiesOnlyRealRestores() throws {
+        let repository = BackupRepository(name: "Local", backend: .local(path: "/repo"))
+        let request = RestoreRequest(
+            repositoryID: repository.id,
+            snapshotID: "abc123",
+            destination: .chosenFolder("/tmp/restore"),
+            verifyRestoredFiles: true,
+            dryRun: false
+        )
+
+        let command = try makeBuilder().restore(request: request, repository: repository)
+
+        XCTAssertTrue(command.arguments.contains("--verify"))
+        XCTAssertFalse(command.arguments.contains("--dry-run"))
     }
 
     func testRestoreCommandNormalizesSelectedPathsAndTarget() throws {

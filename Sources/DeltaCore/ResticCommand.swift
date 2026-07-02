@@ -210,7 +210,7 @@ public struct ResticCommandBuilder: Sendable {
             }
         }
 
-        if request.verifyRestoredFiles {
+        if request.verifyRestoredFiles && !request.dryRun {
             subcommand.append("--verify")
         }
         if request.dryRun {
