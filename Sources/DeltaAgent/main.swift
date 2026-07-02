@@ -4,6 +4,20 @@ import Foundation
 enum DeltaAgentMain {
     static func run() -> Int32 {
         do {
+            let arguments = Set(CommandLine.arguments.dropFirst())
+            if arguments.contains("--status") {
+                print("DeltaAgent ready")
+                return 0
+            }
+            if arguments.contains("--dry-run") {
+                print("DeltaAgent ready; dry run did not start scheduled backups.")
+                return 0
+            }
+            if let unsupportedArgument = arguments.first {
+                fputs("DeltaAgent error: unsupported argument '\(unsupportedArgument)'.\n", stderr)
+                return 64
+            }
+
             let database = try DeltaDatabase.live()
             let coordinator = BackupCoordinator(
                 database: database,
@@ -16,11 +30,6 @@ enum DeltaAgentMain {
                 ),
                 runControlStore: ResticRunControlStore()
             )
-
-            if CommandLine.arguments.contains("--status") {
-                print("DeltaAgent ready")
-                return 0
-            }
 
             _ = try coordinator.recoverAbandonedRunningJobs()
             let runs = try coordinator.runDueBackups()

@@ -64,6 +64,7 @@ struct DeltaMenuBarView: View {
                 .lineLimit(1)
             MenuBarProgressView(
                 progress: model.activeProgress,
+                progressFraction: model.activeDisplayedProgressFraction,
                 latestMessage: model.liveLogLines.last?.message,
                 stopRequest: model.activeStopRequest
             )
@@ -278,14 +279,25 @@ struct DeltaMenuBarView: View {
 
 private struct MenuBarProgressView: View {
     var progress: ResticProgressSnapshot?
+    var progressFraction: Double?
     var latestMessage: String?
     var stopRequest: ResticRunStopReason?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            ProgressView()
-                .progressViewStyle(.linear)
-                .controlSize(.small)
+            if let progressFraction {
+                ProgressView(value: progressFraction, total: 1)
+                    .progressViewStyle(.linear)
+                    .controlSize(.small)
+                    .accessibilityLabel("Estimated backup progress")
+                    .accessibilityValue("\(Int(progressFraction * 100)) percent")
+            } else {
+                ProgressView()
+                    .progressViewStyle(.linear)
+                    .controlSize(.small)
+                    .accessibilityLabel("Backup progress")
+                    .accessibilityValue("Scanning")
+            }
             Text(statusText)
                 .font(.caption)
                 .foregroundStyle(.secondary)

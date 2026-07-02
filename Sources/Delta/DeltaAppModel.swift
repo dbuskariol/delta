@@ -55,6 +55,7 @@ final class DeltaAppModel: ObservableObject {
     @Published var activeOperation: ActiveOperation?
     @Published var activeJobID: UUID?
     @Published var activeProgress: ResticProgressSnapshot?
+    @Published var activeDisplayedProgressFraction: Double?
     @Published var activeStopRequest: ResticRunStopReason?
     @Published private(set) var persistentStoreErrorMessage: String?
     @Published private(set) var launchAgentStatus = LaunchAgentController.status()
@@ -159,6 +160,7 @@ final class DeltaAppModel: ObservableObject {
             activeOperation = nil
             activeJobID = nil
             activeProgress = nil
+            activeDisplayedProgressFraction = nil
             activeStopRequest = nil
             liveLogLines.removeAll()
             lastLiveLogWasStatus = false
@@ -174,6 +176,7 @@ final class DeltaAppModel: ObservableObject {
         )
         activeStopRequest = runControlStore.stopReason(for: runningJob.id)
         activeProgress = nil
+        activeDisplayedProgressFraction = nil
         liveLogLines = jobLogs
             .filter { $0.jobID == runningJob.id }
             .sorted { $0.date < $1.date }
@@ -954,6 +957,7 @@ final class DeltaAppModel: ObservableObject {
         activeJobID = nil
         activeStopRequest = nil
         activeProgress = nil
+        activeDisplayedProgressFraction = nil
         liveLogLines.removeAll()
         lastLiveLogWasStatus = false
         Task.detached(priority: .userInitiated) {
@@ -966,6 +970,7 @@ final class DeltaAppModel: ObservableObject {
                     self.activeJobID = nil
                     self.activeStopRequest = nil
                     self.activeProgress = nil
+                    self.activeDisplayedProgressFraction = nil
                     self.runController.reset()
                     self.reload()
                     self.notifyCompletedJobs(completedJobs)
@@ -978,6 +983,7 @@ final class DeltaAppModel: ObservableObject {
                     self.activeJobID = nil
                     self.activeStopRequest = nil
                     self.activeProgress = nil
+                    self.activeDisplayedProgressFraction = nil
                     self.runController.reset()
                     self.alertMessage = error.localizedDescription
                     self.reload()
@@ -1091,6 +1097,10 @@ final class DeltaAppModel: ObservableObject {
         lastLiveLogWasStatus = isStatusMessage
         if let progress = ResticLogFormatter.progressSnapshot(for: trimmed) {
             activeProgress = progress
+            activeDisplayedProgressFraction = BackupProgressEstimator.displayedFraction(
+                for: progress,
+                previous: activeDisplayedProgressFraction
+            )
         }
         if liveLogLines.count > 500 {
             liveLogLines.removeFirst(liveLogLines.count - 500)

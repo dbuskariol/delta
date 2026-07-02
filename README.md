@@ -21,7 +21,7 @@ The product goal is simple: make serious backup practices approachable without h
 - **Notification Center alerts** for failed or warning jobs, with optional successful-backup summaries. The signed background helper uses the same notification policy for scheduled runs.
 - **Full or browsed selected restore** with backup browsing, file/folder selection, configurable dry-run and verification defaults, overwrite policies, original-path restore, chosen-folder restore, and optional pre-restore backup.
 - **Streaming and saved backup logs** from restic stdout/stderr with source context, stable processed-file counters, clean change summaries, fixed-height live panes, and expandable per-job audit history.
-- **Settings and diagnostics** for updates, notifications, Full Disk Access, Background Backups, restore safety defaults, menu bar visibility, Activity log detail, app version, helper status, tool paths, profile/destination counts, recent jobs, and local support paths.
+- **Settings and diagnostics** for updates, notifications, Full Disk Access, Background Backups, new-backup defaults, restore safety defaults, menu bar visibility, Activity log detail, app version, helper status, tool paths, profile/destination counts, recent jobs, and local support paths.
 - **Sparkle automatic updates** with generated appcast/update archive support.
 
 ## How It Works
@@ -97,6 +97,8 @@ For full-volume profiles, Delta uses:
 Custom-folder profiles use the selected source folders and stored security-scoped bookmarks where available.
 
 Each profile keeps Delta's default macOS-safe excludes and can add extra restic exclude patterns. Extra excludes are saved with the profile and passed to restic as additional `--exclude` arguments.
+
+Settings include app-level defaults for newly-created backup profiles: missed-run catchup, battery policy, Low Power Mode policy, cleanup space reclamation, and cleanup verification. Those defaults seed new profiles only. Existing profiles keep their own schedule, power, bandwidth, retention, and maintenance settings until edited.
 
 ## Scheduling And Maintenance
 

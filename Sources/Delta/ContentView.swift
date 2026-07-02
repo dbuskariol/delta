@@ -124,6 +124,7 @@ struct DashboardView: View {
                 ActiveOperationBanner(
                     operation: operation,
                     progress: model.activeProgress,
+                    progressFraction: model.activeDisplayedProgressFraction,
                     latestMessage: model.liveLogLines.last?.message,
                     stopRequest: model.activeStopRequest,
                     onPause: operation.kind == .backup ? { model.pauseActiveBackup() } : nil,
@@ -995,6 +996,26 @@ struct SettingsView: View {
     @AppStorage(DeltaAppPreferenceKeys.verifiesRestoresByDefault) private var verifiesRestoresByDefault = true
     @AppStorage(DeltaAppPreferenceKeys.defaultRestoreConflictPolicy) private var defaultRestoreConflictPolicyRawValue = RestoreConflictPolicy.ifChanged.rawValue
     @AppStorage(
+        DeltaAppPreferenceKeys.defaultProfileCatchUpMissedRuns,
+        store: UserDefaults(suiteName: DeltaAppPreferences.sharedSuiteName)
+    ) private var defaultProfileCatchUpMissedRuns = true
+    @AppStorage(
+        DeltaAppPreferenceKeys.defaultProfileRunOnBattery,
+        store: UserDefaults(suiteName: DeltaAppPreferences.sharedSuiteName)
+    ) private var defaultProfileRunOnBattery = true
+    @AppStorage(
+        DeltaAppPreferenceKeys.defaultProfileRunInLowPowerMode,
+        store: UserDefaults(suiteName: DeltaAppPreferences.sharedSuiteName)
+    ) private var defaultProfileRunInLowPowerMode = false
+    @AppStorage(
+        DeltaAppPreferenceKeys.defaultProfilePruneAfterForget,
+        store: UserDefaults(suiteName: DeltaAppPreferences.sharedSuiteName)
+    ) private var defaultProfilePruneAfterForget = true
+    @AppStorage(
+        DeltaAppPreferenceKeys.defaultProfileCheckAfterPrune,
+        store: UserDefaults(suiteName: DeltaAppPreferences.sharedSuiteName)
+    ) private var defaultProfileCheckAfterPrune = true
+    @AppStorage(
         DeltaAppPreferenceKeys.sendsJobNotifications,
         store: UserDefaults(suiteName: DeltaAppPreferences.sharedSuiteName)
     ) private var sendsJobNotifications = false
@@ -1244,16 +1265,63 @@ struct SettingsView: View {
 
             SettingsCard(
                 symbol: "slider.horizontal.3",
-                title: "Backup Defaults",
-                subtitle: "Operational backup behavior is configured where it applies."
+                title: "New Backup Defaults",
+                subtitle: "Defaults applied when creating a profile. Existing profiles keep their own settings.",
+                statusText: backupDefaultsStatusText,
+                statusColor: backupDefaultsStatusColor
             ) {
+                SettingsControlRow(
+                    title: "Catch up missed runs",
+                    detail: "Run one backup after a scheduled time was missed because the Mac was asleep, offline, or the destination was unavailable."
+                ) {
+                    Toggle("", isOn: $defaultProfileCatchUpMissedRuns)
+                        .labelsHidden()
+                        .toggleStyle(.switch)
+                }
+
+                SettingsControlRow(
+                    title: "Run on battery",
+                    detail: "Allow scheduled backups when the Mac is not connected to power."
+                ) {
+                    Toggle("", isOn: $defaultProfileRunOnBattery)
+                        .labelsHidden()
+                        .toggleStyle(.switch)
+                }
+
+                SettingsControlRow(
+                    title: "Run in Low Power Mode",
+                    detail: "Allow scheduled backups even when macOS is conserving power."
+                ) {
+                    Toggle("", isOn: $defaultProfileRunInLowPowerMode)
+                        .labelsHidden()
+                        .toggleStyle(.switch)
+                }
+
+                SettingsControlRow(
+                    title: "Free space after cleanup",
+                    detail: "After old restore points are forgotten, remove unreferenced backup data from the destination."
+                ) {
+                    Toggle("", isOn: $defaultProfilePruneAfterForget)
+                        .labelsHidden()
+                        .toggleStyle(.switch)
+                }
+
+                SettingsControlRow(
+                    title: "Verify after cleanup",
+                    detail: "Run a destination check after cleanup to confirm backup data is still readable."
+                ) {
+                    Toggle("", isOn: $defaultProfileCheckAfterPrune)
+                        .labelsHidden()
+                        .toggleStyle(.switch)
+                }
+
                 SettingsFactGrid(items: [
-                    SettingsFact(title: "Schedule", value: "Per profile"),
-                    SettingsFact(title: "Power policy", value: "Per profile"),
-                    SettingsFact(title: "Bandwidth", value: "Per profile"),
-                    SettingsFact(title: "Retention", value: "Per profile"),
+                    SettingsFact(title: "Schedule", value: "Daily 20:00"),
+                    SettingsFact(title: "Retention", value: "24h / 30d / 12w / 12m"),
+                    SettingsFact(title: "Bandwidth", value: "Unlimited"),
                     SettingsFact(title: "Destination locks", value: "Automatic"),
-                    SettingsFact(title: "Restore safety", value: "Wizard")
+                    SettingsFact(title: "Backup type", value: "Incremental"),
+                    SettingsFact(title: "Existing profiles", value: "Unchanged")
                 ])
 
                 HStack(spacing: 8) {
@@ -1504,6 +1572,20 @@ struct SettingsView: View {
         previewsRestoresByDefault && verifiesRestoresByDefault ? .green : .orange
     }
 
+    private var backupDefaultsStatusText: String {
+        !defaultProfileCatchUpMissedRuns
+            || !defaultProfileRunOnBattery
+            || defaultProfileRunInLowPowerMode
+            || !defaultProfilePruneAfterForget
+            || !defaultProfileCheckAfterPrune
+            ? "Custom"
+            : "Recommended"
+    }
+
+    private var backupDefaultsStatusColor: Color {
+        backupDefaultsStatusText == "Recommended" ? .green : .orange
+    }
+
     private var appBundleLocation: String {
         Bundle.main.bundleURL.path
     }
@@ -1649,6 +1731,7 @@ struct ProfileRow: View {
                 if isActiveBackup && showsInlineProgress {
                     InlineBackupProgress(
                         progress: model.activeProgress,
+                        progressFraction: model.activeDisplayedProgressFraction,
                         latestMessage: model.liveLogLines.last?.message,
                         stopRequest: model.activeStopRequest,
                         onPause: model.pauseActiveBackup,
@@ -1904,9 +1987,9 @@ struct ProfileEditorView: View {
 
     init(profile: BackupProfile? = nil) {
         existingProfile = profile
-        let schedule = profile?.schedule ?? BackupSchedule()
+        let schedule = profile?.schedule ?? BackupProfileDefaults.schedule()
         let scheduleState = Self.scheduleEditorState(for: schedule.kind)
-        let retention = profile?.retention ?? RetentionPolicy()
+        let retention = profile?.retention ?? BackupProfileDefaults.retention()
 
         _name = State(initialValue: profile?.name ?? "Mac Backup")
         _mode = State(initialValue: profile?.sourceMode ?? .customFolders)
@@ -3062,6 +3145,7 @@ struct StatPanel: View {
 struct ActiveOperationBanner: View {
     var operation: ActiveOperation
     var progress: ResticProgressSnapshot?
+    var progressFraction: Double?
     var latestMessage: String?
     var stopRequest: ResticRunStopReason?
     var onPause: (() -> Void)?
@@ -3082,6 +3166,7 @@ struct ActiveOperationBanner: View {
                         .foregroundStyle(.secondary)
                     InlineBackupProgress(
                         progress: progress,
+                        progressFraction: progressFraction,
                         latestMessage: latestMessage,
                         stopRequest: stopRequest
                     )
@@ -3099,6 +3184,7 @@ struct ActiveOperationBanner: View {
 
 struct InlineBackupProgress: View {
     var progress: ResticProgressSnapshot?
+    var progressFraction: Double?
     var latestMessage: String?
     var stopRequest: ResticRunStopReason?
     var onPause: (() -> Void)?
@@ -3106,10 +3192,21 @@ struct InlineBackupProgress: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            ProgressView()
-                .progressViewStyle(.linear)
-                .controlSize(.small)
-                .frame(maxWidth: .infinity)
+            if let progressFraction {
+                ProgressView(value: progressFraction, total: 1)
+                    .progressViewStyle(.linear)
+                    .controlSize(.small)
+                    .frame(maxWidth: .infinity)
+                    .accessibilityLabel("Estimated backup progress")
+                    .accessibilityValue("\(Int(progressFraction * 100)) percent")
+            } else {
+                ProgressView()
+                    .progressViewStyle(.linear)
+                    .controlSize(.small)
+                    .frame(maxWidth: .infinity)
+                    .accessibilityLabel("Backup progress")
+                    .accessibilityValue("Scanning")
+            }
             Text(statusText)
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -3126,7 +3223,7 @@ struct InlineBackupProgress: View {
         .padding(10)
         .background(DeltaTheme.badge.opacity(0.65))
         .clipShape(RoundedRectangle(cornerRadius: 8))
-        .deltaTooltip("Delta shows stable processed-file counters because backup totals can change while sources are being discovered.")
+        .deltaTooltip("Estimated progress is stabilized while Delta discovers source files. The processed-file counter shows the current backup work.")
     }
 
     private var statusText: String {

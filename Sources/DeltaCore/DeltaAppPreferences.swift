@@ -2,6 +2,11 @@ import Foundation
 
 public enum DeltaAppPreferenceKeys {
     public static let activityLogDetail = "Delta.activityLogDetail"
+    public static let defaultProfileCatchUpMissedRuns = "Delta.defaultProfileCatchUpMissedRuns"
+    public static let defaultProfileCheckAfterPrune = "Delta.defaultProfileCheckAfterPrune"
+    public static let defaultProfilePruneAfterForget = "Delta.defaultProfilePruneAfterForget"
+    public static let defaultProfileRunInLowPowerMode = "Delta.defaultProfileRunInLowPowerMode"
+    public static let defaultProfileRunOnBattery = "Delta.defaultProfileRunOnBattery"
     public static let defaultRestoreConflictPolicy = "Delta.defaultRestoreConflictPolicy"
     public static let previewsRestoresByDefault = "Delta.previewsRestoresByDefault"
     public static let sendsJobNotifications = "Delta.sendsJobNotifications"
@@ -12,7 +17,7 @@ public enum DeltaAppPreferenceKeys {
 }
 
 public enum DeltaAppPreferences {
-    public static let sharedSuiteName = "com.delta.backup"
+    public static let sharedSuiteName = "com.delta.backup.preferences"
 
     public static func bool(for key: String, default defaultValue: Bool) -> Bool {
         if let storedValue = UserDefaults(suiteName: sharedSuiteName)?.object(forKey: key) as? Bool {
