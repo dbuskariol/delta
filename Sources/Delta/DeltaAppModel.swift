@@ -19,7 +19,7 @@ final class DeltaAppModel: ObservableObject {
     enum Section: String, CaseIterable, Identifiable {
         case dashboard = "Dashboard"
         case backups = "Backups"
-        case repositories = "Destinations"
+        case destinations = "Destinations"
         case restore = "Restore"
         case activity = "Activity"
         case settings = "Settings"
@@ -30,7 +30,7 @@ final class DeltaAppModel: ObservableObject {
             switch self {
             case .dashboard: "rectangle.grid.2x2"
             case .backups: "externaldrive.badge.plus"
-            case .repositories: "externaldrive.connected.to.line.below"
+            case .destinations: "externaldrive.connected.to.line.below"
             case .restore: "arrow.uturn.backward.circle"
             case .activity: "waveform.path.ecg"
             case .settings: "gearshape"

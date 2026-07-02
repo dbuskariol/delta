@@ -24,8 +24,8 @@ struct ContentView: View {
                 DashboardView()
             case .backups:
                 BackupsView()
-            case .repositories:
-                RepositoriesView()
+            case .destinations:
+                DestinationsView()
             case .restore:
                 RestoreView()
             case .activity:
@@ -221,7 +221,7 @@ struct DashboardView: View {
                     symbol: "externaldrive.badge.exclamationmark",
                     warnings: destinationWarnings
                 ) {
-                    model.selectedSection = .repositories
+                    model.selectedSection = .destinations
                 }
             }
 
@@ -406,9 +406,9 @@ private struct DashboardHealthCard: View {
     }
 }
 
-struct RepositoriesView: View {
+struct DestinationsView: View {
     @EnvironmentObject private var model: DeltaAppModel
-    @State private var isPresentingRepositorySheet = false
+    @State private var isPresentingDestinationSheet = false
 
     var body: some View {
         PageScaffold(
@@ -416,7 +416,7 @@ struct RepositoriesView: View {
             subtitle: "Where encrypted backups are stored",
             actions: {
                 Button {
-                    isPresentingRepositorySheet = true
+                    isPresentingDestinationSheet = true
                 } label: {
                     Label("New destination", systemImage: "plus")
                 }
@@ -432,14 +432,14 @@ struct RepositoriesView: View {
                 )
             } else {
                 VStack(spacing: 10) {
-                    ForEach(model.repositories) { repository in
-                        RepositoryRow(repository: repository)
+                    ForEach(model.repositories) { destination in
+                        DestinationRow(destination: destination)
                     }
                 }
             }
         }
-        .sheet(isPresented: $isPresentingRepositorySheet) {
-            RepositoryEditorView()
+        .sheet(isPresented: $isPresentingDestinationSheet) {
+            DestinationEditorView()
                 .environmentObject(model)
                 .frame(width: ModalMetrics.sheetWidth)
         }
@@ -2018,7 +2018,7 @@ struct SettingsView: View {
                         Label("Manage Profiles", systemImage: "externaldrive.badge.plus")
                     }
                     Button {
-                        model.selectedSection = .repositories
+                        model.selectedSection = .destinations
                     } label: {
                         Label("Manage Destinations", systemImage: "externaldrive.connected.to.line.below")
                     }
@@ -3150,22 +3150,22 @@ struct ProfileRow: View {
     }
 }
 
-struct RepositoryRow: View {
+struct DestinationRow: View {
     @EnvironmentObject private var model: DeltaAppModel
-    var repository: BackupRepository
+    var destination: BackupRepository
     @State private var isPresentingEditor = false
     @State private var isConfirmingDelete = false
 
     var body: some View {
         Card {
             HStack(alignment: .top, spacing: 14) {
-                StatusIcon(symbol: repository.backend.kind == .local ? "externaldrive" : "network", color: .teal)
+                StatusIcon(symbol: destination.backend.kind == .local ? "externaldrive" : "network", color: .teal)
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(repository.name)
+                    Text(destination.name)
                         .font(.headline)
                         .lineLimit(1)
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(repository.backend.kind.displayName)
+                        Text(destination.backend.kind.displayName)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         Text(backendSummary)
@@ -3175,7 +3175,7 @@ struct RepositoryRow: View {
                             .truncationMode(.middle)
                     }
                     HStack(spacing: 8) {
-                        MetadataBadge(text: repository.secretStorageMode.displayName)
+                        MetadataBadge(text: destination.secretStorageMode.displayName)
                         MetadataBadge(text: verificationSummary)
                     }
                 }
@@ -3187,15 +3187,15 @@ struct RepositoryRow: View {
                     }
                     .disabled(model.isWorking || !model.isPersistentStoreAvailable)
                     IconButton(symbol: "shippingbox.and.arrow.backward", help: "Retry destination preparation") {
-                        model.initializeRepository(repository)
+                        model.initializeRepository(destination)
                     }
                     .disabled(model.isWorking || !model.isPersistentStoreAvailable)
                     IconButton(symbol: "checkmark.shield", help: "Check destination integrity") {
-                        model.checkRepository(repository)
+                        model.checkRepository(destination)
                     }
                     .disabled(model.isWorking || !model.isPersistentStoreAvailable)
                     IconButton(symbol: "arrow.clockwise", help: "Refresh restore points from this destination") {
-                        model.refreshSnapshots(repository: repository)
+                        model.refreshSnapshots(repository: destination)
                     }
                     .disabled(model.isWorking || !model.isPersistentStoreAvailable)
                     IconButton(symbol: "trash", help: "Remove this destination from Delta") {
@@ -3206,13 +3206,13 @@ struct RepositoryRow: View {
             }
         }
         .sheet(isPresented: $isPresentingEditor) {
-            RepositoryEditorView(repository: repository)
+            DestinationEditorView(destination: destination)
                 .environmentObject(model)
                 .frame(width: ModalMetrics.sheetWidth)
         }
         .confirmationDialog("Remove Destination?", isPresented: $isConfirmingDelete) {
             Button("Remove", role: .destructive) {
-                model.deleteRepository(repository)
+                model.deleteRepository(destination)
             }
             Button("Cancel", role: .cancel) {}
         } message: {
@@ -3221,14 +3221,14 @@ struct RepositoryRow: View {
     }
 
     private var verificationSummary: String {
-        guard let lastVerifiedAt = repository.lastVerifiedAt else {
+        guard let lastVerifiedAt = destination.lastVerifiedAt else {
             return "Not checked"
         }
         return "Verified \(lastVerifiedAt.formatted(date: .abbreviated, time: .shortened))"
     }
 
     private var backendSummary: String {
-        switch repository.backend {
+        switch destination.backend {
         case let .local(path):
             return path
         case let .sftp(host, path, username, port, identityFilePath):
@@ -3696,10 +3696,10 @@ struct TimeControls: View {
     }
 }
 
-struct RepositoryEditorView: View {
+struct DestinationEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var model: DeltaAppModel
-    private let existingRepository: BackupRepository?
+    private let existingDestination: BackupRepository?
     @State private var name = "Primary Destination"
     @State private var kind: RepositoryBackendKind = .local
     @State private var primary = ""
@@ -3712,17 +3712,17 @@ struct RepositoryEditorView: View {
     @State private var passphraseConfirmation = ""
     @State private var credentialValues: [String: String] = [:]
 
-    init(repository: BackupRepository? = nil) {
-        existingRepository = repository
-        let backendState = Self.editorState(for: repository?.backend ?? .local(path: ""))
-        _name = State(initialValue: repository?.name ?? "Primary Destination")
+    init(destination: BackupRepository? = nil) {
+        existingDestination = destination
+        let backendState = Self.editorState(for: destination?.backend ?? .local(path: ""))
+        _name = State(initialValue: destination?.name ?? "Primary Destination")
         _kind = State(initialValue: backendState.kind)
         _primary = State(initialValue: backendState.primary)
         _secondary = State(initialValue: backendState.secondary)
         _tertiary = State(initialValue: backendState.tertiary)
         _quaternary = State(initialValue: backendState.quaternary)
         _sftpIdentityFilePath = State(initialValue: backendState.sftpIdentityFilePath)
-        _storageMode = State(initialValue: repository?.secretStorageMode ?? .appManagedKeychain)
+        _storageMode = State(initialValue: destination?.secretStorageMode ?? .appManagedKeychain)
         _credentialValues = State(initialValue: Dictionary(uniqueKeysWithValues: ResticBackendCredentialTemplates.fields(for: backendState.kind).map { ($0.environmentKey, "") }))
     }
 
@@ -3746,7 +3746,7 @@ struct RepositoryEditorView: View {
             backendFields
             credentialFields
 
-            if existingRepository == nil {
+            if existingDestination == nil {
                 FieldRow(title: "Encryption password") {
                     Picker("Password", selection: $storageMode) {
                         ForEach(SecretStorageMode.allCases, id: \.self) { mode in
@@ -3778,16 +3778,16 @@ struct RepositoryEditorView: View {
                         }
                     }
                 }
-            } else if let existingRepository {
+            } else if let existingDestination {
                 FieldRow(title: "Encryption password") {
-                    Text(existingRepository.secretStorageMode.displayName)
+                    Text(existingDestination.secretStorageMode.displayName)
                         .foregroundStyle(.secondary)
                 }
             }
 
             SheetActions {
                 Button("Cancel") { dismiss() }
-                Button(existingRepository == nil ? "Create" : "Save") {
+                Button(existingDestination == nil ? "Create" : "Save") {
                     if saveDestination() {
                         dismiss()
                     }
@@ -3803,11 +3803,11 @@ struct RepositoryEditorView: View {
     }
 
     private var sheetTitle: String {
-        existingRepository == nil ? "New Destination" : "Edit Destination"
+        existingDestination == nil ? "New Destination" : "Edit Destination"
     }
 
     private var sheetSubtitle: String {
-        existingRepository == nil ? "Choose where encrypted restore points are stored." : "Update where encrypted restore points are stored."
+        existingDestination == nil ? "Choose where encrypted restore points are stored." : "Update where encrypted restore points are stored."
     }
 
     @ViewBuilder
@@ -3938,7 +3938,7 @@ struct RepositoryEditorView: View {
         if kind == .sftp && !quaternary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             guard let parsedPort, (1...65_535).contains(parsedPort) else { return false }
         }
-        if existingRepository == nil && storageMode == .userManagedPassphrase {
+        if existingDestination == nil && storageMode == .userManagedPassphrase {
             guard !passphrase.isEmpty, passphrase == passphraseConfirmation else { return false }
         }
         return true
@@ -3951,9 +3951,9 @@ struct RepositoryEditorView: View {
     }
 
     private func saveDestination() -> Bool {
-        if let existingRepository {
+        if let existingDestination {
             return model.saveRepository(
-                existingRepository,
+                existingDestination,
                 name: name,
                 backend: backend,
                 backendCredentials: sanitizedCredentialValues
@@ -3976,12 +3976,12 @@ struct RepositoryEditorView: View {
         )
     }
 
-    private static func editorState(for backend: RepositoryBackend) -> RepositoryEditorState {
+    private static func editorState(for backend: RepositoryBackend) -> DestinationEditorState {
         switch backend {
         case let .local(path):
-            RepositoryEditorState(kind: .local, primary: path)
+            DestinationEditorState(kind: .local, primary: path)
         case let .sftp(host, path, username, port, identityFilePath):
-            RepositoryEditorState(
+            DestinationEditorState(
                 kind: .sftp,
                 primary: host,
                 secondary: path,
@@ -3990,25 +3990,25 @@ struct RepositoryEditorView: View {
                 sftpIdentityFilePath: identityFilePath ?? ""
             )
         case let .rest(url):
-            RepositoryEditorState(kind: .rest, primary: url)
+            DestinationEditorState(kind: .rest, primary: url)
         case let .s3(endpoint, bucket, path, region):
-            RepositoryEditorState(kind: .s3, primary: bucket, secondary: path ?? "", tertiary: endpoint ?? "", quaternary: region ?? "")
+            DestinationEditorState(kind: .s3, primary: bucket, secondary: path ?? "", tertiary: endpoint ?? "", quaternary: region ?? "")
         case let .backblazeB2(bucket, path):
-            RepositoryEditorState(kind: .backblazeB2, primary: bucket, secondary: path ?? "")
+            DestinationEditorState(kind: .backblazeB2, primary: bucket, secondary: path ?? "")
         case let .azureBlob(container, path):
-            RepositoryEditorState(kind: .azureBlob, primary: container, secondary: path ?? "")
+            DestinationEditorState(kind: .azureBlob, primary: container, secondary: path ?? "")
         case let .googleCloudStorage(bucket, path):
-            RepositoryEditorState(kind: .googleCloudStorage, primary: bucket, secondary: path ?? "")
+            DestinationEditorState(kind: .googleCloudStorage, primary: bucket, secondary: path ?? "")
         case let .swiftObjectStorage(container, path):
-            RepositoryEditorState(kind: .swiftObjectStorage, primary: container, secondary: path ?? "")
+            DestinationEditorState(kind: .swiftObjectStorage, primary: container, secondary: path ?? "")
         case let .rclone(remote, path):
-            RepositoryEditorState(kind: .rclone, primary: remote, secondary: path)
+            DestinationEditorState(kind: .rclone, primary: remote, secondary: path)
         case let .custom(repository):
-            RepositoryEditorState(kind: .custom, primary: repository)
+            DestinationEditorState(kind: .custom, primary: repository)
         }
     }
 
-    private struct RepositoryEditorState {
+    private struct DestinationEditorState {
         var kind: RepositoryBackendKind
         var primary = ""
         var secondary = ""
