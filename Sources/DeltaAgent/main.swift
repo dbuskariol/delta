@@ -4,42 +4,44 @@ import Foundation
 enum DeltaAgentMain {
     static func run() -> Int32 {
         do {
-            let arguments = Set(CommandLine.arguments.dropFirst())
-            if arguments.contains("--status") {
+            switch try DeltaAgentInvocation.command(arguments: Array(CommandLine.arguments.dropFirst())) {
+            case .status:
                 print("DeltaAgent ready")
                 return 0
-            }
-            if arguments.contains("--dry-run") {
+            case .dryRun:
                 print("DeltaAgent ready; dry run did not start scheduled backups.")
                 return 0
+            case .runDueBackups:
+                return try runDueBackups()
             }
-            if let unsupportedArgument = arguments.first {
-                fputs("DeltaAgent error: unsupported argument '\(unsupportedArgument)'.\n", stderr)
-                return 64
-            }
-
-            let database = try DeltaDatabase.live()
-            let coordinator = BackupCoordinator(
-                database: database,
-                commandBuilder: ResticCommandBuilder(
-                    resticExecutableURL: ResticExecutableLocator().locate(),
-                    secretBridgeURL: secretBridgeURL(),
-                    credentialResolver: RepositoryCredentialResolver(
-                        authenticationPolicy: .failIfInteractionNeeded
-                    )
-                ),
-                runControlStore: ResticRunControlStore()
-            )
-
-            _ = try coordinator.recoverAbandonedRunningJobs()
-            let runs = try coordinator.runDueBackups()
-            try notifyCompletedJobs(runs, database: database)
-            print("DeltaAgent completed \(runs.count) due backup run(s).")
-            return runs.contains(where: { $0.status == .failed }) ? 1 : 0
+        } catch let error as DeltaAgentArgumentError {
+            fputs("DeltaAgent error: \(error.localizedDescription)\n", stderr)
+            return 64
         } catch {
             fputs("DeltaAgent error: \(error.localizedDescription)\n", stderr)
             return 1
         }
+    }
+
+    private static func runDueBackups() throws -> Int32 {
+        let database = try DeltaDatabase.live()
+        let coordinator = BackupCoordinator(
+            database: database,
+            commandBuilder: ResticCommandBuilder(
+                resticExecutableURL: ResticExecutableLocator().locate(),
+                secretBridgeURL: secretBridgeURL(),
+                credentialResolver: RepositoryCredentialResolver(
+                    authenticationPolicy: .failIfInteractionNeeded
+                )
+            ),
+            runControlStore: ResticRunControlStore()
+        )
+
+        _ = try coordinator.recoverAbandonedRunningJobs()
+        let runs = try coordinator.runDueBackups()
+        try notifyCompletedJobs(runs, database: database)
+        print("DeltaAgent completed \(runs.count) due backup run(s).")
+        return runs.contains(where: { $0.status == .failed }) ? 1 : 0
     }
 
     private static func secretBridgeURL() -> URL {

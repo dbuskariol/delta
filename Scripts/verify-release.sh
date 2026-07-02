@@ -95,7 +95,21 @@ fi
 wait "$DELTA_PID" >/dev/null 2>&1 || true
 /bin/rm -f "$LAUNCH_LOG"
 
-"$ROOT_DIR/dist/Delta.app/Contents/MacOS/DeltaAgent" --status
+DELTA_AGENT="$ROOT_DIR/dist/Delta.app/Contents/MacOS/DeltaAgent"
+"$DELTA_AGENT" --status
+AGENT_DRY_RUN_OUTPUT="$("$DELTA_AGENT" --dry-run 2>&1)"
+if [[ "$AGENT_DRY_RUN_OUTPUT" != *"dry run did not start scheduled backups"* ]]; then
+  printf "DeltaAgent dry-run did not report non-mutating behavior: %s\n" "$AGENT_DRY_RUN_OUTPUT" >&2
+  exit 1
+fi
+set +e
+AGENT_UNSUPPORTED_OUTPUT="$("$DELTA_AGENT" --status --dry-run 2>&1)"
+AGENT_UNSUPPORTED_STATUS=$?
+set -e
+if [[ "$AGENT_UNSUPPORTED_STATUS" -ne 64 || "$AGENT_UNSUPPORTED_OUTPUT" != *"unsupported arguments"* ]]; then
+  printf "DeltaAgent did not fail closed for unsupported arguments. status=%s output=%s\n" "$AGENT_UNSUPPORTED_STATUS" "$AGENT_UNSUPPORTED_OUTPUT" >&2
+  exit 1
+fi
 "$ROOT_DIR/dist/Delta.app/Contents/MacOS/restic" version
 "$ROOT_DIR/dist/Delta.app/Contents/MacOS/rclone" version | /usr/bin/head -n 1
 
