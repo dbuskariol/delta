@@ -70,6 +70,7 @@ final class DeltaAppModel: ObservableObject {
     private let secretStore = KeychainSecretStore()
     private let credentialResolver = RepositoryCredentialResolver()
     private let bookmarkStore = SecurityScopedBookmarkStore()
+    private let volumeSourceFactory = BackupVolumeSourceFactory()
     private let repositoryValidator = BackupRepositoryValidator()
     private let runController = ResticRunController()
     private let runControlStore = ResticRunControlStore()
@@ -672,6 +673,34 @@ final class DeltaAppModel: ObservableObject {
         } catch {
             alertMessage = error.localizedDescription
             return []
+        }
+    }
+
+    func startupVolumeSource() -> BackupSource {
+        volumeSourceFactory.startupVolumeSource()
+    }
+
+    func chooseBackupVolumeSources(allowsMultipleSelection: Bool = true) -> [BackupSource] {
+        guardPersistentStoreAvailable()
+        guard isPersistentStoreAvailable else { return [] }
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.canCreateDirectories = false
+        panel.allowsMultipleSelection = allowsMultipleSelection
+        panel.prompt = "Choose Volume"
+        panel.message = "Choose any folder on the volume you want Delta to protect. Delta will back up that volume root without crossing into other volumes."
+        panel.directoryURL = URL(fileURLWithPath: "/Volumes", isDirectory: true)
+        guard panel.runModal() == .OK else { return [] }
+        return uniqueBackupSources(
+            panel.urls.map { volumeSourceFactory.selectedVolumeSource(from: $0) }
+        )
+    }
+
+    private func uniqueBackupSources(_ sources: [BackupSource]) -> [BackupSource] {
+        var seenPaths = Set<String>()
+        return sources.filter { source in
+            seenPaths.insert(source.path).inserted
         }
     }
 

@@ -72,6 +72,8 @@ Important implementation details:
 
 Delta creates file-level backups. Full-volume mode is not a bootable clone or bare-metal restore mechanism.
 
+Full-volume profiles start from the startup volume (`/`) or a user-selected mounted volume. When the user chooses a folder on a mounted drive, Delta stores the volume root such as `/Volumes/Archive` instead of the clicked subfolder.
+
 For full-volume profiles, Delta uses:
 
 - restic `backup`

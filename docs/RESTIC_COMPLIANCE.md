@@ -96,6 +96,8 @@ Full-volume backups additionally use:
 --one-file-system
 ```
 
+The UI stores full-volume sources as volume roots (`/` or `/Volumes/<name>`). Choosing a folder on a mounted volume is normalized to the containing volume root before command construction, so the stored profile matches restic's `--one-file-system` behavior.
+
 Delta adds macOS-safe excludes and excludes the local destination path when the destination is inside a local filesystem path.
 
 Expected restic backup exit handling:

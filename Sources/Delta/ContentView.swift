@@ -1383,21 +1383,38 @@ struct ProfileEditorView: View {
             }
 
             FieldRow(title: "Sources") {
-                HStack(spacing: 10) {
-                    Button {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 10) {
                         if mode == .fullVolume {
-                            sources = model.chooseBackupSources(allowsMultipleSelection: false, includeSubvolumes: false)
+                            Button {
+                                sources = [model.startupVolumeSource()]
+                            } label: {
+                                Label("Startup Volume", systemImage: "internaldrive")
+                            }
+                            Button {
+                                let selectedSources = model.chooseBackupVolumeSources(allowsMultipleSelection: true)
+                                if !selectedSources.isEmpty {
+                                    sources = selectedSources
+                                }
+                            } label: {
+                                Label("Choose Volume", systemImage: "externaldrive.badge.plus")
+                            }
                         } else {
-                            sources = model.chooseBackupSources(allowsMultipleSelection: true, includeSubvolumes: true)
+                            Button {
+                                let selectedSources = model.chooseBackupSources(allowsMultipleSelection: true, includeSubvolumes: true)
+                                if !selectedSources.isEmpty {
+                                    sources = selectedSources
+                                }
+                            } label: {
+                                Label("Choose Folders", systemImage: "folder.badge.plus")
+                            }
                         }
-                    } label: {
-                        Label("Choose", systemImage: "folder.badge.plus")
                     }
-                    Text(sources.isEmpty ? "No sources selected" : sources.map(\.path).joined(separator: ", "))
+                    Text(sourceSummaryText)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                         .truncationMode(.middle)
-                        .frame(maxWidth: 380, alignment: .leading)
+                        .frame(maxWidth: 460, alignment: .leading)
                 }
             }
 
@@ -1512,6 +1529,15 @@ struct ProfileEditorView: View {
         .onAppear {
             repositoryID = repositoryID ?? model.repositories.first?.id
         }
+        .onChange(of: mode) { oldMode, newMode in
+            guard oldMode != newMode else { return }
+            switch newMode {
+            case .fullVolume:
+                sources = [model.startupVolumeSource()]
+            case .customFolders:
+                sources.removeAll()
+            }
+        }
     }
 
     private var sheetTitle: String {
@@ -1520,6 +1546,20 @@ struct ProfileEditorView: View {
 
     private var sheetSubtitle: String {
         existingProfile == nil ? "Define what to protect and when to run." : "Update what to protect and when to run."
+    }
+
+    private var sourceSummaryText: String {
+        guard !sources.isEmpty else {
+            return mode == .fullVolume ? "No volume selected" : "No folders selected"
+        }
+
+        let paths = sources.map { source in
+            if mode == .fullVolume, source.path == "/" {
+                return "Startup volume (/)"
+            }
+            return source.path
+        }
+        return paths.joined(separator: ", ")
     }
 
     @ViewBuilder
