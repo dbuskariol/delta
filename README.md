@@ -21,7 +21,7 @@ The product goal is simple: make serious backup practices approachable without h
 - **Notification Center alerts** for failed or warning jobs, with optional successful-backup summaries. The signed background helper uses the same notification policy for scheduled runs.
 - **Full or browsed selected restore** with backup browsing, file/folder selection, configurable dry-run and verification defaults, overwrite policies, original-path restore, chosen-folder restore, and optional pre-restore backup.
 - **Streaming and saved backup logs** from restic stdout/stderr with source context, stable processed-file counters, clean change summaries, fixed-height live panes, and expandable per-job audit history.
-- **Settings and diagnostics** for updates, notifications, Full Disk Access, Background Backups, new-backup defaults, restore safety defaults, menu bar visibility, Activity log detail, app version, helper status, tool paths, profile/destination counts, recent jobs, and local support paths.
+- **Settings and diagnostics** with a top health summary for system access, Background Backups, updates, and notifications, plus controls for new-backup defaults, restore safety defaults, menu bar visibility, Activity log detail, app version, helper status, tool paths, profile/destination counts, recent jobs, and local support paths.
 - **Sparkle automatic updates** with generated appcast/update archive support.
 
 ## How It Works
@@ -102,7 +102,9 @@ Settings include app-level defaults for newly-created backup profiles: missed-ru
 
 ## Scheduling And Maintenance
 
-Background Backups let scheduled profiles run while the main Delta window is closed. The macOS implementation is `DeltaAgent`, a signed Login Item helper registered through `SMAppService` and implemented as a per-user LaunchAgent. In user-facing UI, Delta presents this as Background Backups because the LaunchAgent is the macOS mechanism, not a setting users should have to understand. It runs as the signed-in user, not as a privileged admin helper, and wakes periodically to evaluate:
+Background Backups let scheduled profiles run while the main Delta window is closed. The macOS implementation is `DeltaAgent`, a signed Login Item helper registered through `SMAppService` and implemented as a per-user LaunchAgent. In user-facing UI, Delta presents this as Background Backups because LaunchAgent is the macOS scheduling mechanism, not a user-facing product feature. It runs as the signed-in user, not as a privileged admin helper, wakes for short schedule checks, starts due backups when policy allows it, then exits.
+
+On each check, Background Backups evaluates:
 
 - backup schedule: hourly, daily, weekly, monthly, or custom interval
 - missed-run catchup policy

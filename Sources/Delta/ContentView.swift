@@ -935,6 +935,14 @@ private enum UpdateCheckInterval: Int, CaseIterable, Identifiable {
         }
     }
 
+    var summaryText: String {
+        switch self {
+        case .daily: "Checked daily"
+        case .weekly: "Checked weekly"
+        case .monthly: "Checked monthly"
+        }
+    }
+
     static func normalized(_ rawValue: Int) -> UpdateCheckInterval {
         UpdateCheckInterval(rawValue: rawValue) ?? .daily
     }
@@ -1060,17 +1068,19 @@ struct SettingsView: View {
                 }
             }
 
+            SettingsStatusGrid(items: settingsStatusItems)
+
             SettingsSectionLabel(
-                title: "Automation",
-                subtitle: "Run scheduled backups reliably without keeping the main window open."
+                title: "Background",
+                subtitle: "Keep scheduled protection running without keeping the main Delta window open."
             )
 
             SettingsCard(
                 symbol: "clock.badge.checkmark",
                 title: "Background Backups",
-                subtitle: "Delta's signed macOS helper checks schedules and starts due backups in the background.",
+                subtitle: "Run scheduled profiles while Delta's window is closed.",
                 statusText: backgroundBackupsStatusText,
-                statusColor: launchAgentStatusColor
+                statusColor: backgroundBackupsStatusColor
             ) {
                 SettingsControlRow(
                     title: "Allow scheduled backups",
@@ -1083,16 +1093,17 @@ struct SettingsView: View {
 
                 SettingsNotice(
                     symbol: "clock.arrow.circlepath",
-                    title: "Managed by macOS",
-                    text: "Delta registers a signed Login Item helper. macOS starts it for short schedule checks, then the helper applies destination, network, battery, and low-power rules before running due backups.",
+                    title: "What this does",
+                    text: "Delta installs a signed per-user background backup service through macOS Login Items. It wakes for short schedule checks, starts due backups when policy allows it, then exits. It is not an admin service.",
                     color: .blue
                 )
 
                 SettingsFactGrid(items: [
                     SettingsFact(title: "Scheduled profiles", value: "\(scheduledProfileCount)"),
                     SettingsFact(title: "Check interval", value: "Every 5 min"),
-                    SettingsFact(title: "macOS item", value: "Login Item"),
-                    SettingsFact(title: "Privileges", value: "Current user")
+                    SettingsFact(title: "Runs as", value: "Current user"),
+                    SettingsFact(title: "Window required", value: "No"),
+                    SettingsFact(title: "macOS approval", value: backgroundApprovalText)
                 ])
 
                 if model.launchAgentStatus != .enabled {
@@ -1110,11 +1121,13 @@ struct SettingsView: View {
                     } label: {
                         Label("Open Login Items", systemImage: "gearshape")
                     }
+                    .deltaTooltip("Open macOS Login Items to approve or inspect Delta's background backup service.")
                     Button {
                         model.reload()
                     } label: {
                         Label("Refresh Status", systemImage: "arrow.clockwise")
                     }
+                    .deltaTooltip("Recheck background backup and system access status.")
                     Button {
                         model.repairBackgroundSecretAccess()
                     } label: {
@@ -1145,8 +1158,8 @@ struct SettingsView: View {
 
                 SettingsFactGrid(items: [
                     SettingsFact(title: "Protected folders", value: model.fullDiskAccessStatus.hasLikelyFullDiskAccess ? "Readable" : "Blocked"),
-                    SettingsFact(title: "App location", value: appBundleLocation),
-                    SettingsFact(title: "Approval", value: "Manual in macOS")
+                    SettingsFact(title: "Approval", value: "Manual in macOS"),
+                    SettingsFact(title: "Best install path", value: "/Applications")
                 ])
 
                 SettingsDescription(
@@ -1159,16 +1172,19 @@ struct SettingsView: View {
                     } label: {
                         Label("Open Privacy Settings", systemImage: "arrow.up.forward.app")
                     }
+                    .deltaTooltip("Open Full Disk Access in macOS Privacy & Security.")
                     Button {
                         model.revealInstalledAppInFinder()
                     } label: {
                         Label("Show Delta", systemImage: "folder")
                     }
+                    .deltaTooltip("Show the installed Delta app that should be added to Full Disk Access.")
                     Button {
                         model.reload()
                     } label: {
                         Label("Recheck", systemImage: "arrow.clockwise")
                     }
+                    .deltaTooltip("Recheck whether protected folders are readable.")
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
@@ -1326,6 +1342,11 @@ struct SettingsView: View {
 
                 HStack(spacing: 8) {
                     Button {
+                        resetBackupDefaults()
+                    } label: {
+                        Label("Restore Recommended", systemImage: "arrow.counterclockwise")
+                    }
+                    Button {
                         model.selectedSection = .backups
                     } label: {
                         Label("Manage Profiles", systemImage: "externaldrive.badge.plus")
@@ -1384,6 +1405,14 @@ struct SettingsView: View {
                 SettingsDescription(
                     text: "These defaults keep restores conservative without hiding control. Each restore can still be changed before previewing or running it."
                 )
+
+                Button {
+                    resetRestoreDefaults()
+                } label: {
+                    Label("Restore Recommended", systemImage: "arrow.counterclockwise")
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
             }
 
             SettingsCard(
@@ -1436,6 +1465,27 @@ struct SettingsView: View {
                 title: "Support",
                 subtitle: "Diagnostics and local files for troubleshooting without exposing secrets."
             )
+
+            SettingsCard(
+                symbol: "info.circle",
+                title: "About Delta",
+                subtitle: "Build and local state used when troubleshooting.",
+                statusText: appVersionStatusText,
+                statusColor: .blue
+            ) {
+                SettingsFactGrid(items: [
+                    SettingsFact(title: "Version", value: appVersion),
+                    SettingsFact(title: "Build", value: buildVersion),
+                    SettingsFact(title: "Bundle ID", value: bundleIdentifier),
+                    SettingsFact(title: "Profiles", value: "\(model.profiles.count)"),
+                    SettingsFact(title: "Destinations", value: "\(model.repositories.count)"),
+                    SettingsFact(title: "Restore points", value: "\(model.snapshots.count)")
+                ])
+
+                SettingsDescription(
+                    text: "Install and update Delta from the signed app in /Applications to keep macOS privacy approvals stable across builds."
+                )
+            }
 
             SettingsCard(
                 symbol: "folder.badge.gearshape",
@@ -1502,6 +1552,39 @@ struct SettingsView: View {
         model.profiles.filter { $0.schedule.isEnabled }.count
     }
 
+    private var settingsStatusItems: [SettingsStatusItem] {
+        [
+            SettingsStatusItem(
+                title: "System Access",
+                value: fullDiskAccessStatusText,
+                symbol: "lock.shield",
+                color: fullDiskAccessStatusColor,
+                detail: model.fullDiskAccessStatus.hasLikelyFullDiskAccess ? "Protected folders readable" : "Action required"
+            ),
+            SettingsStatusItem(
+                title: "Background",
+                value: backgroundBackupsStatusText,
+                symbol: "clock.badge.checkmark",
+                color: backgroundBackupsStatusColor,
+                detail: backgroundBackupsSummaryDetail
+            ),
+            SettingsStatusItem(
+                title: "Updates",
+                value: automaticallyChecksForUpdates ? "On" : "Off",
+                symbol: "arrow.down.circle",
+                color: automaticallyChecksForUpdates ? .green : .secondary,
+                detail: UpdateCheckInterval.normalized(updateCheckIntervalSeconds).summaryText
+            ),
+            SettingsStatusItem(
+                title: "Notifications",
+                value: notificationStatusText,
+                symbol: "bell.badge",
+                color: notificationStatusColor,
+                detail: sendsJobNotifications ? "Job alerts configured" : "Alerts disabled"
+            )
+        ]
+    }
+
     private var activityLogDetail: ActivityLogDetail {
         ActivityLogDetail.normalized(activityLogDetailRawValue)
     }
@@ -1533,14 +1616,42 @@ struct SettingsView: View {
         return model.launchAgentStatus.detail
     }
 
+    private var backgroundBackupsSummaryDetail: String {
+        if scheduledProfileCount == 0 {
+            return model.launchAgentStatus == .enabled ? "Ready for future schedules" : "No scheduled profiles"
+        }
+        return model.launchAgentStatus == .enabled ? "Schedules can run closed" : "Scheduled runs need attention"
+    }
+
     private var fullDiskAccessStatusText: String {
         model.fullDiskAccessStatus.hasLikelyFullDiskAccess ? "Ready" : "Needs Access"
+    }
+
+    private var fullDiskAccessStatusColor: Color {
+        model.fullDiskAccessStatus.hasLikelyFullDiskAccess ? .green : .orange
     }
 
     private var fullDiskAccessDescription: String {
         model.fullDiskAccessStatus.hasLikelyFullDiskAccess
             ? "Protected locations look readable for full-volume and selected-folder backups."
             : "Protected locations are not readable yet. Open Privacy & Security, add Delta with the + button if needed, then recheck access."
+    }
+
+    private var backgroundApprovalText: String {
+        switch model.launchAgentStatus {
+        case .enabled:
+            return "Approved"
+        case .requiresApproval:
+            return "Needed"
+        case .notRegistered:
+            return "Off"
+        case .notFound:
+            return "Missing"
+        case .unavailable:
+            return "Unavailable"
+        case .unknown:
+            return "Unknown"
+        }
     }
 
     private var notificationStatusText: String {
@@ -1586,8 +1697,20 @@ struct SettingsView: View {
         backupDefaultsStatusText == "Recommended" ? .green : .orange
     }
 
-    private var appBundleLocation: String {
-        Bundle.main.bundleURL.path
+    private var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
+    }
+
+    private var buildVersion: String {
+        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown"
+    }
+
+    private var bundleIdentifier: String {
+        Bundle.main.bundleIdentifier ?? "Unknown"
+    }
+
+    private var appVersionStatusText: String {
+        appVersion == "Unknown" ? "Unknown" : "Beta \(appVersion)"
     }
 
     private func applyUpdatePreferences() {
@@ -1603,6 +1726,20 @@ struct SettingsView: View {
         if RestoreConflictPolicy(rawValue: defaultRestoreConflictPolicyRawValue) == nil {
             defaultRestoreConflictPolicyRawValue = RestoreConflictPolicy.ifChanged.rawValue
         }
+    }
+
+    private func resetBackupDefaults() {
+        defaultProfileCatchUpMissedRuns = true
+        defaultProfileRunOnBattery = true
+        defaultProfileRunInLowPowerMode = false
+        defaultProfilePruneAfterForget = true
+        defaultProfileCheckAfterPrune = true
+    }
+
+    private func resetRestoreDefaults() {
+        previewsRestoresByDefault = true
+        verifiesRestoresByDefault = true
+        defaultRestoreConflictPolicyRawValue = RestoreConflictPolicy.ifChanged.rawValue
     }
 
     private func refreshNotificationAuthorization() {
@@ -1623,7 +1760,11 @@ struct SettingsView: View {
         }
     }
 
-    private var launchAgentStatusColor: Color {
+    private var backgroundBackupsStatusColor: Color {
+        if scheduledProfileCount == 0 && model.launchAgentStatus == .notRegistered {
+            return .secondary
+        }
+
         switch model.launchAgentStatus {
         case .enabled:
             return .green
@@ -2854,6 +2995,79 @@ struct SurfaceSection<Content: View>: View {
                 content
             }
         }
+    }
+}
+
+struct SettingsStatusItem: Identifiable {
+    var id: String { title }
+    var title: String
+    var value: String
+    var symbol: String
+    var color: Color
+    var detail: String
+}
+
+struct SettingsStatusGrid: View {
+    var items: [SettingsStatusItem]
+
+    var body: some View {
+        LazyVGrid(columns: columns, spacing: 12) {
+            ForEach(items) { item in
+                SettingsStatusTile(item: item)
+            }
+        }
+    }
+
+    private var columns: [GridItem] {
+        [
+            GridItem(.flexible(minimum: 190), spacing: 12),
+            GridItem(.flexible(minimum: 190), spacing: 12),
+            GridItem(.flexible(minimum: 190), spacing: 12),
+            GridItem(.flexible(minimum: 190), spacing: 12)
+        ]
+    }
+}
+
+struct SettingsStatusTile: View {
+    var item: SettingsStatusItem
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: item.symbol)
+                    .font(.system(size: 14, weight: .semibold))
+                    .frame(width: 28, height: 28)
+                    .foregroundStyle(item.color)
+                    .background(item.color.opacity(0.14))
+                    .clipShape(RoundedRectangle(cornerRadius: 7))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(item.title)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    Text(item.value)
+                        .font(.headline)
+                        .lineLimit(1)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            Text(item.detail)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, minHeight: 112, alignment: .topLeading)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(DeltaTheme.panel)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(DeltaTheme.border, lineWidth: 1)
+        )
     }
 }
 
