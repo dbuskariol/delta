@@ -24,6 +24,7 @@ public struct ResticRunResult: Equatable, Sendable {
     public var exitCode: Int32
     public var standardOutput: String
     public var standardError: String
+    public var stopReason: ResticRunStopReason?
     public var status: JobStatus
     public var failureKind: ResticFailureKind?
     public var userFacingMessage: String
@@ -32,6 +33,7 @@ public struct ResticRunResult: Equatable, Sendable {
         self.exitCode = exitCode
         self.standardOutput = standardOutput
         self.standardError = standardError
+        self.stopReason = stopReason
         if let stopReason {
             self.status = .cancelled
             self.failureKind = .interrupted

@@ -143,7 +143,8 @@ public final class BackupCoordinator: @unchecked Sendable {
                     kind: .backup,
                     status: preparationRun.status == .cancelled ? .cancelled : .failed,
                     finishedAt: Date(),
-                    message: message
+                    message: message,
+                    stopReason: preparationRun.stopReason
                 )
                 try database.saveJobRun(run)
                 try database.appendEvent(EventLog(level: .error, message: message))
@@ -559,6 +560,7 @@ public final class BackupCoordinator: @unchecked Sendable {
         job.status = result.status
         job.finishedAt = Date()
         job.exitCode = result.exitCode
+        job.stopReason = result.stopReason
         if kind == .backup {
             job.backupSummary = ResticLogFormatter.backupSummary(from: result.standardOutput)
         }

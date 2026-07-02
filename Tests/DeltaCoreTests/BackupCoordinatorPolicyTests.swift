@@ -226,6 +226,7 @@ final class BackupCoordinatorPolicyTests: XCTestCase {
         let logs = try fixture.database.fetchJobLogs(jobID: job.id)
 
         XCTAssertEqual(job.status, .cancelled)
+        XCTAssertEqual(job.stopReason, .pause)
         XCTAssertTrue(job.message?.localizedCaseInsensitiveContains("paused") == true, job.message ?? "")
         XCTAssertEqual(runner.commands.map(\.resticSubcommand), ["init"])
         XCTAssertEqual(jobs.filter { $0.kind == .initializeRepository && $0.status == .cancelled }.count, 1)
@@ -259,6 +260,7 @@ final class BackupCoordinatorPolicyTests: XCTestCase {
         let job = try coordinator.runBackup(profile: profile, repository: fixture.repository)
 
         XCTAssertEqual(job.status, .cancelled)
+        XCTAssertEqual(job.stopReason, .pause)
         XCTAssertTrue(job.message?.localizedCaseInsensitiveContains("paused") == true, job.message ?? "")
         XCTAssertNil(try store.stopRequest(for: job.id))
     }

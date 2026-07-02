@@ -446,6 +446,7 @@ public struct JobRun: Codable, Identifiable, Equatable, Sendable {
     public var exitCode: Int32?
     public var message: String?
     public var backupSummary: ResticBackupSummary?
+    public var stopReason: ResticRunStopReason?
 
     public init(
         id: UUID = UUID(),
@@ -457,7 +458,8 @@ public struct JobRun: Codable, Identifiable, Equatable, Sendable {
         finishedAt: Date? = nil,
         exitCode: Int32? = nil,
         message: String? = nil,
-        backupSummary: ResticBackupSummary? = nil
+        backupSummary: ResticBackupSummary? = nil,
+        stopReason: ResticRunStopReason? = nil
     ) {
         self.id = id
         self.profileID = profileID
@@ -469,6 +471,7 @@ public struct JobRun: Codable, Identifiable, Equatable, Sendable {
         self.exitCode = exitCode
         self.message = message
         self.backupSummary = backupSummary
+        self.stopReason = stopReason
     }
 
     enum CodingKeys: String, CodingKey {
@@ -482,6 +485,7 @@ public struct JobRun: Codable, Identifiable, Equatable, Sendable {
         case exitCode
         case message
         case backupSummary
+        case stopReason
     }
 
     public init(from decoder: Decoder) throws {
@@ -496,6 +500,11 @@ public struct JobRun: Codable, Identifiable, Equatable, Sendable {
         exitCode = try container.decodeIfPresent(Int32.self, forKey: .exitCode)
         message = try container.decodeIfPresent(String.self, forKey: .message)
         backupSummary = try container.decodeIfPresent(ResticBackupSummary.self, forKey: .backupSummary)
+        stopReason = try container.decodeIfPresent(ResticRunStopReason.self, forKey: .stopReason)
+    }
+
+    public var isPausedBackup: Bool {
+        kind == .backup && status == .cancelled && stopReason == .pause
     }
 }
 

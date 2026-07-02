@@ -1425,8 +1425,7 @@ struct ProfileRow: View {
         guard !isActiveBackup, let latestBackupRun else {
             return false
         }
-        return latestBackupRun.status == .cancelled
-            && latestBackupRun.message?.localizedCaseInsensitiveContains("paused") == true
+        return latestBackupRun.isPausedBackup
     }
 
     private var latestBackupRun: JobRun? {

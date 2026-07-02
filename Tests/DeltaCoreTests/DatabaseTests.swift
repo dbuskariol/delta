@@ -58,7 +58,8 @@ final class DatabaseTests: XCTestCase {
             repositoryID: repository.id,
             kind: .backup,
             status: .succeeded,
-            backupSummary: ResticBackupSummary(filesNew: 2, filesChanged: 1, snapshotID: "snapshot")
+            backupSummary: ResticBackupSummary(filesNew: 2, filesChanged: 1, snapshotID: "snapshot"),
+            stopReason: .pause
         )
         let snapshot = ResticSnapshot(id: "snapshot", time: Date(), paths: ["/Users/me/Documents"])
 
@@ -82,9 +83,23 @@ final class DatabaseTests: XCTestCase {
         XCTAssertEqual(fetchedJob.kind, .backup)
         XCTAssertEqual(fetchedJob.status, .succeeded)
         XCTAssertEqual(fetchedJob.backupSummary, job.backupSummary)
+        XCTAssertEqual(fetchedJob.stopReason, .pause)
 
         let snapshotsByRepository = try database.fetchSnapshotsByRepository()
         XCTAssertEqual(snapshotsByRepository[repository.id]?.first?.id, "snapshot")
+    }
+
+    func testPausedBackupStateRequiresExplicitPauseStopReason() {
+        let repositoryID = UUID()
+        let paused = JobRun(repositoryID: repositoryID, kind: .backup, status: .cancelled, stopReason: .pause)
+        let cancelled = JobRun(repositoryID: repositoryID, kind: .backup, status: .cancelled, stopReason: .cancel)
+        let messageOnly = JobRun(repositoryID: repositoryID, kind: .backup, status: .cancelled, message: "Backup paused.")
+        let restorePause = JobRun(repositoryID: repositoryID, kind: .restore, status: .cancelled, stopReason: .pause)
+
+        XCTAssertTrue(paused.isPausedBackup)
+        XCTAssertFalse(cancelled.isPausedBackup)
+        XCTAssertFalse(messageOnly.isPausedBackup)
+        XCTAssertFalse(restorePause.isPausedBackup)
     }
 
     func testJobLogsRoundTripByJobAndRepository() throws {
