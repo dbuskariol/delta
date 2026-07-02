@@ -89,6 +89,7 @@ append_command "Code Signature Verification" /usr/bin/codesign --verify --strict
 append_command "Code Signature Details" /usr/bin/codesign -dvv "$APP_PATH"
 append_command "Gatekeeper Assessment" /usr/sbin/spctl --assess --type execute --verbose=4 "$APP_PATH"
 append_command "Stapled Notarization Ticket" /usr/bin/xcrun stapler validate "$APP_PATH"
+append_command "Notarization Credential Policy" "$ROOT_DIR/Scripts/verify-notarization-policy.sh"
 append_command "Scheduled Backups Helper Status" "$APP_PATH/Contents/MacOS/DeltaAgent" --status
 append_command "Scheduled Backups Helper Dry Run" "$APP_PATH/Contents/MacOS/DeltaAgent" --dry-run
 ISOLATED_AGENT_SUPPORT="$(/usr/bin/mktemp -d -t delta-agent-support.XXXXXX)"
