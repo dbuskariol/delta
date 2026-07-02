@@ -1,0 +1,218 @@
+# Delta
+
+Delta is a native SwiftUI macOS backup app built around restic. It is designed for encrypted, incremental, scheduled file-level backups to local drives, mounted network drives, and restic-supported remote destinations.
+
+The product goal is simple: make serious backup practices approachable without hiding the engineering that keeps data safe.
+
+## What Delta Does
+
+- **Encrypted backups by default** using restic repositories. There is no unencrypted backup mode.
+- **Incremental restore points** with content-addressed deduplication, metadata tracking, and `--skip-if-unchanged`.
+- **Full-volume or custom-folder protection** with macOS-safe excludes and destination self-exclusion.
+- **Local and network destinations** including local paths, mounted SMB/NFS volumes, SFTP, REST server, S3-compatible storage, Backblaze B2, Azure Blob, Google Cloud Storage, OpenStack Swift, rclone remotes, and custom restic URLs.
+- **Scheduled backups** through a bundled `DeltaAgent` LaunchAgent registered with `SMAppService`.
+- **Power-aware scheduling** with battery and Low Power Mode controls.
+- **Retention maintenance** with scheduled forget/prune/check windows.
+- **Full or selected restore** with dry-run preview, overwrite policies, verification, original-path restore, chosen-folder restore, and optional pre-restore backup.
+- **Streaming backup logs** from restic stdout/stderr with readable progress formatting.
+- **Sparkle automatic updates** with generated appcast/update archive support.
+
+## How It Works
+
+Delta does not invent a custom backup format. It delegates repository format, encryption, snapshots, deduplication, restore, pruning, and integrity checks to [restic](https://restic.net/).
+
+At a high level:
+
+1. A user creates a **Destination**, which is where encrypted restore points are stored.
+2. Delta creates or uses a restic repository at that destination.
+3. A user creates a **Backup Profile**, choosing sources, schedule, retention, bandwidth, and power policy.
+4. Scheduled or manual runs invoke bundled `restic` through `ResticRunner`.
+5. Repository passwords are fetched from Keychain through `DeltaSecretBridge` using restic `--password-command`.
+6. Job state, restore points, events, settings, restore requests, and profile definitions are persisted in SQLite via GRDB.
+7. Restore always goes through a wizard: destination, restore point, scope, restore location, conflict policy, dry run, then execution.
+
+## Terminology
+
+Delta intentionally uses user-facing language instead of restic internals:
+
+| Delta term | restic term | Meaning |
+| --- | --- | --- |
+| Destination | Repository | The encrypted storage location for backup data. |
+| Restore point | Snapshot | A point-in-time backup that can be restored. |
+| Cleanup | Forget/prune | Applies retention rules and removes unneeded data. |
+| Check | Check | Validates repository integrity. |
+
+## Architecture
+
+The app is split into signed targets:
+
+- `Delta`: SwiftUI macOS app, menu bar item, settings, backup/restore UI, Sparkle update controller.
+- `DeltaAgent`: LaunchAgent helper for scheduled runs.
+- `DeltaSecretBridge`: CLI password bridge used by restic `--password-command`.
+- `DeltaCore`: shared models, database, command builder, scheduling, restic runner, parser, Keychain, bookmarks, locks, and policy code.
+
+Important implementation details:
+
+- **SQLite persistence** lives under Application Support through `AppDirectories.databaseURL()`.
+- **Keychain secrets** use `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`.
+- **Security-scoped bookmarks** preserve access to selected source folders where macOS requires it.
+- **Per-destination locks** prevent overlapping backup, restore, prune, and check jobs across app/agent processes.
+- **Bundled tools** are pinned and checksum-verified through `Scripts/bootstrap-tools.sh`.
+- **Packaged app verification** checks signatures, Sparkle embedding, helper smoke tests, and bundled restic/rclone versions.
+
+## Backup Behavior
+
+Delta creates file-level backups. Full-volume mode is not a bootable clone or bare-metal restore mechanism.
+
+For full-volume profiles, Delta uses:
+
+- restic `backup`
+- `--one-file-system`
+- macOS-safe excludes
+- explicit local destination exclusion
+- `--compression auto`
+- `--skip-if-unchanged`
+- profile/restic tags
+
+Custom-folder profiles use the selected source folders and stored security-scoped bookmarks where available.
+
+## Scheduling And Maintenance
+
+`DeltaAgent` is packaged as a LaunchAgent and runs periodically. Each run evaluates:
+
+- backup schedule: hourly, daily, weekly, monthly, or custom interval
+- missed-run catchup policy
+- destination availability
+- battery policy
+- Low Power Mode policy
+- bandwidth limits
+- per-destination lock state
+- scheduled retention maintenance
+
+Retention maintenance can run `forget`, `prune`, and optional `check` based on the profile maintenance schedule. Post-prune checks are returned to the agent so failed validation is visible in job status and process exit status.
+
+## Restore Workflow
+
+Restore is intentionally explicit:
+
+1. Choose a Destination.
+2. Refresh and choose a Restore Point.
+3. Restore the full restore point or selected paths.
+4. Choose a target folder or original paths.
+5. Choose conflict behavior:
+   - Replace all
+   - Replace changed
+   - Replace older
+   - Keep existing
+6. Run a dry-run preview by default.
+7. Optionally verify restored files.
+8. Confirm in-place restore when restoring to original paths.
+
+Selected-path restore uses restic snapshot path syntax for one selected path, and include filters for multiple selected paths.
+
+## Security Model
+
+- Backup data is encrypted by restic before it leaves the Mac.
+- Repository passwords are generated by Delta or supplied by the user.
+- Passwords and backend credentials are stored in Keychain.
+- Restic receives the repository password through a short-lived password command, not a long-lived plaintext environment variable.
+- Command redaction hides password-command values from logs/descriptions.
+- Backend credentials are injected only into the child process environment for the restic run.
+- Empty-password restic repositories are not used.
+
+Losing the repository password means losing access to the encrypted backup data. That is a restic security property, not a recoverable app state.
+
+## Automatic Updates
+
+Delta uses [Sparkle](https://sparkle-project.org/) for automatic updates.
+
+Relevant files:
+
+- `Sources/Delta/SoftwareUpdateController.swift`
+- `Packaging/Delta.app.plist`
+- `Scripts/package-update.sh`
+- `Scripts/generate-appcast.sh`
+
+The appcast URL points at GitHub release assets:
+
+```text
+https://github.com/dbuskariol/delta/releases/latest/download/appcast.xml
+```
+
+## Development
+
+Requirements:
+
+- macOS with Swift 6.2 toolchain/Xcode 26-compatible environment
+- Network access for initial restic/rclone/Sparkle dependency bootstrap
+
+Bootstrap tools:
+
+```sh
+Scripts/bootstrap-tools.sh
+Scripts/verify-tools.sh
+```
+
+Run tests:
+
+```sh
+swift test
+```
+
+Run the local restic integration test:
+
+```sh
+DELTA_RESTIC_INTEGRATION=1 \
+RESTIC_BINARY=Resources/Tools/bin/restic \
+swift test --filter ResticIntegrationTests
+```
+
+Build the app:
+
+```sh
+Scripts/build-app.sh
+```
+
+Full release verification:
+
+```sh
+Scripts/verify-release.sh
+```
+
+Package Sparkle update assets:
+
+```sh
+Scripts/package-update.sh
+Scripts/generate-appcast.sh
+```
+
+## Release And Signing
+
+Local development builds use ad-hoc signing when `DELTA_CODESIGN_IDENTITY` is not set.
+
+Developer ID distribution should use:
+
+```sh
+DELTA_CODESIGN_IDENTITY="Developer ID Application: Example" Scripts/verify-release.sh
+```
+
+Notarization is intentionally deferred until final release preparation. The build pipeline is structured for Developer ID signing and notarization, but Apple notarization credentials/submission should be handled at release time.
+
+## Current Scope
+
+Delta is a file-level backup app. It does not currently provide:
+
+- bootable clone creation
+- bare-metal system imaging
+- block-level disk imaging
+- Time Machine compatibility
+
+Those are separate product categories with different restore expectations and failure modes.
+
+## Further Reading
+
+- [restic backup docs](https://restic.readthedocs.io/en/stable/040_backup.html)
+- [restic restore docs](https://restic.readthedocs.io/en/stable/050_restore.html)
+- [restic retention/prune docs](https://restic.readthedocs.io/en/stable/060_forget.html)
+- [Apple SMAppService](https://developer.apple.com/documentation/servicemanagement/smappservice)
+- [Sparkle](https://sparkle-project.org/)

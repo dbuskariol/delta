@@ -1,0 +1,209 @@
+# Restic Compliance Notes
+
+Delta uses restic as the backup engine. This document maps Delta behavior to restic commands, options, backend syntax, and expected exit handling.
+
+## Version
+
+Bundled restic is pinned in `Resources/Tools/tools.json` and installed by `Scripts/bootstrap-tools.sh`.
+
+The verifier checks:
+
+```sh
+Resources/Tools/bin/restic version
+Resources/Tools/bin/rclone version
+```
+
+## Repository Passwords
+
+Delta uses restic `--password-command`.
+
+The command points at `DeltaSecretBridge`, which reads the destination password from Keychain and writes it to stdout for restic. Delta does not pass repository passwords through long-lived environment variables or command-line literals.
+
+Relevant files:
+
+- `Sources/DeltaCore/ResticCommand.swift`
+- `Sources/DeltaSecretBridge/main.swift`
+- `Sources/DeltaCore/KeychainSecretStore.swift`
+
+## Backends
+
+Delta supports the following restic backend families:
+
+| Destination type | Restic URL shape |
+| --- | --- |
+| Local/mounted path | `/Volumes/Backup/Delta` |
+| SFTP | `sftp:user@host:/path` |
+| SFTP with port/IPv6 | `sftp://user@host:2222//absolute/path` |
+| REST server | `rest:https://host:8000/repo` |
+| S3-compatible | `s3:https://server:port/bucket/path` |
+| Backblaze B2 | `b2:bucket:path/to/repo` |
+| Azure Blob | `azure:container:/path` |
+| Google Cloud Storage | `gs:bucket:/path` |
+| OpenStack Swift | `swift:container:/path` |
+| rclone | `rclone:remote:path` |
+| Custom | User-supplied restic URL |
+
+URL construction is covered by `ResticCommandTests`.
+
+## Backend Credentials
+
+Backend credentials are stored in Keychain and injected into the restic process environment only for the job run.
+
+Supported credential templates include:
+
+- REST: `RESTIC_REST_USERNAME`, `RESTIC_REST_PASSWORD`
+- S3: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN`
+- Backblaze B2: `B2_ACCOUNT_ID`, `B2_ACCOUNT_KEY`
+- Azure Blob: `AZURE_ACCOUNT_NAME`, `AZURE_ACCOUNT_KEY`, `AZURE_ACCOUNT_SAS`, `AZURE_ENDPOINT_SUFFIX`
+- Google Cloud Storage: `GOOGLE_PROJECT_ID`, `GOOGLE_APPLICATION_CREDENTIALS`, `GOOGLE_ACCESS_TOKEN`
+- OpenStack Swift: Keystone, token, and legacy Swift variables
+- rclone: `RCLONE_CONFIG`, `RCLONE_BWLIMIT`, `RCLONE_VERBOSE`
+
+S3 region is passed as an explicit restic backend option:
+
+```text
+-o s3.region=<region>
+```
+
+rclone is pinned to the bundled executable when available:
+
+```text
+-o rclone.program=<Delta.app>/Contents/MacOS/rclone
+```
+
+## Backup
+
+Delta backup commands use:
+
+```text
+backup
+--json
+--compression auto
+--skip-if-unchanged
+--tag delta
+--tag profile:<profile-id>
+```
+
+Full-volume backups additionally use:
+
+```text
+--one-file-system
+```
+
+Delta adds macOS-safe excludes and excludes the local destination path when the destination is inside a local filesystem path.
+
+Expected restic backup exit handling:
+
+| Exit code | Delta state |
+| --- | --- |
+| `0` | Succeeded |
+| `3` | Warning, incomplete snapshot due to unreadable source data |
+| `10` | Destination not prepared/found |
+| `11` | Destination locked |
+| `12` | Wrong password |
+| other non-zero | Failed or cancelled when interruption text is present |
+
+## Snapshots / Restore Points
+
+Delta lists restore points with:
+
+```text
+snapshots --json
+```
+
+The JSON parser is covered by unit tests.
+
+## Restore
+
+Delta restore commands use:
+
+```text
+restore
+--json
+--overwrite <always|if-changed|if-newer|never>
+--target <path>
+```
+
+Optional restore flags:
+
+```text
+--verify
+--dry-run
+--verbose=2
+```
+
+Single selected path restore uses restic snapshot path syntax:
+
+```text
+<snapshot-id>:/path/to/restore
+```
+
+Multiple selected paths use repeated include filters:
+
+```text
+--include /path/one
+--include /path/two
+```
+
+## Retention, Prune, And Check
+
+Delta retention maintenance uses:
+
+```text
+forget
+--keep-hourly <n>
+--keep-daily <n>
+--keep-weekly <n>
+--keep-monthly <n>
+--keep-yearly <n>
+--group-by host,paths,tags
+--prune
+```
+
+`--prune` is controlled by the profile retention policy.
+
+When post-prune validation is enabled, Delta runs:
+
+```text
+check --json --read-data-subset 1/100
+```
+
+Scheduled maintenance is evaluated independently from backup due checks, but it uses the same profile, destination, power policy, and per-destination locking path.
+
+## Locking
+
+Delta uses two lock layers:
+
+1. A local cross-process per-destination lock to prevent overlapping Delta app/agent work.
+2. restic repository locks for repository safety across all restic clients.
+
+Delta maps restic lock exit code `11` and lock-related stderr to a user-facing busy message.
+
+## Streaming Logs
+
+`ResticRunner` streams stdout and stderr while the process is running. The UI formats restic JSON status/error lines into readable Activity output and keeps a capped in-memory live log.
+
+Relevant files:
+
+- `Sources/DeltaCore/ResticRunner.swift`
+- `Sources/DeltaCore/ResticLogFormatter.swift`
+- `Sources/Delta/DeltaAppModel.swift`
+
+## Verification
+
+Primary verification command:
+
+```sh
+Scripts/verify-release.sh
+```
+
+This runs:
+
+- unit tests
+- restic/rclone bootstrap and checksum verification
+- local restic integration test with real init/backup/restore
+- packaged app build
+- codesign verification
+- Sparkle framework checks
+- helper smoke checks
+- bundled restic/rclone version checks
