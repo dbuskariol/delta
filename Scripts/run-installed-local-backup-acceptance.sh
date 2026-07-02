@@ -75,6 +75,8 @@ for expected in \
   "Restore browser entries verified:" \
   "Selected folder restore status:" \
   "Selected file restore status:" \
+  "Dry-run restore status:" \
+  "Overwrite policies verified:" \
   "Cleanup runs:"
 do
   if ! /usr/bin/grep -Fq "$expected" "$OUTPUT"; then

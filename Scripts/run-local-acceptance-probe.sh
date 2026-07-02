@@ -254,7 +254,7 @@ else
   installed_local_output="$(run_capture installed_local_backup "$ROOT_DIR/Scripts/run-installed-local-backup-acceptance.sh" "$APP_PATH")"
   installed_local_status="$(command_status installed_local_backup)"
   if [[ "$installed_local_status" -eq 0 ]]; then
-    installed_local_evidence="Installed app local lifecycle acceptance passed through Delta coordinator: automatic destination preparation, first backup, no-change backup, incremental backup, restore-point cache, browser listing, full restore, selected folder restore, selected file restore, check, cleanup, and post-cleanup check. $installed_local_output"
+    installed_local_evidence="Installed app local lifecycle acceptance passed through Delta coordinator: automatic destination preparation, first backup, no-change backup, incremental backup, restore-point cache, browser listing, full restore, selected folder restore, selected file restore, dry-run restore with no writes, every overwrite policy, check, cleanup, and post-cleanup check. $installed_local_output"
   else
     installed_local_evidence="Installed app local lifecycle acceptance failed: $installed_local_output"
   fi

@@ -20,6 +20,8 @@ enum AcceptanceLocalLifecycleCommand {
         let fullRestoreURL = root.appendingPathComponent("restore-full", isDirectory: true)
         let selectedRestoreURL = root.appendingPathComponent("restore-selected", isDirectory: true)
         let selectedFileRestoreURL = root.appendingPathComponent("restore-selected-file", isDirectory: true)
+        let dryRunRestoreURL = root.appendingPathComponent("restore-dry-run", isDirectory: true)
+        let conflictRestoreURL = root.appendingPathComponent("restore-conflicts", isDirectory: true)
         try fileManager.createDirectory(at: repositoryURL, withIntermediateDirectories: true)
         try fileManager.createDirectory(at: documentsURL, withIntermediateDirectories: true)
         try fileManager.createDirectory(at: photosURL, withIntermediateDirectories: true)
@@ -157,6 +159,92 @@ enum AcceptanceLocalLifecycleCommand {
         try require(try contentsOfFirstFile(named: "report.txt", under: selectedFileRestoreURL)?.contains("updated") == true, "Selected file restore did not recover report.txt.")
         try require(try firstFile(named: "image.txt", under: selectedFileRestoreURL) == nil, "Selected file restore unexpectedly recovered image.txt.")
 
+        let dryRunRestore = try coordinator.restore(
+            request: RestoreRequest(
+                repositoryID: repositoryID,
+                snapshotID: latestSnapshot.id,
+                destination: .chosenFolder(dryRunRestoreURL.path),
+                dryRun: true
+            ),
+            repository: repository
+        )
+        try require(dryRunRestore.status == .succeeded || dryRunRestore.status == .warning, "Dry-run restore did not complete: \(dryRunRestore.message ?? dryRunRestore.status.displayName)")
+        try require(try firstFile(named: "report.txt", under: dryRunRestoreURL) == nil, "Dry-run restore wrote report.txt.")
+        try require(try firstFile(named: "image.txt", under: dryRunRestoreURL) == nil, "Dry-run restore wrote image.txt.")
+
+        let initialConflictRestore = try coordinator.restore(
+            request: RestoreRequest(
+                repositoryID: repositoryID,
+                snapshotID: latestSnapshot.id,
+                destination: .chosenFolder(conflictRestoreURL.path),
+                dryRun: false
+            ),
+            repository: repository
+        )
+        try require(initialConflictRestore.status == .succeeded || initialConflictRestore.status == .warning, "Initial conflict-policy restore did not complete: \(initialConflictRestore.message ?? initialConflictRestore.status.displayName)")
+        let conflictReportURL = try requireValue(
+            firstFile(named: "report.txt", under: conflictRestoreURL),
+            "Initial conflict-policy restore did not recover report.txt."
+        )
+
+        try "local edit should remain\n".write(to: conflictReportURL, atomically: true, encoding: .utf8)
+        let neverOverwriteRestore = try coordinator.restore(
+            request: RestoreRequest(
+                repositoryID: repositoryID,
+                snapshotID: latestSnapshot.id,
+                destination: .chosenFolder(conflictRestoreURL.path),
+                conflictPolicy: .never,
+                dryRun: false
+            ),
+            repository: repository
+        )
+        try require(neverOverwriteRestore.status == .succeeded || neverOverwriteRestore.status == .warning, "Keep-existing restore did not complete: \(neverOverwriteRestore.message ?? neverOverwriteRestore.status.displayName)")
+        try require(try String(contentsOf: conflictReportURL, encoding: .utf8).contains("local edit should remain"), "Keep-existing restore overwrote an existing file.")
+
+        try "local edit should be replaced if changed\n".write(to: conflictReportURL, atomically: true, encoding: .utf8)
+        let ifChangedRestore = try coordinator.restore(
+            request: RestoreRequest(
+                repositoryID: repositoryID,
+                snapshotID: latestSnapshot.id,
+                destination: .chosenFolder(conflictRestoreURL.path),
+                conflictPolicy: .ifChanged,
+                dryRun: false
+            ),
+            repository: repository
+        )
+        try require(ifChangedRestore.status == .succeeded || ifChangedRestore.status == .warning, "Replace-changed restore did not complete: \(ifChangedRestore.message ?? ifChangedRestore.status.displayName)")
+        try require(try String(contentsOf: conflictReportURL, encoding: .utf8).contains("updated"), "Replace-changed restore did not overwrite changed content.")
+
+        try "old local edit should be replaced if newer\n".write(to: conflictReportURL, atomically: true, encoding: .utf8)
+        try fileManager.setAttributes([.modificationDate: Date(timeIntervalSince1970: 1)], ofItemAtPath: conflictReportURL.path)
+        let ifNewerRestore = try coordinator.restore(
+            request: RestoreRequest(
+                repositoryID: repositoryID,
+                snapshotID: latestSnapshot.id,
+                destination: .chosenFolder(conflictRestoreURL.path),
+                conflictPolicy: .ifNewer,
+                dryRun: false
+            ),
+            repository: repository
+        )
+        try require(ifNewerRestore.status == .succeeded || ifNewerRestore.status == .warning, "Replace-older restore did not complete: \(ifNewerRestore.message ?? ifNewerRestore.status.displayName)")
+        try require(try String(contentsOf: conflictReportURL, encoding: .utf8).contains("updated"), "Replace-older restore did not overwrite an older existing file.")
+
+        try "newer local edit should still be replaced by replace-all\n".write(to: conflictReportURL, atomically: true, encoding: .utf8)
+        try fileManager.setAttributes([.modificationDate: Date(timeIntervalSinceNow: 86_400)], ofItemAtPath: conflictReportURL.path)
+        let alwaysOverwriteRestore = try coordinator.restore(
+            request: RestoreRequest(
+                repositoryID: repositoryID,
+                snapshotID: latestSnapshot.id,
+                destination: .chosenFolder(conflictRestoreURL.path),
+                conflictPolicy: .always,
+                dryRun: false
+            ),
+            repository: repository
+        )
+        try require(alwaysOverwriteRestore.status == .succeeded || alwaysOverwriteRestore.status == .warning, "Replace-all restore did not complete: \(alwaysOverwriteRestore.message ?? alwaysOverwriteRestore.status.displayName)")
+        try require(try String(contentsOf: conflictReportURL, encoding: .utf8).contains("updated"), "Replace-all restore did not overwrite a newer existing file.")
+
         let checkRun = try coordinator.check(repository: repository, readDataSubset: "1/100")
         try require(checkRun.status == .succeeded || checkRun.status == .warning, "Destination check did not complete: \(checkRun.message ?? checkRun.status.displayName)")
 
@@ -194,6 +282,8 @@ enum AcceptanceLocalLifecycleCommand {
         - Full restore status: \(fullRestore.status.displayName)
         - Selected folder restore status: \(selectedFolderRestore.status.displayName)
         - Selected file restore status: \(selectedFileRestore.status.displayName)
+        - Dry-run restore status: \(dryRunRestore.status.displayName), no files written
+        - Overwrite policies verified: Keep existing, Replace changed, Replace older, Replace all
         - Destination check status: \(checkRun.status.displayName)
         - Cleanup runs: \(maintenanceRuns.map { $0.kind.displayName + " " + $0.status.displayName }.joined(separator: ", "))
         - Stored backup jobs: \(backupCount)
