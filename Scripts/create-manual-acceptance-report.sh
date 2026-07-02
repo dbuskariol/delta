@@ -97,10 +97,15 @@ EOF
 
 while IFS=$'\t' read -r id area required_evidence; do
   probe_evidence="$(local_probe_evidence_for_id "$id")"
+  if [[ -n "$probe_evidence" ]]; then
+    evidence_note="$probe_evidence Manual evidence: TODO"
+  else
+    evidence_note="Manual evidence: TODO"
+  fi
   printf '| %s | %s | Not run | %s | %s |\n' \
     "$(sanitize_cell "$id")" \
     "$(sanitize_cell "$area")" \
-    "$(sanitize_cell "$probe_evidence")" \
+    "$(sanitize_cell "$evidence_note")" \
     "$(sanitize_cell "$required_evidence")" >>"$OUTPUT"
 done < <(manual_acceptance_items)
 
@@ -108,7 +113,7 @@ cat >>"$OUTPUT" <<'EOF'
 
 ## Release Rule
 
-`Scripts/verify-manual-acceptance.sh` passes only when every required row is present and every Result is `Passed`.
+`Scripts/verify-manual-acceptance.sh` passes only when every required row is present, every Result is `Passed`, and every Evidence / Notes cell has the generated TODO/local-probe follow-up text replaced with real manual evidence.
 EOF
 
 /bin/ln -sfn "$(basename "$OUTPUT")" "$LATEST"

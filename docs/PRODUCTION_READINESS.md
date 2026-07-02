@@ -120,7 +120,7 @@ Create an editable report from the canonical matrix:
 Scripts/create-manual-acceptance-report.sh
 ```
 
-If `dist/local-acceptance/latest.md` exists, the generated manual report copies each row's local probe status into Evidence / Notes while leaving Result as `Not run`. Fill in `dist/manual-acceptance/latest.md` as each check is performed. Use exactly `Passed`, `Failed`, `Blocked`, or `Not run` in the Result column. Verify the report before external beta distribution:
+If `dist/local-acceptance/latest.md` exists, the generated manual report copies each row's local probe status into Evidence / Notes, appends `Manual evidence: TODO`, and leaves Result as `Not run`. Fill in `dist/manual-acceptance/latest.md` as each check is performed. Use exactly `Passed`, `Failed`, `Blocked`, or `Not run` in the Result column. A `Passed` row must replace generated local-probe and follow-up text with real observed manual evidence. Verify the report before external beta distribution:
 
 ```sh
 Scripts/verify-manual-acceptance.sh

@@ -16,6 +16,7 @@ cd "$ROOT_DIR"
   "$ROOT_DIR/Scripts/doctor-production-readiness.sh" \
   "$ROOT_DIR/Scripts/verify-installed-app.sh" \
   "$ROOT_DIR/Scripts/verify-manual-acceptance-matrix.sh" \
+  "$ROOT_DIR/Scripts/verify-manual-acceptance-self-test.sh" \
   "$ROOT_DIR/Scripts/verify-manual-acceptance.sh" \
   "$ROOT_DIR/Scripts/verify-sparkle-update-artifacts.sh" \
   "$ROOT_DIR/Scripts/run-external-backend-acceptance.sh" \
@@ -52,6 +53,10 @@ if [[ ! -x "$ROOT_DIR/Scripts/verify-manual-acceptance.sh" ]]; then
 fi
 if [[ ! -x "$ROOT_DIR/Scripts/verify-manual-acceptance-matrix.sh" ]]; then
   printf "Scripts/verify-manual-acceptance-matrix.sh must be executable.\n" >&2
+  exit 1
+fi
+if [[ ! -x "$ROOT_DIR/Scripts/verify-manual-acceptance-self-test.sh" ]]; then
+  printf "Scripts/verify-manual-acceptance-self-test.sh must be executable.\n" >&2
   exit 1
 fi
 if [[ ! -x "$ROOT_DIR/Scripts/verify-sparkle-update-artifacts.sh" ]]; then
@@ -91,6 +96,7 @@ if [[ ! -x "$ROOT_DIR/Scripts/verify-production-readiness.sh" ]]; then
   exit 1
 fi
 "$ROOT_DIR/Scripts/verify-manual-acceptance-matrix.sh"
+"$ROOT_DIR/Scripts/verify-manual-acceptance-self-test.sh"
 "$ROOT_DIR/Scripts/bootstrap-tools.sh"
 "$ROOT_DIR/Scripts/verify-tools.sh"
 "$ROOT_DIR/Scripts/verify-restic-surface.sh"

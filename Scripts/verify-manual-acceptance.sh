@@ -54,8 +54,55 @@ result_for_id() {
   ' "$REPORT"
 }
 
+evidence_for_id() {
+  local wanted_id="$1"
+  /usr/bin/awk -F'|' -v wanted_id="$wanted_id" '
+    function trim(value) {
+      gsub(/^[ \t]+|[ \t]+$/, "", value)
+      return value
+    }
+    /^\|/ {
+      id = trim($2)
+      evidence = trim($5)
+      if (id == wanted_id) {
+        print evidence
+        exit
+      }
+    }
+  ' "$REPORT"
+}
+
+validate_passed_evidence() {
+  local id="$1"
+  local area="$2"
+  local evidence="$3"
+
+  if [[ -z "$evidence" ]]; then
+    printf "Manual acceptance passed row lacks evidence: %s (%s)\n" "$id" "$area" >&2
+    return 1
+  fi
+  if [[ "$evidence" == *"Manual evidence: TODO"* || "$evidence" == *"TODO"* ]]; then
+    printf "Manual acceptance passed row still has TODO evidence: %s (%s)\n" "$id" "$area" >&2
+    return 1
+  fi
+  if [[ "$evidence" == Local\ probe:* ]]; then
+    printf "Manual acceptance passed row still starts with generated local-probe evidence: %s (%s)\n" "$id" "$area" >&2
+    return 1
+  fi
+  if [[ "$evidence" == *"Follow-up still required:"* ]]; then
+    printf "Manual acceptance passed row still contains generated follow-up text: %s (%s)\n" "$id" "$area" >&2
+    return 1
+  fi
+  if [[ "$evidence" == *"Not run"* ]]; then
+    printf "Manual acceptance passed row still says not run: %s (%s)\n" "$id" "$area" >&2
+    return 1
+  fi
+  return 0
+}
+
 while IFS=$'\t' read -r id area _required_evidence; do
   result="$(result_for_id "$id")"
+  evidence="$(evidence_for_id "$id")"
   if [[ -z "$result" ]]; then
     printf "Manual acceptance report is missing required row: %s (%s)\n" "$id" "$area" >&2
     missing_count=$((missing_count + 1))
@@ -64,7 +111,11 @@ while IFS=$'\t' read -r id area _required_evidence; do
 
   case "$result" in
     Passed)
-      passed_count=$((passed_count + 1))
+      if validate_passed_evidence "$id" "$area" "$evidence"; then
+        passed_count=$((passed_count + 1))
+      else
+        failed_count=$((failed_count + 1))
+      fi
       ;;
     Failed|Blocked|Not\ run)
       printf "Manual acceptance is not passed: %s (%s) is %s\n" "$id" "$area" "$result" >&2
