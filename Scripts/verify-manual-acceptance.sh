@@ -18,6 +18,7 @@ failed_count=0
 passed_count=0
 
 metadata_required=(
+  "Generated"
   "Tester"
   "App"
   "Bundle ID"
@@ -26,15 +27,42 @@ metadata_required=(
   "Git Commit"
   "Host macOS"
   "Signing Identity"
+  "Local Acceptance Probe"
 )
 
 for key in "${metadata_required[@]}"; do
   value="$(/usr/bin/awk -F': ' -v key="- $key" '$1 == key { print $2; exit }' "$REPORT")"
-  if [[ -z "$value" || "$value" == "Unknown" ]]; then
+  if [[ -z "$value" || "$value" == "Unknown" || "$value" == "Not found" || "$value" == *"TODO"* || "$value" == *"TBD"* ]]; then
     printf "Manual acceptance report metadata is missing or unknown: %s\n" "$key" >&2
     exit 1
   fi
 done
+
+expected_commit="${DELTA_MANUAL_ACCEPTANCE_EXPECTED_COMMIT:-$(/usr/bin/git -C "$ROOT_DIR" rev-parse --short HEAD 2>/dev/null || true)}"
+report_commit="$(/usr/bin/awk -F': ' '$1 == "- Git Commit" { print $2; exit }' "$REPORT")"
+if [[ -n "$expected_commit" && "$report_commit" != "$expected_commit" ]]; then
+  printf "Manual acceptance report is for git commit %s, expected %s.\n" "$report_commit" "$expected_commit" >&2
+  exit 1
+fi
+
+row_count_for_id() {
+  local wanted_id="$1"
+  /usr/bin/awk -F'|' -v wanted_id="$wanted_id" '
+    function trim(value) {
+      gsub(/^[ \t]+|[ \t]+$/, "", value)
+      return value
+    }
+    /^\|/ {
+      id = trim($2)
+      if (id == wanted_id) {
+        count += 1
+      }
+    }
+    END {
+      print count + 0
+    }
+  ' "$REPORT"
+}
 
 result_for_id() {
   local wanted_id="$1"
@@ -72,21 +100,45 @@ evidence_for_id() {
   ' "$REPORT"
 }
 
+required_evidence_for_id() {
+  local wanted_id="$1"
+  /usr/bin/awk -F'|' -v wanted_id="$wanted_id" '
+    function trim(value) {
+      gsub(/^[ \t]+|[ \t]+$/, "", value)
+      return value
+    }
+    /^\|/ {
+      id = trim($2)
+      required_evidence = trim($6)
+      if (id == wanted_id) {
+        print required_evidence
+        exit
+      }
+    }
+  ' "$REPORT"
+}
+
 validate_passed_evidence() {
   local id="$1"
   local area="$2"
   local evidence="$3"
+  local evidence_lc
 
   if [[ -z "$evidence" ]]; then
     printf "Manual acceptance passed row lacks evidence: %s (%s)\n" "$id" "$area" >&2
+    return 1
+  fi
+  evidence_lc="$(printf "%s" "$evidence" | /usr/bin/tr '[:upper:]' '[:lower:]')"
+  if [[ "${#evidence}" -lt 40 ]]; then
+    printf "Manual acceptance passed row evidence is too thin: %s (%s)\n" "$id" "$area" >&2
     return 1
   fi
   if [[ "$evidence" == *"Manual evidence: TODO"* || "$evidence" == *"TODO"* ]]; then
     printf "Manual acceptance passed row still has TODO evidence: %s (%s)\n" "$id" "$area" >&2
     return 1
   fi
-  if [[ "$evidence" == Local\ probe:* ]]; then
-    printf "Manual acceptance passed row still starts with generated local-probe evidence: %s (%s)\n" "$id" "$area" >&2
+  if [[ "$evidence" == *"Local probe:"* ]]; then
+    printf "Manual acceptance passed row still contains generated local-probe evidence: %s (%s)\n" "$id" "$area" >&2
     return 1
   fi
   if [[ "$evidence" == *"Follow-up still required:"* ]]; then
@@ -97,15 +149,36 @@ validate_passed_evidence() {
     printf "Manual acceptance passed row still says not run: %s (%s)\n" "$id" "$area" >&2
     return 1
   fi
+  if [[ "$evidence_lc" == "ok" || "$evidence_lc" == "pass" || "$evidence_lc" == "passed" || "$evidence_lc" == "done" || "$evidence_lc" == "yes" ]]; then
+    printf "Manual acceptance passed row evidence is not descriptive: %s (%s)\n" "$id" "$area" >&2
+    return 1
+  fi
+  if [[ "$evidence_lc" == *"tbd"* || "$evidence_lc" == *"unknown"* || "$evidence_lc" == *"not applicable"* || "$evidence_lc" == *"n/a"* ]]; then
+    printf "Manual acceptance passed row contains non-evidence wording: %s (%s)\n" "$id" "$area" >&2
+    return 1
+  fi
   return 0
 }
 
 while IFS=$'\t' read -r id area _required_evidence; do
+  row_count="$(row_count_for_id "$id")"
+  if [[ "$row_count" -gt 1 ]]; then
+    printf "Manual acceptance report has duplicate row: %s (%s)\n" "$id" "$area" >&2
+    failed_count=$((failed_count + 1))
+    continue
+  fi
+
   result="$(result_for_id "$id")"
   evidence="$(evidence_for_id "$id")"
+  required_evidence="$(required_evidence_for_id "$id")"
   if [[ -z "$result" ]]; then
     printf "Manual acceptance report is missing required row: %s (%s)\n" "$id" "$area" >&2
     missing_count=$((missing_count + 1))
+    continue
+  fi
+  if [[ "$required_evidence" != "$_required_evidence" ]]; then
+    printf "Manual acceptance report has stale required evidence for: %s (%s)\n" "$id" "$area" >&2
+    failed_count=$((failed_count + 1))
     continue
   fi
 
