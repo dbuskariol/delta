@@ -179,16 +179,7 @@ final class DeltaAppModel: ObservableObject {
 
     func runRestore(repository: BackupRepository, request: RestoreRequest) {
         let coordinator = makeCoordinator()
-        let profiles = profiles
-        let repositories = repositories
         performBackgroundWork {
-            if
-                let profileID = request.preRestoreBackupProfileID,
-                let profile = profiles.first(where: { $0.id == profileID }),
-                let backupRepository = repositories.first(where: { $0.id == profile.repositoryID })
-            {
-                _ = try coordinator.runBackup(profile: profile, repository: backupRepository)
-            }
             _ = try coordinator.restore(request: request, repository: repository)
         }
     }

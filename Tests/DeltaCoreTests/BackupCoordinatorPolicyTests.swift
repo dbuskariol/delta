@@ -52,6 +52,32 @@ final class BackupCoordinatorPolicyTests: XCTestCase {
         XCTAssertEqual(runner.commands.map(\.resticSubcommand), ["forget"])
     }
 
+    func testSuccessfulRepositoryCheckUpdatesLastVerifiedAt() throws {
+        let fixture = try Fixture()
+        let runner = MockResticRunner(results: [.success])
+        let coordinator = fixture.makeCoordinator(runner: runner)
+        try fixture.database.saveRepository(fixture.repository)
+
+        let checkRun = try coordinator.check(repository: fixture.repository)
+        let storedRepository = try XCTUnwrap(fixture.database.fetchRepositories().first { $0.id == fixture.repository.id })
+
+        XCTAssertEqual(checkRun.status, .succeeded)
+        XCTAssertNotNil(storedRepository.lastVerifiedAt)
+    }
+
+    func testFailedRepositoryCheckDoesNotUpdateLastVerifiedAt() throws {
+        let fixture = try Fixture()
+        let runner = MockResticRunner(results: [ResticRunResult(exitCode: 1, standardOutput: "", standardError: "check failed")])
+        let coordinator = fixture.makeCoordinator(runner: runner)
+        try fixture.database.saveRepository(fixture.repository)
+
+        let checkRun = try coordinator.check(repository: fixture.repository)
+        let storedRepository = try XCTUnwrap(fixture.database.fetchRepositories().first { $0.id == fixture.repository.id })
+
+        XCTAssertEqual(checkRun.status, .failed)
+        XCTAssertNil(storedRepository.lastVerifiedAt)
+    }
+
     func testScheduledMaintenanceRunsCleanupAndCheckWhenDue() throws {
         let fixture = try Fixture()
         let runner = MockResticRunner(results: [.success, .success, .success])
@@ -114,6 +140,95 @@ final class BackupCoordinatorPolicyTests: XCTestCase {
 
         XCTAssertEqual(runner.commands.map(\.resticSubcommand), ["backup", "forget", "check"])
         XCTAssertEqual(runs.map(\.status), [.succeeded, .succeeded, .failed])
+    }
+
+    func testRestoreRunsRequestedPreRestoreBackupBeforeRestore() throws {
+        let fixture = try Fixture()
+        let runner = MockResticRunner(results: [.success, .success])
+        let coordinator = fixture.makeCoordinator(runner: runner)
+        let profile = fixture.profile()
+        try fixture.database.saveRepository(fixture.repository)
+        try fixture.database.saveProfile(profile)
+        let request = RestoreRequest(
+            repositoryID: fixture.repository.id,
+            snapshotID: "latest",
+            destination: .chosenFolder(fixture.root.appendingPathComponent("restore").path),
+            dryRun: false,
+            preRestoreBackupProfileID: profile.id
+        )
+
+        let restoreRun = try coordinator.restore(request: request, repository: fixture.repository)
+        let jobs = try fixture.database.fetchJobRuns(limit: 10)
+
+        XCTAssertEqual(restoreRun.status, .succeeded)
+        XCTAssertEqual(runner.commands.map(\.resticSubcommand), ["backup", "restore"])
+        XCTAssertEqual(jobs.filter { $0.kind == .backup }.count, 1)
+        XCTAssertEqual(jobs.filter { $0.kind == .restore }.count, 1)
+    }
+
+    func testRestoreDoesNotStartWhenPreRestoreBackupFails() throws {
+        let fixture = try Fixture()
+        let backupFailure = ResticRunResult(exitCode: 1, standardOutput: "", standardError: "permission denied")
+        let runner = MockResticRunner(results: [backupFailure])
+        let coordinator = fixture.makeCoordinator(runner: runner)
+        let profile = fixture.profile()
+        try fixture.database.saveRepository(fixture.repository)
+        try fixture.database.saveProfile(profile)
+        let request = RestoreRequest(
+            repositoryID: fixture.repository.id,
+            snapshotID: "latest",
+            destination: .chosenFolder(fixture.root.appendingPathComponent("restore").path),
+            dryRun: false,
+            preRestoreBackupProfileID: profile.id
+        )
+
+        let restoreRun = try coordinator.restore(request: request, repository: fixture.repository)
+        let jobs = try fixture.database.fetchJobRuns(limit: 10)
+
+        XCTAssertEqual(restoreRun.status, .failed)
+        XCTAssertEqual(restoreRun.message, "Restore was not started because the pre-restore backup did not complete successfully.")
+        XCTAssertEqual(runner.commands.map(\.resticSubcommand), ["backup"])
+        XCTAssertEqual(jobs.filter { $0.kind == .backup && $0.status == .failed }.count, 1)
+        XCTAssertEqual(jobs.filter { $0.kind == .restore && $0.status == .failed }.count, 1)
+    }
+
+    func testDryRunRestoreDoesNotRunPreRestoreBackup() throws {
+        let fixture = try Fixture()
+        let runner = MockResticRunner(results: [.success])
+        let coordinator = fixture.makeCoordinator(runner: runner)
+        let request = RestoreRequest(
+            repositoryID: fixture.repository.id,
+            snapshotID: "latest",
+            destination: .chosenFolder(fixture.root.appendingPathComponent("restore").path),
+            dryRun: true,
+            preRestoreBackupProfileID: UUID()
+        )
+
+        let restoreRun = try coordinator.restore(request: request, repository: fixture.repository)
+
+        XCTAssertEqual(restoreRun.status, .succeeded)
+        XCTAssertEqual(runner.commands.map(\.resticSubcommand), ["restore"])
+    }
+
+    func testRestoreFailsWithoutStartingResticWhenPreRestoreProfileIsMissing() throws {
+        let fixture = try Fixture()
+        let runner = MockResticRunner(results: [.success])
+        let coordinator = fixture.makeCoordinator(runner: runner)
+        let request = RestoreRequest(
+            repositoryID: fixture.repository.id,
+            snapshotID: "latest",
+            destination: .chosenFolder(fixture.root.appendingPathComponent("restore").path),
+            dryRun: false,
+            preRestoreBackupProfileID: UUID()
+        )
+
+        let restoreRun = try coordinator.restore(request: request, repository: fixture.repository)
+        let jobs = try fixture.database.fetchJobRuns(limit: 10)
+
+        XCTAssertEqual(restoreRun.status, .failed)
+        XCTAssertEqual(restoreRun.message, "Restore was not started because the selected pre-restore backup profile no longer exists.")
+        XCTAssertTrue(runner.commands.isEmpty)
+        XCTAssertEqual(jobs.filter { $0.kind == .restore && $0.status == .failed }.count, 1)
     }
 
     func testDestinationLockPreventsOverlappingJobsAcrossCoordinators() throws {

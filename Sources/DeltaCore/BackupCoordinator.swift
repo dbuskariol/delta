@@ -84,12 +84,36 @@ public final class BackupCoordinator: @unchecked Sendable {
         }
         let snapshots = try parser.parseSnapshots(from: result.standardOutput)
         try database.saveSnapshots(snapshots, repositoryID: repository.id)
+        try markRepositoryVerified(repositoryID: repository.id, at: Date())
         return snapshots
     }
 
     @discardableResult
     public func restore(request: RestoreRequest, repository: BackupRepository) throws -> JobRun {
         try database.saveRestoreRequest(request)
+        if !request.dryRun, let preRestoreProfileID = request.preRestoreBackupProfileID {
+            let profiles = try database.fetchProfiles()
+            let repositories = Dictionary(uniqueKeysWithValues: try database.fetchRepositories().map { ($0.id, $0) })
+            guard let profile = profiles.first(where: { $0.id == preRestoreProfileID }) else {
+                return try failedRestoreRun(
+                    repositoryID: repository.id,
+                    message: "Restore was not started because the selected pre-restore backup profile no longer exists."
+                )
+            }
+            guard let backupRepository = repositories[profile.repositoryID] else {
+                return try failedRestoreRun(
+                    repositoryID: repository.id,
+                    message: "Restore was not started because the pre-restore backup destination no longer exists."
+                )
+            }
+            let preRestoreRun = try runBackup(profile: profile, repository: backupRepository)
+            guard preRestoreRun.status == .succeeded else {
+                return try failedRestoreRun(
+                    repositoryID: repository.id,
+                    message: "Restore was not started because the pre-restore backup did not complete successfully."
+                )
+            }
+        }
         return try run(repositoryID: repository.id, profileID: nil, kind: .restore) {
             try commandBuilder.restore(request: request, repository: repository)
         }
@@ -178,6 +202,20 @@ public final class BackupCoordinator: @unchecked Sendable {
         ).isDue
     }
 
+    private func failedRestoreRun(repositoryID: UUID, message: String) throws -> JobRun {
+        let run = JobRun(
+            profileID: nil,
+            repositoryID: repositoryID,
+            kind: .restore,
+            status: .failed,
+            finishedAt: Date(),
+            message: message
+        )
+        try database.saveJobRun(run)
+        try database.appendEvent(EventLog(level: .error, message: message))
+        return run
+    }
+
     private func skippedMaintenanceRun(profile: BackupProfile, repository: BackupRepository) -> JobRun {
         JobRun(
             profileID: profile.id,
@@ -220,8 +258,20 @@ public final class BackupCoordinator: @unchecked Sendable {
         job.exitCode = result.exitCode
         job.message = result.userFacingMessage
         try database.saveJobRun(job)
+        if job.status == .succeeded || job.status == .warning {
+            try markRepositoryVerified(repositoryID: repositoryID, at: job.finishedAt ?? Date())
+        }
         try database.appendEvent(EventLog(level: result.status == .failed ? .error : .info, message: "\(kind.displayName) finished with status \(result.status.rawValue)."))
         return job
+    }
+
+    private func markRepositoryVerified(repositoryID: UUID, at date: Date) throws {
+        var repositories = try database.fetchRepositories()
+        guard let index = repositories.firstIndex(where: { $0.id == repositoryID }) else {
+            return
+        }
+        repositories[index].lastVerifiedAt = date
+        try database.saveRepository(repositories[index])
     }
 }
 

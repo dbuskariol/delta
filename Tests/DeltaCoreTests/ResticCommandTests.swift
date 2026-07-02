@@ -45,6 +45,13 @@ final class ResticCommandTests: XCTestCase {
         XCTAssertEqual(try builder.repositoryURL(for: .swiftObjectStorage(container: "delta", path: nil)), "swift:delta:")
     }
 
+    func testBackendURLBuilderExpandsTypedLocalHomePath() throws {
+        let builder = ResticBackendURLBuilder()
+        let expected = ("~/DeltaBackups" as NSString).expandingTildeInPath
+
+        XCTAssertEqual(try builder.repositoryURL(for: .local(path: "  ~/DeltaBackups  ")), expected)
+    }
+
     func testBackupCommandIncludesIncrementalAndSafetyFlags() throws {
         let repository = BackupRepository(name: "Local", backend: .local(path: "/Volumes/Backup/Delta"))
         let profile = BackupProfile(

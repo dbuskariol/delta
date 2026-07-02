@@ -589,6 +589,7 @@ struct RepositoryRow: View {
                 }
                 Spacer()
                 MetadataBadge(text: repository.secretStorageMode.displayName)
+                MetadataBadge(text: verificationSummary)
                 IconButton(symbol: "shippingbox.and.arrow.backward", help: "Prepare destination") {
                     model.initializeRepository(repository)
                 }
@@ -603,6 +604,13 @@ struct RepositoryRow: View {
                 .disabled(model.isWorking)
             }
         }
+    }
+
+    private var verificationSummary: String {
+        guard let lastVerifiedAt = repository.lastVerifiedAt else {
+            return "Not checked"
+        }
+        return "Verified \(lastVerifiedAt.formatted(date: .abbreviated, time: .shortened))"
     }
 
     private var backendSummary: String {
