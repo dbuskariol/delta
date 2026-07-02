@@ -192,7 +192,7 @@ public struct ResticCommandBuilder: Sendable {
             throw ResticCommandValidationError.missingSnapshotID
         }
 
-        var snapshotArgument = snapshotID
+        let snapshotArgument = snapshotID
         var subcommand = [
             "restore",
             "--json",

@@ -157,31 +157,20 @@ final class DeltaStatusItemController: NSObject, ObservableObject, NSPopoverDele
     }
 
     private var statusSymbolName: String {
-        guard let model, model.isPersistentStoreAvailable else {
-            return "externaldrive.badge.exclamationmark"
-        }
-        if model.isWorking {
-            return "arrow.triangle.2.circlepath"
-        }
-        switch latestBackupStatus {
-        case .failed, .warning:
-            return "externaldrive.badge.exclamationmark"
-        default:
-            return "externaldrive.badge.checkmark"
-        }
+        statusPresentation.symbolName
     }
 
     private var accessibilityLabel: String {
-        guard let model, model.isPersistentStoreAvailable else {
-            return "Delta, storage unavailable"
-        }
-        if model.isWorking {
-            return "Delta, backup running"
-        }
-        guard let latestBackupStatus else {
-            return "Delta, ready"
-        }
-        return "Delta, last backup \(latestBackupStatus.displayName)"
+        statusPresentation.accessibilityLabel
+    }
+
+    private var statusPresentation: MenuBarStatusPresentation {
+        MenuBarStatusPresentation.make(
+            isPersistentStoreAvailable: model?.isPersistentStoreAvailable ?? false,
+            isWorking: model?.isWorking ?? false,
+            activeJobKind: model?.activeOperation?.kind,
+            latestBackupStatus: latestBackupStatus
+        )
     }
 
     private var latestBackupStatus: JobStatus? {

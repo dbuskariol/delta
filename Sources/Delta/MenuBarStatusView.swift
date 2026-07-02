@@ -232,46 +232,37 @@ struct DeltaMenuBarView: View {
     }
 
     private var statusSymbol: String {
-        if !model.isPersistentStoreAvailable {
-            return "externaldrive.badge.exclamationmark"
-        }
-        return model.isWorking ? "arrow.triangle.2.circlepath" : "externaldrive.badge.checkmark"
+        statusPresentation.symbolName
     }
 
     private var statusColor: Color {
-        if !model.isPersistentStoreAvailable {
-            return .red
-        }
-        if model.isWorking {
+        switch statusPresentation.tone {
+        case .ready:
+            return .green
+        case .running:
             return .blue
-        }
-        if lastBackupRun?.status == .failed {
+        case .attention:
+            return .orange
+        case .blocked:
             return .red
         }
-        if lastBackupRun?.status == .cancelled {
-            return .orange
-        }
-        return .green
     }
 
     private var statusBadgeText: String {
-        if !model.isPersistentStoreAvailable {
-            return "Blocked"
-        }
-        return model.isWorking ? "Running" : "Ready"
+        statusPresentation.badgeText
     }
 
     private var statusText: String {
-        if !model.isPersistentStoreAvailable {
-            return "Storage unavailable"
-        }
-        if let operation = model.activeOperation {
-            return operation.kind == .backup ? "Backup running" : "\(operation.kind.displayName) running"
-        }
-        guard let lastBackupRun else {
-            return "Ready"
-        }
-        return "Last backup \(lastBackupRun.status.displayName.lowercased())"
+        statusPresentation.headerText
+    }
+
+    private var statusPresentation: MenuBarStatusPresentation {
+        MenuBarStatusPresentation.make(
+            isPersistentStoreAvailable: model.isPersistentStoreAvailable,
+            isWorking: model.isWorking,
+            activeJobKind: model.activeOperation?.kind,
+            latestBackupStatus: lastBackupRun?.status
+        )
     }
 
     private func openApp(section: DeltaAppModel.Section) {
