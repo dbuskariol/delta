@@ -1,18 +1,73 @@
 import Foundation
 
+public struct ResticProgressSnapshot: Equatable, Sendable {
+    public var percentDone: Double?
+    public var filesDone: Int?
+    public var totalFiles: Int?
+    public var bytesDone: Int?
+    public var currentPath: String?
+    public var displayMessage: String
+
+    public init(
+        percentDone: Double? = nil,
+        filesDone: Int? = nil,
+        totalFiles: Int? = nil,
+        bytesDone: Int? = nil,
+        currentPath: String? = nil,
+        displayMessage: String
+    ) {
+        self.percentDone = percentDone
+        self.filesDone = filesDone
+        self.totalFiles = totalFiles
+        self.bytesDone = bytesDone
+        self.currentPath = currentPath
+        self.displayMessage = displayMessage
+    }
+}
+
 public enum ResticLogFormatter {
     public static func displayMessage(for rawMessage: String) -> String {
+        guard let object = jsonObject(from: rawMessage) else {
+            return rawMessage.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        return displayMessage(from: object, fallback: rawMessage)
+    }
+
+    public static func progressSnapshot(for rawMessage: String) -> ResticProgressSnapshot? {
+        guard
+            let object = jsonObject(from: rawMessage),
+            object["message_type"] as? String == "status"
+        else {
+            return nil
+        }
+
+        let percentDone = number(object["percent_done"]).map { min(max($0, 0), 1) }
+        return ResticProgressSnapshot(
+            percentDone: percentDone,
+            filesDone: integer(object["files_done"]),
+            totalFiles: integer(object["total_files"]),
+            bytesDone: integer(object["bytes_done"]),
+            currentPath: currentPath(from: object),
+            displayMessage: statusMessage(from: object)
+        )
+    }
+
+    private static func jsonObject(from rawMessage: String) -> [String: Any]? {
         let trimmed = rawMessage.trimmingCharacters(in: .whitespacesAndNewlines)
         guard
             trimmed.first == "{",
             let data = trimmed.data(using: .utf8),
             let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
         else {
-            return trimmed
+            return nil
         }
+        return object
+    }
 
+    private static func displayMessage(from object: [String: Any], fallback: String) -> String {
         guard let messageType = object["message_type"] as? String else {
-            return trimmed
+            return fallback.trimmingCharacters(in: .whitespacesAndNewlines)
         }
 
         switch messageType {
@@ -26,7 +81,7 @@ public enum ResticLogFormatter {
             if let message = object["message"] as? String, !message.isEmpty {
                 return message
             }
-            return trimmed
+            return fallback.trimmingCharacters(in: .whitespacesAndNewlines)
         }
     }
 

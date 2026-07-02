@@ -3,6 +3,16 @@ import DeltaCore
 import Foundation
 import SwiftUI
 
+struct ActiveOperation: Identifiable, Equatable {
+    var id = UUID()
+    var kind: JobKind
+    var profileID: UUID?
+    var repositoryID: UUID?
+    var title: String
+    var detail: String
+    var startedAt = Date()
+}
+
 @MainActor
 final class DeltaAppModel: ObservableObject {
     enum Section: String, CaseIterable, Identifiable {
@@ -39,6 +49,8 @@ final class DeltaAppModel: ObservableObject {
     @Published var isWorking = false
     @Published var alertMessage: String?
     @Published var liveLogLines: [ResticOutputEvent] = []
+    @Published var activeOperation: ActiveOperation?
+    @Published var activeProgress: ResticProgressSnapshot?
 
     private let database: DeltaDatabase
     private let secretStore = KeychainSecretStore()
@@ -222,21 +234,45 @@ final class DeltaAppModel: ObservableObject {
             return
         }
         let coordinator = makeCoordinator()
-        performBackgroundWork {
+        performBackgroundWork(
+            activeOperation: ActiveOperation(
+                kind: .backup,
+                profileID: profile.id,
+                repositoryID: repository.id,
+                title: "Backing up \(profile.name)",
+                detail: "Saving to \(repository.name)"
+            )
+        ) {
             _ = try coordinator.runBackup(profile: profile, repository: repository)
         }
     }
 
     func initializeRepository(_ repository: BackupRepository) {
         let coordinator = makeCoordinator()
-        performBackgroundWork {
+        performBackgroundWork(
+            activeOperation: ActiveOperation(
+                kind: .initializeRepository,
+                profileID: nil,
+                repositoryID: repository.id,
+                title: "Preparing \(repository.name)",
+                detail: "Creating encrypted destination metadata"
+            )
+        ) {
             _ = try coordinator.initializeRepository(repository)
         }
     }
 
     func checkRepository(_ repository: BackupRepository) {
         let coordinator = makeCoordinator()
-        performBackgroundWork {
+        performBackgroundWork(
+            activeOperation: ActiveOperation(
+                kind: .check,
+                profileID: nil,
+                repositoryID: repository.id,
+                title: "Checking \(repository.name)",
+                detail: "Verifying destination integrity"
+            )
+        ) {
             _ = try coordinator.check(repository: repository, readDataSubset: "1/100")
         }
     }
@@ -247,28 +283,60 @@ final class DeltaAppModel: ObservableObject {
             return
         }
         let coordinator = makeCoordinator()
-        performBackgroundWork {
+        performBackgroundWork(
+            activeOperation: ActiveOperation(
+                kind: .prune,
+                profileID: profile.id,
+                repositoryID: repository.id,
+                title: "Cleaning up \(profile.name)",
+                detail: "Applying retention rules to \(repository.name)"
+            )
+        ) {
             _ = try coordinator.forgetAndPrune(profile: profile, repository: repository)
         }
     }
 
     func runDueBackups() {
         let coordinator = makeCoordinator()
-        performBackgroundWork {
+        performBackgroundWork(
+            activeOperation: ActiveOperation(
+                kind: .backup,
+                profileID: nil,
+                repositoryID: nil,
+                title: "Running scheduled backups",
+                detail: "Checking due profiles and available destinations"
+            )
+        ) {
             _ = try coordinator.runDueBackups()
         }
     }
 
     func refreshSnapshots(repository: BackupRepository) {
         let coordinator = makeCoordinator()
-        performBackgroundWork {
+        performBackgroundWork(
+            activeOperation: ActiveOperation(
+                kind: .check,
+                profileID: nil,
+                repositoryID: repository.id,
+                title: "Refreshing restore points",
+                detail: "Reading snapshots from \(repository.name)"
+            )
+        ) {
             _ = try coordinator.refreshSnapshots(repository: repository)
         }
     }
 
     func runRestore(repository: BackupRepository, request: RestoreRequest) {
         let coordinator = makeCoordinator()
-        performBackgroundWork {
+        performBackgroundWork(
+            activeOperation: ActiveOperation(
+                kind: .restore,
+                profileID: request.preRestoreBackupProfileID,
+                repositoryID: repository.id,
+                title: request.dryRun ? "Previewing restore" : "Restoring files",
+                detail: "Reading from \(repository.name)"
+            )
+        ) {
             _ = try coordinator.restore(request: request, repository: repository)
         }
     }
@@ -322,19 +390,25 @@ final class DeltaAppModel: ObservableObject {
         }
     }
 
-    private func performBackgroundWork(_ operation: @escaping @Sendable () throws -> Void) {
+    private func performBackgroundWork(activeOperation: ActiveOperation, _ operation: @escaping @Sendable () throws -> Void) {
         isWorking = true
+        self.activeOperation = activeOperation
+        activeProgress = nil
         liveLogLines.removeAll()
         Task.detached(priority: .userInitiated) {
             do {
                 try operation()
                 await MainActor.run {
                     self.isWorking = false
+                    self.activeOperation = nil
+                    self.activeProgress = nil
                     self.reload()
                 }
             } catch {
                 await MainActor.run {
                     self.isWorking = false
+                    self.activeOperation = nil
+                    self.activeProgress = nil
                     self.alertMessage = error.localizedDescription
                     self.reload()
                 }
@@ -365,6 +439,9 @@ final class DeltaAppModel: ObservableObject {
         }
         let displayMessage = ResticLogFormatter.displayMessage(for: trimmed)
         liveLogLines.append(ResticOutputEvent(date: event.date, stream: event.stream, message: String(displayMessage.prefix(2_000))))
+        if let progress = ResticLogFormatter.progressSnapshot(for: trimmed) {
+            activeProgress = progress
+        }
         if liveLogLines.count > 500 {
             liveLogLines.removeFirst(liveLogLines.count - 500)
         }

@@ -30,6 +30,19 @@ final class ResticRunnerTests: XCTestCase {
         XCTAssertEqual(message, "Estimated 42% · 21/50 files · 1 MB")
     }
 
+    func testLogFormatterExposesProgressSnapshotForStatusJSON() {
+        let snapshot = ResticLogFormatter.progressSnapshot(for: """
+        {"message_type":"status","percent_done":0.42,"files_done":21,"total_files":50,"bytes_done":1048576,"current_files":["/Users/me/Documents/Projects/Delta/file.txt"]}
+        """)
+
+        XCTAssertEqual(snapshot?.percentDone, 0.42)
+        XCTAssertEqual(snapshot?.filesDone, 21)
+        XCTAssertEqual(snapshot?.totalFiles, 50)
+        XCTAssertEqual(snapshot?.bytesDone, 1_048_576)
+        XCTAssertEqual(snapshot?.currentPath, "/Users/me/Documents/Projects/Delta/file.txt")
+        XCTAssertEqual(snapshot?.displayMessage, "Estimated 42% · 21/50 files · 1 MB · Current .../Projects/Delta/file.txt")
+    }
+
     func testLogFormatterShowsCurrentFileWhenResticReportsIt() {
         let message = ResticLogFormatter.displayMessage(for: """
         {"message_type":"status","percent_done":0.42,"files_done":21,"total_files":50,"bytes_done":1048576,"current_files":["/Users/me/Documents/Projects/Delta/file.txt"]}
