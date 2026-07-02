@@ -147,7 +147,12 @@ EXTRACTED_TEAM="$(/usr/bin/awk -F= '/^TeamIdentifier=/{print $2; exit}' <<<"$EXT
 SOURCE_AUTHORITY="$(/usr/bin/awk -F= '/^Authority=/{print $2; exit}' <<<"$SOURCE_SIGNING")"
 EXTRACTED_AUTHORITY="$(/usr/bin/awk -F= '/^Authority=/{print $2; exit}' <<<"$EXTRACTED_SIGNING")"
 [[ -n "$SOURCE_IDENTIFIER" && "$SOURCE_IDENTIFIER" == "$EXTRACTED_IDENTIFIER" ]] || fail "archived app signing identifier does not match source app"
-[[ -n "$SOURCE_TEAM" && "$SOURCE_TEAM" == "$EXTRACTED_TEAM" ]] || fail "archived app TeamIdentifier does not match source app"
-[[ -n "$SOURCE_AUTHORITY" && "$SOURCE_AUTHORITY" == "$EXTRACTED_AUTHORITY" ]] || fail "archived app signing authority does not match source app"
+if [[ "${DELTA_ALLOW_ADHOC_UPDATE_VERIFICATION:-0}" == "1" ]]; then
+  [[ "${SOURCE_TEAM:-not set}" == "${EXTRACTED_TEAM:-not set}" ]] || fail "archived app TeamIdentifier does not match source app"
+  [[ "${SOURCE_AUTHORITY:-ad-hoc}" == "${EXTRACTED_AUTHORITY:-ad-hoc}" ]] || fail "archived app signing authority does not match source app"
+else
+  [[ -n "$SOURCE_TEAM" && "$SOURCE_TEAM" == "$EXTRACTED_TEAM" ]] || fail "archived app TeamIdentifier does not match source app"
+  [[ -n "$SOURCE_AUTHORITY" && "$SOURCE_AUTHORITY" == "$EXTRACTED_AUTHORITY" ]] || fail "archived app signing authority does not match source app"
+fi
 
 printf "Sparkle update artifacts verified: %s, %s, appcast.xml\n" "$ARCHIVE_NAME" "$RELEASE_NOTES_NAME"

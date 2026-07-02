@@ -11,6 +11,8 @@ cd "$ROOT_DIR"
 /bin/bash -n \
   "$ROOT_DIR/Scripts/package-update.sh" \
   "$ROOT_DIR/Scripts/notarize-release.sh" \
+  "$ROOT_DIR/Scripts/verify-ci.sh" \
+  "$ROOT_DIR/Scripts/verify-ci-workflows.sh" \
   "$ROOT_DIR/Scripts/verify-notarization-policy.sh" \
   "$ROOT_DIR/Scripts/manual-acceptance-items.sh" \
   "$ROOT_DIR/Scripts/collect-release-evidence.sh" \
@@ -36,6 +38,14 @@ if [[ ! -x "$ROOT_DIR/Scripts/notarize-release.sh" ]]; then
 fi
 if [[ ! -x "$ROOT_DIR/Scripts/verify-notarization-policy.sh" ]]; then
   printf "Scripts/verify-notarization-policy.sh must be executable.\n" >&2
+  exit 1
+fi
+if [[ ! -x "$ROOT_DIR/Scripts/verify-ci.sh" ]]; then
+  printf "Scripts/verify-ci.sh must be executable.\n" >&2
+  exit 1
+fi
+if [[ ! -x "$ROOT_DIR/Scripts/verify-ci-workflows.sh" ]]; then
+  printf "Scripts/verify-ci-workflows.sh must be executable.\n" >&2
   exit 1
 fi
 if [[ ! -x "$ROOT_DIR/Scripts/collect-release-evidence.sh" ]]; then
@@ -113,6 +123,7 @@ fi
 "$ROOT_DIR/Scripts/verify-manual-acceptance-matrix.sh"
 "$ROOT_DIR/Scripts/verify-manual-acceptance-self-test.sh"
 "$ROOT_DIR/Scripts/verify-notarization-policy.sh"
+"$ROOT_DIR/Scripts/verify-ci-workflows.sh"
 "$ROOT_DIR/Scripts/bootstrap-tools.sh"
 "$ROOT_DIR/Scripts/verify-tools.sh"
 "$ROOT_DIR/Scripts/verify-restic-surface.sh"

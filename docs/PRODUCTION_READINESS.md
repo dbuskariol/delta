@@ -10,6 +10,8 @@ Run from the repository root:
 Scripts/verify-release.sh
 ```
 
+Every push and pull request also runs `.github/workflows/ci.yml` on GitHub's macOS 26 runner. The workflow calls `Scripts/verify-ci.sh`, which is intentionally certificate-free: it runs tests, product-language checks, manual-matrix validators, tool verification, the local restic integration, an ad-hoc signed app build, code-signature validation, and Sparkle artifact verification. The local release gate remains stricter because it requires a stable Apple signing identity and installed-app acceptance checks.
+
 The automated gate must pass before any beta or production build is shipped. It verifies:
 
 - Swift unit tests

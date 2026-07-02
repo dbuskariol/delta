@@ -370,6 +370,8 @@ Scripts/generate-appcast.sh
 
 Local development builds prefer `DELTA_CODESIGN_IDENTITY` when set. If it is unset, the build script automatically uses the first available `Developer ID Application` or `Apple Development` signing identity before falling back to ad-hoc signing. Stable signing matters for macOS privacy permissions such as Full Disk Access; changing the signing identity changes the app identity macOS trusts. The release verifier rejects ad-hoc-signed app bundles because they are not production-ready and can invalidate privacy approvals between installs. It also fails the production app build if compiler warnings are emitted.
 
+Every push and pull request runs `.github/workflows/ci.yml` on GitHub's macOS 26 runner. `Scripts/verify-ci.sh` is the certificate-free CI gate: it runs unit tests, product-language checks, manual-matrix validators, bundled tool verification, the real local restic lifecycle integration, an ad-hoc signed app build, strict code-signature validation, and Sparkle archive/appcast verification. `Scripts/verify-release.sh` remains the stronger local release gate because it also requires a stable Apple signing identity and installed-app acceptance checks.
+
 Developer ID distribution should use:
 
 ```sh

@@ -101,6 +101,11 @@ else
 fi
 
 printf "\n## Automated Gate\n\n"
+if "$ROOT_DIR/Scripts/verify-ci-workflows.sh" >/dev/null 2>&1; then
+  pass "GitHub Actions CI workflow is configured for the macOS 26 CI gate."
+else
+  block "GitHub Actions CI workflow is missing or invalid. Run Scripts/verify-ci-workflows.sh."
+fi
 if [[ -f "$GATE_STATUS_FILE" ]]; then
   gate_status="$(gate_status_value status)"
   gate_commit="$(gate_status_value git_commit)"
