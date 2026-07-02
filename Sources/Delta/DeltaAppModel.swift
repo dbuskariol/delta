@@ -52,6 +52,7 @@ final class DeltaAppModel: ObservableObject {
     @Published var alertMessage: String?
     @Published var liveLogLines: [ResticOutputEvent] = []
     @Published var activeOperation: ActiveOperation?
+    @Published var activeJobID: UUID?
     @Published var activeProgress: ResticProgressSnapshot?
     @Published var activeStopRequest: ResticRunStopReason?
 
@@ -61,6 +62,9 @@ final class DeltaAppModel: ObservableObject {
     private let bookmarkStore = SecurityScopedBookmarkStore()
     private let repositoryValidator = BackupRepositoryValidator()
     private let runController = ResticRunController()
+    private let runControlStore = ResticRunControlStore()
+    private var localOperationIsRunning = false
+    private var databaseRefreshTask: Task<Void, Never>?
     private var lastLiveLogWasStatus = false
 
     init() {
@@ -68,22 +72,129 @@ final class DeltaAppModel: ObservableObject {
         database = result.database
         alertMessage = result.warning
         reload()
+        startDatabaseRefreshLoop()
+    }
+
+    deinit {
+        databaseRefreshTask?.cancel()
     }
 
     func reload() {
         do {
             let storedRepositories = try database.fetchRepositories()
+            let storedProfiles = try database.fetchProfiles()
+            let storedJobs = try database.fetchJobRuns(limit: 100)
+            let storedJobLogs = try database.fetchJobLogs(limit: 300)
             repositories = storedRepositories
-            profiles = try database.fetchProfiles()
-            jobs = try database.fetchJobRuns(limit: 100)
-            jobLogs = try database.fetchJobLogs(limit: 300)
+            profiles = storedProfiles
+            jobs = storedJobs
+            jobLogs = storedJobLogs
             snapshots = try database.fetchSnapshots()
             snapshotsByRepository = try database.fetchSnapshotsByRepository()
             events = try database.fetchEvents(limit: 200)
             fullDiskAccessStatus = FullDiskAccessProbe().check()
+            reconcileObservedActiveJob(
+                jobs: storedJobs,
+                jobLogs: storedJobLogs,
+                profiles: storedProfiles,
+                repositories: storedRepositories
+            )
         } catch {
             alertMessage = error.localizedDescription
         }
+    }
+
+    private func startDatabaseRefreshLoop() {
+        databaseRefreshTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                await MainActor.run {
+                    self?.reload()
+                }
+            }
+        }
+    }
+
+    private func reconcileObservedActiveJob(
+        jobs: [JobRun],
+        jobLogs: [JobLogEntry],
+        profiles: [BackupProfile],
+        repositories: [BackupRepository]
+    ) {
+        guard !localOperationIsRunning else {
+            return
+        }
+
+        guard let runningJob = jobs
+            .filter({ $0.status == .running })
+            .max(by: { $0.startedAt < $1.startedAt })
+        else {
+            isWorking = false
+            activeOperation = nil
+            activeJobID = nil
+            activeProgress = nil
+            activeStopRequest = nil
+            liveLogLines.removeAll()
+            lastLiveLogWasStatus = false
+            return
+        }
+
+        isWorking = true
+        activeJobID = runningJob.id
+        activeOperation = observedOperation(
+            for: runningJob,
+            profiles: profiles,
+            repositories: repositories
+        )
+        activeStopRequest = runControlStore.stopReason(for: runningJob.id)
+        activeProgress = nil
+        liveLogLines = jobLogs
+            .filter { $0.jobID == runningJob.id }
+            .sorted { $0.date < $1.date }
+            .suffix(200)
+            .map { ResticOutputEvent(id: $0.id, date: $0.date, stream: $0.stream, message: $0.message) }
+        lastLiveLogWasStatus = false
+    }
+
+    private func observedOperation(
+        for job: JobRun,
+        profiles: [BackupProfile],
+        repositories: [BackupRepository]
+    ) -> ActiveOperation {
+        let profile = job.profileID.flatMap { profileID in profiles.first { $0.id == profileID } }
+        let repository = repositories.first { $0.id == job.repositoryID }
+        let profileName = profile?.name ?? "scheduled backup"
+        let repositoryName = repository?.name ?? "destination"
+
+        let title: String
+        let detail: String
+        switch job.kind {
+        case .initializeRepository:
+            title = "Preparing \(repositoryName)"
+            detail = "Creating encrypted destination metadata"
+        case .backup:
+            title = profile.map { "Backing up \($0.name)" } ?? "Running scheduled backups"
+            detail = "Saving to \(repositoryName)"
+        case .restore:
+            title = "Restoring files"
+            detail = "Reading from \(repositoryName)"
+        case .check:
+            title = "Checking \(repositoryName)"
+            detail = "Verifying destination integrity"
+        case .prune:
+            title = "Cleaning up \(profileName)"
+            detail = "Applying retention rules to \(repositoryName)"
+        }
+
+        return ActiveOperation(
+            id: job.id,
+            kind: job.kind,
+            profileID: job.profileID,
+            repositoryID: job.repositoryID,
+            title: title,
+            detail: detail,
+            startedAt: job.startedAt
+        )
     }
 
     func savedLogs(for jobID: UUID, limit: Int = 10_000) -> [JobLogEntry] {
@@ -478,8 +589,10 @@ final class DeltaAppModel: ObservableObject {
 
     private func performBackgroundWork(activeOperation: ActiveOperation, _ operation: @escaping @Sendable () throws -> Void) {
         runController.reset()
+        localOperationIsRunning = true
         isWorking = true
         self.activeOperation = activeOperation
+        activeJobID = nil
         activeStopRequest = nil
         activeProgress = nil
         liveLogLines.removeAll()
@@ -488,8 +601,10 @@ final class DeltaAppModel: ObservableObject {
             do {
                 try operation()
                 await MainActor.run {
+                    self.localOperationIsRunning = false
                     self.isWorking = false
                     self.activeOperation = nil
+                    self.activeJobID = nil
                     self.activeStopRequest = nil
                     self.activeProgress = nil
                     self.runController.reset()
@@ -497,8 +612,10 @@ final class DeltaAppModel: ObservableObject {
                 }
             } catch {
                 await MainActor.run {
+                    self.localOperationIsRunning = false
                     self.isWorking = false
                     self.activeOperation = nil
+                    self.activeJobID = nil
                     self.activeStopRequest = nil
                     self.activeProgress = nil
                     self.runController.reset()
@@ -517,8 +634,10 @@ final class DeltaAppModel: ObservableObject {
                 secretBridgeURL: Self.secretBridgeURL()
             ),
             runner: ResticRunner(runController: runController),
-            outputHandler: { [weak self] _, event in
+            runControlStore: runControlStore,
+            outputHandler: { [weak self] jobID, event in
                 Task { @MainActor [weak self] in
+                    self?.activeJobID = jobID
                     self?.appendLiveLog(event)
                 }
             }
@@ -527,6 +646,13 @@ final class DeltaAppModel: ObservableObject {
 
     private func requestActiveStop(_ reason: ResticRunStopReason) {
         activeStopRequest = reason
+        if let activeJobID {
+            do {
+                try runControlStore.requestStop(jobID: activeJobID, reason: reason)
+            } catch {
+                alertMessage = error.localizedDescription
+            }
+        }
         let event = ResticOutputEvent(stream: .standardOutput, message: reason.requestMessage)
         appendLiveLog(event)
         runController.requestStop(reason)

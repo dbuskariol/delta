@@ -12,10 +12,10 @@ The product goal is simple: make serious backup practices approachable without h
 - **Local and network destinations** including local paths, mounted SMB/NFS volumes, SFTP, REST server, S3-compatible storage, Backblaze B2, Azure Blob, Google Cloud Storage, OpenStack Swift, rclone remotes, and custom restic URLs.
 - **Destination validation before save** for required fields, new or changed writable local paths, REST URLs, SFTP paths/ports, and rclone remote syntax.
 - **Automatic destination preparation** after a destination is added, with a first-backup safety net for writable local or mounted destinations that still have no restic metadata.
-- **Scheduled backups** through a bundled `DeltaAgent` LaunchAgent registered with `SMAppService`.
+- **Scheduled backups** through a bundled `DeltaAgent` LaunchAgent registered with `SMAppService`, with agent-started jobs reflected back into the app and menu bar.
 - **Power-aware scheduling** with battery and Low Power Mode controls.
 - **Retention maintenance** with scheduled forget/prune/check windows.
-- **Pause, resume, and cancel controls** for active backups from the main window and macOS menu bar. Pause stops restic safely, keeps the profile visibly paused, and Resume continues from already saved backup data.
+- **Pause, resume, and cancel controls** for active backups from the main window and macOS menu bar, including scheduled jobs started by `DeltaAgent`. Pause stops restic safely, keeps the profile visibly paused, and Resume continues from already saved backup data.
 - **Clear backup summaries** showing new, changed, unchanged, added, and checked data for each backup run.
 - **Full or browsed selected restore** with backup browsing, file/folder selection, dry-run preview, overwrite policies, verification, original-path restore, chosen-folder restore, and optional pre-restore backup.
 - **Streaming and saved backup logs** from restic stdout/stderr with source context, stable processed-file counters, clean change summaries, fixed-height live panes, and expandable per-job audit history.
@@ -62,6 +62,7 @@ Important implementation details:
 - **Security-scoped bookmarks** preserve access to selected source folders where macOS requires it.
 - **Per-destination locks** prevent overlapping backup, restore, prune, and check jobs across app/agent processes.
 - **Per-job output logs** persist formatted restic progress, warnings, errors, start lines, and finish lines for troubleshooting after relaunch or scheduled agent runs.
+- **Durable run controls** let the app request pause/cancel for an agent-owned restic process without relying on in-memory UI state.
 - **Bundled tools** are pinned and checksum-verified through `Scripts/bootstrap-tools.sh`.
 - **Packaged app verification** checks signatures, Sparkle embedding, LaunchAgent plist integrity, helper smoke tests, Sparkle update metadata, and bundled restic/rclone versions.
 

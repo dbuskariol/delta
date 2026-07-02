@@ -139,6 +139,36 @@ final class BackupCoordinatorPolicyTests: XCTestCase {
         XCTAssertTrue(logs.contains { $0.message.localizedCaseInsensitiveContains("paused") })
     }
 
+    func testRunBackupHonorsPersistentStopRequestFromControlStore() throws {
+        let fixture = try Fixture()
+        let store = ResticRunControlStore(directoryProvider: { fixture.root.appendingPathComponent("controls", isDirectory: true) })
+        let capturedJobID = LockedValue<UUID?>(nil)
+        let runner = ControlledMockResticRunner { stopReasonProvider in
+            let jobID = try XCTUnwrap(capturedJobID.value)
+            try store.requestStop(jobID: jobID, reason: .pause)
+            return ResticRunResult(
+                exitCode: 130,
+                standardOutput: "",
+                standardError: "",
+                stopReason: stopReasonProvider?()
+            )
+        }
+        let coordinator = fixture.makeCoordinator(
+            runner: runner,
+            runControlStore: store,
+            outputHandler: { jobID, _ in
+                capturedJobID.value = jobID
+            }
+        )
+        let profile = fixture.profile()
+
+        let job = try coordinator.runBackup(profile: profile, repository: fixture.repository)
+
+        XCTAssertEqual(job.status, .cancelled)
+        XCTAssertTrue(job.message?.localizedCaseInsensitiveContains("paused") == true, job.message ?? "")
+        XCTAssertNil(try store.stopRequest(for: job.id))
+    }
+
     func testRefreshSnapshotsUsesFriendlyRepositoryMissingMessage() throws {
         let fixture = try Fixture()
         let rawError = """
@@ -597,6 +627,58 @@ private final class MockResticRunner: ResticStreamingRunning, @unchecked Sendabl
     }
 }
 
+private final class ControlledMockResticRunner: ResticControlledStreamingRunning, @unchecked Sendable {
+    private let lock = NSLock()
+    private let resultProvider: (@Sendable ((@Sendable () -> ResticRunStopReason?)?) throws -> ResticRunResult)
+    private(set) var commands: [ResticCommand] = []
+
+    init(resultProvider: @escaping @Sendable ((@Sendable () -> ResticRunStopReason?)?) throws -> ResticRunResult) {
+        self.resultProvider = resultProvider
+    }
+
+    func run(_ command: ResticCommand) throws -> ResticRunResult {
+        try run(command, outputHandler: nil, stopReasonProvider: nil)
+    }
+
+    func run(_ command: ResticCommand, outputHandler: (@Sendable (ResticOutputEvent) -> Void)?) throws -> ResticRunResult {
+        try run(command, outputHandler: outputHandler, stopReasonProvider: nil)
+    }
+
+    func run(
+        _ command: ResticCommand,
+        outputHandler: (@Sendable (ResticOutputEvent) -> Void)?,
+        stopReasonProvider: (@Sendable () -> ResticRunStopReason?)?
+    ) throws -> ResticRunResult {
+        lock.lock()
+        commands.append(command)
+        lock.unlock()
+        outputHandler?(ResticOutputEvent(stream: .standardOutput, message: "running"))
+        return try resultProvider(stopReasonProvider)
+    }
+}
+
+private final class LockedValue<Value>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storedValue: Value
+
+    init(_ value: Value) {
+        storedValue = value
+    }
+
+    var value: Value {
+        get {
+            lock.lock()
+            defer { lock.unlock() }
+            return storedValue
+        }
+        set {
+            lock.lock()
+            storedValue = newValue
+            lock.unlock()
+        }
+    }
+}
+
 private final class JobOutputRecorder: @unchecked Sendable {
     private let lock = NSLock()
     private var recordedEvents: [(jobID: UUID, event: ResticOutputEvent)] = []
@@ -695,6 +777,7 @@ private struct Fixture {
         runner: any ResticRunning,
         scheduleEvaluator: ScheduleEvaluator = ScheduleEvaluator(),
         powerState: PowerState = PowerState(isOnBatteryPower: false, isLowPowerModeEnabled: false),
+        runControlStore: ResticRunControlStore? = nil,
         outputHandler: (@Sendable (UUID, ResticOutputEvent) -> Void)? = nil
     ) -> BackupCoordinator {
         BackupCoordinator(
@@ -707,6 +790,7 @@ private struct Fixture {
             scheduleEvaluator: scheduleEvaluator,
             powerStateProvider: PowerStateProvider(currentPowerState: { powerState }),
             lockManager: lockManager,
+            runControlStore: runControlStore,
             outputHandler: outputHandler
         )
     }

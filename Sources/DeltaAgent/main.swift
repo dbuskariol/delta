@@ -13,7 +13,8 @@ enum DeltaAgentMain {
                     credentialResolver: RepositoryCredentialResolver(
                         authenticationPolicy: .failIfInteractionNeeded
                     )
-                )
+                ),
+                runControlStore: ResticRunControlStore()
             )
 
             if CommandLine.arguments.contains("--status") {

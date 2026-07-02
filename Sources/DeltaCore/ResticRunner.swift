@@ -181,6 +181,14 @@ public protocol ResticStreamingRunning: ResticRunning {
     func run(_ command: ResticCommand, outputHandler: (@Sendable (ResticOutputEvent) -> Void)?) throws -> ResticRunResult
 }
 
+public protocol ResticControlledStreamingRunning: ResticStreamingRunning {
+    func run(
+        _ command: ResticCommand,
+        outputHandler: (@Sendable (ResticOutputEvent) -> Void)?,
+        stopReasonProvider: (@Sendable () -> ResticRunStopReason?)?
+    ) throws -> ResticRunResult
+}
+
 public final class ResticRunController: @unchecked Sendable {
     private let lock = NSLock()
     private var process: Process?
@@ -271,6 +279,14 @@ public final class ResticRunner: ResticRunning, @unchecked Sendable {
     }
 
     public func run(_ command: ResticCommand, outputHandler additionalOutputHandler: (@Sendable (ResticOutputEvent) -> Void)?) throws -> ResticRunResult {
+        try run(command, outputHandler: additionalOutputHandler, stopReasonProvider: nil)
+    }
+
+    public func run(
+        _ command: ResticCommand,
+        outputHandler additionalOutputHandler: (@Sendable (ResticOutputEvent) -> Void)?,
+        stopReasonProvider: (@Sendable () -> ResticRunStopReason?)?
+    ) throws -> ResticRunResult {
         let process = Process()
         process.executableURL = command.executableURL
         process.arguments = normalizedArguments(for: command)
@@ -306,9 +322,16 @@ public final class ResticRunner: ResticRunning, @unchecked Sendable {
         }
 
         try process.run()
-        runController?.attach(process)
+        let controller = runController ?? (stopReasonProvider == nil ? nil : ResticRunController())
+        let stopMonitor = ResticStopRequestMonitor(
+            controller: controller,
+            stopReasonProvider: stopReasonProvider
+        )
+        controller?.attach(process)
+        stopMonitor.start()
         process.waitUntilExit()
-        runController?.detach(process)
+        stopMonitor.cancel()
+        controller?.detach(process)
 
         stdoutPipe.fileHandleForReading.readabilityHandler = nil
         stderrPipe.fileHandleForReading.readabilityHandler = nil
@@ -319,7 +342,7 @@ public final class ResticRunner: ResticRunning, @unchecked Sendable {
             exitCode: process.terminationStatus,
             standardOutput: stdoutCollector.stringValue,
             standardError: stderrCollector.stringValue,
-            stopReason: runController?.requestedStopReason
+            stopReason: controller?.requestedStopReason
         )
     }
 
@@ -331,7 +354,48 @@ public final class ResticRunner: ResticRunning, @unchecked Sendable {
     }
 }
 
-extension ResticRunner: ResticStreamingRunning {}
+extension ResticRunner: ResticControlledStreamingRunning {}
+
+private final class ResticStopRequestMonitor: @unchecked Sendable {
+    private let controller: ResticRunController?
+    private let stopReasonProvider: (@Sendable () -> ResticRunStopReason?)?
+    private var timer: DispatchSourceTimer?
+
+    init(
+        controller: ResticRunController?,
+        stopReasonProvider: (@Sendable () -> ResticRunStopReason?)?
+    ) {
+        self.controller = controller
+        self.stopReasonProvider = stopReasonProvider
+        guard controller != nil, stopReasonProvider != nil else {
+            return
+        }
+        let timer = DispatchSource.makeTimerSource(queue: DispatchQueue.global(qos: .utility))
+        timer.schedule(deadline: .now() + 0.25, repeating: 0.5)
+        self.timer = timer
+    }
+
+    func start() {
+        guard let timer else {
+            return
+        }
+        timer.setEventHandler { [controller, stopReasonProvider] in
+            guard
+                controller?.requestedStopReason == nil,
+                let reason = stopReasonProvider?()
+            else {
+                return
+            }
+            controller?.requestStop(reason)
+        }
+        timer.resume()
+    }
+
+    func cancel() {
+        timer?.cancel()
+        timer = nil
+    }
+}
 
 private final class LineEmitter: @unchecked Sendable {
     private let lock = NSLock()

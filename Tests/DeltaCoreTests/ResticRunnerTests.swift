@@ -51,6 +51,56 @@ final class ResticRunnerTests: XCTestCase {
         XCTAssertTrue(box.result?.userFacingMessage.localizedCaseInsensitiveContains("paused") == true)
     }
 
+    func testControlStorePersistsAndClearsStopRequests() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("delta-control-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let store = ResticRunControlStore(directoryProvider: { directory })
+        let jobID = UUID()
+
+        try store.requestStop(jobID: jobID, reason: .pause)
+
+        XCTAssertEqual(try store.stopRequest(for: jobID)?.reason, .pause)
+        XCTAssertEqual(store.stopReason(for: jobID), .pause)
+
+        store.clearStopRequest(jobID: jobID)
+
+        XCTAssertNil(try store.stopRequest(for: jobID))
+    }
+
+    func testRunnerHonorsExternalStopProvider() throws {
+        let runner = ResticRunner()
+        let stopBox = StopRequestBox()
+        let command = ResticCommand(
+            executableURL: URL(fileURLWithPath: "/bin/sh"),
+            arguments: ["-c", "trap 'echo interrupted >&2; exit 130' INT; while true; do sleep 1; done"]
+        )
+        let completion = DispatchSemaphore(value: 0)
+        let box = ResultBox()
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                box.result = try runner.run(command, outputHandler: nil) {
+                    stopBox.reason
+                }
+            } catch {
+                box.error = error
+            }
+            completion.signal()
+        }
+
+        Thread.sleep(forTimeInterval: 0.25)
+        stopBox.reason = .cancel
+
+        XCTAssertEqual(completion.wait(timeout: .now() + 5), .success)
+        XCTAssertNil(box.error)
+        XCTAssertEqual(box.result?.status, .cancelled)
+        XCTAssertEqual(box.result?.failureKind, .interrupted)
+        XCTAssertTrue(box.result?.userFacingMessage.localizedCaseInsensitiveContains("cancelled") == true)
+    }
+
     func testLogFormatterTurnsResticStatusJSONIntoReadableProgress() {
         let message = ResticLogFormatter.displayMessage(for: """
         {"message_type":"status","percent_done":0.42,"files_done":21,"total_files":50,"bytes_done":1048576}
@@ -165,6 +215,24 @@ private final class ResultBox: @unchecked Sendable {
         set {
             lock.lock()
             storedError = newValue
+            lock.unlock()
+        }
+    }
+}
+
+private final class StopRequestBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storedReason: ResticRunStopReason?
+
+    var reason: ResticRunStopReason? {
+        get {
+            lock.lock()
+            defer { lock.unlock() }
+            return storedReason
+        }
+        set {
+            lock.lock()
+            storedReason = newValue
             lock.unlock()
         }
     }

@@ -10,6 +10,7 @@ public final class BackupCoordinator: @unchecked Sendable {
     private let bookmarkStore: SecurityScopedBookmarkStore
     private let powerStateProvider: PowerStateProvider
     private let lockManager: any RepositoryLocking
+    private let runControlStore: ResticRunControlStore?
     private let outputHandler: (@Sendable (UUID, ResticOutputEvent) -> Void)?
 
     public init(
@@ -22,6 +23,7 @@ public final class BackupCoordinator: @unchecked Sendable {
         bookmarkStore: SecurityScopedBookmarkStore = SecurityScopedBookmarkStore(),
         powerStateProvider: PowerStateProvider = PowerStateProvider(),
         lockManager: any RepositoryLocking = RepositoryJobLockManager(),
+        runControlStore: ResticRunControlStore? = nil,
         outputHandler: (@Sendable (UUID, ResticOutputEvent) -> Void)? = nil
     ) {
         self.database = database
@@ -33,6 +35,7 @@ public final class BackupCoordinator: @unchecked Sendable {
         self.bookmarkStore = bookmarkStore
         self.powerStateProvider = powerStateProvider
         self.lockManager = lockManager
+        self.runControlStore = runControlStore
         self.outputHandler = outputHandler
     }
 
@@ -389,6 +392,9 @@ public final class BackupCoordinator: @unchecked Sendable {
 
         var job = JobRun(profileID: profileID, repositoryID: repositoryID, kind: kind, status: .running)
         try database.saveJobRun(job)
+        defer {
+            runControlStore?.clearStopRequest(jobID: job.id)
+        }
         for message in initialLogMessages {
             recordJobLog(
                 jobID: job.id,
@@ -426,7 +432,26 @@ public final class BackupCoordinator: @unchecked Sendable {
 
         let result: ResticRunResult
         do {
-            if let streamingRunner = runner as? any ResticStreamingRunning {
+            if let controlledRunner = runner as? any ResticControlledStreamingRunning {
+                let jobID = job.id
+                let profileID = profileID
+                let repositoryID = repositoryID
+                result = try controlledRunner.run(
+                    command,
+                    outputHandler: { [weak self] event in
+                        self?.recordJobLog(
+                            jobID: jobID,
+                            profileID: profileID,
+                            repositoryID: repositoryID,
+                            event: event
+                        )
+                        self?.outputHandler?(jobID, event)
+                    },
+                    stopReasonProvider: { [runControlStore] in
+                        runControlStore?.stopReason(for: jobID)
+                    }
+                )
+            } else if let streamingRunner = runner as? any ResticStreamingRunning {
                 let jobID = job.id
                 let profileID = profileID
                 let repositoryID = repositoryID

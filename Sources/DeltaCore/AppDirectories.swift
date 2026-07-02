@@ -30,4 +30,10 @@ public enum AppDirectories {
         try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
         return directory
     }
+
+    public static func controlDirectory(fileManager: FileManager = .default) throws -> URL {
+        let directory = try applicationSupportDirectory(fileManager: fileManager).appendingPathComponent("Control", isDirectory: true)
+        try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory
+    }
 }

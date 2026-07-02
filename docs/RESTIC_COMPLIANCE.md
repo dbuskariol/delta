@@ -199,13 +199,14 @@ Delta maps restic lock exit code `11` and lock-related stderr to a user-facing b
 
 ## Streaming Logs
 
-`ResticRunner` streams stdout and stderr while the process is running. The coordinator records start, streamed output, and finish lines as per-job SQLite log entries, while the UI also receives the same live events for Activity output. Restic JSON status/error lines are formatted into readable messages before durable storage.
+`ResticRunner` streams stdout and stderr while the process is running. The coordinator records start, streamed output, and finish lines as per-job SQLite log entries, while the UI also receives the same live events for Activity output. When a scheduled backup is started by `DeltaAgent`, the app polls the same SQLite job/log state so the dashboard, Activity page, and menu bar still show the active operation. Restic JSON status/error lines are formatted into readable messages before durable storage.
 
-Active backups expose Pause and Cancel controls in the main window and macOS menu bar. Pause sends restic a graceful interrupt, records the job as cancelled with a paused message, keeps the profile visibly paused, and shows Resume as the next primary action. Resume runs restic backup again, relying on restic's content-addressed storage so already written data is reused. Cancel uses the same safe interruption path for any active restic job and records a cancelled job instead of a failed job.
+Active backups expose Pause and Cancel controls in the main window and macOS menu bar. For UI-owned jobs Delta uses the in-memory `ResticRunController`; for agent-owned jobs it writes a per-job stop request under Application Support and the runner checks that request while restic is alive. Pause sends restic a graceful interrupt, records the job as cancelled with a paused message, keeps the profile visibly paused, and shows Resume as the next primary action. Resume runs restic backup again, relying on restic's content-addressed storage so already written data is reused. Cancel uses the same safe interruption path for any active restic job and records a cancelled job instead of a failed job.
 
 Relevant files:
 
 - `Sources/DeltaCore/ResticRunner.swift`
+- `Sources/DeltaCore/ResticRunControlStore.swift`
 - `Sources/DeltaCore/ResticLogFormatter.swift`
 - `Sources/DeltaCore/BackupCoordinator.swift`
 - `Sources/DeltaCore/DeltaDatabase.swift`
