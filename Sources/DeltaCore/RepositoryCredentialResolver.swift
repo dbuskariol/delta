@@ -73,34 +73,76 @@ public struct RepositoryCredentialResolver: Sendable {
         let existingByKey = Dictionary(uniqueKeysWithValues: existingReferences.map { ($0.environmentKey, $0) })
         let allowedKeys = allowedKeys.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
         var updatedReferences: [RepositoryCredentialReference] = []
+        var rollbackItems: [CredentialRollbackItem] = []
+        var touchedAccounts = Set<String>()
 
-        for key in allowedKeys {
-            let value = credentials[key] ?? ""
-            let isBlank = value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            if isBlank, let existing = existingByKey[key] {
-                updatedReferences.append(existing)
-                continue
-            }
-            guard !isBlank else {
-                continue
-            }
+        do {
+            for key in allowedKeys {
+                let value = credentials[key] ?? ""
+                let isBlank = value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                if isBlank, let existing = existingByKey[key] {
+                    updatedReferences.append(existing)
+                    continue
+                }
+                guard !isBlank else {
+                    continue
+                }
 
-            let account = existingByKey[key]?.keychainAccount ?? "repository-\(repositoryID.uuidString)-env-\(key)"
-            try saveSecret(value, account)
-            updatedReferences.append(
-                RepositoryCredentialReference(
-                    id: existingByKey[key]?.id ?? UUID(),
-                    environmentKey: key,
-                    keychainAccount: account
+                let existing = existingByKey[key]
+                let account = existing?.keychainAccount ?? "repository-\(repositoryID.uuidString)-env-\(key)"
+                if touchedAccounts.insert(account).inserted {
+                    rollbackItems.append(
+                        CredentialRollbackItem(
+                            account: account,
+                            previousSecret: try existing.map { try loadSecret($0.keychainAccount) }
+                        )
+                    )
+                }
+                try saveSecret(value, account)
+                updatedReferences.append(
+                    RepositoryCredentialReference(
+                        id: existing?.id ?? UUID(),
+                        environmentKey: key,
+                        keychainAccount: account
+                    )
                 )
-            )
-        }
+            }
 
-        let keptAccounts = Set(updatedReferences.map(\.keychainAccount))
-        for oldReference in existingReferences where !keptAccounts.contains(oldReference.keychainAccount) {
-            try deleteSecret(oldReference.keychainAccount)
+            let keptAccounts = Set(updatedReferences.map(\.keychainAccount))
+            for oldReference in existingReferences where !keptAccounts.contains(oldReference.keychainAccount) {
+                if touchedAccounts.insert(oldReference.keychainAccount).inserted {
+                    rollbackItems.append(
+                        CredentialRollbackItem(
+                            account: oldReference.keychainAccount,
+                            previousSecret: try loadSecret(oldReference.keychainAccount)
+                        )
+                    )
+                }
+                try deleteSecret(oldReference.keychainAccount)
+            }
+            return updatedReferences.sorted { $0.environmentKey < $1.environmentKey }
+        } catch {
+            for rollbackItem in rollbackItems.reversed() {
+                rollbackItem.rollback(saveSecret: saveSecret, deleteSecret: deleteSecret)
+            }
+            throw error
         }
-        return updatedReferences.sorted { $0.environmentKey < $1.environmentKey }
+    }
+}
+
+private struct CredentialRollbackItem {
+    var account: String
+    var previousSecret: String?
+
+    func rollback(
+        saveSecret: @Sendable (String, String) throws -> Void,
+        deleteSecret: @Sendable (String) throws -> Void
+    ) {
+        if let previousSecret {
+            try? saveSecret(previousSecret, account)
+        } else {
+            try? deleteSecret(account)
+        }
     }
 }
 

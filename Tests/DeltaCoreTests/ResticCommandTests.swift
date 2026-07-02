@@ -458,6 +458,102 @@ final class ResticCommandTests: XCTestCase {
         XCTAssertThrowsError(try secrets.load(account: oldReference.keychainAccount))
     }
 
+    func testCredentialUpdateRestoresEarlierExistingSecretWhenLaterSaveFails() throws {
+        enum TestError: Error {
+            case saveFailed
+        }
+
+        let secrets = InMemorySecretStore()
+        let repositoryID = UUID()
+        let existing = try secrets.resolver.saveCredentials(
+            [
+                "A_KEY": "old-a",
+                "B_FAIL": "old-b"
+            ],
+            repositoryID: repositoryID
+        )
+        let resolver = RepositoryCredentialResolver(
+            loadSecret: { account in
+                try secrets.load(account: account)
+            },
+            saveSecret: { secret, account in
+                if account.hasSuffix("B_FAIL") {
+                    throw TestError.saveFailed
+                }
+                try secrets.save(secret: secret, account: account)
+            },
+            deleteSecret: { account in
+                try secrets.delete(account: account)
+            }
+        )
+
+        XCTAssertThrowsError(
+            try resolver.updateCredentials(
+                [
+                    "A_KEY": "new-a",
+                    "B_FAIL": "new-b"
+                ],
+                existingReferences: existing,
+                repositoryID: repositoryID,
+                allowedKeys: ["A_KEY", "B_FAIL"]
+            )
+        )
+
+        let repository = BackupRepository(
+            id: repositoryID,
+            name: "S3",
+            backend: .s3(endpoint: "s3.amazonaws.com", bucket: "bucket", path: nil, region: nil),
+            credentialReferences: existing
+        )
+        let environment = try secrets.resolver.environment(for: repository)
+        XCTAssertEqual(environment["A_KEY"], "old-a")
+        XCTAssertEqual(environment["B_FAIL"], "old-b")
+    }
+
+    func testCredentialUpdateDeletesEarlierNewSecretWhenLaterSaveFails() throws {
+        enum TestError: Error {
+            case saveFailed
+        }
+
+        let secrets = InMemorySecretStore()
+        let repositoryID = UUID()
+        let existing = try secrets.resolver.saveCredentials(
+            ["A_KEY": "old-a"],
+            repositoryID: repositoryID
+        )
+        let newAccount = "repository-\(repositoryID.uuidString)-env-B_KEY"
+        let resolver = RepositoryCredentialResolver(
+            loadSecret: { account in
+                try secrets.load(account: account)
+            },
+            saveSecret: { secret, account in
+                if account.hasSuffix("C_FAIL") {
+                    throw TestError.saveFailed
+                }
+                try secrets.save(secret: secret, account: account)
+            },
+            deleteSecret: { account in
+                try secrets.delete(account: account)
+            }
+        )
+
+        XCTAssertThrowsError(
+            try resolver.updateCredentials(
+                [
+                    "B_KEY": "new-b",
+                    "C_FAIL": "new-c"
+                ],
+                existingReferences: existing,
+                repositoryID: repositoryID,
+                allowedKeys: ["A_KEY", "B_KEY", "C_FAIL"]
+            )
+        )
+
+        XCTAssertThrowsError(try secrets.load(account: newAccount))
+        let originalReference = try XCTUnwrap(existing.first)
+        XCTAssertEqual(try secrets.load(account: originalReference.keychainAccount), "old-a")
+    }
+
     func testCredentialTemplatesExposeDocumentedResticEnvironmentKeys() {
         XCTAssertTrue(ResticBackendCredentialTemplates.keys(for: .rest).contains("RESTIC_REST_USERNAME"))
         XCTAssertTrue(ResticBackendCredentialTemplates.keys(for: .rest).contains("RESTIC_REST_PASSWORD"))
