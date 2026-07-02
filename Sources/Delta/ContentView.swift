@@ -1143,8 +1143,18 @@ private enum ActivityLogDetail: String, CaseIterable, Identifiable {
 }
 
 struct SettingsView: View {
+    private enum SettingsCategory: String, CaseIterable, Identifiable {
+        case essentials = "Essentials"
+        case defaults = "Defaults"
+        case updates = "Updates"
+        case support = "Support"
+
+        var id: String { rawValue }
+    }
+
     @EnvironmentObject private var model: DeltaAppModel
     @EnvironmentObject private var softwareUpdateController: SoftwareUpdateController
+    @State private var settingsCategory: SettingsCategory = .essentials
     @AppStorage(
         DeltaAppPreferenceKeys.updateCheckIntervalSeconds,
         store: DeltaAppPreferences.sharedStore()
@@ -1283,18 +1293,29 @@ struct SettingsView: View {
                 items: settingsStatusItems
             )
 
-            SettingsSectionLabel(
-                title: "Backup Automation",
-                subtitle: "Permissions and approvals needed for reliable unattended scheduled backups."
-            )
+            Picker("Settings Group", selection: $settingsCategory) {
+                ForEach(SettingsCategory.allCases) { category in
+                    Text(category.rawValue).tag(category)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .frame(maxWidth: 520, alignment: .leading)
+            .accessibilityLabel("Settings group")
 
-            SettingsCard(
-                symbol: "clock.badge.checkmark",
-                title: "Background Backups",
-                subtitle: "Run scheduled backups while Delta's main window is closed.",
-                statusText: backgroundBackupsStatusText,
-                statusColor: backgroundBackupsStatusColor
-            ) {
+            if settingsCategory == .essentials {
+                SettingsSectionLabel(
+                    title: "Backup Automation",
+                    subtitle: "Permissions and approvals needed for reliable unattended scheduled backups."
+                )
+
+                SettingsCard(
+                    symbol: "clock.badge.checkmark",
+                    title: "Background Backups",
+                    subtitle: "Run scheduled backups while Delta's main window is closed.",
+                    statusText: backgroundBackupsStatusText,
+                    statusColor: backgroundBackupsStatusColor
+                ) {
                 SettingsControlRow(
                     title: "Run scheduled backups in background",
                     detail: backgroundBackupsControlDetail
@@ -1372,7 +1393,7 @@ struct SettingsView: View {
                 }
             }
 
-            SettingsCard(
+                SettingsCard(
                 symbol: "lock.shield",
                 title: "Full Disk Access",
                 subtitle: "Allow Delta to read protected folders during full-volume and user-folder backups.",
@@ -1415,7 +1436,7 @@ struct SettingsView: View {
                 }
             }
 
-            SettingsCard(
+                SettingsCard(
                 symbol: "powerplug",
                 title: "Power & Reliability",
                 subtitle: "Reduce the chance of long-running work being interrupted by idle sleep.",
@@ -1442,18 +1463,18 @@ struct SettingsView: View {
                 )
             }
 
-            SettingsSectionLabel(
-                title: "App Behavior",
-                subtitle: "Controls for Delta's menu bar, sign-in behavior, and macOS alerts."
-            )
+                SettingsSectionLabel(
+                    title: "App Behavior",
+                    subtitle: "Controls for Delta's menu bar, sign-in behavior, and macOS alerts."
+                )
 
-            SettingsCard(
-                symbol: "menubar.rectangle",
-                title: "Menu Bar & Login",
-                subtitle: "Keep Delta's quick actions visible and optionally open the app at sign-in.",
-                statusText: menuBarAndLoginStatusText,
-                statusColor: menuBarAndLoginStatusColor
-            ) {
+                SettingsCard(
+                    symbol: "menubar.rectangle",
+                    title: "Menu Bar & Login",
+                    subtitle: "Keep Delta's quick actions visible and optionally open the app at sign-in.",
+                    statusText: menuBarAndLoginStatusText,
+                    statusColor: menuBarAndLoginStatusColor
+                ) {
                 SettingsControlRow(
                     title: "Status menu",
                     detail: "Keep Back Up Now, Run Due Backups, Pause, Stop, last backup status, activity, and update checks available outside the main window."
@@ -1507,7 +1528,7 @@ struct SettingsView: View {
                 }
             }
 
-            SettingsCard(
+                SettingsCard(
                 symbol: "bell.badge",
                 title: "Notifications",
                 subtitle: "Show macOS alerts when backup work needs attention.",
@@ -1567,19 +1588,21 @@ struct SettingsView: View {
                     }
                 }
             }
+            }
 
-            SettingsSectionLabel(
-                title: "Backup & Restore Defaults",
-                subtitle: "Recommended defaults for newly created profiles and restore jobs."
-            )
+            if settingsCategory == .defaults {
+                SettingsSectionLabel(
+                    title: "Backup & Restore Defaults",
+                    subtitle: "Recommended defaults for newly created profiles and restore jobs."
+                )
 
-            SettingsCard(
-                symbol: "heart.text.square",
-                title: "Health Monitoring",
-                subtitle: "Dashboard attention thresholds for missed backups and destination integrity checks.",
-                statusText: healthMonitoringStatusText,
-                statusColor: healthMonitoringStatusColor
-            ) {
+                SettingsCard(
+                    symbol: "heart.text.square",
+                    title: "Health Monitoring",
+                    subtitle: "Dashboard attention thresholds for missed backups and destination integrity checks.",
+                    statusText: healthMonitoringStatusText,
+                    statusColor: healthMonitoringStatusColor
+                ) {
                 SettingsControlRow(
                     title: "Backup freshness",
                     detail: "Show dashboard attention when a scheduled profile has no completed backup or its last completed backup is older than this."
@@ -1635,7 +1658,7 @@ struct SettingsView: View {
                 }
             }
 
-            SettingsCard(
+                SettingsCard(
                 symbol: "slider.horizontal.3",
                 title: "New Backup Defaults",
                 subtitle: "Defaults applied when creating a profile. Existing profiles keep their own settings.",
@@ -1751,7 +1774,7 @@ struct SettingsView: View {
                 }
             }
 
-            SettingsCard(
+                SettingsCard(
                 symbol: "arrow.uturn.backward.circle",
                 title: "Restore Defaults",
                 subtitle: "Safety defaults used when the Restore page opens.",
@@ -1804,19 +1827,21 @@ struct SettingsView: View {
                     }
                 }
             }
+            }
 
-            SettingsSectionLabel(
-                title: "Updates",
-                subtitle: "Signed update checks and install behavior."
-            )
+            if settingsCategory == .updates {
+                SettingsSectionLabel(
+                    title: "Updates",
+                    subtitle: "Signed update checks and install behavior."
+                )
 
-            SettingsCard(
-                symbol: "arrow.down.circle",
-                title: "Automatic Updates",
-                subtitle: "Check for signed Delta releases using Sparkle.",
-                statusText: automaticUpdatesStatusText,
-                statusColor: automaticUpdatesStatusColor
-            ) {
+                SettingsCard(
+                    symbol: "arrow.down.circle",
+                    title: "Automatic Updates",
+                    subtitle: "Check for signed Delta releases using Sparkle.",
+                    statusText: automaticUpdatesStatusText,
+                    statusColor: automaticUpdatesStatusColor
+                ) {
                 SettingsControlRow(
                     title: "Automatic checks",
                     detail: "Delta verifies signed update packages before installing them."
@@ -1876,19 +1901,21 @@ struct SettingsView: View {
                     .disabled(!softwareUpdateController.canCheckForUpdates)
                 }
             }
+            }
 
-            SettingsSectionLabel(
-                title: "Support",
-                subtitle: "Diagnostics and local files for troubleshooting without exposing secrets."
-            )
+            if settingsCategory == .support {
+                SettingsSectionLabel(
+                    title: "Support",
+                    subtitle: "Diagnostics and local files for troubleshooting without exposing secrets."
+                )
 
-            SettingsCard(
-                symbol: "info.circle",
-                title: "About Delta",
-                subtitle: "Build and local state used when troubleshooting.",
-                statusText: appVersionStatusText,
-                statusColor: .blue
-            ) {
+                SettingsCard(
+                    symbol: "info.circle",
+                    title: "About Delta",
+                    subtitle: "Build and local state used when troubleshooting.",
+                    statusText: appVersionStatusText,
+                    statusColor: .blue
+                ) {
                 SettingsFactGrid(items: [
                     SettingsFact(title: "Version", value: appVersion),
                     SettingsFact(title: "Build", value: buildVersion),
@@ -1903,7 +1930,7 @@ struct SettingsView: View {
                 )
             }
 
-            SettingsCard(
+                SettingsCard(
                 symbol: "externaldrive.badge.checkmark",
                 title: "Backup Tools",
                 subtitle: "Bundled engines Delta uses for encrypted backups and remote destinations.",
@@ -1930,7 +1957,7 @@ struct SettingsView: View {
                 }
             }
 
-            SettingsCard(
+                SettingsCard(
                 symbol: "folder.badge.gearshape",
                 title: "Support Files",
                 subtitle: "Open local data and logs used for troubleshooting."
@@ -1949,7 +1976,7 @@ struct SettingsView: View {
                 )
             }
 
-            SettingsCard(
+                SettingsCard(
                 symbol: "stethoscope",
                 title: "Diagnostics",
                 subtitle: "Control troubleshooting output and generate support information without secrets."
@@ -2014,6 +2041,7 @@ struct SettingsView: View {
                     .disabled(model.isWorking || !model.isPersistentStoreAvailable)
                     .deltaTooltip("Apply the selected activity history retention policy now.")
                 }
+            }
             }
         }
         .onAppear {
