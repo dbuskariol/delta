@@ -90,6 +90,14 @@ Scripts/verify-production-readiness.sh
 
 This gate fails unless the automated gate passed for the current git commit, the manual acceptance report passes for the same commit, the app is signed with Developer ID, the notarization ticket is stapled and accepted by Gatekeeper, notarization logs are archived, `/Applications/Delta.app` matches the verified app, installed-app smoke verification passes, and the regenerated release evidence says the build is ready for external distribution.
 
+To inspect those prerequisites before running the hard gate, use:
+
+```sh
+Scripts/doctor-production-readiness.sh
+```
+
+The doctor reports signing identity availability, automated-gate freshness, installed-app identity, notarization and Gatekeeper status, local/manual acceptance state, and configured external backend acceptance targets. It exits non-zero while production blockers remain; set `DELTA_DOCTOR_ALLOW_BLOCKERS=1` to collect the report without failing the shell.
+
 ## Notarization Gate
 
 External distribution builds must be notarized after the automated gate passes:

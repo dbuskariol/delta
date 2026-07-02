@@ -13,6 +13,7 @@ cd "$ROOT_DIR"
   "$ROOT_DIR/Scripts/manual-acceptance-items.sh" \
   "$ROOT_DIR/Scripts/collect-release-evidence.sh" \
   "$ROOT_DIR/Scripts/create-manual-acceptance-report.sh" \
+  "$ROOT_DIR/Scripts/doctor-production-readiness.sh" \
   "$ROOT_DIR/Scripts/verify-installed-app.sh" \
   "$ROOT_DIR/Scripts/verify-manual-acceptance-matrix.sh" \
   "$ROOT_DIR/Scripts/verify-manual-acceptance.sh" \
@@ -38,6 +39,10 @@ if [[ ! -x "$ROOT_DIR/Scripts/verify-installed-app.sh" ]]; then
 fi
 if [[ ! -x "$ROOT_DIR/Scripts/create-manual-acceptance-report.sh" ]]; then
   printf "Scripts/create-manual-acceptance-report.sh must be executable.\n" >&2
+  exit 1
+fi
+if [[ ! -x "$ROOT_DIR/Scripts/doctor-production-readiness.sh" ]]; then
+  printf "Scripts/doctor-production-readiness.sh must be executable.\n" >&2
   exit 1
 fi
 if [[ ! -x "$ROOT_DIR/Scripts/verify-manual-acceptance.sh" ]]; then

@@ -345,6 +345,14 @@ The local acceptance probe writes `dist/local-acceptance/latest.md` and separate
 
 The release evidence report is written under `dist/release-evidence/` and records the app version, git commit, signing details, helper/tool smoke output, Sparkle artifacts, automated gate status, local acceptance probe output, installed app smoke output, notarization ticket status, and manual acceptance report verification. `Scripts/verify-production-readiness.sh` fails unless that evidence, the current manual acceptance report, notarization, Gatekeeper, and the installed app all prove the same current git commit is ready for external distribution.
 
+To see the remaining external prerequisites in one place, run:
+
+```sh
+Scripts/doctor-production-readiness.sh
+```
+
+The doctor checks signing identities, automated-gate freshness, installed-app identity, notarization and Gatekeeper state, local and manual acceptance reports, and external backend acceptance environment variables. It exits non-zero while blockers remain; set `DELTA_DOCTOR_ALLOW_BLOCKERS=1` when you only want the report.
+
 Production readiness and manual macOS acceptance:
 
 ```text
