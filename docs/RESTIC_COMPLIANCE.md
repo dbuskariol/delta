@@ -19,6 +19,8 @@ Delta uses restic `--password-command`.
 
 The command points at `DeltaSecretBridge`, which reads the destination password from Keychain and writes it to stdout for restic. Delta does not pass repository passwords through long-lived environment variables or command-line literals.
 
+App-managed destinations use a generated Keychain password. User-managed passphrase destinations require confirmation before the password is stored.
+
 Relevant files:
 
 - `Sources/DeltaCore/ResticCommand.swift`

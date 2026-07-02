@@ -1102,6 +1102,7 @@ struct RepositoryEditorView: View {
     @State private var quaternary = ""
     @State private var storageMode: SecretStorageMode = .appManagedKeychain
     @State private var passphrase = ""
+    @State private var passphraseConfirmation = ""
     @State private var credentialValues: [String: String] = [:]
 
     init(repository: BackupRepository? = nil) {
@@ -1153,6 +1154,20 @@ struct RepositoryEditorView: View {
                     FieldRow(title: "Passphrase") {
                         SecureField("Encryption passphrase", text: $passphrase)
                             .textFieldStyle(.roundedBorder)
+                    }
+                    FieldRow(title: "Confirm") {
+                        SecureField("Confirm encryption passphrase", text: $passphraseConfirmation)
+                            .textFieldStyle(.roundedBorder)
+                    }
+                    if !passphraseConfirmation.isEmpty && passphrase != passphraseConfirmation {
+                        FieldRow(title: "") {
+                            InlineWarning(
+                                symbol: "exclamationmark.triangle",
+                                title: "Passphrases do not match.",
+                                message: "This password is required to restore encrypted backup data."
+                            )
+                            .frame(width: ModalMetrics.primaryControlWidth, alignment: .leading)
+                        }
                     }
                 }
             } else if let existingRepository {
@@ -1278,6 +1293,9 @@ struct RepositoryEditorView: View {
         }
         if kind == .sftp && !quaternary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             guard let parsedPort, (1...65_535).contains(parsedPort) else { return false }
+        }
+        if existingRepository == nil && storageMode == .userManagedPassphrase {
+            guard !passphrase.isEmpty, passphrase == passphraseConfirmation else { return false }
         }
         return true
     }
