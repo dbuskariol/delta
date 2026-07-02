@@ -14,6 +14,7 @@ The automated gate must pass before any beta or production build is shipped. It 
 
 - Swift unit tests
 - pinned restic and rclone checksums
+- product-language checks for user-facing app strings and Keychain wording
 - restic command and flag surface
 - real local restic init, backup, incremental backup, full restore, selected restore, repository check, prune, and post-prune check
 - packaged app build
@@ -35,7 +36,7 @@ Record the app version, build number, macOS build, signing identity, date, and t
 | Settings surface | Confirm Settings shows plain-language Background Scheduling, not raw LaunchAgent status; the top status summary matches Full Disk Access, schedules, updates, notifications, and bundled backup-tool state; reset buttons restore recommended backup and restore defaults. |
 | Full Disk Access | From Settings, open Privacy & Security, add Delta manually when required, recheck access, and confirm the dashboard only shows Readiness when action is needed. |
 | Background Scheduling | Create an enabled scheduled profile, approve Delta in Login Items if macOS asks, quit the main window, wait for the helper interval, and confirm the scheduled run appears in Dashboard, Activity, and menu bar state after relaunch. |
-| Keychain background access | Use an app-managed destination and a destination with backend credentials. Confirm a scheduled backup does not show interactive Keychain prompts after Repair Keychain Access has been run when needed. |
+| Keychain background access | Use an app-managed destination and a destination with backend credentials. Confirm a scheduled backup does not show interactive Keychain prompts after Repair Password Access has been run when needed. |
 | Local drive destination | Create a new local or external-drive destination, confirm automatic preparation runs, then run a first backup and a second no-change backup. |
 | Mounted network drive | Test at least one SMB or NFS mounted path under `/Volumes`, disconnect it, confirm Delta reports destination unavailable without invoking restic, reconnect it, and confirm backup resumes. |
 | SFTP destination | Test a real SFTP destination with a non-root absolute path and non-interactive SSH authentication through a configured key file or ssh-agent; confirm wrong credential/key failure, corrected credential success, restore point refresh, and restore. |
@@ -50,7 +51,7 @@ Record the app version, build number, macOS build, signing identity, date, and t
 | Menu bar | Confirm Back Up Now, Run Due Backups, Pause, Stop, Activity, Updates, last backup status, and status transitions work without the menu closing unexpectedly on completion. |
 | Notifications | Enable job alerts in Settings, allow macOS notification permission, trigger one warning/failed job from the app and one scheduled helper job, and confirm successful-backup summaries only appear when the separate success setting is enabled. |
 | Sparkle updates | Install an older signed build, host or publish a signed appcast and archive, check for updates, install the update, and confirm settings, Full Disk Access identity, destinations, profiles, restore points, and scheduled helper behavior remain intact. |
-| Diagnostics | Copy and export a diagnostic report and confirm it contains app/helper/tool/profile/job state but no repository password or backend credential values. |
+| Diagnostics | Copy and export a diagnostic report and confirm it contains app/helper/tool/profile/job state but no destination password or backend credential values. |
 | Notarization | For release builds only, sign with Developer ID, submit for notarization, staple the ticket, verify Gatekeeper launch, and archive notarization logs. |
 
 ## Release Decision

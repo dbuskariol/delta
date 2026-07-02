@@ -6,6 +6,7 @@ cd "$ROOT_DIR"
 
 /usr/bin/swift test
 
+"$ROOT_DIR/Scripts/verify-product-language.sh"
 "$ROOT_DIR/Scripts/bootstrap-tools.sh"
 "$ROOT_DIR/Scripts/verify-tools.sh"
 "$ROOT_DIR/Scripts/verify-restic-surface.sh"

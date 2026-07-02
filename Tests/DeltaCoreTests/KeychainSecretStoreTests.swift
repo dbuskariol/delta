@@ -4,6 +4,11 @@ import XCTest
 @testable import DeltaCore
 
 final class KeychainSecretStoreTests: XCTestCase {
+    func testDefaultServiceUsesDestinationLanguage() {
+        XCTAssertEqual(KeychainSecretStore.defaultService, "com.delta.backup.destination-secrets")
+        XCTAssertEqual(KeychainSecretStore.accessPromptName, "Delta destination secrets")
+    }
+
     func testBackgroundLoadQueryFailsInsteadOfPromptingForAuthentication() throws {
         let query = KeychainSecretStore(service: "test").loadQuery(
             account: "account",

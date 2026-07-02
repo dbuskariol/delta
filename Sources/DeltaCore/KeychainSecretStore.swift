@@ -27,7 +27,8 @@ public enum KeychainAuthenticationPolicy: Sendable {
 }
 
 public struct KeychainSecretStore: Sendable {
-    public static let defaultService = "com.delta.backup.secrets"
+    public static let defaultService = "com.delta.backup.destination-secrets"
+    static let accessPromptName = "Delta destination secrets"
 
     public var service: String
     public var trustedApplicationPaths: [String]
@@ -149,7 +150,7 @@ public struct KeychainSecretStore: Sendable {
         }
 
         var access: SecAccess?
-        let status = SecAccessCreate("Delta repository secrets" as CFString, trustedApplications as CFArray, &access)
+        let status = SecAccessCreate(Self.accessPromptName as CFString, trustedApplications as CFArray, &access)
         guard status == errSecSuccess else {
             throw KeychainSecretError.unexpectedStatus(status)
         }

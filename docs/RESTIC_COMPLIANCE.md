@@ -17,13 +17,13 @@ Resources/Tools/bin/rclone version
 
 Delta uses restic `--password-command`.
 
-The command points at `DeltaSecretBridge`, which reads the destination password from Keychain and writes it to stdout for restic. Delta does not pass repository passwords through long-lived environment variables or command-line literals.
+The command points at `DeltaSecretBridge`, which reads the destination password from Keychain and writes it to stdout for restic. Delta does not pass destination passwords through long-lived environment variables or command-line literals.
 
 `DeltaSecretBridge` accepts exactly one keychain account argument and exits with usage status for missing or extra arguments. This keeps the password bridge fail-closed if restic or a caller invokes it with an unexpected command line.
 
 If restic reports that password resolution failed through the bridge, Delta maps the failure to a destination-password access message that points users to Repair Password Access or re-saving the destination, instead of showing raw Keychain status output.
 
-App-managed destinations use a generated Keychain password. User-managed passphrase destinations require confirmation before the password is stored.
+App-managed destinations use a generated Keychain password stored under `com.delta.backup.destination-secrets` with a `Delta destination secrets` access label. User-managed passphrase destinations require confirmation before the password is stored.
 
 Relevant files:
 
@@ -61,7 +61,7 @@ Backup profiles are validated before save and again before execution. Delta trim
 
 ## Backend Credentials
 
-Backend credentials and backend configuration values are stored in Keychain and injected into a curated restic process environment only for the job run. Keychain items are created with a trusted-application access list for the signed Delta app, DeltaAgent, and DeltaSecretBridge so scheduled jobs do not require interactive Keychain approval. Agent and secret-bridge reads use a non-interactive `LAContext`, so scheduled jobs fail closed instead of showing Keychain prompts. New destination creation rolls back newly-created backend credential/configuration and repository password items if persistence fails, and partial backend field saves roll back earlier saved items before returning the error. Delta also exposes a Background Secret Access repair operation that reloads and rewrites saved destination passwords plus backend credential/configuration items through the current signed app identity, then verifies they are readable with interaction disabled. Delta forwards operational values such as `PATH`, `HOME`, `TMPDIR`, locale, and `SSH_AUTH_SOCK`, but does not pass arbitrary ambient environment variables to restic.
+Backend credentials and backend configuration values are stored in Keychain and injected into a curated restic process environment only for the job run. Keychain items are created with a trusted-application access list for the signed Delta app, DeltaAgent, and DeltaSecretBridge so scheduled jobs do not require interactive Keychain approval. Agent and secret-bridge reads use a non-interactive `LAContext`, so scheduled jobs fail closed instead of showing Keychain prompts. New destination creation rolls back newly-created backend credential/configuration and destination password items if persistence fails, and partial backend field saves roll back earlier saved items before returning the error. Delta also exposes a Background Secret Access repair operation that reloads and rewrites saved destination passwords plus backend credential/configuration items through the current signed app identity, then verifies they are readable with interaction disabled. Delta forwards operational values such as `PATH`, `HOME`, `TMPDIR`, locale, and `SSH_AUTH_SOCK`, but does not pass arbitrary ambient environment variables to restic.
 
 Supported credential templates include:
 

@@ -416,19 +416,18 @@ struct RestoreView: View {
         }
         .onAppear {
             applyRestoreDefaultsIfNeeded()
-            if repositoryID == nil {
-                repositoryID = model.repositories.first?.id
-                Task { @MainActor in
-                    refreshRestorePointsForSelectedRepository()
-                }
-            } else {
-                refreshRestorePointsForSelectedRepository()
-            }
+            repositoryID = repositoryID ?? model.repositories.first?.id
+            reconcileSelectedRestorePoint()
+            refreshRestorePointsForSelectedRepository()
         }
         .onChange(of: repositoryID) { _, _ in
             snapshotID = ""
             resetBrowser()
+            reconcileSelectedRestorePoint()
             refreshRestorePointsForSelectedRepository()
+        }
+        .onChange(of: restorePointIDs) { _, _ in
+            reconcileSelectedRestorePoint()
         }
         .onChange(of: snapshotID) { _, _ in
             resetBrowser()
@@ -445,27 +444,35 @@ struct RestoreView: View {
         return model.snapshotsByRepository[repositoryID] ?? []
     }
 
+    private var restorePointIDs: [String] {
+        repositorySnapshots.map(\.id)
+    }
+
     private var selectedSnapshot: ResticSnapshot? {
         repositorySnapshots.first { $0.id == snapshotID }
     }
 
-    private var backupSummariesBySnapshotID: [String: ResticBackupSummary] {
+    private var backupSummariesByRestorePoint: [String: ResticBackupSummary] {
         var summaries: [String: ResticBackupSummary] = [:]
         for job in model.jobs.sorted(by: { $0.startedAt > $1.startedAt }) where job.kind == .backup {
             guard
                 let summary = job.backupSummary ?? ResticLogFormatter.backupSummary(from: job.message),
                 let snapshotID = summary.snapshotID,
-                summaries[snapshotID] == nil
+                summaries[RestorePointSelection.scopedSummaryKey(destinationID: job.repositoryID, restorePointID: snapshotID)] == nil
             else {
                 continue
             }
-            summaries[snapshotID] = summary
+            summaries[RestorePointSelection.scopedSummaryKey(destinationID: job.repositoryID, restorePointID: snapshotID)] = summary
         }
         return summaries
     }
 
     private var selectedRestorePointSummary: String? {
-        guard let selectedSnapshot, let summary = backupSummariesBySnapshotID[selectedSnapshot.id] else {
+        guard
+            let repositoryID,
+            let selectedSnapshot,
+            let summary = backupSummariesByRestorePoint[RestorePointSelection.scopedSummaryKey(destinationID: repositoryID, restorePointID: selectedSnapshot.id)]
+        else {
             return nil
         }
         return "Backup changes: \(summary.detailedText)"
@@ -572,10 +579,22 @@ struct RestoreView: View {
 
     private func restorePointLabel(for snapshot: ResticSnapshot) -> String {
         let base = "\(snapshot.time.formatted(date: .abbreviated, time: .shortened)) · \(snapshot.id.prefix(8))"
-        guard let summary = backupSummariesBySnapshotID[snapshot.id] else {
+        guard
+            let repositoryID,
+            let summary = backupSummariesByRestorePoint[RestorePointSelection.scopedSummaryKey(destinationID: repositoryID, restorePointID: snapshot.id)]
+        else {
             return base
         }
         return "\(base) · \(summary.conciseText)"
+    }
+
+    private func reconcileSelectedRestorePoint() {
+        let nextSnapshotID = RestorePointSelection.reconciledSelection(currentID: snapshotID, availableIDs: restorePointIDs)
+        guard snapshotID != nextSnapshotID else {
+            return
+        }
+        snapshotID = nextSnapshotID
+        resetBrowser()
     }
 
     private func refreshRestorePointsForSelectedRepository() {
