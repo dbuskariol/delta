@@ -1437,8 +1437,8 @@ struct SettingsView: View {
 
                 SettingsCard(
                     symbol: "clock.badge.checkmark",
-                    title: "Background Backup Service",
-                    subtitle: "Run scheduled profiles while Delta's main window is closed.",
+                    title: "Scheduled Backups",
+                    subtitle: "Run due profiles after sign-in while Delta's main window is closed.",
                     statusText: backgroundBackupsPresentation.statusText,
                     statusColor: backgroundBackupsStatusColor
                 ) {
@@ -1524,7 +1524,7 @@ struct SettingsView: View {
                     } label: {
                         Label("Review Login Items", systemImage: "gearshape")
                     }
-                    .deltaTooltip("Open macOS Login Items to approve or inspect Delta's background backup service.")
+                    .deltaTooltip("Open macOS Login Items to approve or inspect Delta's background scheduler.")
                     Button {
                         model.reload()
                     } label: {

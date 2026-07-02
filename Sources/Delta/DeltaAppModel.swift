@@ -71,7 +71,7 @@ final class DeltaAppModel: ObservableObject {
         profiles.contains { $0.schedule.isEnabled } && launchAgentStatus.blocksScheduledBackups
     }
 
-    private var database: DeltaDatabase
+    private var database: DeltaDatabase?
     private let secretStore = KeychainSecretStore()
     private let credentialResolver = RepositoryCredentialResolver()
     private let bookmarkStore = SecurityScopedBookmarkStore()
@@ -103,7 +103,7 @@ final class DeltaAppModel: ObservableObject {
     }
 
     func reload() {
-        guard reopenPersistentStoreIfNeeded() else {
+        guard reopenPersistentStoreIfNeeded(), let database else {
             sourceHealthWarnings = []
             backgroundSecretAccessReports = []
             fullDiskAccessStatus = FullDiskAccessProbe().check()
@@ -113,7 +113,7 @@ final class DeltaAppModel: ObservableObject {
         }
         do {
             if !localOperationIsRunning {
-                _ = try makeCoordinator().recoverAbandonedRunningJobs()
+                _ = try makeCoordinator(database: database).recoverAbandonedRunningJobs()
                 pruneOperationalHistoryIfNeeded()
             }
             let storedRepositories = try database.fetchRepositories()
@@ -242,8 +242,7 @@ final class DeltaAppModel: ObservableObject {
     }
 
     func savedLogs(for jobID: UUID, limit: Int = 10_000) -> [JobLogEntry] {
-        guardPersistentStoreAvailable()
-        guard isPersistentStoreAvailable else { return [] }
+        guard let database = requirePersistentDatabase() else { return [] }
         do {
             return try database.fetchJobLogs(jobID: jobID, limit: limit)
         } catch {
@@ -260,8 +259,7 @@ final class DeltaAppModel: ObservableObject {
         passphrase: String? = nil,
         backendCredentials: [String: String] = [:]
     ) -> Bool {
-        guardPersistentStoreAvailable()
-        guard isPersistentStoreAvailable else { return false }
+        guard let database = requirePersistentDatabase() else { return false }
         var rollbackSecretAccounts = Set<String>()
         var didPersistRepository = false
         let userManagedPassphrase = passphrase ?? ""
@@ -312,8 +310,7 @@ final class DeltaAppModel: ObservableObject {
         backend: RepositoryBackend,
         backendCredentials: [String: String] = [:]
     ) -> Bool {
-        guardPersistentStoreAvailable()
-        guard isPersistentStoreAvailable else { return false }
+        guard let database = requirePersistentDatabase() else { return false }
         do {
             let validated = try repositoryValidator.validate(
                 name: name,
@@ -357,8 +354,7 @@ final class DeltaAppModel: ObservableObject {
         retention: RetentionPolicy = RetentionPolicy(),
         excludePatterns: [String] = BackupExcludePolicy.defaultMacOSExcludes
     ) {
-        guardPersistentStoreAvailable()
-        guard isPersistentStoreAvailable else { return }
+        guard let database = requirePersistentDatabase() else { return }
         do {
             let profile = BackupProfile(
                 name: name,
@@ -383,8 +379,7 @@ final class DeltaAppModel: ObservableObject {
     }
 
     func saveProfile(_ profile: BackupProfile) {
-        guardPersistentStoreAvailable()
-        guard isPersistentStoreAvailable else { return }
+        guard let database = requirePersistentDatabase() else { return }
         do {
             var profile = profile
             profile.updatedAt = Date()
@@ -402,8 +397,7 @@ final class DeltaAppModel: ObservableObject {
     }
 
     func deleteProfile(_ profile: BackupProfile) {
-        guardPersistentStoreAvailable()
-        guard isPersistentStoreAvailable else { return }
+        guard let database = requirePersistentDatabase() else { return }
         do {
             try database.deleteProfile(id: profile.id)
             try database.appendEvent(EventLog(level: .info, message: "Backup profile '\(profile.name)' was removed."))
@@ -414,8 +408,7 @@ final class DeltaAppModel: ObservableObject {
     }
 
     func deleteRepository(_ repository: BackupRepository) {
-        guardPersistentStoreAvailable()
-        guard isPersistentStoreAvailable else { return }
+        guard let database = requirePersistentDatabase() else { return }
         do {
             let currentProfiles = try database.fetchProfiles()
             let referencingProfileNames = currentProfiles
@@ -458,13 +451,12 @@ final class DeltaAppModel: ObservableObject {
     }
 
     private func startBackup(profile: BackupProfile, isResume: Bool) {
-        guardPersistentStoreAvailable()
-        guard isPersistentStoreAvailable else { return }
+        guard let database = requirePersistentDatabase() else { return }
         guard let repository = repositories.first(where: { $0.id == profile.repositoryID }) else {
             alertMessage = "Destination for this profile no longer exists."
             return
         }
-        let coordinator = makeCoordinator()
+        let coordinator = makeCoordinator(database: database)
         performBackgroundJobWork(
             activeOperation: ActiveOperation(
                 kind: .backup,
@@ -479,8 +471,7 @@ final class DeltaAppModel: ObservableObject {
     }
 
     func pauseActiveBackup() {
-        guardPersistentStoreAvailable()
-        guard isPersistentStoreAvailable else { return }
+        guard requirePersistentDatabase() != nil else { return }
         guard isWorking, activeOperation?.kind == .backup, activeStopRequest == nil else {
             return
         }
@@ -488,8 +479,7 @@ final class DeltaAppModel: ObservableObject {
     }
 
     func cancelActiveJob() {
-        guardPersistentStoreAvailable()
-        guard isPersistentStoreAvailable else { return }
+        guard requirePersistentDatabase() != nil else { return }
         guard isWorking, activeOperation != nil, activeStopRequest == nil else {
             return
         }
@@ -497,9 +487,8 @@ final class DeltaAppModel: ObservableObject {
     }
 
     func initializeRepository(_ repository: BackupRepository) {
-        guardPersistentStoreAvailable()
-        guard isPersistentStoreAvailable else { return }
-        let coordinator = makeCoordinator()
+        guard let database = requirePersistentDatabase() else { return }
+        let coordinator = makeCoordinator(database: database)
         performBackgroundJobWork(
             activeOperation: ActiveOperation(
                 kind: .initializeRepository,
@@ -514,9 +503,8 @@ final class DeltaAppModel: ObservableObject {
     }
 
     func checkRepository(_ repository: BackupRepository) {
-        guardPersistentStoreAvailable()
-        guard isPersistentStoreAvailable else { return }
-        let coordinator = makeCoordinator()
+        guard let database = requirePersistentDatabase() else { return }
+        let coordinator = makeCoordinator(database: database)
         performBackgroundJobWork(
             activeOperation: ActiveOperation(
                 kind: .check,
@@ -531,13 +519,12 @@ final class DeltaAppModel: ObservableObject {
     }
 
     func prune(profile: BackupProfile) {
-        guardPersistentStoreAvailable()
-        guard isPersistentStoreAvailable else { return }
+        guard let database = requirePersistentDatabase() else { return }
         guard let repository = repositories.first(where: { $0.id == profile.repositoryID }) else {
             alertMessage = "Destination for this profile no longer exists."
             return
         }
-        let coordinator = makeCoordinator()
+        let coordinator = makeCoordinator(database: database)
         performBackgroundJobWork(
             activeOperation: ActiveOperation(
                 kind: .prune,
@@ -552,13 +539,12 @@ final class DeltaAppModel: ObservableObject {
     }
 
     func runDueBackups() {
-        guardPersistentStoreAvailable()
-        guard isPersistentStoreAvailable else { return }
+        guard let database = requirePersistentDatabase() else { return }
         guard !DeltaAppPreferences.bool(for: DeltaAppPreferenceKeys.pausesScheduledBackups, default: false) else {
             alertMessage = "Scheduled backups are paused. Resume scheduled backups in Settings or run a manual backup from a profile."
             return
         }
-        let coordinator = makeCoordinator()
+        let coordinator = makeCoordinator(database: database)
         performBackgroundJobWork(
             activeOperation: ActiveOperation(
                 kind: .backup,
@@ -573,9 +559,8 @@ final class DeltaAppModel: ObservableObject {
     }
 
     func refreshSnapshots(repository: BackupRepository) {
-        guardPersistentStoreAvailable()
-        guard isPersistentStoreAvailable else { return }
-        let coordinator = makeCoordinator()
+        guard let database = requirePersistentDatabase() else { return }
+        let coordinator = makeCoordinator(database: database)
         performBackgroundWork(
             activeOperation: ActiveOperation(
                 kind: .check,
@@ -602,8 +587,7 @@ final class DeltaAppModel: ObservableObject {
     }
 
     func loadSnapshotEntries(repository: BackupRepository, snapshotID: String, directoryPath: String?, force: Bool = false) {
-        guardPersistentStoreAvailable()
-        guard isPersistentStoreAvailable else { return }
+        guard let database = requirePersistentDatabase() else { return }
         guard !snapshotID.isEmpty else {
             return
         }
@@ -616,7 +600,7 @@ final class DeltaAppModel: ObservableObject {
             return
         }
         snapshotEntryLoadingKey = key
-        let coordinator = makeCoordinator()
+        let coordinator = makeCoordinator(database: database)
         Task.detached(priority: .userInitiated) {
             do {
                 let entries = try coordinator.listSnapshotEntries(
@@ -644,9 +628,8 @@ final class DeltaAppModel: ObservableObject {
     }
 
     func runRestore(repository: BackupRepository, request: RestoreRequest) {
-        guardPersistentStoreAvailable()
-        guard isPersistentStoreAvailable else { return }
-        let coordinator = makeCoordinator()
+        guard let database = requirePersistentDatabase() else { return }
+        let coordinator = makeCoordinator(database: database)
         performBackgroundJobWork(
             activeOperation: ActiveOperation(
                 kind: .restore,
@@ -705,8 +688,7 @@ final class DeltaAppModel: ObservableObject {
     }
 
     func repairBackgroundSecretAccess() {
-        guardPersistentStoreAvailable()
-        guard isPersistentStoreAvailable else { return }
+        guard let database = requirePersistentDatabase() else { return }
         guard !isWorking else {
             alertMessage = "Wait for the current Delta job to finish before repairing background secret access."
             return
@@ -750,7 +732,7 @@ final class DeltaAppModel: ObservableObject {
             do {
                 try LaunchAgentController.register()
                 launchAgentStatus = LaunchAgentController.status()
-                try? database.appendEvent(EventLog(level: .info, message: "Background Backups registration was requested for scheduled profile '\(profile.name)'."))
+                try? database?.appendEvent(EventLog(level: .info, message: "Background Backups registration was requested for scheduled profile '\(profile.name)'."))
             } catch {
                 launchAgentStatus = LaunchAgentController.status()
                 alertMessage = "Scheduled backups were saved, but Background Backups could not be turned on: \(error.localizedDescription)"
@@ -855,8 +837,7 @@ final class DeltaAppModel: ObservableObject {
     }
 
     func pruneOperationalHistoryNow() {
-        guardPersistentStoreAvailable()
-        guard isPersistentStoreAvailable else { return }
+        guard let database = requirePersistentDatabase() else { return }
         guard !isWorking else {
             alertMessage = "Wait for the current Delta job to finish before cleaning up activity history."
             return
@@ -907,6 +888,9 @@ final class DeltaAppModel: ObservableObject {
     }
 
     private func pruneOperationalHistoryIfNeeded(now: Date = Date()) {
+        guard let database else {
+            return
+        }
         if let lastOperationalHistoryPruneAt, now.timeIntervalSince(lastOperationalHistoryPruneAt) < 3_600 {
             return
         }
@@ -964,8 +948,69 @@ final class DeltaAppModel: ObservableObject {
     }
 
     private func diagnosticSnapshot() -> DiagnosticReportSnapshot {
-        DiagnosticSnapshotCollector(database: database, bundle: .main)
+        guard let database else {
+            return unavailableDiagnosticSnapshot()
+        }
+        return DiagnosticSnapshotCollector(database: database, bundle: .main)
             .snapshot(activeOperation: activeOperation.map { "\($0.kind.displayName): \($0.title)" })
+    }
+
+    private func unavailableDiagnosticSnapshot() -> DiagnosticReportSnapshot {
+        let bundle = Bundle.main
+        let info = bundle.infoDictionary ?? [:]
+        let resticURL = ResticExecutableLocator().locate(in: bundle)
+        let rcloneURL = resticURL.deletingLastPathComponent().appendingPathComponent("rclone")
+        let fullDiskAccess = FullDiskAccessProbe().check()
+        return DiagnosticReportSnapshot(
+            generatedAt: Date(),
+            appVersion: info["CFBundleShortVersionString"] as? String ?? "Unknown",
+            buildVersion: info["CFBundleVersion"] as? String ?? "Unknown",
+            bundleIdentifier: bundle.bundleIdentifier ?? "Unknown",
+            bundlePath: bundle.bundleURL.path,
+            executablePath: bundle.executableURL?.path ?? "Unknown",
+            applicationSupportPath: (try? AppDirectories.applicationSupportDirectory().path) ?? "Unavailable",
+            databasePath: (try? AppDirectories.databaseURL().path) ?? "Unavailable",
+            logPath: (try? AppDirectories.logDirectory().path) ?? "Unavailable",
+            fullDiskAccessStatus: fullDiskAccess.hasLikelyFullDiskAccess ? "Ready" : "Needs Access",
+            backgroundBackupsStatus: LaunchAgentController.status().displayName,
+            scheduledAutomationStatus: DeltaAppPreferences.bool(for: DeltaAppPreferenceKeys.pausesScheduledBackups, default: false) ? "Paused" : "Running",
+            backgroundPasswordAccessStatus: "Unavailable",
+            appLoginItemStatus: AppLoginItemController.status().displayName,
+            notificationStatus: DeltaAppPreferences.bool(for: DeltaAppPreferenceKeys.sendsJobNotifications, default: false) ? "Enabled" : "Disabled",
+            menuBarStatus: DeltaAppPreferences.bool(for: DeltaAppPreferenceKeys.showsMenuBarExtra, default: true) ? "Shown" : "Hidden",
+            idleSleepProtectionStatus: DeltaAppPreferences.bool(for: DeltaAppPreferenceKeys.preventsIdleSleepDuringJobs, default: true) ? "Enabled" : "Disabled",
+            operationalHistoryRetentionStatus: OperationalHistoryRetention.current().summaryText,
+            backupFreshnessStatus: BackupFreshnessWarningThreshold
+                .normalized(DeltaAppPreferences.integer(for: DeltaAppPreferenceKeys.backupFreshnessWarningHours, default: BackupFreshnessWarningThreshold.threeDays.rawValue))
+                .summaryText,
+            destinationVerificationStatus: DestinationVerificationWarningThreshold
+                .normalized(DeltaAppPreferences.integer(for: DeltaAppPreferenceKeys.destinationVerificationWarningHours, default: DestinationVerificationWarningThreshold.thirtyDays.rawValue))
+                .summaryText,
+            destinationFreeSpaceStatus: DestinationFreeSpaceWarningThreshold
+                .normalized(DeltaAppPreferences.integer(for: DeltaAppPreferenceKeys.destinationFreeSpaceWarningGiB, default: DestinationFreeSpaceWarningThreshold.fiftyGiB.rawValue))
+                .summaryText,
+            restoreDefaultsStatus: RestoreDefaults.current().summaryText,
+            activeOperation: activeOperation.map { "\($0.kind.displayName): \($0.title)" } ?? persistentStoreErrorMessage ?? "Local app data unavailable",
+            profileCount: 0,
+            destinationCount: 0,
+            restorePointCount: 0,
+            recentJobCount: 0,
+            tools: [
+                DiagnosticToolSummary(
+                    name: "restic",
+                    path: resticURL.path,
+                    isExecutable: FileManager.default.isExecutableFile(atPath: resticURL.path)
+                ),
+                DiagnosticToolSummary(
+                    name: "rclone",
+                    path: rcloneURL.path,
+                    isExecutable: FileManager.default.isExecutableFile(atPath: rcloneURL.path)
+                )
+            ],
+            destinations: [],
+            profiles: [],
+            recentJobs: []
+        )
     }
 
     private func diagnosticReportFilename() -> String {
@@ -977,8 +1022,7 @@ final class DeltaAppModel: ObservableObject {
     }
 
     func chooseBackupSources(allowsMultipleSelection: Bool = false, includeSubvolumes: Bool = false) -> [BackupSource] {
-        guardPersistentStoreAvailable()
-        guard isPersistentStoreAvailable else { return [] }
+        guard requirePersistentDatabase() != nil else { return [] }
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
@@ -1000,8 +1044,7 @@ final class DeltaAppModel: ObservableObject {
     }
 
     func chooseBackupVolumeSources(allowsMultipleSelection: Bool = true) -> [BackupSource] {
-        guardPersistentStoreAvailable()
-        guard isPersistentStoreAvailable else { return [] }
+        guard requirePersistentDatabase() != nil else { return [] }
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
@@ -1031,8 +1074,7 @@ final class DeltaAppModel: ObservableObject {
     }
 
     private func performBackgroundJobWork(activeOperation: ActiveOperation, _ operation: @escaping @Sendable () throws -> [JobRun]) {
-        guardPersistentStoreAvailable()
-        guard isPersistentStoreAvailable else { return }
+        guard requirePersistentDatabase() != nil else { return }
         runController.reset()
         localOperationIsRunning = true
         isWorking = true
@@ -1105,7 +1147,7 @@ final class DeltaAppModel: ObservableObject {
         }
     }
 
-    private func makeCoordinator() -> BackupCoordinator {
+    private func makeCoordinator(database: DeltaDatabase) -> BackupCoordinator {
         BackupCoordinator(
             database: database,
             commandBuilder: ResticCommandBuilder(
@@ -1125,13 +1167,24 @@ final class DeltaAppModel: ObservableObject {
     }
 
     private func knownRepositoryIDs() throws -> Set<UUID> {
-        Set(try database.fetchRepositories().map(\.id))
+        guard let database else {
+            return []
+        }
+        return Set(try database.fetchRepositories().map(\.id))
     }
 
-    private func guardPersistentStoreAvailable() {
+    private func requirePersistentDatabase() -> DeltaDatabase? {
         if let persistentStoreErrorMessage {
             alertMessage = persistentStoreErrorMessage
+            return nil
         }
+        guard let database else {
+            let message = "Delta could not open its local database. Backup, destination, and restore actions are disabled until app data opens successfully."
+            persistentStoreErrorMessage = message
+            alertMessage = message
+            return nil
+        }
+        return database
     }
 
     private func reopenPersistentStoreIfNeeded() -> Bool {
@@ -1198,21 +1251,11 @@ final class DeltaAppModel: ObservableObject {
             : URL(fileURLWithPath: "/usr/bin/false")
     }
 
-    private static func openDatabase() -> (database: DeltaDatabase, errorMessage: String?) {
+    private static func openDatabase() -> (database: DeltaDatabase?, errorMessage: String?) {
         do {
             return (try DeltaDatabase.live(), nil)
         } catch {
-            let fallbackURL = FileManager.default.temporaryDirectory
-                .appendingPathComponent("Delta-\(UUID().uuidString)", isDirectory: true)
-                .appendingPathComponent("Delta.sqlite")
-            do {
-                return (
-                    try DeltaDatabase(url: fallbackURL),
-                    persistentStoreUnavailableMessage(for: error)
-                )
-            } catch {
-                preconditionFailure("Delta cannot create a database: \(error)")
-            }
+            return (nil, persistentStoreUnavailableMessage(for: error))
         }
     }
 

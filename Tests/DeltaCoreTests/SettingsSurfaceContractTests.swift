@@ -14,7 +14,7 @@ final class SettingsSurfaceContractTests: XCTestCase {
     }
 
     func testSettingsSurfaceContractCoversProductionReadinessControls() {
-        XCTAssertTrue(SettingsSurfaceContract.cardTitles.contains("Background Backup Service"))
+        XCTAssertTrue(SettingsSurfaceContract.cardTitles.contains("Scheduled Backups"))
         XCTAssertTrue(SettingsSurfaceContract.cardTitles.contains("Background Password Access"))
         XCTAssertTrue(SettingsSurfaceContract.cardTitles.contains("Full Disk Access"))
         XCTAssertTrue(SettingsSurfaceContract.cardTitles.contains("Power & Reliability"))
@@ -45,7 +45,7 @@ final class SettingsSurfaceContractTests: XCTestCase {
     }
 
     func testSettingsSurfaceContractMapsToManualAcceptanceCoverage() {
-        XCTAssertTrue(SettingsSurfaceContract.requiredManualAcceptanceCoverage.contains("Plain-language Background Backup Service status"))
+        XCTAssertTrue(SettingsSurfaceContract.requiredManualAcceptanceCoverage.contains("Plain-language Scheduled Backups status"))
         XCTAssertTrue(SettingsSurfaceContract.requiredManualAcceptanceCoverage.contains("Background password access repair"))
         XCTAssertTrue(SettingsSurfaceContract.requiredManualAcceptanceCoverage.contains("Compact status summary"))
         XCTAssertTrue(SettingsSurfaceContract.requiredManualAcceptanceCoverage.contains("Run Due Now scheduler action"))

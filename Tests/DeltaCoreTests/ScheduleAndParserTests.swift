@@ -136,7 +136,7 @@ final class ScheduleAndParserTests: XCTestCase {
         XCTAssertEqual(LaunchAgentRegistrationStatus.enabled.displayName, "Ready")
         XCTAssertEqual(LaunchAgentRegistrationStatus.requiresApproval.displayName, "Needs Approval")
         XCTAssertEqual(LaunchAgentRegistrationStatus.notRegistered.displayName, "Off")
-        XCTAssertEqual(LaunchAgentRegistrationStatus.notFound.displayName, "Missing Service")
+        XCTAssertEqual(LaunchAgentRegistrationStatus.notFound.displayName, "Missing Scheduler")
     }
 
     func testLaunchAgentStatusParserHandlesRawServiceManagementStates() {
@@ -211,7 +211,7 @@ final class ScheduleAndParserTests: XCTestCase {
         XCTAssertEqual(presentation.approvalText, "Approved")
         XCTAssertEqual(presentation.attentionTitle, "Scheduled backups paused")
         XCTAssertEqual(presentation.severity, .attention)
-        XCTAssertTrue(presentation.controlDetail.contains("Keep the background service approved"))
+        XCTAssertTrue(presentation.controlDetail.contains("Keep background backups approved"))
     }
 
     func testBackgroundBackupPresentationUsesProductLanguageForMissingService() {
@@ -221,11 +221,11 @@ final class ScheduleAndParserTests: XCTestCase {
             pausesScheduledBackups: false
         )
 
-        XCTAssertEqual(presentation.statusText, "Missing Service")
-        XCTAssertEqual(presentation.attentionTitle, "Background service missing")
+        XCTAssertEqual(presentation.statusText, "Missing Scheduler")
+        XCTAssertEqual(presentation.attentionTitle, "Background scheduler missing")
         XCTAssertEqual(
             presentation.attentionText,
-            "The signed background backup service is missing from the installed app bundle. Reinstall Delta from the latest build."
+            "The signed background scheduler is missing from the installed app bundle. Reinstall Delta from the latest build."
         )
         XCTAssertEqual(presentation.severity, .blocked)
     }

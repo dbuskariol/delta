@@ -17,7 +17,7 @@ public enum LaunchAgentRegistrationStatus: Equatable, Sendable {
         case .enabled: "Ready"
         case .requiresApproval: "Needs Approval"
         case .notRegistered: "Off"
-        case .notFound: "Missing Service"
+        case .notFound: "Missing Scheduler"
         case .unavailable: "Unavailable"
         case .unknown: "Unknown"
         }
@@ -32,7 +32,7 @@ public enum LaunchAgentRegistrationStatus: Equatable, Sendable {
         case .notRegistered:
             return "Turn on background backups to run scheduled backups while Delta is closed."
         case .notFound:
-            return "The background backup service could not be found in the app bundle."
+            return "The background scheduler could not be found in the app bundle."
         case .unavailable:
             return "Background backups are unavailable on this macOS version."
         case .unknown:

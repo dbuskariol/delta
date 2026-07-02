@@ -7,6 +7,7 @@ cd "$ROOT_DIR"
 /usr/bin/swift test
 
 "$ROOT_DIR/Scripts/verify-product-language.sh"
+"$ROOT_DIR/Scripts/verify-no-crash-markers.sh"
 /bin/bash -n \
   "$ROOT_DIR/Scripts/package-update.sh" \
   "$ROOT_DIR/Scripts/notarize-release.sh" \
@@ -23,6 +24,7 @@ cd "$ROOT_DIR"
   "$ROOT_DIR/Scripts/run-installed-diagnostics-acceptance.sh" \
   "$ROOT_DIR/Scripts/run-installed-keychain-access-acceptance.sh" \
   "$ROOT_DIR/Scripts/run-installed-local-backup-acceptance.sh" \
+  "$ROOT_DIR/Scripts/run-installed-preferences-acceptance.sh" \
   "$ROOT_DIR/Scripts/run-installed-run-control-acceptance.sh" \
   "$ROOT_DIR/Scripts/run-installed-scheduled-agent-acceptance.sh" \
   "$ROOT_DIR/Scripts/run-local-acceptance-probe.sh" \
@@ -63,12 +65,20 @@ if [[ ! -x "$ROOT_DIR/Scripts/verify-sparkle-update-artifacts.sh" ]]; then
   printf "Scripts/verify-sparkle-update-artifacts.sh must be executable.\n" >&2
   exit 1
 fi
+if [[ ! -x "$ROOT_DIR/Scripts/verify-no-crash-markers.sh" ]]; then
+  printf "Scripts/verify-no-crash-markers.sh must be executable.\n" >&2
+  exit 1
+fi
 if [[ ! -x "$ROOT_DIR/Scripts/run-local-acceptance-probe.sh" ]]; then
   printf "Scripts/run-local-acceptance-probe.sh must be executable.\n" >&2
   exit 1
 fi
 if [[ ! -x "$ROOT_DIR/Scripts/run-installed-local-backup-acceptance.sh" ]]; then
   printf "Scripts/run-installed-local-backup-acceptance.sh must be executable.\n" >&2
+  exit 1
+fi
+if [[ ! -x "$ROOT_DIR/Scripts/run-installed-preferences-acceptance.sh" ]]; then
+  printf "Scripts/run-installed-preferences-acceptance.sh must be executable.\n" >&2
   exit 1
 fi
 if [[ ! -x "$ROOT_DIR/Scripts/run-installed-run-control-acceptance.sh" ]]; then

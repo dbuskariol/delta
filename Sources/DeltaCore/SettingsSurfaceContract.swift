@@ -32,7 +32,7 @@ public enum SettingsSurfaceContract {
     ]
 
     public static let cardTitles = [
-        "Background Backup Service",
+        "Scheduled Backups",
         "Background Password Access",
         "Full Disk Access",
         "Power & Reliability",
@@ -111,7 +111,7 @@ public enum SettingsSurfaceContract {
     ]
 
     public static let requiredManualAcceptanceCoverage = [
-        "Plain-language Background Backup Service status",
+        "Plain-language Scheduled Backups status",
         "Background password access repair",
         "Compact status summary",
         "Run Due Now scheduler action",
@@ -139,7 +139,7 @@ public enum SettingsSurfaceContract {
         require(statusSummaryTitles, contains: "Notifications", in: "status summary", failures: &failures)
         require(statusSummaryTitles, contains: "Status Menu", in: "status summary", failures: &failures)
         require(statusSummaryTitles, contains: "Backup Tools", in: "status summary", failures: &failures)
-        require(cardTitles, contains: "Background Backup Service", in: "cards", failures: &failures)
+        require(cardTitles, contains: "Scheduled Backups", in: "cards", failures: &failures)
         require(cardTitles, contains: "Background Password Access", in: "cards", failures: &failures)
         require(cardTitles, contains: "Full Disk Access", in: "cards", failures: &failures)
         require(cardTitles, contains: "Power & Reliability", in: "cards", failures: &failures)

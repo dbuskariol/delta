@@ -20,7 +20,7 @@ public struct BackgroundBackupServicePresentation: Equatable, Sendable {
         attentionTitle != nil && attentionText != nil
     }
 
-    public static let purposeText = "macOS can launch Delta's signed background backup service after sign-in and during short schedule checks. It runs as your user account, honors each profile's power and destination policy, starts due backups, then exits when there is no work."
+    public static let purposeText = "macOS can start Delta's signed background scheduler after sign-in and during short schedule checks. It runs as your user account, honors each profile's power and destination policy, starts due backups, then exits when there is no work."
 
     public static func make(
         status: LaunchAgentRegistrationStatus,
@@ -99,7 +99,7 @@ public struct BackgroundBackupServicePresentation: Equatable, Sendable {
         isPaused: Bool
     ) -> String {
         if isPaused {
-            return "Keep the background service approved, but skip automatic scheduled runs until automation is resumed."
+            return "Keep background backups approved, but skip automatic scheduled runs until automation is resumed."
         }
         if scheduledProfileCount == 0 {
             return "Optional until at least one backup profile has an hourly, daily, weekly, monthly, or custom schedule."
@@ -147,7 +147,7 @@ public struct BackgroundBackupServicePresentation: Equatable, Sendable {
         case .notRegistered:
             return "Background backups are off"
         case .notFound:
-            return "Background service missing"
+            return "Background scheduler missing"
         case .unavailable:
             return "Background backups unavailable"
         case .unknown:
@@ -174,9 +174,9 @@ public struct BackgroundBackupServicePresentation: Equatable, Sendable {
         case .notRegistered:
             return "Turn on Background Backups before scheduled profiles can run while the main window is closed."
         case .notFound:
-            return "The signed background backup service is missing from the installed app bundle. Reinstall Delta from the latest build."
+            return "The signed background scheduler is missing from the installed app bundle. Reinstall Delta from the latest build."
         case .unavailable:
-            return "This macOS version cannot run Delta's background backup service."
+            return "This macOS version cannot run Delta's background scheduler."
         case .unknown:
             return "macOS returned an unknown background backup status. Refresh status, then review Login Items if scheduled backups do not run."
         }
