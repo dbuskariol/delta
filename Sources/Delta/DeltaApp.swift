@@ -6,7 +6,10 @@ struct DeltaApp: App {
     @StateObject private var model = DeltaAppModel()
     @StateObject private var softwareUpdateController = SoftwareUpdateController()
     @StateObject private var statusItemController = DeltaStatusItemController()
-    @AppStorage(DeltaAppPreferenceKeys.showsMenuBarExtra) private var showsMenuBarExtra = true
+    @AppStorage(
+        DeltaAppPreferenceKeys.showsMenuBarExtra,
+        store: DeltaAppPreferences.sharedStore()
+    ) private var showsMenuBarExtra = true
 
     var body: some Scene {
         WindowGroup(id: "main") {

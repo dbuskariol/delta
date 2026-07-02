@@ -254,9 +254,18 @@ struct RepositoriesView: View {
 
 struct RestoreView: View {
     @EnvironmentObject private var model: DeltaAppModel
-    @AppStorage(DeltaAppPreferenceKeys.previewsRestoresByDefault) private var previewsRestoresByDefault = true
-    @AppStorage(DeltaAppPreferenceKeys.verifiesRestoresByDefault) private var verifiesRestoresByDefault = true
-    @AppStorage(DeltaAppPreferenceKeys.defaultRestoreConflictPolicy) private var defaultRestoreConflictPolicyRawValue = RestoreConflictPolicy.ifChanged.rawValue
+    @AppStorage(
+        DeltaAppPreferenceKeys.previewsRestoresByDefault,
+        store: DeltaAppPreferences.sharedStore()
+    ) private var previewsRestoresByDefault = true
+    @AppStorage(
+        DeltaAppPreferenceKeys.verifiesRestoresByDefault,
+        store: DeltaAppPreferences.sharedStore()
+    ) private var verifiesRestoresByDefault = true
+    @AppStorage(
+        DeltaAppPreferenceKeys.defaultRestoreConflictPolicy,
+        store: DeltaAppPreferences.sharedStore()
+    ) private var defaultRestoreConflictPolicyRawValue = RestoreConflictPolicy.ifChanged.rawValue
     @State private var repositoryID: UUID?
     @State private var snapshotID = ""
     @State private var selectedRestorePaths: Set<String> = []
@@ -896,7 +905,10 @@ private extension Array where Element == ResticSnapshotEntry {
 
 struct ActivityView: View {
     @EnvironmentObject private var model: DeltaAppModel
-    @AppStorage(DeltaAppPreferenceKeys.activityLogDetail) private var activityLogDetailRawValue = ActivityLogDetail.standard.rawValue
+    @AppStorage(
+        DeltaAppPreferenceKeys.activityLogDetail,
+        store: DeltaAppPreferences.sharedStore()
+    ) private var activityLogDetailRawValue = ActivityLogDetail.standard.rawValue
 
     var body: some View {
         PageScaffold(title: "Activity", subtitle: "Jobs, destination checks, and system events") {
@@ -938,34 +950,6 @@ struct ActivityView: View {
 
     private var activityLogDetail: ActivityLogDetail {
         ActivityLogDetail.normalized(activityLogDetailRawValue)
-    }
-}
-
-private enum UpdateCheckInterval: Int, CaseIterable, Identifiable {
-    case daily = 86_400
-    case weekly = 604_800
-    case monthly = 2_592_000
-
-    var id: Int { rawValue }
-
-    var title: String {
-        switch self {
-        case .daily: "Daily"
-        case .weekly: "Weekly"
-        case .monthly: "Monthly"
-        }
-    }
-
-    var summaryText: String {
-        switch self {
-        case .daily: "Checked daily"
-        case .weekly: "Checked weekly"
-        case .monthly: "Checked monthly"
-        }
-    }
-
-    static func normalized(_ rawValue: Int) -> UpdateCheckInterval {
-        UpdateCheckInterval(rawValue: rawValue) ?? .daily
     }
 }
 
@@ -1019,40 +1003,58 @@ private enum ActivityLogDetail: String, CaseIterable, Identifiable {
 struct SettingsView: View {
     @EnvironmentObject private var model: DeltaAppModel
     @EnvironmentObject private var softwareUpdateController: SoftwareUpdateController
-    @AppStorage(DeltaAppPreferenceKeys.updateCheckIntervalSeconds) private var updateCheckIntervalSeconds = UpdateCheckInterval.daily.rawValue
-    @AppStorage(DeltaAppPreferenceKeys.activityLogDetail) private var activityLogDetailRawValue = ActivityLogDetail.standard.rawValue
-    @AppStorage(DeltaAppPreferenceKeys.previewsRestoresByDefault) private var previewsRestoresByDefault = true
-    @AppStorage(DeltaAppPreferenceKeys.verifiesRestoresByDefault) private var verifiesRestoresByDefault = true
-    @AppStorage(DeltaAppPreferenceKeys.defaultRestoreConflictPolicy) private var defaultRestoreConflictPolicyRawValue = RestoreConflictPolicy.ifChanged.rawValue
+    @AppStorage(
+        DeltaAppPreferenceKeys.updateCheckIntervalSeconds,
+        store: DeltaAppPreferences.sharedStore()
+    ) private var updateCheckIntervalSeconds = AppUpdateCheckInterval.daily.rawValue
+    @AppStorage(
+        DeltaAppPreferenceKeys.activityLogDetail,
+        store: DeltaAppPreferences.sharedStore()
+    ) private var activityLogDetailRawValue = ActivityLogDetail.standard.rawValue
+    @AppStorage(
+        DeltaAppPreferenceKeys.previewsRestoresByDefault,
+        store: DeltaAppPreferences.sharedStore()
+    ) private var previewsRestoresByDefault = true
+    @AppStorage(
+        DeltaAppPreferenceKeys.verifiesRestoresByDefault,
+        store: DeltaAppPreferences.sharedStore()
+    ) private var verifiesRestoresByDefault = true
+    @AppStorage(
+        DeltaAppPreferenceKeys.defaultRestoreConflictPolicy,
+        store: DeltaAppPreferences.sharedStore()
+    ) private var defaultRestoreConflictPolicyRawValue = RestoreConflictPolicy.ifChanged.rawValue
     @AppStorage(
         DeltaAppPreferenceKeys.defaultProfileCatchUpMissedRuns,
-        store: UserDefaults(suiteName: DeltaAppPreferences.sharedSuiteName)
+        store: DeltaAppPreferences.sharedStore()
     ) private var defaultProfileCatchUpMissedRuns = true
     @AppStorage(
         DeltaAppPreferenceKeys.defaultProfileRunOnBattery,
-        store: UserDefaults(suiteName: DeltaAppPreferences.sharedSuiteName)
+        store: DeltaAppPreferences.sharedStore()
     ) private var defaultProfileRunOnBattery = true
     @AppStorage(
         DeltaAppPreferenceKeys.defaultProfileRunInLowPowerMode,
-        store: UserDefaults(suiteName: DeltaAppPreferences.sharedSuiteName)
+        store: DeltaAppPreferences.sharedStore()
     ) private var defaultProfileRunInLowPowerMode = false
     @AppStorage(
         DeltaAppPreferenceKeys.defaultProfilePruneAfterForget,
-        store: UserDefaults(suiteName: DeltaAppPreferences.sharedSuiteName)
+        store: DeltaAppPreferences.sharedStore()
     ) private var defaultProfilePruneAfterForget = true
     @AppStorage(
         DeltaAppPreferenceKeys.defaultProfileCheckAfterPrune,
-        store: UserDefaults(suiteName: DeltaAppPreferences.sharedSuiteName)
+        store: DeltaAppPreferences.sharedStore()
     ) private var defaultProfileCheckAfterPrune = true
     @AppStorage(
         DeltaAppPreferenceKeys.sendsJobNotifications,
-        store: UserDefaults(suiteName: DeltaAppPreferences.sharedSuiteName)
+        store: DeltaAppPreferences.sharedStore()
     ) private var sendsJobNotifications = false
     @AppStorage(
         DeltaAppPreferenceKeys.sendsSuccessfulBackupNotifications,
-        store: UserDefaults(suiteName: DeltaAppPreferences.sharedSuiteName)
+        store: DeltaAppPreferences.sharedStore()
     ) private var sendsSuccessfulBackupNotifications = false
-    @AppStorage(DeltaAppPreferenceKeys.showsMenuBarExtra) private var showsMenuBarExtra = true
+    @AppStorage(
+        DeltaAppPreferenceKeys.showsMenuBarExtra,
+        store: DeltaAppPreferences.sharedStore()
+    ) private var showsMenuBarExtra = true
     @State private var automaticallyChecksForUpdates = true
     @State private var notificationAuthorizationState: DeltaNotificationAuthorizationState = .notDetermined
 
@@ -1508,7 +1510,7 @@ struct SettingsView: View {
                     detail: "How often Delta asks Sparkle to check for a newer build."
                 ) {
                     Picker("", selection: $updateCheckIntervalSeconds) {
-                        ForEach(UpdateCheckInterval.allCases) { interval in
+                        ForEach(AppUpdateCheckInterval.allCases) { interval in
                             Text(interval.title).tag(interval.rawValue)
                         }
                     }
@@ -1669,7 +1671,7 @@ struct SettingsView: View {
                 value: automaticallyChecksForUpdates ? "On" : "Off",
                 symbol: "arrow.down.circle",
                 color: automaticallyChecksForUpdates ? .green : .secondary,
-                detail: UpdateCheckInterval.normalized(updateCheckIntervalSeconds).summaryText
+                detail: AppUpdateCheckInterval.normalized(updateCheckIntervalSeconds).summaryText
             ),
             SettingsStatusItem(
                 title: "Notifications",
@@ -1942,7 +1944,7 @@ struct SettingsView: View {
     }
 
     private func applyUpdatePreferences() {
-        let interval = UpdateCheckInterval.normalized(updateCheckIntervalSeconds)
+        let interval = AppUpdateCheckInterval.normalized(updateCheckIntervalSeconds)
         if updateCheckIntervalSeconds != interval.rawValue {
             updateCheckIntervalSeconds = interval.rawValue
         }

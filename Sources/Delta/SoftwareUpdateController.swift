@@ -1,3 +1,4 @@
+import DeltaCore
 import Foundation
 import Sparkle
 import SwiftUI
@@ -12,6 +13,7 @@ final class SoftwareUpdateController: ObservableObject {
             updaterDelegate: nil,
             userDriverDelegate: nil
         )
+        applyStoredPreferences()
     }
 
     var automaticallyChecksForUpdates: Bool {
@@ -34,5 +36,15 @@ final class SoftwareUpdateController: ObservableObject {
 
     func checkForUpdates() {
         updaterController.checkForUpdates(nil)
+    }
+
+    private func applyStoredPreferences() {
+        let intervalRawValue = DeltaAppPreferences.integer(
+            for: DeltaAppPreferenceKeys.updateCheckIntervalSeconds,
+            default: AppUpdateCheckInterval.daily.rawValue
+        )
+        updaterController.updater.updateCheckInterval = TimeInterval(
+            AppUpdateCheckInterval.normalized(intervalRawValue).rawValue
+        )
     }
 }

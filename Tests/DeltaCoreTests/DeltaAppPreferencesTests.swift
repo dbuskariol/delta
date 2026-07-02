@@ -6,7 +6,7 @@ final class DeltaAppPreferencesTests: XCTestCase {
         UserDefaults(suiteName: DeltaAppPreferences.sharedSuiteName)
     }
 
-    func testBoolReadsSharedSuiteBeforeStandardDefaults() {
+    func testBoolReadsSharedSuiteAndIgnoresStandardDefaults() {
         let key = "Delta.test.\(UUID().uuidString)"
         sharedSuite?.set(true, forKey: key)
         UserDefaults.standard.set(false, forKey: key)
@@ -18,7 +18,7 @@ final class DeltaAppPreferencesTests: XCTestCase {
         XCTAssertTrue(DeltaAppPreferences.bool(for: key, default: false))
     }
 
-    func testBoolFallsBackToSharedSuiteForHelperProcesses() {
+    func testBoolUsesSharedSuiteForHelperProcesses() {
         let key = "Delta.test.\(UUID().uuidString)"
         UserDefaults.standard.removeObject(forKey: key)
         sharedSuite?.set(true, forKey: key)
@@ -32,13 +32,17 @@ final class DeltaAppPreferencesTests: XCTestCase {
 
     func testBoolUsesDefaultWhenUnset() {
         let key = "Delta.test.\(UUID().uuidString)"
-        UserDefaults.standard.removeObject(forKey: key)
+        UserDefaults.standard.set(false, forKey: key)
         UserDefaults(suiteName: DeltaAppPreferences.sharedSuiteName)?.removeObject(forKey: key)
+        defer {
+            UserDefaults.standard.removeObject(forKey: key)
+            sharedSuite?.removeObject(forKey: key)
+        }
 
         XCTAssertTrue(DeltaAppPreferences.bool(for: key, default: true))
     }
 
-    func testStringReadsSharedSuiteBeforeStandardDefaults() {
+    func testStringReadsSharedSuiteAndIgnoresStandardDefaults() {
         let key = "Delta.test.\(UUID().uuidString)"
         sharedSuite?.set("shared", forKey: key)
         UserDefaults.standard.set("standard", forKey: key)
@@ -48,6 +52,69 @@ final class DeltaAppPreferencesTests: XCTestCase {
         }
 
         XCTAssertEqual(DeltaAppPreferences.string(for: key, default: "fallback"), "shared")
+    }
+
+    func testStringUsesDefaultWhenOnlyStandardDefaultsContainsValue() {
+        let key = "Delta.test.\(UUID().uuidString)"
+        sharedSuite?.removeObject(forKey: key)
+        UserDefaults.standard.set("standard", forKey: key)
+        defer {
+            UserDefaults.standard.removeObject(forKey: key)
+            sharedSuite?.removeObject(forKey: key)
+        }
+
+        XCTAssertEqual(DeltaAppPreferences.string(for: key, default: "fallback"), "fallback")
+    }
+
+    func testIntegerReadsSharedSuiteAndIgnoresStandardDefaults() {
+        let key = "Delta.test.\(UUID().uuidString)"
+        sharedSuite?.set(42, forKey: key)
+        UserDefaults.standard.set(7, forKey: key)
+        defer {
+            UserDefaults.standard.removeObject(forKey: key)
+            sharedSuite?.removeObject(forKey: key)
+        }
+
+        XCTAssertEqual(DeltaAppPreferences.integer(for: key, default: 1), 42)
+    }
+
+    func testIntegerUsesDefaultWhenOnlyStandardDefaultsContainsValue() {
+        let key = "Delta.test.\(UUID().uuidString)"
+        sharedSuite?.removeObject(forKey: key)
+        UserDefaults.standard.set(7, forKey: key)
+        defer {
+            UserDefaults.standard.removeObject(forKey: key)
+            sharedSuite?.removeObject(forKey: key)
+        }
+
+        XCTAssertEqual(DeltaAppPreferences.integer(for: key, default: 1), 1)
+    }
+
+    func testSharedStoreWritesAreVisibleToPreferenceReaders() {
+        let boolKey = "Delta.test.\(UUID().uuidString)"
+        let stringKey = "Delta.test.\(UUID().uuidString)"
+        let intKey = "Delta.test.\(UUID().uuidString)"
+        DeltaAppPreferences.sharedStore().set(true, forKey: boolKey)
+        DeltaAppPreferences.sharedStore().set("shared", forKey: stringKey)
+        DeltaAppPreferences.sharedStore().set(86_400, forKey: intKey)
+        defer {
+            DeltaAppPreferences.sharedStore().removeObject(forKey: boolKey)
+            DeltaAppPreferences.sharedStore().removeObject(forKey: stringKey)
+            DeltaAppPreferences.sharedStore().removeObject(forKey: intKey)
+            UserDefaults.standard.removeObject(forKey: boolKey)
+            UserDefaults.standard.removeObject(forKey: stringKey)
+            UserDefaults.standard.removeObject(forKey: intKey)
+        }
+
+        XCTAssertTrue(DeltaAppPreferences.bool(for: boolKey, default: false))
+        XCTAssertEqual(DeltaAppPreferences.string(for: stringKey, default: "fallback"), "shared")
+        XCTAssertEqual(DeltaAppPreferences.integer(for: intKey, default: 0), 86_400)
+    }
+
+    func testUpdateCheckIntervalNormalizesUnsupportedValues() {
+        XCTAssertEqual(AppUpdateCheckInterval.normalized(AppUpdateCheckInterval.daily.rawValue), .daily)
+        XCTAssertEqual(AppUpdateCheckInterval.normalized(AppUpdateCheckInterval.weekly.rawValue), .weekly)
+        XCTAssertEqual(AppUpdateCheckInterval.normalized(-1), .daily)
     }
 
     func testBackupProfileDefaultsUseRecommendedPolicyWhenUnset() {
