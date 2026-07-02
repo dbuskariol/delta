@@ -3850,7 +3850,7 @@ struct StatusPill: View {
     var status: JobStatus
 
     var body: some View {
-        Text(status.rawValue.capitalized)
+        Text(status.displayName)
             .font(.caption.weight(.medium))
             .padding(.horizontal, 9)
             .padding(.vertical, 5)

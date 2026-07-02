@@ -127,6 +127,17 @@ public enum JobStatus: String, Codable, CaseIterable, Sendable {
     case warning
     case failed
     case cancelled
+
+    public var displayName: String {
+        switch self {
+        case .queued: "Queued"
+        case .running: "Running"
+        case .succeeded: "Completed"
+        case .warning: "Completed with warnings"
+        case .failed: "Failed"
+        case .cancelled: "Stopped"
+        }
+    }
 }
 
 public enum RestoreScope: Codable, Equatable, Sendable {

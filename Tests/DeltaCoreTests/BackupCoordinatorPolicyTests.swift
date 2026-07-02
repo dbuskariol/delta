@@ -883,7 +883,7 @@ final class BackupCoordinatorPolicyTests: XCTestCase {
         XCTAssertFalse(startMessage.contains("user:secret"))
         XCTAssertFalse(startMessage.contains("example.com/repo"))
         XCTAssertTrue(messages.contains("Processed 21 files · 1 MB"))
-        XCTAssertTrue(messages.contains("Finished Backup with status succeeded."))
+        XCTAssertTrue(messages.contains("Backup completed."))
         XCTAssertTrue(recorder.events.contains { $0.jobID == job.id && $0.event.message == "Source: \(fixture.source.path)" })
         XCTAssertTrue(recorder.events.contains { $0.jobID == job.id && $0.event == event })
     }

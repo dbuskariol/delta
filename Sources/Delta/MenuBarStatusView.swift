@@ -5,7 +5,11 @@ import SwiftUI
 struct DeltaMenuBarView: View {
     @EnvironmentObject private var model: DeltaAppModel
     @EnvironmentObject private var softwareUpdateController: SoftwareUpdateController
-    @Environment(\.openWindow) private var openWindow
+    var openApp: (DeltaAppModel.Section) -> Void
+
+    init(openApp: @escaping (DeltaAppModel.Section) -> Void) {
+        self.openApp = openApp
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -267,13 +271,12 @@ struct DeltaMenuBarView: View {
         guard let lastBackupRun else {
             return "Ready"
         }
-        return "Last backup \(lastBackupRun.status.rawValue)"
+        return "Last backup \(lastBackupRun.status.displayName.lowercased())"
     }
 
     private func openApp(section: DeltaAppModel.Section) {
         model.selectedSection = section
-        openWindow(id: "main")
-        NSApplication.shared.activate(ignoringOtherApps: true)
+        openApp(section)
     }
 }
 

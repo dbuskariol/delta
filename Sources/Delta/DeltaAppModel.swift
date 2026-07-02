@@ -859,7 +859,7 @@ final class DeltaAppModel: ObservableObject {
             .map {
                 DiagnosticJobSummary(
                     kind: $0.kind.displayName,
-                    status: $0.status.rawValue,
+                    status: $0.status.displayName,
                     startedAt: $0.startedAt,
                     exitCode: $0.exitCode,
                     message: $0.message

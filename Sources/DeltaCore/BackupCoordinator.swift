@@ -662,12 +662,17 @@ public final class BackupCoordinator: @unchecked Sendable {
             profileID: profileID,
             repositoryID: repositoryID,
             stream: result.status == .failed ? .standardError : .standardOutput,
-            message: "Finished \(kind.displayName) with status \(result.status.rawValue)."
+            message: "\(kind.displayName) \(result.status.displayName.lowercased())."
         )
         if job.status == .succeeded || job.status == .warning {
             try markRepositoryVerified(repositoryID: repositoryID, at: job.finishedAt ?? Date())
         }
-        try database.appendEvent(EventLog(level: result.status == .failed ? .error : .info, message: "\(kind.displayName) finished with status \(result.status.rawValue)."))
+        try database.appendEvent(
+            EventLog(
+                level: result.status == .failed ? .error : .info,
+                message: "\(kind.displayName) \(result.status.displayName.lowercased())."
+            )
+        )
         return job
     }
 
