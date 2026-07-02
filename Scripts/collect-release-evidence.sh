@@ -104,7 +104,7 @@ append_command "Secret Bridge Fail-Closed Check" /bin/sh -c "'$APP_PATH/Contents
 append_command "Manual Acceptance Matrix Consistency" "$ROOT_DIR/Scripts/verify-manual-acceptance-matrix.sh"
 
 if [[ -d "$ROOT_DIR/dist/updates" ]]; then
-  append_command "Sparkle Update Artifacts" /bin/sh -c "ls -la '$ROOT_DIR/dist/updates' && test -f '$ROOT_DIR/dist/updates/appcast.xml' && grep -E 'sparkle:(version|shortVersionString)|sparkle:edSignature' '$ROOT_DIR/dist/updates/appcast.xml'"
+  append_command "Sparkle Update Artifacts" /bin/sh -c "ls -la '$ROOT_DIR/dist/updates' && '$ROOT_DIR/Scripts/verify-sparkle-update-artifacts.sh' '$APP_PATH' '$ROOT_DIR/dist/updates'"
 fi
 
 if [[ -f "$GATE_STATUS_FILE" ]]; then

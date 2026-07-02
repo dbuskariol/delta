@@ -188,12 +188,15 @@ Relevant files:
 - `Packaging/Delta.app.plist`
 - `Scripts/package-update.sh`
 - `Scripts/generate-appcast.sh`
+- `Scripts/verify-sparkle-update-artifacts.sh`
 
 The appcast URL points at GitHub release assets:
 
 ```text
 https://github.com/dbuskariol/delta/releases/latest/download/appcast.xml
 ```
+
+Release verification validates the generated update archive, release notes, signed appcast enclosure, advertised file size, extracted app bundle identifier/version/build, extracted Sparkle settings, and extracted bundle code signature before a build is considered ready for manual Sparkle install testing.
 
 ## Development
 

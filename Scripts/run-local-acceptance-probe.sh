@@ -371,11 +371,12 @@ else
   append_row "menu_bar" "$(item_area menu_bar)" "Manual Required" "Native status item presentation and persistent popover behavior require visual macOS interaction." "Enable/disable the menu bar item and verify ready/running/attention states plus all popover actions."
   append_row "notifications" "$(item_area notifications)" "Manual Required" "Notification Center authorization and delivery require user approval and real macOS delivery." "Enable alerts, grant macOS permission, trigger warning/failed helper jobs, and verify success summaries only when opted in."
 
-  appcast="$ROOT_DIR/dist/updates/appcast.xml"
-  if [[ -f "$appcast" ]] && /usr/bin/grep -Eq 'sparkle:edSignature="[A-Za-z0-9+/=]{40,}"' "$appcast"; then
-    append_row "sparkle_update_install" "$(item_area sparkle_update_install)" "Partial" "Signed Sparkle appcast metadata exists at $appcast." "Install an older signed build from the appcast, update through Sparkle, and confirm state survives."
+  sparkle_output="$(run_capture sparkle_artifacts "$ROOT_DIR/Scripts/verify-sparkle-update-artifacts.sh" "$ROOT_DIR/dist/Delta.app" "$ROOT_DIR/dist/updates")"
+  sparkle_status="$(command_status sparkle_artifacts)"
+  if [[ "$sparkle_status" -eq 0 ]]; then
+    append_row "sparkle_update_install" "$(item_area sparkle_update_install)" "Partial" "Sparkle update artifact verification passed for the packaged app, archive, release notes, signed appcast enclosure, extracted bundle identity, and extracted bundle code signature: $sparkle_output" "Install an older signed build from the appcast, update through Sparkle, and confirm state survives."
   else
-    append_row "sparkle_update_install" "$(item_area sparkle_update_install)" "Failed" "Signed Sparkle appcast metadata was not found at $appcast." "Run Scripts/verify-release.sh or Scripts/generate-appcast.sh, then perform an actual update install."
+    append_row "sparkle_update_install" "$(item_area sparkle_update_install)" "Failed" "Sparkle update artifact verification failed: $sparkle_output" "Run Scripts/verify-release.sh or Scripts/generate-appcast.sh, then perform an actual update install."
   fi
 
   notarization_output="$(run_capture notarization /bin/sh -c "/usr/bin/codesign -dvv '$APP_PATH' 2>&1 | /usr/bin/grep -q '^Authority=Developer ID Application:' && /usr/bin/stapler validate '$APP_PATH' >/dev/null 2>&1 && /usr/sbin/spctl --assess --type execute '$APP_PATH' >/dev/null 2>&1")"
