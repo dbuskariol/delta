@@ -13,11 +13,11 @@ Resources/Tools/bin/restic version
 Resources/Tools/bin/rclone version
 ```
 
-## Repository Passwords
+## Destination Passwords
 
 Delta uses restic `--password-command`.
 
-The command points at `Delta --secret-bridge`, which reads the destination password from Keychain and writes it to stdout for restic. Delta does not pass destination passwords through long-lived environment variables or command-line literals. Job logs use the command's redacted description, which hides destination URL arguments, repository-file paths, and password-command values before persisting the start line. Streamed restic output and fallback final job messages are also redacted for URL-embedded credentials and common backend secret assignments before they are displayed or stored.
+The command points at `Delta --secret-bridge`, which reads the destination password from Keychain and writes it to stdout for restic. Delta does not pass destination passwords through long-lived environment variables or command-line literals. Job logs use the command's redacted description, which hides destination URL arguments, destination-file paths, and password-command values before persisting the start line. Streamed restic output and fallback final job messages are also redacted for URL-embedded credentials and common backend secret assignments before they are displayed or stored.
 
 `Delta --secret-bridge` accepts exactly one keychain account argument and exits with usage status for missing or extra arguments. This keeps the password bridge fail-closed if restic or a caller invokes it with an unexpected command line. The standalone `DeltaSecretBridge` target remains signed and fail-closed as a compatibility helper, but it is not the active restic password command.
 
@@ -41,9 +41,9 @@ Delta supports the following restic backend families:
 | Local/mounted path | `/Volumes/Backup/Delta` |
 | SFTP | `sftp:user@host:/path` |
 | SFTP with port/IPv6 | `sftp://user@host:2222//absolute/path` |
-| REST server | `rest:https://host:8000/repo` |
-| S3-compatible | `s3:https://server:port/bucket/path` |
-| Backblaze B2 | `b2:bucket:path/to/repo` |
+| REST server | `rest:https://host:8000/delta` |
+| S3-compatible | `s3:https://server:port/bucket/delta` |
+| Backblaze B2 | `b2:bucket:path/to/delta` |
 | Azure Blob | `azure:container:/path` |
 | Google Cloud Storage | `gs:bucket:/path` |
 | OpenStack Swift | `swift:container:/path` |
@@ -144,7 +144,7 @@ Before invoking restic for a backup, Delta resolves security-scoped source bookm
 
 Restic progress totals can change while it scans sources, so Delta does not expose volatile live percentages as authoritative completion. The UI uses a monotonic estimated progress bar that never moves backward during a running job, paired with stable processed-file and processed-byte counters. Backup jobs record source paths at job start, and saved logs are grouped by job with expandable full-log loading from SQLite. Restic summary JSON is parsed into explicit new, changed, unchanged, added, and checked counts so unchanged successful runs are clearly distinguished from runs that created new backup data. Delta stores those counts as compact structured job metadata, including restic `snapshot_id` when present, instead of storing the complete restic stdout stream in the job message.
 
-Saved activity output is operational history, not backup data. Delta applies a configurable local retention policy to job summaries, saved stdout/stderr lines, restore request records, and app events from both the main app and Scheduled Backups helper. Cleanup keeps a minimum set of recent job summaries for UI continuity and never deletes cached restore points or restic repository data.
+Saved activity output is operational history, not backup data. Delta applies a configurable local retention policy to job summaries, saved stdout/stderr lines, restore request records, and app events from both the main app and Scheduled Backups helper. Cleanup keeps a minimum set of recent job summaries for UI continuity and never deletes cached restore points or encrypted destination data.
 
 ## Snapshots / Restore Points
 

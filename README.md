@@ -29,12 +29,12 @@ The product goal is simple: make serious backup practices approachable without h
 
 ## How It Works
 
-Delta does not invent a custom backup format. It delegates repository format, encryption, snapshots, deduplication, restore, pruning, and integrity checks to [restic](https://restic.net/).
+Delta does not invent a custom backup format. It delegates encrypted storage format, snapshots, deduplication, restore, pruning, and integrity checks to [restic](https://restic.net/).
 
 At a high level:
 
 1. A user creates a **Destination**, which is where encrypted restore points are stored.
-2. Delta creates or uses a restic repository at that destination.
+2. Delta creates or uses encrypted restic storage at that destination.
 3. A user creates a **Backup Profile**, choosing sources, schedule, retention, bandwidth, and power policy.
 4. Scheduled or manual runs invoke bundled `restic` through `ResticRunner`.
 5. Destination passwords are fetched from Keychain through `Delta --secret-bridge` using restic `--password-command`.
@@ -172,7 +172,7 @@ The browser loads source roots from the selected restore point immediately and a
 - New user-managed encryption passphrases must be entered twice before the destination can be saved.
 - Restic receives the destination password through a short-lived password command, not a long-lived plaintext environment variable.
 - Removing a destination from Delta first verifies no backup profile still uses it, removes cached app state, then cleans up saved password and credential items without deleting backup data at the destination.
-- Command, stream, and final-message redaction hides destination URLs, repository-file paths, password-command values, and common backend secret assignments from logs/descriptions.
+- Command, stream, and final-message redaction hides destination URLs, destination-file paths, password-command values, and common backend secret assignments from logs/descriptions.
 - Backend credentials are injected only into a curated child-process environment for the restic run; Delta does not forward arbitrary ambient environment secrets.
 - Empty-password restic repositories are not used.
 
