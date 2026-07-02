@@ -186,6 +186,50 @@ final class DeltaAppPreferencesTests: XCTestCase {
         }
     }
 
+    func testRestoreDefaultsUseRecommendedPolicyWhenUnset() {
+        withClearedRestoreDefaults {
+            let defaults = RestoreDefaults.current()
+
+            XCTAssertTrue(defaults.previewFirst)
+            XCTAssertTrue(defaults.verifyRestoredFiles)
+            XCTAssertEqual(defaults.conflictPolicy, .ifChanged)
+            XCTAssertEqual(defaults.summaryText, "Preview first, verify files, Replace changed")
+        }
+    }
+
+    func testRestoreDefaultsReadSharedSettings() {
+        withClearedRestoreDefaults {
+            sharedSuite?.set(false, forKey: DeltaAppPreferenceKeys.previewsRestoresByDefault)
+            sharedSuite?.set(false, forKey: DeltaAppPreferenceKeys.verifiesRestoresByDefault)
+            sharedSuite?.set(RestoreConflictPolicy.never.rawValue, forKey: DeltaAppPreferenceKeys.defaultRestoreConflictPolicy)
+
+            let defaults = RestoreDefaults.current()
+
+            XCTAssertFalse(defaults.previewFirst)
+            XCTAssertFalse(defaults.verifyRestoredFiles)
+            XCTAssertEqual(defaults.conflictPolicy, .never)
+            XCTAssertEqual(defaults.summaryText, "Direct restore, no verification, Keep existing")
+        }
+    }
+
+    func testRestoreDefaultsNormalizeInvalidConflictPolicy() {
+        let normalized = RestoreDefaults.normalized(
+            previewFirst: false,
+            verifyRestoredFiles: true,
+            conflictPolicyRawValue: "invalid-policy"
+        )
+
+        XCTAssertFalse(normalized.previewFirst)
+        XCTAssertTrue(normalized.verifyRestoredFiles)
+        XCTAssertEqual(normalized.conflictPolicy, .ifChanged)
+
+        withClearedRestoreDefaults {
+            sharedSuite?.set("invalid-policy", forKey: DeltaAppPreferenceKeys.defaultRestoreConflictPolicy)
+
+            XCTAssertEqual(RestoreDefaults.current().conflictPolicy, .ifChanged)
+        }
+    }
+
     private func withClearedBackupProfileDefaults(_ body: () -> Void) {
         let keys = [
             DeltaAppPreferenceKeys.defaultProfileCatchUpMissedRuns,
@@ -199,6 +243,34 @@ final class DeltaAppPreferencesTests: XCTestCase {
             DeltaAppPreferenceKeys.defaultProfileMaintenanceIntervalDays,
             DeltaAppPreferenceKeys.defaultProfileMaintenanceHour,
             DeltaAppPreferenceKeys.defaultProfileMaintenanceMinute
+        ]
+        let standardValues = keys.reduce(into: [String: Any]()) { values, key in
+            values[key] = UserDefaults.standard.object(forKey: key)
+        }
+        let sharedValues = keys.reduce(into: [String: Any]()) { values, key in
+            values[key] = sharedSuite?.object(forKey: key)
+        }
+        keys.forEach {
+            UserDefaults.standard.removeObject(forKey: $0)
+            sharedSuite?.removeObject(forKey: $0)
+        }
+        defer {
+            keys.forEach {
+                UserDefaults.standard.removeObject(forKey: $0)
+                sharedSuite?.removeObject(forKey: $0)
+            }
+            standardValues.forEach { UserDefaults.standard.set($0.value, forKey: $0.key) }
+            sharedValues.forEach { sharedSuite?.set($0.value, forKey: $0.key) }
+        }
+
+        body()
+    }
+
+    private func withClearedRestoreDefaults(_ body: () -> Void) {
+        let keys = [
+            DeltaAppPreferenceKeys.previewsRestoresByDefault,
+            DeltaAppPreferenceKeys.verifiesRestoresByDefault,
+            DeltaAppPreferenceKeys.defaultRestoreConflictPolicy
         ]
         let standardValues = keys.reduce(into: [String: Any]()) { values, key in
             values[key] = UserDefaults.standard.object(forKey: key)

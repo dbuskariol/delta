@@ -277,7 +277,7 @@ struct RestoreView: View {
     @State private var verify = true
     @State private var preRestoreProfileID: UUID?
     @State private var acknowledgedInPlaceRestore = false
-    @State private var didApplyRestoreDefaults = false
+    @State private var appliedRestoreDefaults: RestoreDefaults?
 
     var body: some View {
         PageScaffold(
@@ -443,6 +443,9 @@ struct RestoreView: View {
         .onChange(of: snapshotID) { _, _ in
             resetBrowser()
         }
+        .onChange(of: restoreDefaults) { _, _ in
+            applyRestoreDefaultsIfNeeded()
+        }
     }
 
     private var selectedRepository: BackupRepository? {
@@ -561,6 +564,32 @@ struct RestoreView: View {
         return selectedRepository != nil && !snapshotID.isEmpty && destinationIsValid && inPlaceIsAcknowledged
     }
 
+    private var restoreDefaults: RestoreDefaults {
+        RestoreDefaults.normalized(
+            previewFirst: previewsRestoresByDefault,
+            verifyRestoredFiles: verifiesRestoresByDefault,
+            conflictPolicyRawValue: defaultRestoreConflictPolicyRawValue
+        )
+    }
+
+    private var hasRestoreDraft: Bool {
+        !selectedRestorePaths.isEmpty
+            || !destinationPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || restoreOriginalPaths
+            || preRestoreProfileID != nil
+            || acknowledgedInPlaceRestore
+            || restoreControlsDifferFromAppliedDefaults
+    }
+
+    private var restoreControlsDifferFromAppliedDefaults: Bool {
+        guard let appliedRestoreDefaults else {
+            return false
+        }
+        return dryRun != appliedRestoreDefaults.previewFirst
+            || verify != appliedRestoreDefaults.verifyRestoredFiles
+            || conflictPolicy != appliedRestoreDefaults.conflictPolicy
+    }
+
     private func runRestore() {
         guard let repository = selectedRepository else { return }
         let paths = normalizedSelectedRestorePaths
@@ -579,13 +608,17 @@ struct RestoreView: View {
     }
 
     private func applyRestoreDefaultsIfNeeded() {
-        guard !didApplyRestoreDefaults else {
+        let defaults = restoreDefaults
+        guard appliedRestoreDefaults != defaults else {
             return
         }
-        dryRun = previewsRestoresByDefault
-        verify = verifiesRestoresByDefault
-        conflictPolicy = RestoreConflictPolicy(rawValue: defaultRestoreConflictPolicyRawValue) ?? .ifChanged
-        didApplyRestoreDefaults = true
+        guard appliedRestoreDefaults == nil || !hasRestoreDraft else {
+            return
+        }
+        dryRun = defaults.previewFirst
+        verify = defaults.verifyRestoredFiles
+        conflictPolicy = defaults.conflictPolicy
+        appliedRestoreDefaults = defaults
     }
 
     private func restorePointLabel(for snapshot: ResticSnapshot) -> String {

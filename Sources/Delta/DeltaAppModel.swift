@@ -936,14 +936,7 @@ final class DeltaAppModel: ObservableObject {
     }
 
     private func restoreDefaultsDiagnosticStatus() -> String {
-        let preview = DeltaAppPreferences.bool(for: DeltaAppPreferenceKeys.previewsRestoresByDefault, default: true)
-        let verify = DeltaAppPreferences.bool(for: DeltaAppPreferenceKeys.verifiesRestoresByDefault, default: true)
-        let rawConflictPolicy = DeltaAppPreferences.string(
-            for: DeltaAppPreferenceKeys.defaultRestoreConflictPolicy,
-            default: RestoreConflictPolicy.ifChanged.rawValue
-        )
-        let conflictPolicy = RestoreConflictPolicy(rawValue: rawConflictPolicy) ?? .ifChanged
-        return "\(preview ? "Preview first" : "Direct restore"), \(verify ? "verify files" : "no verification"), \(conflictPolicy.displayName)"
+        RestoreDefaults.current().summaryText
     }
 
     private func diagnosticReportFilename() -> String {
