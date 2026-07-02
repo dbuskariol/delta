@@ -185,6 +185,25 @@ public struct BackupSource: Codable, Identifiable, Equatable, Sendable {
     }
 }
 
+public struct RetentionMaintenanceSchedule: Codable, Equatable, Sendable {
+    public var isEnabled: Bool
+    public var intervalDays: Int
+    public var hour: Int
+    public var minute: Int
+
+    public init(
+        isEnabled: Bool = true,
+        intervalDays: Int = 7,
+        hour: Int = 2,
+        minute: Int = 0
+    ) {
+        self.isEnabled = isEnabled
+        self.intervalDays = intervalDays
+        self.hour = hour
+        self.minute = minute
+    }
+}
+
 public struct RetentionPolicy: Codable, Equatable, Sendable {
     public var keepHourly: Int
     public var keepDaily: Int
@@ -193,6 +212,7 @@ public struct RetentionPolicy: Codable, Equatable, Sendable {
     public var keepYearly: Int
     public var pruneAfterForget: Bool
     public var checkAfterPrune: Bool
+    public var maintenanceSchedule: RetentionMaintenanceSchedule
 
     public init(
         keepHourly: Int = 24,
@@ -201,7 +221,8 @@ public struct RetentionPolicy: Codable, Equatable, Sendable {
         keepMonthly: Int = 12,
         keepYearly: Int = 0,
         pruneAfterForget: Bool = true,
-        checkAfterPrune: Bool = true
+        checkAfterPrune: Bool = true,
+        maintenanceSchedule: RetentionMaintenanceSchedule = RetentionMaintenanceSchedule()
     ) {
         self.keepHourly = keepHourly
         self.keepDaily = keepDaily
@@ -210,6 +231,34 @@ public struct RetentionPolicy: Codable, Equatable, Sendable {
         self.keepYearly = keepYearly
         self.pruneAfterForget = pruneAfterForget
         self.checkAfterPrune = checkAfterPrune
+        self.maintenanceSchedule = maintenanceSchedule
+    }
+
+    public var hasKeepRules: Bool {
+        keepHourly > 0 || keepDaily > 0 || keepWeekly > 0 || keepMonthly > 0 || keepYearly > 0
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case keepHourly
+        case keepDaily
+        case keepWeekly
+        case keepMonthly
+        case keepYearly
+        case pruneAfterForget
+        case checkAfterPrune
+        case maintenanceSchedule
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        keepHourly = try container.decode(Int.self, forKey: .keepHourly)
+        keepDaily = try container.decode(Int.self, forKey: .keepDaily)
+        keepWeekly = try container.decode(Int.self, forKey: .keepWeekly)
+        keepMonthly = try container.decode(Int.self, forKey: .keepMonthly)
+        keepYearly = try container.decode(Int.self, forKey: .keepYearly)
+        pruneAfterForget = try container.decode(Bool.self, forKey: .pruneAfterForget)
+        checkAfterPrune = try container.decode(Bool.self, forKey: .checkAfterPrune)
+        maintenanceSchedule = try container.decodeIfPresent(RetentionMaintenanceSchedule.self, forKey: .maintenanceSchedule) ?? RetentionMaintenanceSchedule()
     }
 }
 

@@ -97,13 +97,25 @@ public final class BackupCoordinator: @unchecked Sendable {
 
     @discardableResult
     public func forgetAndPrune(profile: BackupProfile, repository: BackupRepository) throws -> JobRun {
+        try runRetentionMaintenance(profile: profile, repository: repository).first ?? skippedMaintenanceRun(profile: profile, repository: repository)
+    }
+
+    @discardableResult
+    public func runRetentionMaintenance(profile: BackupProfile, repository: BackupRepository) throws -> [JobRun] {
+        guard profile.retention.hasKeepRules else {
+            let run = skippedMaintenanceRun(profile: profile, repository: repository)
+            try database.saveJobRun(run)
+            try database.appendEvent(EventLog(level: .warning, message: "Cleanup skipped for '\(profile.name)' because no retention keep rules are configured."))
+            return [run]
+        }
         let pruneRun = try run(repositoryID: repository.id, profileID: profile.id, kind: .prune) {
             try commandBuilder.forgetAndPrune(profile: profile, repository: repository)
         }
-        if profile.retention.checkAfterPrune && (pruneRun.status == .succeeded || pruneRun.status == .warning) {
-            _ = try check(repository: repository, readDataSubset: "1/100")
+        var runs = [pruneRun]
+        if profile.retention.pruneAfterForget && profile.retention.checkAfterPrune && (pruneRun.status == .succeeded || pruneRun.status == .warning) {
+            runs.append(try check(repository: repository, readDataSubset: "1/100"))
         }
-        return pruneRun
+        return runs
     }
 
     @discardableResult
@@ -135,11 +147,46 @@ public final class BackupCoordinator: @unchecked Sendable {
                 .map(\.startedAt)
                 .max()
             let decision = scheduleEvaluator.decision(for: profile.schedule, lastRun: lastRun, now: now)
+            var backupRun: JobRun?
             if decision.isDue {
-                runs.append(try runBackup(profile: profile, repository: repository))
+                let run = try runBackup(profile: profile, repository: repository)
+                runs.append(run)
+                backupRun = run
+            }
+
+            if isMaintenanceDue(for: profile, jobRuns: jobRuns, now: now) {
+                if let backupRun, backupRun.status != .succeeded && backupRun.status != .warning {
+                    try database.appendEvent(EventLog(level: .warning, message: "Cleanup skipped for '\(profile.name)' because the backup did not complete successfully."))
+                    continue
+                }
+                runs.append(contentsOf: try runRetentionMaintenance(profile: profile, repository: repository))
             }
         }
         return runs
+    }
+
+    private func isMaintenanceDue(for profile: BackupProfile, jobRuns: [JobRun], now: Date) -> Bool {
+        let lastMaintenanceRun = jobRuns
+            .filter { $0.profileID == profile.id && $0.kind == .prune && ($0.status == .succeeded || $0.status == .warning) }
+            .compactMap { $0.finishedAt ?? $0.startedAt }
+            .max()
+        return scheduleEvaluator.maintenanceDecision(
+            for: profile.retention.maintenanceSchedule,
+            profileCreatedAt: profile.createdAt,
+            lastMaintenanceRun: lastMaintenanceRun,
+            now: now
+        ).isDue
+    }
+
+    private func skippedMaintenanceRun(profile: BackupProfile, repository: BackupRepository) -> JobRun {
+        JobRun(
+            profileID: profile.id,
+            repositoryID: repository.id,
+            kind: .prune,
+            status: .warning,
+            finishedAt: Date(),
+            message: "Cleanup skipped because this profile has no retention keep rules."
+        )
     }
 
     private func run(

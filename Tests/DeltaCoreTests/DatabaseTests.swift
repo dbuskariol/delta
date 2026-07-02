@@ -2,6 +2,24 @@ import XCTest
 @testable import DeltaCore
 
 final class DatabaseTests: XCTestCase {
+    func testRetentionPolicyDecodesOldPayloadWithDefaultMaintenanceSchedule() throws {
+        let data = """
+        {
+          "keepHourly": 24,
+          "keepDaily": 30,
+          "keepWeekly": 12,
+          "keepMonthly": 12,
+          "keepYearly": 0,
+          "pruneAfterForget": true,
+          "checkAfterPrune": true
+        }
+        """.data(using: .utf8)!
+
+        let policy = try JSONDecoder().decode(RetentionPolicy.self, from: data)
+
+        XCTAssertEqual(policy.maintenanceSchedule, RetentionMaintenanceSchedule())
+    }
+
     func testDatabaseRoundTripsRepositoryProfileAndJob() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)

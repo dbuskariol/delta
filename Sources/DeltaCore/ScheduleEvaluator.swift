@@ -43,6 +43,35 @@ public struct ScheduleEvaluator: Sendable {
         )
     }
 
+    public func maintenanceDecision(
+        for schedule: RetentionMaintenanceSchedule,
+        profileCreatedAt: Date,
+        lastMaintenanceRun: Date?,
+        now: Date = Date()
+    ) -> ScheduleDecision {
+        guard schedule.isEnabled else {
+            return ScheduleDecision(isDue: false, nextRun: nil)
+        }
+
+        let nextRun: Date?
+        if let lastMaintenanceRun {
+            let lastScheduledWindow = maintenanceWindow(onOrBefore: lastMaintenanceRun, schedule: schedule) ?? lastMaintenanceRun
+            let earliestDate = calendar.date(
+                byAdding: .day,
+                value: max(1, schedule.intervalDays),
+                to: lastScheduledWindow
+            ) ?? lastScheduledWindow.addingTimeInterval(TimeInterval(max(1, schedule.intervalDays)) * 86_400)
+            nextRun = nextMaintenanceRun(onOrAfter: earliestDate, schedule: schedule)
+        } else {
+            nextRun = nextMaintenanceRun(onOrAfter: profileCreatedAt, schedule: schedule)
+        }
+
+        guard let nextRun else {
+            return ScheduleDecision(isDue: false, nextRun: nil)
+        }
+        return ScheduleDecision(isDue: now >= nextRun, nextRun: nextRun)
+    }
+
     public func nextRun(after date: Date, kind: ScheduleKind) -> Date? {
         switch kind {
         case let .hourly(minute):
@@ -110,6 +139,50 @@ public struct ScheduleEvaluator: Sendable {
             cursor = nextMonth
         }
         return nil
+    }
+
+    private func nextMaintenanceRun(onOrAfter date: Date, schedule: RetentionMaintenanceSchedule) -> Date? {
+        let hour = clamped(schedule.hour, lower: 0, upper: 23)
+        let minute = clamped(schedule.minute, lower: 0, upper: 59)
+        let startOfDay = calendar.startOfDay(for: date)
+        var components = calendar.dateComponents([.year, .month, .day], from: startOfDay)
+        components.hour = hour
+        components.minute = minute
+        components.second = 0
+
+        if let sameDay = calendar.date(from: components), sameDay >= date {
+            return sameDay
+        }
+        guard let nextDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) else {
+            return nil
+        }
+        var nextComponents = calendar.dateComponents([.year, .month, .day], from: nextDay)
+        nextComponents.hour = hour
+        nextComponents.minute = minute
+        nextComponents.second = 0
+        return calendar.date(from: nextComponents)
+    }
+
+    private func maintenanceWindow(onOrBefore date: Date, schedule: RetentionMaintenanceSchedule) -> Date? {
+        let hour = clamped(schedule.hour, lower: 0, upper: 23)
+        let minute = clamped(schedule.minute, lower: 0, upper: 59)
+        let startOfDay = calendar.startOfDay(for: date)
+        var components = calendar.dateComponents([.year, .month, .day], from: startOfDay)
+        components.hour = hour
+        components.minute = minute
+        components.second = 0
+
+        if let sameDay = calendar.date(from: components), sameDay <= date {
+            return sameDay
+        }
+        guard let previousDay = calendar.date(byAdding: .day, value: -1, to: startOfDay) else {
+            return nil
+        }
+        var previousComponents = calendar.dateComponents([.year, .month, .day], from: previousDay)
+        previousComponents.hour = hour
+        previousComponents.minute = minute
+        previousComponents.second = 0
+        return calendar.date(from: previousComponents)
     }
 
     private func latestScheduledRun(after lastRun: Date, onOrBefore now: Date, kind: ScheduleKind) -> Date? {

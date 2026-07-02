@@ -2,6 +2,12 @@ import XCTest
 @testable import DeltaCore
 
 final class BackupCoordinatorPolicyTests: XCTestCase {
+    private static let utc: Calendar = {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        return calendar
+    }()
+
     func testRunDueBackupsSkipsWhenLowPowerModeIsEnabledAndProfileDisallowsIt() throws {
         let fixture = try Fixture()
         let runner = MockResticRunner(results: [.success])
@@ -33,6 +39,81 @@ final class BackupCoordinatorPolicyTests: XCTestCase {
         XCTAssertEqual(runner.commands.map { $0.arguments.first(where: { ["forget", "check"].contains($0) }) }, ["forget", "check"])
         XCTAssertEqual(jobs.filter { $0.kind == .prune }.count, 1)
         XCTAssertEqual(jobs.filter { $0.kind == .check }.count, 1)
+    }
+
+    func testPruneDoesNotRunCheckWhenPruneIsDisabled() throws {
+        let fixture = try Fixture()
+        let runner = MockResticRunner(results: [.success])
+        let coordinator = fixture.makeCoordinator(runner: runner)
+        let profile = fixture.profile(retention: RetentionPolicy(pruneAfterForget: false, checkAfterPrune: true))
+
+        _ = try coordinator.forgetAndPrune(profile: profile, repository: fixture.repository)
+
+        XCTAssertEqual(runner.commands.map(\.resticSubcommand), ["forget"])
+    }
+
+    func testScheduledMaintenanceRunsCleanupAndCheckWhenDue() throws {
+        let fixture = try Fixture()
+        let runner = MockResticRunner(results: [.success, .success, .success])
+        let coordinator = fixture.makeCoordinator(runner: runner, scheduleEvaluator: ScheduleEvaluator(calendar: Self.utc))
+        let createdAt = try XCTUnwrap(Self.utc.date(from: DateComponents(year: 2026, month: 7, day: 1, hour: 1, minute: 0)))
+        let now = try XCTUnwrap(Self.utc.date(from: DateComponents(year: 2026, month: 7, day: 1, hour: 2, minute: 5)))
+        let profile = fixture.profile(
+            retention: RetentionPolicy(
+                maintenanceSchedule: RetentionMaintenanceSchedule(intervalDays: 1, hour: 2, minute: 0)
+            ),
+            createdAt: createdAt
+        )
+        try fixture.database.saveRepository(fixture.repository)
+        try fixture.database.saveProfile(profile)
+
+        let runs = try coordinator.runDueBackups(now: now)
+
+        XCTAssertEqual(runner.commands.map(\.resticSubcommand), ["backup", "forget", "check"])
+        XCTAssertEqual(runs.map(\.kind), [.backup, .prune, .check])
+    }
+
+    func testScheduledMaintenanceDoesNotRunBeforeConfiguredTime() throws {
+        let fixture = try Fixture()
+        let runner = MockResticRunner(results: [.success])
+        let coordinator = fixture.makeCoordinator(runner: runner, scheduleEvaluator: ScheduleEvaluator(calendar: Self.utc))
+        let createdAt = try XCTUnwrap(Self.utc.date(from: DateComponents(year: 2026, month: 7, day: 1, hour: 1, minute: 0)))
+        let now = try XCTUnwrap(Self.utc.date(from: DateComponents(year: 2026, month: 7, day: 1, hour: 1, minute: 30)))
+        let profile = fixture.profile(
+            retention: RetentionPolicy(
+                maintenanceSchedule: RetentionMaintenanceSchedule(intervalDays: 1, hour: 2, minute: 0)
+            ),
+            createdAt: createdAt
+        )
+        try fixture.database.saveRepository(fixture.repository)
+        try fixture.database.saveProfile(profile)
+
+        let runs = try coordinator.runDueBackups(now: now)
+
+        XCTAssertEqual(runner.commands.map(\.resticSubcommand), ["backup"])
+        XCTAssertEqual(runs.map(\.kind), [.backup])
+    }
+
+    func testScheduledMaintenanceSurfacesPostPruneCheckFailure() throws {
+        let fixture = try Fixture()
+        let checkFailure = ResticRunResult(exitCode: 1, standardOutput: "", standardError: "repository check failed")
+        let runner = MockResticRunner(results: [.success, .success, checkFailure])
+        let coordinator = fixture.makeCoordinator(runner: runner, scheduleEvaluator: ScheduleEvaluator(calendar: Self.utc))
+        let createdAt = try XCTUnwrap(Self.utc.date(from: DateComponents(year: 2026, month: 7, day: 1, hour: 1, minute: 0)))
+        let now = try XCTUnwrap(Self.utc.date(from: DateComponents(year: 2026, month: 7, day: 1, hour: 2, minute: 5)))
+        let profile = fixture.profile(
+            retention: RetentionPolicy(
+                maintenanceSchedule: RetentionMaintenanceSchedule(intervalDays: 1, hour: 2, minute: 0)
+            ),
+            createdAt: createdAt
+        )
+        try fixture.database.saveRepository(fixture.repository)
+        try fixture.database.saveProfile(profile)
+
+        let runs = try coordinator.runDueBackups(now: now)
+
+        XCTAssertEqual(runner.commands.map(\.resticSubcommand), ["backup", "forget", "check"])
+        XCTAssertEqual(runs.map(\.status), [.succeeded, .succeeded, .failed])
     }
 
     func testDestinationLockPreventsOverlappingJobsAcrossCoordinators() throws {
@@ -170,6 +251,12 @@ private extension ResticRunResult {
     static let success = ResticRunResult(exitCode: 0, standardOutput: "ok", standardError: "")
 }
 
+private extension ResticCommand {
+    var resticSubcommand: String? {
+        arguments.first { ["backup", "forget", "check", "restore", "snapshots", "init"].contains($0) }
+    }
+}
+
 private struct Fixture {
     let root: URL
     let source: URL
@@ -195,7 +282,8 @@ private struct Fixture {
 
     func profile(
         schedule: BackupSchedule = BackupSchedule(),
-        retention: RetentionPolicy = RetentionPolicy()
+        retention: RetentionPolicy = RetentionPolicy(),
+        createdAt: Date = Date()
     ) -> BackupProfile {
         BackupProfile(
             name: "Mac",
@@ -203,12 +291,15 @@ private struct Fixture {
             sources: [BackupSource(path: source.path)],
             repositoryID: repository.id,
             schedule: schedule,
-            retention: retention
+            retention: retention,
+            createdAt: createdAt,
+            updatedAt: createdAt
         )
     }
 
     func makeCoordinator(
         runner: MockResticRunner,
+        scheduleEvaluator: ScheduleEvaluator = ScheduleEvaluator(),
         powerState: PowerState = PowerState(isOnBatteryPower: false, isLowPowerModeEnabled: false)
     ) -> BackupCoordinator {
         BackupCoordinator(
@@ -218,6 +309,7 @@ private struct Fixture {
                 secretBridgeURL: URL(fileURLWithPath: "/usr/bin/false")
             ),
             runner: runner,
+            scheduleEvaluator: scheduleEvaluator,
             powerStateProvider: PowerStateProvider(currentPowerState: { powerState }),
             lockManager: lockManager
         )

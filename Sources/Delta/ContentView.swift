@@ -656,6 +656,10 @@ struct ProfileEditorView: View {
     @State private var keepYearly = 0
     @State private var pruneAfterForget = true
     @State private var checkAfterPrune = true
+    @State private var maintenanceEnabled = true
+    @State private var maintenanceIntervalDays = 7
+    @State private var maintenanceHour = 2
+    @State private var maintenanceMinute = 0
 
     var body: some View {
         SheetScaffold(title: "New Backup Profile", subtitle: "Define what to protect and when to run.") {
@@ -761,6 +765,14 @@ struct ProfileEditorView: View {
                         Toggle("Check after prune", isOn: $checkAfterPrune)
                             .toggleStyle(.checkbox)
                     }
+                    Divider()
+                    HStack(spacing: 16) {
+                        Toggle("Automatic cleanup", isOn: $maintenanceEnabled)
+                            .toggleStyle(.checkbox)
+                        Stepper("Every \(maintenanceIntervalDays) days", value: $maintenanceIntervalDays, in: 1...90)
+                    }
+                    TimeControls(hour: $maintenanceHour, minute: $maintenanceMinute)
+                        .disabled(!maintenanceEnabled)
                 }
             }
 
@@ -850,7 +862,13 @@ struct ProfileEditorView: View {
             keepMonthly: keepMonthly,
             keepYearly: keepYearly,
             pruneAfterForget: pruneAfterForget,
-            checkAfterPrune: checkAfterPrune
+            checkAfterPrune: checkAfterPrune,
+            maintenanceSchedule: RetentionMaintenanceSchedule(
+                isEnabled: maintenanceEnabled,
+                intervalDays: maintenanceIntervalDays,
+                hour: maintenanceHour,
+                minute: maintenanceMinute
+            )
         )
     }
 

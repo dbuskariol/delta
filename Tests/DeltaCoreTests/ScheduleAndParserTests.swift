@@ -51,6 +51,38 @@ final class ScheduleAndParserTests: XCTestCase {
         XCTAssertEqual(day, 28)
     }
 
+    func testMaintenanceScheduleRunsAtFirstWindowAfterProfileCreation() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let evaluator = ScheduleEvaluator(calendar: calendar)
+        let createdAt = components(calendar, year: 2026, month: 7, day: 1, hour: 1, minute: 0)
+        let now = components(calendar, year: 2026, month: 7, day: 1, hour: 2, minute: 1)
+        let schedule = RetentionMaintenanceSchedule(intervalDays: 7, hour: 2, minute: 0)
+
+        let decision = evaluator.maintenanceDecision(for: schedule, profileCreatedAt: createdAt, lastMaintenanceRun: nil, now: now)
+
+        XCTAssertTrue(decision.isDue)
+        XCTAssertEqual(decision.nextRun, components(calendar, year: 2026, month: 7, day: 1, hour: 2, minute: 0))
+    }
+
+    func testMaintenanceScheduleUsesIntervalAfterLastCleanup() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let evaluator = ScheduleEvaluator(calendar: calendar)
+        let createdAt = components(calendar, year: 2026, month: 7, day: 1, hour: 1, minute: 0)
+        let lastCleanup = components(calendar, year: 2026, month: 7, day: 1, hour: 2, minute: 3)
+        let beforeNextWindow = components(calendar, year: 2026, month: 7, day: 8, hour: 1, minute: 59)
+        let afterNextWindow = components(calendar, year: 2026, month: 7, day: 8, hour: 2, minute: 1)
+        let schedule = RetentionMaintenanceSchedule(intervalDays: 7, hour: 2, minute: 0)
+
+        let earlyDecision = evaluator.maintenanceDecision(for: schedule, profileCreatedAt: createdAt, lastMaintenanceRun: lastCleanup, now: beforeNextWindow)
+        let dueDecision = evaluator.maintenanceDecision(for: schedule, profileCreatedAt: createdAt, lastMaintenanceRun: lastCleanup, now: afterNextWindow)
+
+        XCTAssertFalse(earlyDecision.isDue)
+        XCTAssertTrue(dueDecision.isDue)
+        XCTAssertEqual(dueDecision.nextRun, components(calendar, year: 2026, month: 7, day: 8, hour: 2, minute: 0))
+    }
+
     func testSnapshotParserDecodesResticJSON() throws {
         let json = """
         [
