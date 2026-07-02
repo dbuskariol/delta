@@ -210,6 +210,45 @@ final class BackupCoordinatorPolicyTests: XCTestCase {
         XCTAssertEqual(runner.commands.map(\.resticSubcommand), ["restore"])
     }
 
+    func testOriginalPathRestoreRequiresExplicitConfirmation() throws {
+        let fixture = try Fixture()
+        let runner = MockResticRunner(results: [.success])
+        let coordinator = fixture.makeCoordinator(runner: runner)
+        let request = RestoreRequest(
+            repositoryID: fixture.repository.id,
+            snapshotID: "latest",
+            destination: .originalPaths,
+            dryRun: false
+        )
+
+        let restoreRun = try coordinator.restore(request: request, repository: fixture.repository)
+        let jobs = try fixture.database.fetchJobRuns(limit: 10)
+
+        XCTAssertEqual(restoreRun.status, .failed)
+        XCTAssertEqual(restoreRun.message, "Restore was not started because original-path restore was not explicitly confirmed.")
+        XCTAssertTrue(runner.commands.isEmpty)
+        XCTAssertEqual(jobs.filter { $0.kind == .restore && $0.status == .failed }.count, 1)
+    }
+
+    func testConfirmedOriginalPathRestoreRunsRestic() throws {
+        let fixture = try Fixture()
+        let runner = MockResticRunner(results: [.success])
+        let coordinator = fixture.makeCoordinator(runner: runner)
+        let request = RestoreRequest(
+            repositoryID: fixture.repository.id,
+            snapshotID: "latest",
+            destination: .originalPaths,
+            dryRun: false,
+            confirmedOriginalPathRestore: true
+        )
+
+        let restoreRun = try coordinator.restore(request: request, repository: fixture.repository)
+
+        XCTAssertEqual(restoreRun.status, .succeeded)
+        XCTAssertEqual(runner.commands.map(\.resticSubcommand), ["restore"])
+        XCTAssertTrue(runner.commands.first?.arguments.contains("/") == true)
+    }
+
     func testRestoreFailsWithoutStartingResticWhenPreRestoreProfileIsMissing() throws {
         let fixture = try Fixture()
         let runner = MockResticRunner(results: [.success])

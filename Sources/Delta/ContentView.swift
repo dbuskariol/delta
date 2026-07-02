@@ -381,6 +381,7 @@ struct RestoreView: View {
             conflictPolicy: conflictPolicy,
             verifyRestoredFiles: verify,
             dryRun: dryRun,
+            confirmedOriginalPathRestore: restoreOriginalPaths && !dryRun && acknowledgedInPlaceRestore,
             preRestoreBackupProfileID: preRestoreProfileID
         )
         model.runRestore(repository: repository, request: request)

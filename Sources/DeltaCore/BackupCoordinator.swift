@@ -126,6 +126,12 @@ public final class BackupCoordinator: @unchecked Sendable {
     @discardableResult
     public func restore(request: RestoreRequest, repository: BackupRepository) throws -> JobRun {
         try database.saveRestoreRequest(request)
+        if case .originalPaths = request.destination, !request.dryRun, !request.confirmedOriginalPathRestore {
+            return try failedRestoreRun(
+                repositoryID: repository.id,
+                message: "Restore was not started because original-path restore was not explicitly confirmed."
+            )
+        }
         if !request.dryRun, let preRestoreProfileID = request.preRestoreBackupProfileID {
             let profiles = try database.fetchProfiles()
             let repositories = Dictionary(uniqueKeysWithValues: try database.fetchRepositories().map { ($0.id, $0) })

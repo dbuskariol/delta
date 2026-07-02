@@ -108,7 +108,7 @@ Restore is intentionally explicit:
    - Keep existing
 6. Run a dry-run preview by default.
 7. Optionally verify restored files.
-8. Confirm in-place restore when restoring to original paths.
+8. Confirm in-place restore when restoring to original paths. Delta enforces this confirmation before any non-preview original-path restore can run.
 
 Selected-path restore uses restic snapshot path syntax for one selected path, and include filters for multiple selected paths.
 

@@ -147,6 +147,8 @@ Multiple selected paths use repeated include filters:
 --include /path/two
 ```
 
+Non-preview restore to original paths targets `/` and requires an explicit confirmation flag on the restore request before Delta runs restic. Dry-run original-path previews are allowed without that confirmation.
+
 ## Retention, Prune, And Check
 
 Delta retention maintenance uses:

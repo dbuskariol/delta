@@ -506,6 +506,7 @@ public struct RestoreRequest: Codable, Identifiable, Equatable, Sendable {
     public var conflictPolicy: RestoreConflictPolicy
     public var verifyRestoredFiles: Bool
     public var dryRun: Bool
+    public var confirmedOriginalPathRestore: Bool
     public var preRestoreBackupProfileID: UUID?
     public var createdAt: Date
 
@@ -518,6 +519,7 @@ public struct RestoreRequest: Codable, Identifiable, Equatable, Sendable {
         conflictPolicy: RestoreConflictPolicy = .ifChanged,
         verifyRestoredFiles: Bool = true,
         dryRun: Bool = false,
+        confirmedOriginalPathRestore: Bool = false,
         preRestoreBackupProfileID: UUID? = nil,
         createdAt: Date = Date()
     ) {
@@ -529,6 +531,7 @@ public struct RestoreRequest: Codable, Identifiable, Equatable, Sendable {
         self.conflictPolicy = conflictPolicy
         self.verifyRestoredFiles = verifyRestoredFiles
         self.dryRun = dryRun
+        self.confirmedOriginalPathRestore = confirmedOriginalPathRestore
         self.preRestoreBackupProfileID = preRestoreBackupProfileID
         self.createdAt = createdAt
     }
@@ -542,6 +545,7 @@ public struct RestoreRequest: Codable, Identifiable, Equatable, Sendable {
         case conflictPolicy
         case verifyRestoredFiles
         case dryRun
+        case confirmedOriginalPathRestore
         case preRestoreBackupProfileID
         case createdAt
     }
@@ -556,6 +560,7 @@ public struct RestoreRequest: Codable, Identifiable, Equatable, Sendable {
         conflictPolicy = try container.decode(RestoreConflictPolicy.self, forKey: .conflictPolicy)
         verifyRestoredFiles = try container.decode(Bool.self, forKey: .verifyRestoredFiles)
         dryRun = try container.decode(Bool.self, forKey: .dryRun)
+        confirmedOriginalPathRestore = try container.decodeIfPresent(Bool.self, forKey: .confirmedOriginalPathRestore) ?? false
         preRestoreBackupProfileID = try container.decodeIfPresent(UUID.self, forKey: .preRestoreBackupProfileID)
         createdAt = try container.decode(Date.self, forKey: .createdAt)
     }
