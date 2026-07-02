@@ -89,6 +89,7 @@ public struct DiagnosticReportSnapshot: Equatable, Sendable {
     public var operationalHistoryRetentionStatus: String
     public var backupFreshnessStatus: String
     public var destinationVerificationStatus: String
+    public var destinationFreeSpaceStatus: String
     public var restoreDefaultsStatus: String
     public var activeOperation: String?
     public var profileCount: Int
@@ -121,6 +122,7 @@ public struct DiagnosticReportSnapshot: Equatable, Sendable {
         operationalHistoryRetentionStatus: String,
         backupFreshnessStatus: String,
         destinationVerificationStatus: String,
+        destinationFreeSpaceStatus: String,
         restoreDefaultsStatus: String,
         activeOperation: String?,
         profileCount: Int,
@@ -152,6 +154,7 @@ public struct DiagnosticReportSnapshot: Equatable, Sendable {
         self.operationalHistoryRetentionStatus = operationalHistoryRetentionStatus
         self.backupFreshnessStatus = backupFreshnessStatus
         self.destinationVerificationStatus = destinationVerificationStatus
+        self.destinationFreeSpaceStatus = destinationFreeSpaceStatus
         self.restoreDefaultsStatus = restoreDefaultsStatus
         self.activeOperation = activeOperation
         self.profileCount = profileCount
@@ -197,6 +200,7 @@ public struct DiagnosticReportBuilder: Sendable {
             "- Activity History Retention: \(snapshot.operationalHistoryRetentionStatus)",
             "- Backup Freshness: \(snapshot.backupFreshnessStatus)",
             "- Destination Verification: \(snapshot.destinationVerificationStatus)",
+            "- Destination Free Space: \(snapshot.destinationFreeSpaceStatus)",
             "- Restore Defaults: \(snapshot.restoreDefaultsStatus)",
             "- Active Operation: \(snapshot.activeOperation.map { diagnosticText($0) } ?? "None")",
             "",

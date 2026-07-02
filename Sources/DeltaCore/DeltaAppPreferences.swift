@@ -3,6 +3,7 @@ import Foundation
 public enum DeltaAppPreferenceKeys {
     public static let activityLogDetail = "Delta.activityLogDetail"
     public static let backupFreshnessWarningHours = "Delta.backupFreshnessWarningHours"
+    public static let destinationFreeSpaceWarningGiB = "Delta.destinationFreeSpaceWarningGiB"
     public static let destinationVerificationWarningHours = "Delta.destinationVerificationWarningHours"
     public static let defaultProfileCatchUpMissedRuns = "Delta.defaultProfileCatchUpMissedRuns"
     public static let defaultProfileCheckAfterPrune = "Delta.defaultProfileCheckAfterPrune"
@@ -58,6 +59,7 @@ public enum DeltaAppPreferenceKeys {
 
     public static let healthMonitoring = [
         backupFreshnessWarningHours,
+        destinationFreeSpaceWarningGiB,
         destinationVerificationWarningHours
     ]
 
@@ -187,6 +189,48 @@ public enum DestinationVerificationWarningThreshold: Int, CaseIterable, Identifi
 
     public static func normalized(_ rawValue: Int) -> DestinationVerificationWarningThreshold {
         DestinationVerificationWarningThreshold(rawValue: rawValue) ?? .thirtyDays
+    }
+}
+
+public enum DestinationFreeSpaceWarningThreshold: Int, CaseIterable, Identifiable, Sendable {
+    case off = 0
+    case tenGiB = 10
+    case fiftyGiB = 50
+    case oneHundredGiB = 100
+    case twoHundredFiftyGiB = 250
+
+    public var id: Int { rawValue }
+
+    public var title: String {
+        switch self {
+        case .off: "Off"
+        case .tenGiB: "10 GB"
+        case .fiftyGiB: "50 GB"
+        case .oneHundredGiB: "100 GB"
+        case .twoHundredFiftyGiB: "250 GB"
+        }
+    }
+
+    public var summaryText: String {
+        switch self {
+        case .off:
+            return "Off"
+        default:
+            return "Warn below \(title)"
+        }
+    }
+
+    public var minimumBytes: Int64? {
+        switch self {
+        case .off:
+            return nil
+        default:
+            return Int64(rawValue) * 1_024 * 1_024 * 1_024
+        }
+    }
+
+    public static func normalized(_ rawValue: Int) -> DestinationFreeSpaceWarningThreshold {
+        DestinationFreeSpaceWarningThreshold(rawValue: rawValue) ?? .fiftyGiB
     }
 }
 

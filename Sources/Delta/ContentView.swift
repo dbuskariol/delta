@@ -67,6 +67,10 @@ struct DashboardView: View {
         store: DeltaAppPreferences.sharedStore()
     ) private var destinationVerificationWarningHours = DestinationVerificationWarningThreshold.thirtyDays.rawValue
     @AppStorage(
+        DeltaAppPreferenceKeys.destinationFreeSpaceWarningGiB,
+        store: DeltaAppPreferences.sharedStore()
+    ) private var destinationFreeSpaceWarningGiB = DestinationFreeSpaceWarningThreshold.fiftyGiB.rawValue
+    @AppStorage(
         DeltaAppPreferenceKeys.pausesScheduledBackups,
         store: DeltaAppPreferences.sharedStore()
     ) private var pausesScheduledBackups = false
@@ -265,9 +269,11 @@ struct DashboardView: View {
 
     private var destinationHealthWarnings: [DashboardHealthWarning] {
         let threshold = DestinationVerificationWarningThreshold.normalized(destinationVerificationWarningHours)
+        let freeSpaceThreshold = DestinationFreeSpaceWarningThreshold.normalized(destinationFreeSpaceWarningGiB)
         return DashboardHealthEvaluator().destinationWarnings(
             repositories: model.repositories,
-            threshold: threshold
+            threshold: threshold,
+            freeSpaceThreshold: freeSpaceThreshold
         )
     }
 
@@ -1268,6 +1274,10 @@ struct SettingsView: View {
         store: DeltaAppPreferences.sharedStore()
     ) private var destinationVerificationWarningHours = DestinationVerificationWarningThreshold.thirtyDays.rawValue
     @AppStorage(
+        DeltaAppPreferenceKeys.destinationFreeSpaceWarningGiB,
+        store: DeltaAppPreferences.sharedStore()
+    ) private var destinationFreeSpaceWarningGiB = DestinationFreeSpaceWarningThreshold.fiftyGiB.rawValue
+    @AppStorage(
         DeltaAppPreferenceKeys.previewsRestoresByDefault,
         store: DeltaAppPreferences.sharedStore()
     ) private var previewsRestoresByDefault = true
@@ -1838,9 +1848,27 @@ struct SettingsView: View {
                     }
                 }
 
+                SettingsControlRow(
+                    title: "Destination free space",
+                    detail: "Show dashboard attention when a local or mounted destination has less available space than this. Remote cloud destinations are skipped."
+                ) {
+                    Picker("", selection: $destinationFreeSpaceWarningGiB) {
+                        ForEach(DestinationFreeSpaceWarningThreshold.allCases) { threshold in
+                            Text(threshold.title).tag(threshold.rawValue)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.segmented)
+                    .frame(width: 320)
+                    .onChange(of: destinationFreeSpaceWarningGiB) { _, _ in
+                        normalizeHealthMonitoring()
+                    }
+                }
+
                 SettingsFactGrid(items: [
                     SettingsFact(title: "Backups", value: backupFreshnessThreshold.summaryText),
                     SettingsFact(title: "Destinations", value: destinationVerificationThreshold.summaryText),
+                    SettingsFact(title: "Free space", value: destinationFreeSpaceThreshold.summaryText),
                     SettingsFact(title: "Dashboard", value: "Attention only"),
                     SettingsFact(title: "Profiles", value: "Unchanged")
                 ])
@@ -2595,7 +2623,9 @@ struct SettingsView: View {
     }
 
     private var healthMonitoringStatusText: String {
-        backupFreshnessThreshold == .threeDays && destinationVerificationThreshold == .thirtyDays
+        backupFreshnessThreshold == .threeDays
+            && destinationVerificationThreshold == .thirtyDays
+            && destinationFreeSpaceThreshold == .fiftyGiB
             ? "Recommended"
             : "Custom"
     }
@@ -2738,6 +2768,10 @@ struct SettingsView: View {
         DestinationVerificationWarningThreshold.normalized(destinationVerificationWarningHours)
     }
 
+    private var destinationFreeSpaceThreshold: DestinationFreeSpaceWarningThreshold {
+        DestinationFreeSpaceWarningThreshold.normalized(destinationFreeSpaceWarningGiB)
+    }
+
     private func applyUpdatePreferences() {
         let interval = AppUpdateCheckInterval.normalized(updateCheckIntervalSeconds)
         if updateCheckIntervalSeconds != interval.rawValue {
@@ -2766,6 +2800,10 @@ struct SettingsView: View {
         if backupFreshnessWarningHours != normalizedBackupFreshness {
             backupFreshnessWarningHours = normalizedBackupFreshness
         }
+        let normalizedDestinationFreeSpace = destinationFreeSpaceThreshold.rawValue
+        if destinationFreeSpaceWarningGiB != normalizedDestinationFreeSpace {
+            destinationFreeSpaceWarningGiB = normalizedDestinationFreeSpace
+        }
         let normalizedDestinationVerification = destinationVerificationThreshold.rawValue
         if destinationVerificationWarningHours != normalizedDestinationVerification {
             destinationVerificationWarningHours = normalizedDestinationVerification
@@ -2787,6 +2825,7 @@ struct SettingsView: View {
 
     private func resetHealthMonitoringDefaults() {
         backupFreshnessWarningHours = BackupFreshnessWarningThreshold.threeDays.rawValue
+        destinationFreeSpaceWarningGiB = DestinationFreeSpaceWarningThreshold.fiftyGiB.rawValue
         destinationVerificationWarningHours = DestinationVerificationWarningThreshold.thirtyDays.rawValue
     }
 

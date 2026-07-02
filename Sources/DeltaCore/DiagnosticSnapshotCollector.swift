@@ -70,6 +70,14 @@ public struct DiagnosticSnapshotCollector {
                     )
                 )
                 .summaryText,
+            destinationFreeSpaceStatus: DestinationFreeSpaceWarningThreshold
+                .normalized(
+                    DeltaAppPreferences.integer(
+                        for: DeltaAppPreferenceKeys.destinationFreeSpaceWarningGiB,
+                        default: DestinationFreeSpaceWarningThreshold.fiftyGiB.rawValue
+                    )
+                )
+                .summaryText,
             restoreDefaultsStatus: RestoreDefaults.current().summaryText,
             activeOperation: activeOperation,
             profileCount: profiles.count,

@@ -106,11 +106,12 @@ public struct DashboardHealthEvaluator: Sendable {
     public func destinationWarnings(
         repositories: [BackupRepository],
         threshold: DestinationVerificationWarningThreshold,
+        freeSpaceThreshold: DestinationFreeSpaceWarningThreshold = .off,
         now: Date = Date(),
         limit: Int = 4
     ) -> [DashboardHealthWarning] {
         repositories
-            .compactMap { warning(for: $0, threshold: threshold, now: now) }
+            .compactMap { warning(for: $0, threshold: threshold, freeSpaceThreshold: freeSpaceThreshold, now: now) }
             .prefix(limit)
             .map { $0 }
     }
@@ -177,6 +178,7 @@ public struct DashboardHealthEvaluator: Sendable {
     private func warning(
         for repository: BackupRepository,
         threshold: DestinationVerificationWarningThreshold,
+        freeSpaceThreshold: DestinationFreeSpaceWarningThreshold,
         now: Date
     ) -> DashboardHealthWarning? {
         if repository.backend.kind == .local && !availabilityChecker.isAvailable(repository, allowingCreation: false) {
@@ -184,6 +186,17 @@ public struct DashboardHealthEvaluator: Sendable {
                 id: "\(repository.id.uuidString)-unavailable",
                 title: "\(repository.name) is unavailable",
                 detail: "Connect, mount, or prepare this destination before scheduled backups run.",
+                isCritical: true
+            )
+        }
+
+        if let minimumBytes = freeSpaceThreshold.minimumBytes,
+           let availableBytes = availabilityChecker.availableCapacityBytes(for: repository),
+           availableBytes < minimumBytes {
+            return DashboardHealthWarning(
+                id: "\(repository.id.uuidString)-low-space",
+                title: "\(repository.name) is low on space",
+                detail: "\(formattedCapacity(availableBytes)) available; Settings warns below \(freeSpaceThreshold.title).",
                 isCritical: true
             )
         }
@@ -213,5 +226,13 @@ public struct DashboardHealthEvaluator: Sendable {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .full
         return formatter.localizedString(for: date, relativeTo: referenceDate)
+    }
+
+    private func formattedCapacity(_ bytes: Int64) -> String {
+        let formatter = ByteCountFormatter()
+        formatter.allowedUnits = [.useGB]
+        formatter.countStyle = .file
+        formatter.includesUnit = true
+        return formatter.string(fromByteCount: bytes)
     }
 }

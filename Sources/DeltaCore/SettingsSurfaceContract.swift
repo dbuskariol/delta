@@ -58,6 +58,7 @@ public enum SettingsSurfaceContract {
         "Success summaries",
         "Backup freshness",
         "Destination checks",
+        "Destination free space",
         "Catch up missed runs",
         "Run on battery",
         "Run in Low Power Mode",
@@ -121,6 +122,7 @@ public enum SettingsSurfaceContract {
         "Backup freshness warning control",
         "Source access warning visibility through dashboard health",
         "Destination check warning control",
+        "Destination free-space warning control",
         "Activity history retention"
     ]
 
@@ -146,6 +148,7 @@ public enum SettingsSurfaceContract {
         require(controlTitles, contains: "Pause scheduled automation", in: "controls", failures: &failures)
         require(controlTitles, contains: "Backup freshness", in: "controls", failures: &failures)
         require(controlTitles, contains: "Destination checks", in: "controls", failures: &failures)
+        require(controlTitles, contains: "Destination free space", in: "controls", failures: &failures)
         require(controlTitles, contains: "Activity log detail", in: "controls", failures: &failures)
         require(controlTitles, contains: "History retention", in: "controls", failures: &failures)
         require(actionTitles, contains: "Run Due Now", in: "actions", failures: &failures)
@@ -156,6 +159,7 @@ public enum SettingsSurfaceContract {
         require(actionTitles, contains: "Copy Report", in: "actions", failures: &failures)
         require(requiredManualAcceptanceCoverage, contains: "Source access warning visibility through dashboard health", in: "manual coverage", failures: &failures)
         require(requiredManualAcceptanceCoverage, contains: "Background password access repair", in: "manual coverage", failures: &failures)
+        require(requiredManualAcceptanceCoverage, contains: "Destination free-space warning control", in: "manual coverage", failures: &failures)
 
         let visibleStrings = allVisibleStrings()
         let forbiddenTerms = [

@@ -146,6 +146,63 @@ final class DashboardHealthEvaluatorTests: XCTestCase {
         XCTAssertEqual(warnings.map(\.isCritical), [true, false, false])
     }
 
+    func testDestinationWarningsCallOutLowFreeSpaceForLocalDestinations() throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanUp() }
+        let now = Date(timeIntervalSince1970: 100_000)
+        let lowSpace = BackupRepository(
+            name: "Small Drive",
+            backend: .local(path: fixture.directory.path),
+            lastVerifiedAt: now.addingTimeInterval(-3_600)
+        )
+        let remote = BackupRepository(
+            name: "Remote",
+            backend: .s3(endpoint: "s3.example.com", bucket: "delta", path: nil, region: nil),
+            lastVerifiedAt: now.addingTimeInterval(-3_600)
+        )
+        let evaluator = DashboardHealthEvaluator(
+            availabilityChecker: RepositoryAvailabilityChecker(capacityProvider: { _ in
+                Int64(9 * 1_024 * 1_024 * 1_024)
+            })
+        )
+
+        let warnings = evaluator.destinationWarnings(
+            repositories: [lowSpace, remote],
+            threshold: .thirtyDays,
+            freeSpaceThreshold: .tenGiB,
+            now: now
+        )
+
+        XCTAssertEqual(warnings.map(\.title), ["Small Drive is low on space"])
+        XCTAssertEqual(warnings.first?.isCritical, true)
+        XCTAssertTrue(warnings.first?.detail.contains("Settings warns below 10 GB") == true)
+    }
+
+    func testDestinationWarningsSkipLowFreeSpaceWhenThresholdIsOff() throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanUp() }
+        let now = Date(timeIntervalSince1970: 100_000)
+        let repository = BackupRepository(
+            name: "Small Drive",
+            backend: .local(path: fixture.directory.path),
+            lastVerifiedAt: now.addingTimeInterval(-3_600)
+        )
+        let evaluator = DashboardHealthEvaluator(
+            availabilityChecker: RepositoryAvailabilityChecker(capacityProvider: { _ in
+                Int64(1)
+            })
+        )
+
+        let warnings = evaluator.destinationWarnings(
+            repositories: [repository],
+            threshold: .thirtyDays,
+            freeSpaceThreshold: .off,
+            now: now
+        )
+
+        XCTAssertTrue(warnings.isEmpty)
+    }
+
     func testSourceWarningsCallOutUnavailableInvalidAndUnreadableSources() throws {
         let fixture = try Fixture()
         defer { fixture.cleanUp() }

@@ -79,6 +79,30 @@ final class RepositoryAvailabilityCheckerTests: XCTestCase {
 
         XCTAssertFalse(RepositoryAvailabilityChecker().isAvailable(repository))
     }
+
+    func testLocalDestinationReportsAvailableCapacityForExistingDirectory() throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanUp() }
+        let repository = BackupRepository(name: "Local", backend: .local(path: fixture.directory.path))
+        let capacityBytes: Int64 = 42 * 1_024 * 1_024 * 1_024
+        let checker = RepositoryAvailabilityChecker(capacityProvider: { url in
+            url.path == fixture.directory.path ? capacityBytes : nil
+        })
+
+        XCTAssertEqual(checker.availableCapacityBytes(for: repository), capacityBytes)
+    }
+
+    func testLocalDestinationDoesNotReportCapacityForMissingRepositoryWhenCreationIsNotAllowed() throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanUp() }
+        let child = fixture.directory.appendingPathComponent("new-repository", isDirectory: true)
+        let repository = BackupRepository(name: "Local", backend: .local(path: child.path))
+        let checker = RepositoryAvailabilityChecker(capacityProvider: { _ in
+            Int64(42 * 1_024 * 1_024 * 1_024)
+        })
+
+        XCTAssertNil(checker.availableCapacityBytes(for: repository))
+    }
 }
 
 private struct Fixture {

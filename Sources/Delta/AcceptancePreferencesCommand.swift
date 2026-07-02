@@ -76,6 +76,7 @@ enum AcceptancePreferencesCommand {
         store.set("invalid-policy", forKey: DeltaAppPreferenceKeys.defaultRestoreConflictPolicy)
         store.set(-1, forKey: DeltaAppPreferenceKeys.backupFreshnessWarningHours)
         store.set(-1, forKey: DeltaAppPreferenceKeys.destinationVerificationWarningHours)
+        store.set(-1, forKey: DeltaAppPreferenceKeys.destinationFreeSpaceWarningGiB)
         store.set(-1, forKey: DeltaAppPreferenceKeys.operationalHistoryRetentionDays)
         store.set(-1, forKey: DeltaAppPreferenceKeys.updateCheckIntervalSeconds)
         store.synchronize()
@@ -103,6 +104,7 @@ enum AcceptancePreferencesCommand {
         store.set(RestoreConflictPolicy.never.rawValue, forKey: DeltaAppPreferenceKeys.defaultRestoreConflictPolicy)
         store.set(BackupFreshnessWarningThreshold.oneWeek.rawValue, forKey: DeltaAppPreferenceKeys.backupFreshnessWarningHours)
         store.set(DestinationVerificationWarningThreshold.ninetyDays.rawValue, forKey: DeltaAppPreferenceKeys.destinationVerificationWarningHours)
+        store.set(DestinationFreeSpaceWarningThreshold.oneHundredGiB.rawValue, forKey: DeltaAppPreferenceKeys.destinationFreeSpaceWarningGiB)
         store.set(OperationalHistoryRetention.sevenDays.rawValue, forKey: DeltaAppPreferenceKeys.operationalHistoryRetentionDays)
         store.set(true, forKey: DeltaAppPreferenceKeys.pausesScheduledBackups)
         store.set(false, forKey: DeltaAppPreferenceKeys.preventsIdleSleepDuringJobs)
@@ -129,6 +131,7 @@ enum AcceptancePreferencesCommand {
         try require(restore == RestoreDefaults(), "Recommended restore defaults changed.")
         try require(BackupFreshnessWarningThreshold.normalized(-1) == .threeDays, "Backup freshness fallback changed.")
         try require(DestinationVerificationWarningThreshold.normalized(-1) == .thirtyDays, "Destination check fallback changed.")
+        try require(DestinationFreeSpaceWarningThreshold.normalized(-1) == .fiftyGiB, "Destination free-space fallback changed.")
         try require(OperationalHistoryRetention.normalized(-1) == .ninetyDays, "History retention fallback changed.")
         try require(AppUpdateCheckInterval.normalized(-1) == .daily, "Update interval fallback changed.")
         try require(!DeltaAppPreferences.bool(for: DeltaAppPreferenceKeys.pausesScheduledBackups, default: false), "Scheduled automation should default to running.")
@@ -159,6 +162,7 @@ enum AcceptancePreferencesCommand {
         try require(restore.conflictPolicy == .ifChanged, "Invalid restore conflict policy did not normalize.")
         try require(BackupFreshnessWarningThreshold.normalized(DeltaAppPreferences.integer(for: DeltaAppPreferenceKeys.backupFreshnessWarningHours, default: -1)) == .threeDays, "Invalid backup freshness preference did not normalize.")
         try require(DestinationVerificationWarningThreshold.normalized(DeltaAppPreferences.integer(for: DeltaAppPreferenceKeys.destinationVerificationWarningHours, default: -1)) == .thirtyDays, "Invalid destination check preference did not normalize.")
+        try require(DestinationFreeSpaceWarningThreshold.normalized(DeltaAppPreferences.integer(for: DeltaAppPreferenceKeys.destinationFreeSpaceWarningGiB, default: -1)) == .fiftyGiB, "Invalid destination free-space preference did not normalize.")
         try require(OperationalHistoryRetention.current() == .ninetyDays, "Invalid history retention preference did not normalize.")
         try require(AppUpdateCheckInterval.normalized(DeltaAppPreferences.integer(for: DeltaAppPreferenceKeys.updateCheckIntervalSeconds, default: -1)) == .daily, "Invalid update interval did not normalize.")
     }
@@ -207,6 +211,7 @@ enum AcceptancePreferencesCommand {
         try require(diagnostic.operationalHistoryRetentionStatus == "Keep 7 days", "Diagnostics did not reflect history retention preference.")
         try require(diagnostic.backupFreshnessStatus == "Warn after 1 week", "Diagnostics did not reflect backup freshness preference.")
         try require(diagnostic.destinationVerificationStatus == "Warn after 90 days", "Diagnostics did not reflect destination verification preference.")
+        try require(diagnostic.destinationFreeSpaceStatus == "Warn below 100 GB", "Diagnostics did not reflect destination free-space preference.")
         try require(diagnostic.restoreDefaultsStatus == "Direct restore, no verification, Keep existing", "Diagnostics did not reflect restore defaults.")
     }
 

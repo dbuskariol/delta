@@ -187,6 +187,15 @@ final class DeltaAppPreferencesTests: XCTestCase {
         XCTAssertEqual(DestinationVerificationWarningThreshold.thirtyDays.summaryText, "Warn after 30 days")
     }
 
+    func testDestinationFreeSpaceWarningThresholdNormalizesUnsupportedValues() {
+        XCTAssertEqual(DestinationFreeSpaceWarningThreshold.normalized(DestinationFreeSpaceWarningThreshold.tenGiB.rawValue), .tenGiB)
+        XCTAssertEqual(DestinationFreeSpaceWarningThreshold.normalized(DestinationFreeSpaceWarningThreshold.off.rawValue), .off)
+        XCTAssertEqual(DestinationFreeSpaceWarningThreshold.normalized(-1), .fiftyGiB)
+        XCTAssertEqual(DestinationFreeSpaceWarningThreshold.fiftyGiB.summaryText, "Warn below 50 GB")
+        XCTAssertEqual(DestinationFreeSpaceWarningThreshold.fiftyGiB.minimumBytes, 50 * 1_024 * 1_024 * 1_024)
+        XCTAssertNil(DestinationFreeSpaceWarningThreshold.off.minimumBytes)
+    }
+
     func testOperationalHistoryRetentionNormalizesUnsupportedValues() {
         XCTAssertEqual(OperationalHistoryRetention.normalized(OperationalHistoryRetention.sevenDays.rawValue), .sevenDays)
         XCTAssertEqual(OperationalHistoryRetention.normalized(OperationalHistoryRetention.forever.rawValue), .forever)

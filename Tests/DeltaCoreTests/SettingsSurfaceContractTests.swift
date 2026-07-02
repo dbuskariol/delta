@@ -23,6 +23,7 @@ final class SettingsSurfaceContractTests: XCTestCase {
         XCTAssertTrue(SettingsSurfaceContract.controlTitles.contains("Pause scheduled automation"))
         XCTAssertTrue(SettingsSurfaceContract.controlTitles.contains("Backup freshness"))
         XCTAssertTrue(SettingsSurfaceContract.controlTitles.contains("Destination checks"))
+        XCTAssertTrue(SettingsSurfaceContract.controlTitles.contains("Destination free space"))
         XCTAssertTrue(SettingsSurfaceContract.controlTitles.contains("Activity log detail"))
         XCTAssertTrue(SettingsSurfaceContract.controlTitles.contains("History retention"))
         XCTAssertTrue(SettingsSurfaceContract.actionTitles.contains("Run Due Now"))
@@ -54,6 +55,7 @@ final class SettingsSurfaceContractTests: XCTestCase {
         XCTAssertTrue(SettingsSurfaceContract.requiredManualAcceptanceCoverage.contains("Backup freshness warning control"))
         XCTAssertTrue(SettingsSurfaceContract.requiredManualAcceptanceCoverage.contains("Source access warning visibility through dashboard health"))
         XCTAssertTrue(SettingsSurfaceContract.requiredManualAcceptanceCoverage.contains("Destination check warning control"))
+        XCTAssertTrue(SettingsSurfaceContract.requiredManualAcceptanceCoverage.contains("Destination free-space warning control"))
         XCTAssertTrue(SettingsSurfaceContract.requiredManualAcceptanceCoverage.contains("Activity history retention"))
     }
 }
