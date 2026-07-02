@@ -14,6 +14,7 @@ mkdir -p "$OUTPUT_DIR"
 
 TIMESTAMP="$(/bin/date -u +%Y%m%dT%H%M%SZ)"
 OUTPUT="$OUTPUT_DIR/Delta-release-evidence-$TIMESTAMP.md"
+LATEST="$OUTPUT_DIR/latest.md"
 INFO_PLIST="$APP_PATH/Contents/Info.plist"
 GATE_STATUS_FILE="$ROOT_DIR/dist/release-evidence/automated-gate-status"
 MANUAL_ACCEPTANCE_REPORT="${DELTA_MANUAL_ACCEPTANCE_REPORT:-$ROOT_DIR/dist/manual-acceptance/latest.md}"
@@ -199,4 +200,9 @@ Manual matrix passed: $MANUAL_MATRIX_PASSED
 - Ready for external distribution: $READY_FOR_EXTERNAL_DISTRIBUTION
 EOF
 
+LATEST_TMP="$OUTPUT_DIR/.latest.$$"
+/bin/ln -s "$(basename "$OUTPUT")" "$LATEST_TMP"
+/bin/mv -f "$LATEST_TMP" "$LATEST"
+
 printf "Wrote release evidence to %s\n" "$OUTPUT"
+printf "Updated %s\n" "$LATEST"

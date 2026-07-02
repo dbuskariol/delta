@@ -6,6 +6,7 @@ APP_PATH="${DELTA_DOCTOR_APP:-$ROOT_DIR/dist/Delta.app}"
 INSTALLED_APP_PATH="${DELTA_DOCTOR_INSTALLED_APP:-/Applications/Delta.app}"
 LOCAL_ACCEPTANCE_REPORT="${DELTA_DOCTOR_LOCAL_ACCEPTANCE_REPORT:-$ROOT_DIR/dist/local-acceptance/latest.md}"
 MANUAL_REPORT="${DELTA_DOCTOR_MANUAL_ACCEPTANCE_REPORT:-$ROOT_DIR/dist/manual-acceptance/latest.md}"
+RELEASE_EVIDENCE_REPORT="${DELTA_DOCTOR_RELEASE_EVIDENCE_REPORT:-$ROOT_DIR/dist/release-evidence/latest.md}"
 GATE_STATUS_FILE="$ROOT_DIR/dist/release-evidence/automated-gate-status"
 NOTARY_OUTPUT_DIR="${DELTA_NOTARY_OUTPUT_DIR:-$ROOT_DIR/dist/notarization}"
 
@@ -57,6 +58,11 @@ manual_report_value() {
 local_report_value() {
   local key="$1"
   /usr/bin/awk -F': ' -v key="- $key" '$1 == key { print $2; exit }' "$LOCAL_ACCEPTANCE_REPORT" 2>/dev/null || true
+}
+
+release_evidence_value() {
+  local key="$1"
+  /usr/bin/awk -F': ' -v key="- $key" '$1 == key { print $2; exit }' "$RELEASE_EVIDENCE_REPORT" 2>/dev/null || true
 }
 
 first_row_for_id() {
@@ -183,6 +189,26 @@ else
 fi
 
 printf "\n## Acceptance Evidence\n\n"
+if [[ -f "$RELEASE_EVIDENCE_REPORT" || -L "$RELEASE_EVIDENCE_REPORT" ]]; then
+  release_commit="$(release_evidence_value "Git Commit")"
+  release_ready="$(release_evidence_value "Ready for external distribution")"
+  if [[ "$release_commit" == "$head_commit" ]]; then
+    pass "Release evidence report is for current commit $head_commit."
+  else
+    block "Release evidence report is for ${release_commit:-unknown}, not current commit $head_commit. Run Scripts/collect-release-evidence.sh."
+  fi
+  if /usr/bin/grep -q '^### Notarization Credential Policy$' "$RELEASE_EVIDENCE_REPORT" \
+    && /usr/bin/grep -q '^Notarization credential policy verified\.$' "$RELEASE_EVIDENCE_REPORT"
+  then
+    pass "Release evidence records notarization credential policy verification."
+  else
+    block "Release evidence does not record notarization credential policy verification."
+  fi
+  printf -- "- Release evidence ready for external distribution: ${release_ready:-Unknown}\n"
+else
+  block "Release evidence report is missing at $RELEASE_EVIDENCE_REPORT. Run Scripts/collect-release-evidence.sh."
+fi
+
 if [[ -f "$LOCAL_ACCEPTANCE_REPORT" ]]; then
   local_commit="$(local_report_value "Git Commit")"
   if [[ "$local_commit" == "$head_commit" ]]; then

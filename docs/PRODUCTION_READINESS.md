@@ -43,7 +43,7 @@ After the automated gate, collect a release evidence report:
 Scripts/collect-release-evidence.sh
 ```
 
-The automated gate writes `dist/release-evidence/automated-gate-status` when it passes. The release evidence report is written under `dist/release-evidence/` and records the exact app path, version, git commit, signature details, scheduler/tool smoke output, Sparkle update artifacts, installed app smoke output, Gatekeeper/notarization status, notarization credential policy, automated gate status, local acceptance probe output, and manual acceptance verification.
+The automated gate writes `dist/release-evidence/automated-gate-status` when it passes. The release evidence report is written under `dist/release-evidence/`, with `dist/release-evidence/latest.md` pointing at the newest report, and records the exact app path, version, git commit, signature details, scheduler/tool smoke output, Sparkle update artifacts, installed app smoke output, Gatekeeper/notarization status, notarization credential policy, automated gate status, local acceptance probe output, and manual acceptance verification.
 
 For a faster local readiness picture, run:
 
