@@ -19,7 +19,7 @@ public enum LaunchAgentRegistrationStatus: Equatable, Sendable {
         case .notRegistered: "Not Registered"
         case .notFound: "Not Found"
         case .unavailable: "Unavailable"
-        case let .unknown(raw): raw
+        case .unknown: "Unknown"
         }
     }
 

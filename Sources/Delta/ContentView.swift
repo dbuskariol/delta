@@ -2158,8 +2158,8 @@ struct SettingsView: View {
             return "The signed background helper is missing from the installed app bundle. Reinstall Delta from the latest build."
         case .unavailable:
             return "This macOS version cannot run Delta's background backup helper."
-        case let .unknown(rawValue):
-            return "macOS returned an unknown background backup status: \(rawValue)"
+        case .unknown:
+            return "macOS returned an unknown background backup status. Refresh status, then review Login Items if scheduled backups do not run."
         case .enabled:
             return "Scheduled backups can run while the main window is closed."
         }
@@ -4659,7 +4659,7 @@ struct BackupSummaryMetricRow: View {
             BackupSummaryMetric(title: "New", value: summary.filesNew.formatted()),
             BackupSummaryMetric(title: "Changed", value: summary.filesChanged.formatted())
         ]
-        if let dataAdded = summary.dataAdded, dataAdded > 0 {
+        if summary.hasChanges, let dataAdded = summary.dataAdded, dataAdded > 0 {
             items.append(
                 BackupSummaryMetric(
                     title: "Added",

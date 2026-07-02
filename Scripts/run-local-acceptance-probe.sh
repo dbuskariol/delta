@@ -219,9 +219,9 @@ else
   installed_local_output="$(run_capture installed_local_backup "$ROOT_DIR/Scripts/run-installed-local-backup-acceptance.sh" "$APP_PATH")"
   installed_local_status="$(command_status installed_local_backup)"
   if [[ "$installed_local_status" -eq 0 ]]; then
-    installed_local_evidence="Installed-bundle local backup acceptance passed: init, first backup, deduplicated second backup with no new or changed file data, full restore, selected folder restore, check, prune, and post-prune check. $installed_local_output"
+    installed_local_evidence="Installed app local lifecycle acceptance passed through Delta coordinator: automatic destination preparation, first backup, no-change backup, incremental backup, restore-point cache, browser listing, full restore, selected folder restore, selected file restore, check, cleanup, and post-cleanup check. $installed_local_output"
   else
-    installed_local_evidence="Installed-bundle local backup acceptance failed: $installed_local_output"
+    installed_local_evidence="Installed app local lifecycle acceptance failed: $installed_local_output"
   fi
 
   installed_diagnostics_output="$(run_capture installed_diagnostics "$ROOT_DIR/Scripts/run-installed-diagnostics-acceptance.sh" "$APP_PATH")"
@@ -281,8 +281,8 @@ else
       append_row "local_drive_destination" "$(item_area local_drive_destination)" "Partial" "$installed_local_evidence Automated release gate also passed local restic lifecycle and source access preflight coverage for commit $git_commit." "Repeat through the installed app UI with the target local or external drive."
       append_row "restore_wizard" "$(item_area restore_wizard)" "Partial" "$installed_local_evidence Automated release gate also passed dry-run restore command paths for commit $git_commit." "Exercise the installed Restore wizard UI, original-path confirmation, browser selection, and each overwrite policy."
     else
-      append_row "local_drive_destination" "$(item_area local_drive_destination)" "Failed" "$installed_local_evidence" "Fix installed-bundle local backup acceptance, then repeat through the installed app UI."
-      append_row "restore_wizard" "$(item_area restore_wizard)" "Failed" "$installed_local_evidence" "Fix installed-bundle restore acceptance, then exercise the installed Restore wizard UI."
+      append_row "local_drive_destination" "$(item_area local_drive_destination)" "Failed" "$installed_local_evidence" "Fix installed app local lifecycle acceptance, then repeat through the installed app UI."
+      append_row "restore_wizard" "$(item_area restore_wizard)" "Failed" "$installed_local_evidence" "Fix installed app restore acceptance, then exercise the installed Restore wizard UI."
     fi
     append_row "new_backup_defaults" "$(item_area new_backup_defaults)" "Partial" "Automated release gate passed backup-default preference, health-threshold normalization, source-access dashboard health evaluation, and schedule policy tests for commit $git_commit." "Change defaults in Settings and confirm newly-created UI profiles inherit them without mutating existing profiles. Confirm Health Monitoring thresholds change dashboard attention timing without mutating profiles."
     append_row "restore_defaults" "$(item_area restore_defaults)" "Partial" "Automated release gate passed restore-default preference normalization, shared-settings reads, diagnostic summaries, and restore command safety coverage for commit $git_commit." "Change Settings > Restore Defaults, reopen Restore, and confirm defaults apply while remaining editable."

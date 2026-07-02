@@ -204,12 +204,8 @@ public struct ResticCommandBuilder: Sendable {
             break
         case let .selectedPaths(paths):
             let normalizedPaths = try Self.normalizedRestorePaths(paths)
-            if normalizedPaths.count == 1, let first = normalizedPaths.first {
-                snapshotArgument = "\(snapshotID):\(first)"
-            } else {
-                for path in normalizedPaths {
-                    subcommand += ["--include", path]
-                }
+            for path in normalizedPaths {
+                subcommand += ["--include", path]
             }
         }
 

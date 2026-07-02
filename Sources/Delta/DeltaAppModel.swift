@@ -765,8 +765,8 @@ final class DeltaAppModel: ObservableObject {
             return "Background Backups could not start because the helper is missing from the app bundle."
         case .unavailable:
             return "Background Backups are unavailable on this macOS version."
-        case let .unknown(rawValue):
-            return "Background Backups returned an unknown macOS status: \(rawValue)"
+        case .unknown:
+            return "Background Backups returned an unknown macOS status. Refresh status or review Login Items if scheduled backups do not run."
         }
     }
 
@@ -782,8 +782,8 @@ final class DeltaAppModel: ObservableObject {
             return "Delta could not be added to Login Items because macOS could not find the app bundle."
         case .unavailable:
             return "Start at login is unavailable on this macOS version."
-        case let .unknown(rawValue):
-            return "Start at login returned an unknown macOS status: \(rawValue)"
+        case .unknown:
+            return "Start at login returned an unknown macOS status. Refresh status or review Login Items if Delta does not open at sign-in."
         }
     }
 

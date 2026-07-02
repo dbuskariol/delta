@@ -45,6 +45,8 @@ struct DeltaApp: App {
             runExportDiagnostics()
         case "--acceptance-seed-diagnostics":
             runAcceptanceSeedDiagnostics()
+        case "--acceptance-local-lifecycle":
+            runAcceptanceLocalLifecycle()
         case "--acceptance-save-secret":
             runAcceptanceSave(arguments: Array(arguments.dropFirst()))
         case "--acceptance-delete-secret":
@@ -160,6 +162,22 @@ struct DeltaApp: App {
             exit(0)
         } catch {
             fputs("Delta diagnostic acceptance error: \(error.localizedDescription)\n", stderr)
+            exit(1)
+        }
+    }
+
+    private static func runAcceptanceLocalLifecycle() -> Never {
+        guard ProcessInfo.processInfo.environment["DELTA_ENABLE_LOCAL_LIFECYCLE_ACCEPTANCE"] == "1" else {
+            fputs("Delta local lifecycle acceptance command is disabled.\n", stderr)
+            exit(64)
+        }
+
+        do {
+            let report = try AcceptanceLocalLifecycleCommand.run(executableURL: selfExecutableURL())
+            print(report, terminator: report.hasSuffix("\n") ? "" : "\n")
+            exit(0)
+        } catch {
+            fputs("Delta local lifecycle acceptance error: \(error.localizedDescription)\n", stderr)
             exit(1)
         }
     }

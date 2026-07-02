@@ -32,6 +32,7 @@ public struct ResticBackupSummary: Codable, Equatable, Sendable {
     public var totalFilesProcessed: Int
     public var totalBytesProcessed: Int64
     public var dataAdded: Int64?
+    public var dataBlobs: Int?
     public var snapshotID: String?
 
     public init(
@@ -41,6 +42,7 @@ public struct ResticBackupSummary: Codable, Equatable, Sendable {
         totalFilesProcessed: Int = 0,
         totalBytesProcessed: Int64 = 0,
         dataAdded: Int64? = nil,
+        dataBlobs: Int? = nil,
         snapshotID: String? = nil
     ) {
         self.filesNew = filesNew
@@ -49,11 +51,12 @@ public struct ResticBackupSummary: Codable, Equatable, Sendable {
         self.totalFilesProcessed = totalFilesProcessed
         self.totalBytesProcessed = totalBytesProcessed
         self.dataAdded = dataAdded
+        self.dataBlobs = dataBlobs
         self.snapshotID = snapshotID
     }
 
     public var hasChanges: Bool {
-        filesNew > 0 || filesChanged > 0 || (dataAdded ?? 0) > 0
+        filesNew > 0 || filesChanged > 0 || (dataBlobs ?? 0) > 0
     }
 
     public var conciseText: String {
@@ -247,6 +250,7 @@ public enum ResticLogFormatter {
             totalFilesProcessed: integer(object["total_files_processed"]) ?? 0,
             totalBytesProcessed: int64(object["total_bytes_processed"]) ?? 0,
             dataAdded: int64(object["data_added"]),
+            dataBlobs: integer(object["data_blobs"]),
             snapshotID: string(object["snapshot_id"])
         )
     }

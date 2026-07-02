@@ -218,7 +218,9 @@ final class ResticCommandTests: XCTestCase {
         XCTAssertTrue(command.arguments.contains("--overwrite"))
         XCTAssertTrue(command.arguments.contains("never"))
         XCTAssertTrue(command.arguments.contains("/tmp/restore"))
-        XCTAssertTrue(command.arguments.contains("abc123:/Users/me/Documents"))
+        XCTAssertTrue(command.arguments.contains("abc123"))
+        XCTAssertFalse(command.arguments.contains("abc123:/Users/me/Documents"))
+        XCTAssertEqual(includeArguments(in: command.arguments), ["/Users/me/Documents"])
     }
 
     func testRestoreCommandVerifiesOnlyRealRestores() throws {

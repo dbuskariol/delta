@@ -170,6 +170,19 @@ final class ResticRunnerTests: XCTestCase {
         XCTAssertEqual(message, "No changes detected · 0 new · 0 changed · 2.1 MB checked")
     }
 
+    func testLogFormatterTreatsMetadataOnlyBackupAsUnchanged() throws {
+        let output = """
+        {"message_type":"summary","files_new":0,"files_changed":0,"files_unmodified":100,"data_blobs":0,"tree_blobs":1,"data_added":512,"total_files_processed":100,"total_bytes_processed":2097152}
+        """
+
+        let summary = try XCTUnwrap(ResticLogFormatter.backupSummary(from: output))
+
+        XCTAssertFalse(summary.hasChanges)
+        XCTAssertEqual(summary.dataBlobs, 0)
+        XCTAssertEqual(summary.conciseText, "0 new · 0 changed · 2.1 MB checked")
+        XCTAssertEqual(summary.logText, "No changes detected · 0 new · 0 changed · 2.1 MB checked")
+    }
+
     func testLogFormatterDoesNotTreatGenericSummaryAsBackupSummary() {
         let message = ResticLogFormatter.displayMessage(for: """
         {"message_type":"summary","total_files":12,"total_bytes":4096}

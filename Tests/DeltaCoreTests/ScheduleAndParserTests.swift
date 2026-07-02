@@ -139,6 +139,13 @@ final class ScheduleAndParserTests: XCTestCase {
         XCTAssertEqual(LaunchAgentRegistrationStatus.parse("SMAppServiceStatus(rawValue: 3)"), .notFound)
     }
 
+    func testUnknownLaunchAgentStatusDoesNotExposeRawServiceManagementText() {
+        let status = LaunchAgentRegistrationStatus.parse("SMAppServiceStatus(rawValue: 99)")
+
+        XCTAssertEqual(status.displayName, "Unknown")
+        XCTAssertEqual(status.detail, "macOS returned an unknown background backup status.")
+    }
+
     private func components(_ calendar: Calendar, year: Int, month: Int, day: Int, hour: Int, minute: Int) -> Date {
         calendar.date(from: DateComponents(year: year, month: month, day: day, hour: hour, minute: minute, second: 0))!
     }
