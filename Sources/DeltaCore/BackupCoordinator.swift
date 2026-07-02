@@ -227,6 +227,22 @@ public final class BackupCoordinator: @unchecked Sendable {
         }
     }
 
+    private func refreshSnapshotsAfterCompletedMaintenance(_ run: JobRun, repository: BackupRepository) {
+        guard run.status == .succeeded || run.status == .warning else {
+            return
+        }
+        do {
+            _ = try refreshSnapshots(repository: repository)
+        } catch {
+            try? database.appendEvent(
+                EventLog(
+                    level: .warning,
+                    message: "Cleanup completed, but restore points could not be refreshed automatically: \(error.localizedDescription)"
+                )
+            )
+        }
+    }
+
     @discardableResult
     public func restore(request: RestoreRequest, repository: BackupRepository) throws -> JobRun {
         try database.saveRestoreRequest(request)
@@ -300,6 +316,7 @@ public final class BackupCoordinator: @unchecked Sendable {
         if profile.retention.pruneAfterForget && profile.retention.checkAfterPrune && (pruneRun.status == .succeeded || pruneRun.status == .warning) {
             runs.append(try check(repository: repository, readDataSubset: "1/100"))
         }
+        refreshSnapshotsAfterCompletedMaintenance(pruneRun, repository: repository)
         return runs
     }
 

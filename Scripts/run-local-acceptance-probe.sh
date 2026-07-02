@@ -254,7 +254,7 @@ else
   installed_local_output="$(run_capture installed_local_backup "$ROOT_DIR/Scripts/run-installed-local-backup-acceptance.sh" "$APP_PATH")"
   installed_local_status="$(command_status installed_local_backup)"
   if [[ "$installed_local_status" -eq 0 ]]; then
-    installed_local_evidence="Installed app local lifecycle acceptance passed through Delta coordinator: automatic destination preparation, first backup, no-change backup, incremental backup, restore-point cache, browser listing, full restore, selected folder restore, selected file restore, dry-run restore with no writes, every overwrite policy, check, cleanup, and post-cleanup check. $installed_local_output"
+    installed_local_evidence="Installed app local lifecycle acceptance passed through Delta coordinator: automatic destination preparation, first backup, no-change backup, incremental backup, newest-first restore-point cache, browser listing with nested file metadata, full restore, selected folder restore, selected file restore, dry-run restore with no writes, every overwrite policy, check, cleanup, post-cleanup check, pruned cache refresh, and saved backup log source/summary evidence. $installed_local_output"
   else
     installed_local_evidence="Installed app local lifecycle acceptance failed: $installed_local_output"
   fi
@@ -359,9 +359,17 @@ else
       append_row "new_backup_defaults" "$(item_area new_backup_defaults)" "Failed" "$installed_preferences_evidence" "Fix installed-app settings/defaults behavior, then verify Settings defaults in the UI."
       append_row "restore_defaults" "$(item_area restore_defaults)" "Failed" "$installed_preferences_evidence" "Fix installed-app restore defaults behavior, then verify Restore defaults in the UI."
     fi
-    append_row "browse_restore_points" "$(item_area browse_restore_points)" "Partial" "Automated release gate passed restore-point parsing, cache replacement, newest-first reads, and browser path command validation for commit $git_commit." "Open Restore, confirm restore points load on tab selection, refresh returns all current points, and pruned points disappear."
+    if [[ "$installed_local_status" -eq 0 ]]; then
+      append_row "browse_restore_points" "$(item_area browse_restore_points)" "Partial" "$installed_local_evidence Automated release gate also passed restore-point parsing, cache replacement, newest-first reads, and browser path command validation for commit $git_commit." "Open Restore, confirm restore points load on tab selection, refresh returns all current points, and pruned points disappear."
+    else
+      append_row "browse_restore_points" "$(item_area browse_restore_points)" "Failed" "$installed_local_evidence" "Fix installed restore-point browser acceptance, then confirm Restore loads and refreshes points in the UI."
+    fi
     append_row "pause_resume_cancel" "$(item_area pause_resume_cancel)" "Partial" "Automated release gate passed durable run-control and stopped-job model coverage for commit $git_commit." "Pause, resume, and cancel a real large backup from the main app and menu bar."
-    append_row "streaming_logs" "$(item_area streaming_logs)" "Partial" "Automated release gate passed log formatting and persistence coverage for commit $git_commit." "Watch a real large backup and confirm fixed-height live logs, auto-scroll, source context, and expandable saved job logs."
+    if [[ "$installed_local_status" -eq 0 ]]; then
+      append_row "streaming_logs" "$(item_area streaming_logs)" "Partial" "$installed_local_evidence Automated release gate also passed log formatting and persistence coverage for commit $git_commit." "Watch a real large backup and confirm fixed-height live logs, auto-scroll, source context, and expandable saved job logs."
+    else
+      append_row "streaming_logs" "$(item_area streaming_logs)" "Failed" "$installed_local_evidence" "Fix installed backup-log acceptance, then watch a real large backup in the UI."
+    fi
     if [[ "$installed_diagnostics_status" -eq 0 ]]; then
       append_row "diagnostics_redaction" "$(item_area diagnostics_redaction)" "Partial" "$installed_diagnostics_evidence Automated release gate also passed diagnostic redaction coverage for commit $git_commit." "Copy and export a report from Settings and manually confirm no secrets appear."
     else

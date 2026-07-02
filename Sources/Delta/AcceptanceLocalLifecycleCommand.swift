@@ -100,7 +100,12 @@ enum AcceptanceLocalLifecycleCommand {
 
         let snapshots = try database.fetchSnapshots(repositoryID: repositoryID)
         try require(snapshots.count >= 2, "Expected at least two restore points after incremental backup, found \(snapshots.count).")
-        let latestSnapshot = try requireValue(snapshots.max(by: { $0.time < $1.time }), "No restore point was cached.")
+        let snapshotIDsNewestFirst = snapshots.map(\.id)
+        try require(
+            snapshotIDsNewestFirst == snapshots.sorted { $0.time > $1.time }.map(\.id),
+            "Restore points were not cached newest first."
+        )
+        let latestSnapshot = try requireValue(snapshots.first, "No restore point was cached.")
 
         let rootEntries = try coordinator.listSnapshotEntries(
             repository: repository,
@@ -116,7 +121,12 @@ enum AcceptanceLocalLifecycleCommand {
             snapshotID: latestSnapshot.id,
             directoryPath: documentsURL.path
         )
-        try require(documentEntries.contains { $0.path == reportURL.path && $0.type == .file }, "Restore browser did not list report.txt inside Documents.")
+        let reportEntry = try requireValue(
+            documentEntries.first { $0.path == reportURL.path && $0.type == .file },
+            "Restore browser did not list report.txt inside Documents."
+        )
+        try require((reportEntry.size ?? 0) > 0, "Restore browser did not include report.txt file size metadata.")
+        try require(reportEntry.modifiedAt != nil, "Restore browser did not include report.txt modification metadata.")
 
         let fullRestore = try coordinator.restore(
             request: RestoreRequest(
@@ -251,11 +261,34 @@ enum AcceptanceLocalLifecycleCommand {
         let maintenanceRuns = try coordinator.runRetentionMaintenance(profile: profile, repository: repository)
         try require(maintenanceRuns.contains { $0.kind == .prune && ($0.status == .succeeded || $0.status == .warning) }, "Cleanup did not complete successfully.")
         try require(maintenanceRuns.contains { $0.kind == .check && ($0.status == .succeeded || $0.status == .warning) }, "Post-cleanup check did not run successfully.")
+        let snapshotsAfterCleanup = try database.fetchSnapshots(repositoryID: repositoryID)
+        try require(snapshotsAfterCleanup.count < snapshots.count, "Cleanup did not refresh the restore-point cache after pruning.")
+        try require(snapshotsAfterCleanup.contains { $0.id == latestSnapshot.id }, "Cleanup did not retain the newest restore point in the cache.")
 
         let latestJobs = try database.fetchJobRuns(limit: 50)
         let backupCount = latestJobs.filter { $0.repositoryID == repositoryID && $0.kind == .backup }.count
         let restoreCount = latestJobs.filter { $0.repositoryID == repositoryID && $0.kind == .restore }.count
         let browseLogCount = rootEntries.count + documentEntries.count
+        let firstBackupLogs = try database.fetchJobLogs(jobID: firstRun.id, limit: 1_000)
+        let noChangeLogs = try database.fetchJobLogs(jobID: noChangeRun.id, limit: 1_000)
+        let incrementalLogs = try database.fetchJobLogs(jobID: incrementalRun.id, limit: 1_000)
+        try require(
+            firstBackupLogs.contains { $0.stream == .standardOutput && $0.message == "Source: \(sourceURL.path)" },
+            "Saved first-backup logs did not include source context."
+        )
+        try require(
+            firstBackupLogs.contains { $0.stream == .standardOutput && $0.message.hasPrefix("Starting Backup:") },
+            "Saved first-backup logs did not include the redacted command start line."
+        )
+        try require(
+            noChangeLogs.contains { $0.message.localizedCaseInsensitiveContains("No changes detected") },
+            "Saved no-change backup logs did not include a no-change summary."
+        )
+        try require(
+            incrementalLogs.contains { $0.message.localizedCaseInsensitiveContains("Backup summary") && $0.message.localizedCaseInsensitiveContains("changed") },
+            "Saved incremental backup logs did not include a changed-file summary."
+        )
+        let savedBackupLogCount = firstBackupLogs.count + noChangeLogs.count + incrementalLogs.count
 
         return """
         # Delta Installed Local Lifecycle Acceptance
@@ -278,7 +311,8 @@ enum AcceptanceLocalLifecycleCommand {
         - Incremental backup: \(incrementalSummary.detailedText)
         - Cached restore points: \(snapshots.count)
         - Latest restore point: \(latestSnapshot.id)
-        - Restore browser entries verified: \(browseLogCount)
+        - Restore points newest first: Yes
+        - Restore browser entries verified: \(browseLogCount), including nested file metadata
         - Full restore status: \(fullRestore.status.displayName)
         - Selected folder restore status: \(selectedFolderRestore.status.displayName)
         - Selected file restore status: \(selectedFileRestore.status.displayName)
@@ -286,6 +320,9 @@ enum AcceptanceLocalLifecycleCommand {
         - Overwrite policies verified: Keep existing, Replace changed, Replace older, Replace all
         - Destination check status: \(checkRun.status.displayName)
         - Cleanup runs: \(maintenanceRuns.map { $0.kind.displayName + " " + $0.status.displayName }.joined(separator: ", "))
+        - Restore points after cleanup: \(snapshotsAfterCleanup.count)
+        - Pruned restore points removed from cache: Yes
+        - Saved backup log lines: \(savedBackupLogCount), including source context, no-change summary, and changed-file summary
         - Stored backup jobs: \(backupCount)
         - Stored restore jobs: \(restoreCount)
         - Keychain item deleted on exit: Yes

@@ -72,12 +72,16 @@ fi
 for expected in \
   "No-change backup:" \
   "Incremental backup:" \
+  "Restore points newest first: Yes" \
   "Restore browser entries verified:" \
+  "including nested file metadata" \
   "Selected folder restore status:" \
   "Selected file restore status:" \
   "Dry-run restore status:" \
   "Overwrite policies verified:" \
-  "Cleanup runs:"
+  "Cleanup runs:" \
+  "Pruned restore points removed from cache: Yes" \
+  "Saved backup log lines:"
 do
   if ! /usr/bin/grep -Fq "$expected" "$OUTPUT"; then
     printf "Installed local lifecycle acceptance output was missing: %s\n" "$expected" >&2
