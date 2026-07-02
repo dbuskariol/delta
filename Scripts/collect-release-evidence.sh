@@ -64,7 +64,7 @@ fi
 NOTARIZATION_COMPLETE="No"
 SIGNING_DETAILS="$(/usr/bin/codesign -dvv "$APP_PATH" 2>&1 || true)"
 if /usr/bin/grep -q '^Authority=Developer ID Application:' <<<"$SIGNING_DETAILS" \
-  && /usr/bin/stapler validate "$APP_PATH" >/dev/null 2>&1 \
+  && /usr/bin/xcrun stapler validate "$APP_PATH" >/dev/null 2>&1 \
   && /usr/sbin/spctl --assess --type execute "$APP_PATH" >/dev/null 2>&1
 then
   NOTARIZATION_COMPLETE="Yes"

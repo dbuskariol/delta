@@ -8,6 +8,35 @@ OUTPUT_DIR="${DELTA_NOTARY_OUTPUT_DIR:-$ROOT_DIR/dist/notarization}"
 PREPARE_ONLY="${DELTA_NOTARY_PREPARE_ONLY:-0}"
 REPACKAGE_SPARKLE="${DELTA_NOTARY_REPACKAGE_SPARKLE:-1}"
 
+require_executable() {
+  local path="$1"
+  if [[ ! -x "$path" ]]; then
+    printf "Required tool is missing or not executable: %s\n" "$path" >&2
+    exit 1
+  fi
+}
+
+require_xcrun_tool() {
+  local tool="$1"
+  if ! /usr/bin/xcrun --find "$tool" >/dev/null 2>&1; then
+    printf "Required Xcode command line tool is not available: %s\n" "$tool" >&2
+    printf "Install Xcode command line tools or select Xcode with xcode-select before notarizing.\n" >&2
+    exit 1
+  fi
+}
+
+require_executable /usr/bin/codesign
+require_executable /usr/bin/ditto
+require_executable /usr/bin/plutil
+require_executable /usr/bin/xcrun
+require_executable /usr/libexec/PlistBuddy
+
+if [[ "$PREPARE_ONLY" != "1" ]]; then
+  require_executable /usr/sbin/spctl
+  require_xcrun_tool notarytool
+  require_xcrun_tool stapler
+fi
+
 if [[ ! -d "$APP" ]]; then
   printf "App bundle not found: %s\nRun DELTA_CODESIGN_IDENTITY=\"Developer ID Application: ...\" Scripts/build-app.sh first.\n" "$APP" >&2
   exit 1

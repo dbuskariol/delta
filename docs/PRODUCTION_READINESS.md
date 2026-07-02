@@ -108,7 +108,7 @@ DELTA_CODESIGN_IDENTITY="Developer ID Application: Example" Scripts/verify-relea
 DELTA_NOTARY_KEYCHAIN_PROFILE="Delta Notary" Scripts/notarize-release.sh
 ```
 
-`Scripts/notarize-release.sh` requires a Developer ID Application signature, submits the app archive with `xcrun notarytool`, waits for the result, saves the submission and notary logs under `dist/notarization`, staples the ticket, validates the stapled app with `stapler` and `spctl`, then regenerates the Sparkle archive and appcast from the stapled app.
+`Scripts/notarize-release.sh` requires a Developer ID Application signature, submits the app archive with `xcrun notarytool`, waits for the result, saves the submission and notary logs under `dist/notarization`, staples the ticket, validates the stapled app with `xcrun stapler` and `spctl`, then regenerates the Sparkle archive and appcast from the stapled app.
 
 ## Manual macOS Acceptance Matrix
 
