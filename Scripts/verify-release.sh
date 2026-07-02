@@ -7,6 +7,11 @@ cd "$ROOT_DIR"
 /usr/bin/swift test
 
 "$ROOT_DIR/Scripts/verify-product-language.sh"
+/bin/bash -n "$ROOT_DIR/Scripts/package-update.sh" "$ROOT_DIR/Scripts/notarize-release.sh"
+if [[ ! -x "$ROOT_DIR/Scripts/notarize-release.sh" ]]; then
+  printf "Scripts/notarize-release.sh must be executable.\n" >&2
+  exit 1
+fi
 "$ROOT_DIR/Scripts/bootstrap-tools.sh"
 "$ROOT_DIR/Scripts/verify-tools.sh"
 "$ROOT_DIR/Scripts/verify-restic-surface.sh"

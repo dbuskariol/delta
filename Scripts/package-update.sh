@@ -5,7 +5,15 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP="$ROOT_DIR/dist/Delta.app"
 UPDATES_DIR="$ROOT_DIR/dist/updates"
 
-"$ROOT_DIR/Scripts/build-app.sh"
+if [[ "${DELTA_SKIP_BUILD:-0}" == "1" ]]; then
+  if [[ ! -d "$APP" ]]; then
+    printf "DELTA_SKIP_BUILD=1 was set, but %s does not exist.\n" "$APP" >&2
+    exit 1
+  fi
+  /usr/bin/codesign --verify --strict --deep --verbose=2 "$APP"
+else
+  "$ROOT_DIR/Scripts/build-app.sh"
+fi
 
 SHORT_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist")"
 BUILD_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP/Contents/Info.plist")"

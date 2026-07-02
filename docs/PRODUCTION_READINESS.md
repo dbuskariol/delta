@@ -25,6 +25,18 @@ The automated gate must pass before any beta or production build is shipped. It 
 - app launch smoke test
 - DeltaAgent status, dry-run, and fail-closed argument smoke tests
 - Sparkle update archive and signed appcast metadata
+- notarization workflow syntax and executable-bit hygiene
+
+## Notarization Gate
+
+External distribution builds must be notarized after the automated gate passes:
+
+```sh
+DELTA_CODESIGN_IDENTITY="Developer ID Application: Example" Scripts/verify-release.sh
+DELTA_NOTARY_KEYCHAIN_PROFILE="Delta Notary" Scripts/notarize-release.sh
+```
+
+`Scripts/notarize-release.sh` requires a Developer ID Application signature, submits the app archive with `xcrun notarytool`, waits for the result, saves the submission and notary logs under `dist/notarization`, staples the ticket, validates the stapled app with `stapler` and `spctl`, then regenerates the Sparkle archive and appcast from the stapled app.
 
 ## Manual macOS Acceptance Matrix
 

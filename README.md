@@ -251,7 +251,19 @@ Developer ID distribution should use:
 DELTA_CODESIGN_IDENTITY="Developer ID Application: Example" Scripts/verify-release.sh
 ```
 
-Notarization is intentionally deferred until final release preparation. The build pipeline is structured for Developer ID signing and notarization, but Apple notarization credentials/submission should be handled at release time.
+Notarize and staple the verified Developer ID build:
+
+```sh
+xcrun notarytool store-credentials "Delta Notary" \
+  --apple-id "you@example.com" \
+  --team-id "TEAMID" \
+  --password "app-specific-password"
+
+DELTA_CODESIGN_IDENTITY="Developer ID Application: Example" Scripts/build-app.sh
+DELTA_NOTARY_KEYCHAIN_PROFILE="Delta Notary" Scripts/notarize-release.sh
+```
+
+`Scripts/notarize-release.sh` submits `dist/Delta.app`, waits for Apple notarization, staples the ticket, validates Gatekeeper assessment, archives the notarization log under `dist/notarization`, and regenerates Sparkle update assets from the stapled app. It also supports `DELTA_NOTARY_PREPARE_ONLY=1` for local archive validation without submitting to Apple.
 
 ## Current Scope
 
