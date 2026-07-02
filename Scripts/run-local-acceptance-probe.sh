@@ -224,12 +224,12 @@ else
     scheduled_agent_output="$(run_capture scheduled_agent "$ROOT_DIR/Scripts/run-installed-scheduled-agent-acceptance.sh" "$APP_PATH")"
     scheduled_agent_status="$(command_status scheduled_agent)"
     if [[ "$agent_status_status" -eq 0 && "$agent_dry_status" -eq 0 && "$agent_due_status" -eq 0 && "$scheduled_agent_status" -eq 0 ]]; then
-      append_row "background_backups" "$(item_area background_backups)" "Partial" "Helper status, dry-run, no-profile isolated due-run, and seeded scheduled-helper backup acceptance passed: $agent_status_output $agent_dry_output $agent_due_output $scheduled_agent_output" "Approve Login Items if macOS asks, quit Delta, wait for a real scheduled interval, and confirm the run appears after relaunch."
+      append_row "scheduled_backups" "$(item_area scheduled_backups)" "Partial" "Helper status, dry-run, no-profile isolated due-run, and seeded scheduled-helper backup acceptance passed: $agent_status_output $agent_dry_output $agent_due_output $scheduled_agent_output" "Approve Login Items if macOS asks, quit Delta, wait for a real scheduled interval, and confirm the run appears after relaunch."
     else
-      append_row "background_backups" "$(item_area background_backups)" "Failed" "Helper checks failed. status=$agent_status_status dry=$agent_dry_status due=$agent_due_status scheduled=$scheduled_agent_status output: $agent_status_output $agent_dry_output $agent_due_output $scheduled_agent_output" "Fix bundled Scheduled Backups helper before manual schedule testing."
+      append_row "scheduled_backups" "$(item_area scheduled_backups)" "Failed" "Helper checks failed. status=$agent_status_status dry=$agent_dry_status due=$agent_due_status scheduled=$scheduled_agent_status output: $agent_status_output $agent_dry_output $agent_due_output $scheduled_agent_output" "Fix bundled Scheduled Backups helper before manual schedule testing."
     fi
   else
-    append_row "background_backups" "$(item_area background_backups)" "Failed" "DeltaAgent was not executable at $agent." "Rebuild and reinstall the app bundle."
+    append_row "scheduled_backups" "$(item_area scheduled_backups)" "Failed" "DeltaAgent was not executable at $agent." "Rebuild and reinstall the app bundle."
   fi
 
   bridge="$APP_PATH/Contents/MacOS/DeltaSecretBridge"
@@ -239,16 +239,16 @@ else
     installed_keychain_output="$(run_capture installed_keychain_access "$ROOT_DIR/Scripts/run-installed-keychain-access-acceptance.sh" "$APP_PATH")"
     installed_keychain_status="$(command_status installed_keychain_access)"
     if [[ "$bridge_status" -eq 0 && "$installed_keychain_status" -eq 0 && "$installed_diagnostics_status" -eq 0 ]]; then
-      append_row "keychain_background_access" "$(item_area keychain_background_access)" "Partial" "Secret bridge fail-closed argument behavior passed, installed Keychain access acceptance proved a throwaway destination password can be read by Delta --secret-bridge without interaction, and installed diagnostics proved Password Access as Ready for a destination with backend credentials: $bridge_output $installed_keychain_output $installed_diagnostics_output" "Run scheduled backups against saved app-managed and credentialed destinations and confirm Keychain does not prompt."
+      append_row "password_access" "$(item_area password_access)" "Partial" "Secret bridge fail-closed argument behavior passed, installed Keychain access acceptance proved a throwaway destination password can be read by Delta --secret-bridge without interaction, and installed diagnostics proved Password Access as Ready for a destination with backend credentials: $bridge_output $installed_keychain_output $installed_diagnostics_output" "Run scheduled backups against saved app-managed and credentialed destinations and confirm Keychain does not prompt."
     elif [[ "$bridge_status" -eq 0 && "$installed_keychain_status" -eq 0 ]]; then
-      append_row "keychain_background_access" "$(item_area keychain_background_access)" "Failed" "Secret bridge and installed Keychain access acceptance passed, but installed diagnostics did not prove Password Access readiness: $installed_diagnostics_evidence" "Fix password-access diagnostics before scheduled-secret testing."
+      append_row "password_access" "$(item_area password_access)" "Failed" "Secret bridge and installed Keychain access acceptance passed, but installed diagnostics did not prove Password Access readiness: $installed_diagnostics_evidence" "Fix password-access diagnostics before scheduled-secret testing."
     elif [[ "$bridge_status" -eq 0 ]]; then
-      append_row "keychain_background_access" "$(item_area keychain_background_access)" "Failed" "Secret bridge fail-closed argument behavior passed, but installed non-interactive Keychain access failed: $installed_keychain_output" "Fix the Keychain trusted-app access list or signed app identity before scheduled-secret testing."
+      append_row "password_access" "$(item_area password_access)" "Failed" "Secret bridge fail-closed argument behavior passed, but installed non-interactive Keychain access failed: $installed_keychain_output" "Fix the Keychain trusted-app access list or signed app identity before scheduled-secret testing."
     else
-      append_row "keychain_background_access" "$(item_area keychain_background_access)" "Failed" "Secret bridge fail-closed check failed: $bridge_output" "Fix secret bridge argument handling before scheduled-secret testing."
+      append_row "password_access" "$(item_area password_access)" "Failed" "Secret bridge fail-closed check failed: $bridge_output" "Fix secret bridge argument handling before scheduled-secret testing."
     fi
   else
-    append_row "keychain_background_access" "$(item_area keychain_background_access)" "Failed" "DeltaSecretBridge was not executable at $bridge." "Rebuild and reinstall the app bundle."
+    append_row "password_access" "$(item_area password_access)" "Failed" "DeltaSecretBridge was not executable at $bridge." "Rebuild and reinstall the app bundle."
   fi
 
   installed_local_output="$(run_capture installed_local_backup "$ROOT_DIR/Scripts/run-installed-local-backup-acceptance.sh" "$APP_PATH")"
