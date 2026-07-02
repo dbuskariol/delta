@@ -1,12 +1,10 @@
 import Foundation
 
 public enum SecurityScopedBookmarkError: Error, LocalizedError {
-    case cannotCreate(URL, String)
     case cannotResolve(String)
 
     public var errorDescription: String? {
         switch self {
-        case let .cannotCreate(url, reason): "Could not create persistent access for \(url.path): \(reason)"
         case let .cannotResolve(path): "Could not resolve persistent access for \(path)."
         }
     }
@@ -36,7 +34,7 @@ public struct SecurityScopedBookmarkStore: Sendable {
             let data = try url.bookmarkData(options: [.withSecurityScope], includingResourceValuesForKeys: nil, relativeTo: nil)
             return BackupSource(path: url.path, bookmarkData: data, includeSubvolumes: includeSubvolumes)
         } catch {
-            throw SecurityScopedBookmarkError.cannotCreate(url, error.localizedDescription)
+            return BackupSource(path: url.path, bookmarkData: nil, includeSubvolumes: includeSubvolumes)
         }
     }
 

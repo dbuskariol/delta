@@ -156,7 +156,7 @@ struct BackupsView: View {
         .sheet(isPresented: $isPresentingProfileSheet) {
             ProfileEditorView()
                 .environmentObject(model)
-                .frame(width: 760, height: 680)
+                .frame(width: ModalMetrics.sheetWidth, height: 680)
         }
     }
 }
@@ -195,7 +195,7 @@ struct RepositoriesView: View {
         .sheet(isPresented: $isPresentingRepositorySheet) {
             RepositoryEditorView()
                 .environmentObject(model)
-                .frame(width: 720)
+                .frame(width: ModalMetrics.sheetWidth)
         }
     }
 }
@@ -676,10 +676,11 @@ struct ProfileEditorView: View {
                 }
                 .labelsHidden()
                 .pickerStyle(.segmented)
+                .frame(width: 230, alignment: .leading)
             }
 
             FieldRow(title: "Sources") {
-                HStack {
+                HStack(spacing: 10) {
                     Button {
                         if mode == .fullVolume {
                             sources = model.chooseBackupSources(allowsMultipleSelection: false, includeSubvolumes: false)
@@ -692,6 +693,8 @@ struct ProfileEditorView: View {
                     Text(sources.isEmpty ? "No sources selected" : sources.map(\.path).joined(separator: ", "))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
+                        .truncationMode(.middle)
+                        .frame(maxWidth: 380, alignment: .leading)
                 }
             }
 
@@ -703,7 +706,7 @@ struct ProfileEditorView: View {
                     }
                 }
                 .labelsHidden()
-                .frame(maxWidth: 360)
+                .frame(width: 264, alignment: .leading)
             }
 
             FieldRow(title: "Schedule") {
@@ -715,6 +718,7 @@ struct ProfileEditorView: View {
                     }
                     .labelsHidden()
                     .pickerStyle(.segmented)
+                    .frame(width: 350, alignment: .leading)
 
                     scheduleControls
                 }
@@ -722,17 +726,21 @@ struct ProfileEditorView: View {
 
             FieldRow(title: "Run policy") {
                 VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 16) {
+                    HStack(spacing: 18) {
                         Toggle("Enabled", isOn: $scheduleEnabled)
                             .toggleStyle(.checkbox)
+                            .frame(width: 170, alignment: .leading)
                         Toggle("Catch up missed runs", isOn: $catchUpMissedRuns)
                             .toggleStyle(.checkbox)
+                            .frame(width: 210, alignment: .leading)
                     }
-                    HStack(spacing: 16) {
+                    HStack(spacing: 18) {
                         Toggle("Run on battery", isOn: $runOnBattery)
                             .toggleStyle(.checkbox)
+                            .frame(width: 170, alignment: .leading)
                         Toggle("Run in Low Power Mode", isOn: $runInLowPowerMode)
                             .toggleStyle(.checkbox)
+                            .frame(width: 210, alignment: .leading)
                     }
                 }
             }
@@ -741,35 +749,45 @@ struct ProfileEditorView: View {
                 HStack(spacing: 10) {
                     TextField("Upload KiB/s", text: $uploadLimit)
                         .textFieldStyle(.roundedBorder)
-                        .frame(width: 120)
+                        .frame(width: 132)
                     TextField("Download KiB/s", text: $downloadLimit)
                         .textFieldStyle(.roundedBorder)
-                        .frame(width: 140)
+                        .frame(width: 132)
                 }
             }
 
             FieldRow(title: "Retention") {
                 VStack(alignment: .leading, spacing: 10) {
-                    HStack(spacing: 12) {
+                    HStack(spacing: 10) {
                         Stepper("Hourly \(keepHourly)", value: $keepHourly, in: 0...168)
+                            .frame(width: 122, alignment: .leading)
                         Stepper("Daily \(keepDaily)", value: $keepDaily, in: 0...365)
+                            .frame(width: 122, alignment: .leading)
                         Stepper("Weekly \(keepWeekly)", value: $keepWeekly, in: 0...260)
+                            .frame(width: 132, alignment: .leading)
                     }
-                    HStack(spacing: 12) {
+                    HStack(spacing: 10) {
                         Stepper("Monthly \(keepMonthly)", value: $keepMonthly, in: 0...120)
+                            .frame(width: 122, alignment: .leading)
                         Stepper("Yearly \(keepYearly)", value: $keepYearly, in: 0...50)
+                            .frame(width: 122, alignment: .leading)
                     }
-                    HStack(spacing: 16) {
+                    HStack(spacing: 18) {
                         Toggle("Prune after forget", isOn: $pruneAfterForget)
                             .toggleStyle(.checkbox)
+                            .frame(width: 170, alignment: .leading)
                         Toggle("Check after prune", isOn: $checkAfterPrune)
                             .toggleStyle(.checkbox)
+                            .frame(width: 170, alignment: .leading)
                     }
                     Divider()
-                    HStack(spacing: 16) {
+                        .frame(width: 390)
+                    HStack(spacing: 18) {
                         Toggle("Automatic cleanup", isOn: $maintenanceEnabled)
                             .toggleStyle(.checkbox)
+                            .frame(width: 170, alignment: .leading)
                         Stepper("Every \(maintenanceIntervalDays) days", value: $maintenanceIntervalDays, in: 1...90)
+                            .frame(width: 170, alignment: .leading)
                     }
                     TimeControls(hour: $maintenanceHour, minute: $maintenanceMinute)
                         .disabled(!maintenanceEnabled)
@@ -805,6 +823,7 @@ struct ProfileEditorView: View {
         switch scheduleKind {
         case .hourly:
             Stepper("Minute \(minute)", value: $minute, in: 0...59)
+                .frame(width: 120, alignment: .leading)
         case .daily:
             TimeControls(hour: $hour, minute: $minute)
         case .weekly:
@@ -820,10 +839,12 @@ struct ProfileEditorView: View {
         case .monthly:
             HStack(spacing: 12) {
                 Stepper("Day \(day)", value: $day, in: 1...31)
+                    .frame(width: 100, alignment: .leading)
                 TimeControls(hour: $hour, minute: $minute)
             }
         case .custom:
             Stepper("Every \(intervalMinutes) minutes", value: $intervalMinutes, in: 1...10_080, step: 15)
+                .frame(width: 190, alignment: .leading)
         }
     }
 
@@ -905,9 +926,11 @@ struct TimeControls: View {
     @Binding var minute: Int
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 10) {
             Stepper("Hour \(hour)", value: $hour, in: 0...23)
+                .frame(width: 92, alignment: .leading)
             Stepper("Minute \(minute)", value: $minute, in: 0...59)
+                .frame(width: 112, alignment: .leading)
         }
     }
 }
@@ -939,6 +962,7 @@ struct RepositoryEditorView: View {
                     }
                 }
                 .labelsHidden()
+                .frame(width: ModalMetrics.primaryControlWidth, alignment: .leading)
             }
 
             backendFields
@@ -952,6 +976,7 @@ struct RepositoryEditorView: View {
                 }
                 .labelsHidden()
                 .pickerStyle(.segmented)
+                .frame(width: 360, alignment: .leading)
             }
 
             if storageMode == .userManagedPassphrase {
@@ -991,6 +1016,7 @@ struct RepositoryEditorView: View {
                 HStack {
                     TextField("Destination folder", text: $primary)
                         .textFieldStyle(.roundedBorder)
+                        .frame(width: ModalMetrics.primaryControlWidth)
                     Button {
                         if let path = model.chooseFolder().first {
                             primary = path
@@ -1153,10 +1179,19 @@ struct SheetScaffold<Content: View>: View {
                     content
                 }
                 .padding(.vertical, 2)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .padding(22)
+        .frame(width: ModalMetrics.sheetWidth, alignment: .topLeading)
     }
+}
+
+enum ModalMetrics {
+    static let sheetWidth: CGFloat = 760
+    static let labelWidth: CGFloat = 154
+    static let contentWidth: CGFloat = 548
+    static let primaryControlWidth: CGFloat = 420
 }
 
 struct Card<Content: View>: View {
@@ -1282,14 +1317,18 @@ struct FieldRow<Content: View>: View {
     @ViewBuilder var content: Content
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 14) {
+        HStack(alignment: .top, spacing: 14) {
             Text(title)
                 .foregroundStyle(.secondary)
                 .font(.subheadline.weight(.medium))
-                .frame(width: 154, alignment: .trailing)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .frame(width: ModalMetrics.labelWidth, alignment: .trailing)
+                .padding(.top, 5)
             content
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(width: ModalMetrics.contentWidth, alignment: .leading)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
