@@ -70,7 +70,7 @@ struct DashboardView: View {
                     Label(model.isWorking ? "Running" : "Run due", systemImage: model.isWorking ? "arrow.triangle.2.circlepath" : "play.fill")
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(model.profiles.isEmpty || model.isWorking)
+                .disabled(model.profiles.isEmpty || model.isWorking || !model.isPersistentStoreAvailable)
                 .deltaTooltip(model.isWorking ? "A Delta job is already running." : "Run every backup profile that is currently due.")
             }
         ) {
@@ -79,6 +79,23 @@ struct DashboardView: View {
                 StatPanel(title: "Destinations", value: "\(model.repositories.count)", symbol: "externaldrive.connected.to.line.below")
                 StatPanel(title: "Restore Points", value: "\(model.snapshots.count)", symbol: "clock.arrow.circlepath")
                 StatPanel(title: "Recent Jobs", value: "\(model.jobs.count)", symbol: "waveform.path.ecg")
+            }
+
+            if let persistentStoreErrorMessage = model.persistentStoreErrorMessage {
+                Card {
+                    HStack(alignment: .top, spacing: 14) {
+                        StatusIcon(symbol: "externaldrive.badge.exclamationmark", color: .red)
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Storage Unavailable")
+                                .font(.headline)
+                            Text(persistentStoreErrorMessage)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        Spacer()
+                        StateBadge(text: "Blocked", color: .red)
+                    }
+                }
             }
 
             if let operation = model.activeOperation {
@@ -141,7 +158,7 @@ struct BackupsView: View {
                     Label("New profile", systemImage: "plus")
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(model.repositories.isEmpty)
+                .disabled(model.repositories.isEmpty || !model.isPersistentStoreAvailable)
             }
         ) {
             if model.repositories.isEmpty {
@@ -187,6 +204,7 @@ struct RepositoriesView: View {
                     Label("New destination", systemImage: "plus")
                 }
                 .buttonStyle(.borderedProminent)
+                .disabled(!model.isPersistentStoreAvailable)
             }
         ) {
             if model.repositories.isEmpty {
@@ -356,7 +374,7 @@ struct RestoreView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
-                .disabled(!canRestore || model.isWorking)
+                .disabled(!canRestore || model.isWorking || !model.isPersistentStoreAvailable)
             }
         }
         .onAppear {
@@ -868,6 +886,24 @@ struct SettingsView: View {
                 }
             }
 
+            if let persistentStoreErrorMessage = model.persistentStoreErrorMessage {
+                SettingsCard(symbol: "externaldrive.badge.exclamationmark", title: "App Data Storage") {
+                    HStack {
+                        StateBadge(text: "Blocked", color: .red)
+                        Text("Backup and restore actions are disabled.")
+                            .foregroundStyle(.secondary)
+                    }
+                    Text(persistentStoreErrorMessage)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button {
+                        model.reload()
+                    } label: {
+                        Label("Retry", systemImage: "arrow.clockwise")
+                    }
+                }
+            }
+
             SettingsCard(symbol: "clock.badge.checkmark", title: "LaunchAgent") {
                 HStack {
                     Text("Status")
@@ -950,7 +986,7 @@ struct ProfileRow: View {
                         }
                         .buttonStyle(.borderedProminent)
                         .controlSize(.small)
-                        .disabled(model.isWorking)
+                        .disabled(model.isWorking || !model.isPersistentStoreAvailable)
                         .fixedSize()
                         .deltaTooltip(primaryActionTooltip)
                         .accessibilityLabel(primaryActionTitle)
@@ -959,15 +995,15 @@ struct ProfileRow: View {
                             IconButton(symbol: "pencil", help: "Edit sources, destination, schedule, and retention") {
                                 isPresentingEditor = true
                             }
-                            .disabled(model.isWorking)
+                            .disabled(model.isWorking || !model.isPersistentStoreAvailable)
                             IconButton(symbol: "scissors", help: "Run retention cleanup for this profile") {
                                 model.prune(profile: profile)
                             }
-                            .disabled(model.isWorking)
+                            .disabled(model.isWorking || !model.isPersistentStoreAvailable)
                             IconButton(symbol: "trash", help: "Delete this backup profile") {
                                 isConfirmingDelete = true
                             }
-                            .disabled(model.isWorking)
+                            .disabled(model.isWorking || !model.isPersistentStoreAvailable)
                         }
                     }
                 }
@@ -1129,23 +1165,23 @@ struct RepositoryRow: View {
                     IconButton(symbol: "pencil", help: "Edit destination settings and credentials") {
                         isPresentingEditor = true
                     }
-                    .disabled(model.isWorking)
+                    .disabled(model.isWorking || !model.isPersistentStoreAvailable)
                     IconButton(symbol: "shippingbox.and.arrow.backward", help: "Retry destination preparation") {
                         model.initializeRepository(repository)
                     }
-                    .disabled(model.isWorking)
+                    .disabled(model.isWorking || !model.isPersistentStoreAvailable)
                     IconButton(symbol: "checkmark.shield", help: "Check destination integrity") {
                         model.checkRepository(repository)
                     }
-                    .disabled(model.isWorking)
+                    .disabled(model.isWorking || !model.isPersistentStoreAvailable)
                     IconButton(symbol: "arrow.clockwise", help: "Refresh restore points from this destination") {
                         model.refreshSnapshots(repository: repository)
                     }
-                    .disabled(model.isWorking)
+                    .disabled(model.isWorking || !model.isPersistentStoreAvailable)
                     IconButton(symbol: "trash", help: "Remove this destination from Delta") {
                         isConfirmingDelete = true
                     }
-                    .disabled(model.isWorking)
+                    .disabled(model.isWorking || !model.isPersistentStoreAvailable)
                 }
             }
         }
@@ -1405,7 +1441,7 @@ struct ProfileEditorView: View {
                     }
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(name.isEmpty || repositoryID == nil || sources.isEmpty)
+                .disabled(name.isEmpty || repositoryID == nil || sources.isEmpty || !model.isPersistentStoreAvailable)
             }
         }
         .onAppear {
@@ -1679,7 +1715,7 @@ struct RepositoryEditorView: View {
                     }
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(!canCreate)
+                .disabled(!canCreate || !model.isPersistentStoreAvailable)
             }
         }
         .onChange(of: kind) { _, newKind in

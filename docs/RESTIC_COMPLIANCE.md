@@ -199,6 +199,8 @@ Delta maps restic lock exit code `11` and lock-related stderr to a user-facing b
 
 The shared SQLite database is opened with WAL journal mode and a busy timeout so the app and `DeltaAgent` can read/write job state without immediately failing during short concurrent writes.
 
+If the app cannot open the Application Support database, backup, destination, browse, and restore actions are blocked. The app still opens far enough to show the storage error and retry, but it does not run restic jobs against temporary profile/job state.
+
 On app or agent startup, Delta also reconciles any persisted `running` job rows. A job is marked interrupted only when Delta can acquire the destination's per-process lock, which proves no app/agent process currently owns that destination. If the lock is still held, the job remains running and the UI continues to observe it through SQLite/log polling.
 
 ## Streaming Logs

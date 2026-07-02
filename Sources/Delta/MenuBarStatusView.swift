@@ -43,7 +43,7 @@ struct DeltaMenuBarView: View {
                     .lineLimit(1)
             }
             Spacer()
-            StateBadge(text: model.isWorking ? "Running" : "Ready", color: statusColor)
+            StateBadge(text: statusBadgeText, color: statusColor)
         }
     }
 
@@ -143,7 +143,7 @@ struct DeltaMenuBarView: View {
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(model.profiles.isEmpty || model.isWorking)
+                .disabled(model.profiles.isEmpty || model.isWorking || !model.isPersistentStoreAvailable)
             } else {
                 Menu {
                     ForEach(model.profiles) { profile in
@@ -156,7 +156,7 @@ struct DeltaMenuBarView: View {
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(model.isWorking)
+                .disabled(model.isWorking || !model.isPersistentStoreAvailable)
             }
 
             Button {
@@ -166,7 +166,7 @@ struct DeltaMenuBarView: View {
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.bordered)
-            .disabled(model.profiles.isEmpty || model.isWorking)
+            .disabled(model.profiles.isEmpty || model.isWorking || !model.isPersistentStoreAvailable)
         }
         .controlSize(.regular)
     }
@@ -227,10 +227,16 @@ struct DeltaMenuBarView: View {
     }
 
     private var statusSymbol: String {
-        model.isWorking ? "arrow.triangle.2.circlepath" : "externaldrive.badge.checkmark"
+        if !model.isPersistentStoreAvailable {
+            return "externaldrive.badge.exclamationmark"
+        }
+        return model.isWorking ? "arrow.triangle.2.circlepath" : "externaldrive.badge.checkmark"
     }
 
     private var statusColor: Color {
+        if !model.isPersistentStoreAvailable {
+            return .red
+        }
         if model.isWorking {
             return .blue
         }
@@ -243,7 +249,17 @@ struct DeltaMenuBarView: View {
         return .green
     }
 
+    private var statusBadgeText: String {
+        if !model.isPersistentStoreAvailable {
+            return "Blocked"
+        }
+        return model.isWorking ? "Running" : "Ready"
+    }
+
     private var statusText: String {
+        if !model.isPersistentStoreAvailable {
+            return "Storage unavailable"
+        }
         if let operation = model.activeOperation {
             return operation.kind == .backup ? "Backup running" : "\(operation.kind.displayName) running"
         }
