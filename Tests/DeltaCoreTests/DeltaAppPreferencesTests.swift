@@ -206,6 +206,11 @@ final class DeltaAppPreferencesTests: XCTestCase {
             XCTAssertFalse(schedule.runInLowPowerMode)
             XCTAssertNil(schedule.uploadLimitKiB)
             XCTAssertNil(schedule.downloadLimitKiB)
+            XCTAssertEqual(retention.keepHourly, 24)
+            XCTAssertEqual(retention.keepDaily, 30)
+            XCTAssertEqual(retention.keepWeekly, 12)
+            XCTAssertEqual(retention.keepMonthly, 12)
+            XCTAssertEqual(retention.keepYearly, 0)
             XCTAssertTrue(retention.pruneAfterForget)
             XCTAssertTrue(retention.checkAfterPrune)
             XCTAssertTrue(retention.maintenanceSchedule.isEnabled)
@@ -224,6 +229,11 @@ final class DeltaAppPreferencesTests: XCTestCase {
             sharedSuite?.set(false, forKey: DeltaAppPreferenceKeys.defaultProfileCheckAfterPrune)
             sharedSuite?.set(1_024, forKey: DeltaAppPreferenceKeys.defaultProfileUploadLimitKiB)
             sharedSuite?.set(2_048, forKey: DeltaAppPreferenceKeys.defaultProfileDownloadLimitKiB)
+            sharedSuite?.set(48, forKey: DeltaAppPreferenceKeys.defaultProfileKeepHourly)
+            sharedSuite?.set(60, forKey: DeltaAppPreferenceKeys.defaultProfileKeepDaily)
+            sharedSuite?.set(26, forKey: DeltaAppPreferenceKeys.defaultProfileKeepWeekly)
+            sharedSuite?.set(24, forKey: DeltaAppPreferenceKeys.defaultProfileKeepMonthly)
+            sharedSuite?.set(7, forKey: DeltaAppPreferenceKeys.defaultProfileKeepYearly)
             sharedSuite?.set(false, forKey: DeltaAppPreferenceKeys.defaultProfileMaintenanceEnabled)
             sharedSuite?.set(14, forKey: DeltaAppPreferenceKeys.defaultProfileMaintenanceIntervalDays)
             sharedSuite?.set(3, forKey: DeltaAppPreferenceKeys.defaultProfileMaintenanceHour)
@@ -237,6 +247,11 @@ final class DeltaAppPreferencesTests: XCTestCase {
             XCTAssertTrue(schedule.runInLowPowerMode)
             XCTAssertEqual(schedule.uploadLimitKiB, 1_024)
             XCTAssertEqual(schedule.downloadLimitKiB, 2_048)
+            XCTAssertEqual(retention.keepHourly, 48)
+            XCTAssertEqual(retention.keepDaily, 60)
+            XCTAssertEqual(retention.keepWeekly, 26)
+            XCTAssertEqual(retention.keepMonthly, 24)
+            XCTAssertEqual(retention.keepYearly, 7)
             XCTAssertFalse(retention.pruneAfterForget)
             XCTAssertFalse(retention.checkAfterPrune)
             XCTAssertFalse(retention.maintenanceSchedule.isEnabled)
@@ -250,6 +265,11 @@ final class DeltaAppPreferencesTests: XCTestCase {
         withClearedBackupProfileDefaults {
             sharedSuite?.set(-1, forKey: DeltaAppPreferenceKeys.defaultProfileUploadLimitKiB)
             sharedSuite?.set(0, forKey: DeltaAppPreferenceKeys.defaultProfileDownloadLimitKiB)
+            sharedSuite?.set(-1, forKey: DeltaAppPreferenceKeys.defaultProfileKeepHourly)
+            sharedSuite?.set(999, forKey: DeltaAppPreferenceKeys.defaultProfileKeepDaily)
+            sharedSuite?.set(999, forKey: DeltaAppPreferenceKeys.defaultProfileKeepWeekly)
+            sharedSuite?.set(999, forKey: DeltaAppPreferenceKeys.defaultProfileKeepMonthly)
+            sharedSuite?.set(999, forKey: DeltaAppPreferenceKeys.defaultProfileKeepYearly)
             sharedSuite?.set(0, forKey: DeltaAppPreferenceKeys.defaultProfileMaintenanceIntervalDays)
             sharedSuite?.set(99, forKey: DeltaAppPreferenceKeys.defaultProfileMaintenanceHour)
             sharedSuite?.set(-12, forKey: DeltaAppPreferenceKeys.defaultProfileMaintenanceMinute)
@@ -259,6 +279,11 @@ final class DeltaAppPreferencesTests: XCTestCase {
 
             XCTAssertNil(schedule.uploadLimitKiB)
             XCTAssertNil(schedule.downloadLimitKiB)
+            XCTAssertEqual(retention.keepHourly, 0)
+            XCTAssertEqual(retention.keepDaily, 365)
+            XCTAssertEqual(retention.keepWeekly, 260)
+            XCTAssertEqual(retention.keepMonthly, 120)
+            XCTAssertEqual(retention.keepYearly, 50)
             XCTAssertEqual(retention.maintenanceSchedule.intervalDays, 1)
             XCTAssertEqual(retention.maintenanceSchedule.hour, 23)
             XCTAssertEqual(retention.maintenanceSchedule.minute, 0)
@@ -318,6 +343,11 @@ final class DeltaAppPreferencesTests: XCTestCase {
             DeltaAppPreferenceKeys.defaultProfileCheckAfterPrune,
             DeltaAppPreferenceKeys.defaultProfileUploadLimitKiB,
             DeltaAppPreferenceKeys.defaultProfileDownloadLimitKiB,
+            DeltaAppPreferenceKeys.defaultProfileKeepHourly,
+            DeltaAppPreferenceKeys.defaultProfileKeepDaily,
+            DeltaAppPreferenceKeys.defaultProfileKeepWeekly,
+            DeltaAppPreferenceKeys.defaultProfileKeepMonthly,
+            DeltaAppPreferenceKeys.defaultProfileKeepYearly,
             DeltaAppPreferenceKeys.defaultProfileMaintenanceEnabled,
             DeltaAppPreferenceKeys.defaultProfileMaintenanceIntervalDays,
             DeltaAppPreferenceKeys.defaultProfileMaintenanceHour,

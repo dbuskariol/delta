@@ -1299,6 +1299,26 @@ struct SettingsView: View {
         store: DeltaAppPreferences.sharedStore()
     ) private var defaultProfileDownloadLimitKiB = 0
     @AppStorage(
+        DeltaAppPreferenceKeys.defaultProfileKeepHourly,
+        store: DeltaAppPreferences.sharedStore()
+    ) private var defaultProfileKeepHourly = 24
+    @AppStorage(
+        DeltaAppPreferenceKeys.defaultProfileKeepDaily,
+        store: DeltaAppPreferences.sharedStore()
+    ) private var defaultProfileKeepDaily = 30
+    @AppStorage(
+        DeltaAppPreferenceKeys.defaultProfileKeepWeekly,
+        store: DeltaAppPreferences.sharedStore()
+    ) private var defaultProfileKeepWeekly = 12
+    @AppStorage(
+        DeltaAppPreferenceKeys.defaultProfileKeepMonthly,
+        store: DeltaAppPreferences.sharedStore()
+    ) private var defaultProfileKeepMonthly = 12
+    @AppStorage(
+        DeltaAppPreferenceKeys.defaultProfileKeepYearly,
+        store: DeltaAppPreferences.sharedStore()
+    ) private var defaultProfileKeepYearly = 0
+    @AppStorage(
         DeltaAppPreferenceKeys.defaultProfileMaintenanceEnabled,
         store: DeltaAppPreferences.sharedStore()
     ) private var defaultProfileMaintenanceEnabled = true
@@ -1388,19 +1408,19 @@ struct SettingsView: View {
 
             if settingsCategory == .essentials {
                 SettingsSectionLabel(
-                    title: "Backup Automation",
-                    subtitle: "Permissions and approvals needed for reliable unattended scheduled backups."
+                    title: "Background Backups",
+                    subtitle: "Unattended scheduling, macOS approval, and reliability controls."
                 )
 
                 SettingsCard(
                     symbol: "clock.badge.checkmark",
                     title: "Background Backups",
-                    subtitle: "Run scheduled backups while Delta's main window is closed.",
+                    subtitle: "Let scheduled profiles run while Delta's main window is closed.",
                     statusText: backgroundBackupsStatusText,
                     statusColor: backgroundBackupsStatusColor
                 ) {
                 SettingsControlRow(
-                    title: "Run scheduled backups in background",
+                    title: "Scheduled backups",
                     detail: backgroundBackupsControlDetail
                 ) {
                     Toggle("", isOn: backgroundBackupsBinding)
@@ -1409,7 +1429,7 @@ struct SettingsView: View {
                 }
 
                 SettingsControlRow(
-                    title: "Pause scheduled automation",
+                    title: "Pause schedules",
                     detail: "Temporarily stop hourly, daily, weekly, monthly, and custom scheduled runs without editing profiles or removing the background helper."
                 ) {
                     Toggle("", isOn: $pausesScheduledBackups)
@@ -1419,8 +1439,8 @@ struct SettingsView: View {
 
                 SettingsNotice(
                     symbol: "clock.arrow.circlepath",
-                    title: "How it works",
-                    text: "macOS starts Delta's signed background helper at sign-in and during short schedule checks. It runs as your user account, uses the same saved destinations, starts due backups when policy allows, then exits when there is no work.",
+                    title: "What macOS runs",
+                    text: "macOS starts Delta's signed background backup helper at sign-in and during short schedule checks. It runs as your user account, uses the same saved destinations, starts due backups when policy allows, then exits when there is no work.",
                     color: .blue
                 )
 
@@ -1434,8 +1454,8 @@ struct SettingsView: View {
                     SettingsFact(title: "Scheduled profiles", value: "\(scheduledProfileCount)"),
                     SettingsFact(title: "Automation", value: pausesScheduledBackups ? "Paused" : "Running"),
                     SettingsFact(title: "Passwords", value: backgroundSecretAccessSummary.displayName),
-                    SettingsFact(title: "Schedule checks", value: "Every 5 min"),
-                    SettingsFact(title: "Runs at sign-in", value: "Yes"),
+                    SettingsFact(title: "Check cadence", value: "Every 5 min"),
+                    SettingsFact(title: "Sign-in check", value: "Enabled"),
                     SettingsFact(title: "Runs as", value: "Your user"),
                     SettingsFact(title: "Admin access", value: "No"),
                     SettingsFact(title: "macOS approval", value: backgroundApprovalText)
@@ -1830,6 +1850,28 @@ struct SettingsView: View {
                 }
 
                 SettingsControlRow(
+                    title: "Default retention",
+                    detail: "How many restore points new profiles keep before scheduled cleanup removes older ones."
+                ) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 8) {
+                            Stepper("Hourly \(defaultProfileKeepHourly)", value: $defaultProfileKeepHourly, in: 0...168)
+                                .frame(width: 100, alignment: .leading)
+                            Stepper("Daily \(defaultProfileKeepDaily)", value: $defaultProfileKeepDaily, in: 0...365)
+                                .frame(width: 100, alignment: .leading)
+                            Stepper("Weekly \(defaultProfileKeepWeekly)", value: $defaultProfileKeepWeekly, in: 0...260)
+                                .frame(width: 104, alignment: .leading)
+                        }
+                        HStack(spacing: 8) {
+                            Stepper("Monthly \(defaultProfileKeepMonthly)", value: $defaultProfileKeepMonthly, in: 0...120)
+                                .frame(width: 112, alignment: .leading)
+                            Stepper("Yearly \(defaultProfileKeepYearly)", value: $defaultProfileKeepYearly, in: 0...50)
+                                .frame(width: 100, alignment: .leading)
+                        }
+                    }
+                }
+
+                SettingsControlRow(
                     title: "Automatic cleanup",
                     detail: "Create new profiles with scheduled cleanup for old restore points."
                 ) {
@@ -1852,7 +1894,7 @@ struct SettingsView: View {
 
                 SettingsFactGrid(items: [
                     SettingsFact(title: "Schedule", value: "Daily 20:00"),
-                    SettingsFact(title: "Retention", value: "24h / 30d / 12w / 12m"),
+                    SettingsFact(title: "Retention", value: defaultRetentionSummary),
                     SettingsFact(title: "Bandwidth", value: defaultBandwidthSummary),
                     SettingsFact(title: "Cleanup", value: defaultCleanupSummary),
                     SettingsFact(title: "Destination locks", value: "Automatic"),
@@ -2570,6 +2612,11 @@ struct SettingsView: View {
             || !defaultProfileCheckAfterPrune
             || defaultProfileUploadLimitKiB > 0
             || defaultProfileDownloadLimitKiB > 0
+            || defaultProfileKeepHourly != 24
+            || defaultProfileKeepDaily != 30
+            || defaultProfileKeepWeekly != 12
+            || defaultProfileKeepMonthly != 12
+            || defaultProfileKeepYearly != 0
             || !defaultProfileMaintenanceEnabled
             || defaultProfileMaintenanceIntervalDays != 7
             || defaultProfileMaintenanceHour != 2
@@ -2662,6 +2709,20 @@ struct SettingsView: View {
         }
     }
 
+    private var defaultRetentionSummary: String {
+        let components = [
+            "\(defaultProfileKeepHourly)h",
+            "\(defaultProfileKeepDaily)d",
+            "\(defaultProfileKeepWeekly)w",
+            "\(defaultProfileKeepMonthly)m"
+        ]
+        let base = components.joined(separator: " / ")
+        guard defaultProfileKeepYearly > 0 else {
+            return base
+        }
+        return "\(base) / \(defaultProfileKeepYearly)y"
+    }
+
     private var defaultCleanupSummary: String {
         guard defaultProfileMaintenanceEnabled else {
             return "Manual"
@@ -2714,6 +2775,11 @@ struct SettingsView: View {
     private func normalizeBackupDefaults() {
         defaultProfileUploadLimitKiB = clamped(defaultProfileUploadLimitKiB, to: 0...1_048_576)
         defaultProfileDownloadLimitKiB = clamped(defaultProfileDownloadLimitKiB, to: 0...1_048_576)
+        defaultProfileKeepHourly = clamped(defaultProfileKeepHourly, to: 0...168)
+        defaultProfileKeepDaily = clamped(defaultProfileKeepDaily, to: 0...365)
+        defaultProfileKeepWeekly = clamped(defaultProfileKeepWeekly, to: 0...260)
+        defaultProfileKeepMonthly = clamped(defaultProfileKeepMonthly, to: 0...120)
+        defaultProfileKeepYearly = clamped(defaultProfileKeepYearly, to: 0...50)
         defaultProfileMaintenanceIntervalDays = clamped(defaultProfileMaintenanceIntervalDays, to: 1...90)
         defaultProfileMaintenanceHour = clamped(defaultProfileMaintenanceHour, to: 0...23)
         defaultProfileMaintenanceMinute = clamped(defaultProfileMaintenanceMinute, to: 0...59)
@@ -2732,6 +2798,11 @@ struct SettingsView: View {
         defaultProfileCheckAfterPrune = true
         defaultProfileUploadLimitKiB = 0
         defaultProfileDownloadLimitKiB = 0
+        defaultProfileKeepHourly = 24
+        defaultProfileKeepDaily = 30
+        defaultProfileKeepWeekly = 12
+        defaultProfileKeepMonthly = 12
+        defaultProfileKeepYearly = 0
         defaultProfileMaintenanceEnabled = true
         defaultProfileMaintenanceIntervalDays = 7
         defaultProfileMaintenanceHour = 2
@@ -4305,9 +4376,7 @@ struct SettingsFactGrid: View {
 
     private var columns: [GridItem] {
         [
-            GridItem(.flexible(minimum: 120), spacing: 8),
-            GridItem(.flexible(minimum: 120), spacing: 8),
-            GridItem(.flexible(minimum: 120), spacing: 8)
+            GridItem(.adaptive(minimum: 150), spacing: 8)
         ]
     }
 }
@@ -4331,7 +4400,7 @@ struct SettingsControlRow<Control: View>: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             control
-                .frame(width: 340, alignment: .trailing)
+                .frame(width: 320, alignment: .trailing)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

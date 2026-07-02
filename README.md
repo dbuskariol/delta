@@ -106,7 +106,7 @@ Custom-folder profiles use the selected source folders and stored security-scope
 
 Each profile keeps Delta's default macOS-safe excludes and can add extra restic exclude patterns. Extra excludes are saved with the profile and passed to restic as additional `--exclude` arguments.
 
-Settings include a global scheduled-backup pause for temporarily suspending automated due runs without editing profiles or removing Background Backups. Manual Back Up Now actions still work. Settings also include app-level defaults for newly-created backup profiles: missed-run catchup, battery policy, Low Power Mode policy, optional bandwidth limits, cleanup space reclamation, cleanup verification, and cleanup cadence. Those defaults seed new profiles only. Existing profiles keep their own schedule, power, bandwidth, retention, and maintenance settings until edited.
+Settings include a global scheduled-backup pause for temporarily suspending automated due runs without editing profiles or removing Background Backups. Manual Back Up Now actions still work. Settings also include app-level defaults for newly-created backup profiles: missed-run catchup, battery policy, Low Power Mode policy, optional bandwidth limits, retention keep rules, cleanup space reclamation, cleanup verification, and cleanup cadence. Those defaults seed new profiles only. Existing profiles keep their own schedule, power, bandwidth, retention, and maintenance settings until edited.
 
 Delta can also hold a macOS activity assertion while a backup, restore, destination check, or cleanup is actively running. This is enabled by default to reduce the chance of long unattended jobs being interrupted by idle sleep. It does not force a scheduled backup to start on battery or in Low Power Mode; those profile policies are still evaluated before work begins.
 
@@ -114,7 +114,7 @@ Diagnostics settings include live-log detail and local activity history retentio
 
 ## Scheduling And Maintenance
 
-Background Backups let scheduled profiles run while the main Delta window is closed. The macOS implementation is `DeltaAgent`, a signed Login Item helper registered through `SMAppService` and implemented as a per-user LaunchAgent. In user-facing UI, Delta presents this as Background Backups because LaunchAgent is the macOS scheduling mechanism, not a product feature. It runs as the signed-in user, not as a privileged admin helper, wakes for short schedule checks, starts due backups when policy allows it, then exits.
+Background Backups let scheduled profiles run while the main Delta window is closed. The macOS implementation is `DeltaAgent`, a signed Login Item helper registered through `SMAppService`; macOS runs it as a per-user LaunchAgent under the hood. In user-facing UI, Delta presents this as Background Backups because LaunchAgent is the operating-system mechanism, not a product concept users should manage directly. It runs as the signed-in user, not as a privileged admin helper, wakes for short schedule checks, starts due backups when policy allows it, then exits.
 
 On each check, Background Backups evaluate:
 

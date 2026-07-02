@@ -22,6 +22,41 @@ public enum BackupProfileDefaults {
 
     public static func retention() -> RetentionPolicy {
         RetentionPolicy(
+            keepHourly: clamped(
+                DeltaAppPreferences.integer(
+                    for: DeltaAppPreferenceKeys.defaultProfileKeepHourly,
+                    default: 24
+                ),
+                to: 0...168
+            ),
+            keepDaily: clamped(
+                DeltaAppPreferences.integer(
+                    for: DeltaAppPreferenceKeys.defaultProfileKeepDaily,
+                    default: 30
+                ),
+                to: 0...365
+            ),
+            keepWeekly: clamped(
+                DeltaAppPreferences.integer(
+                    for: DeltaAppPreferenceKeys.defaultProfileKeepWeekly,
+                    default: 12
+                ),
+                to: 0...260
+            ),
+            keepMonthly: clamped(
+                DeltaAppPreferences.integer(
+                    for: DeltaAppPreferenceKeys.defaultProfileKeepMonthly,
+                    default: 12
+                ),
+                to: 0...120
+            ),
+            keepYearly: clamped(
+                DeltaAppPreferences.integer(
+                    for: DeltaAppPreferenceKeys.defaultProfileKeepYearly,
+                    default: 0
+                ),
+                to: 0...50
+            ),
             pruneAfterForget: DeltaAppPreferences.bool(
                 for: DeltaAppPreferenceKeys.defaultProfilePruneAfterForget,
                 default: true
