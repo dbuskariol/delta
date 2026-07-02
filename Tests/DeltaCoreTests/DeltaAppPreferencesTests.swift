@@ -218,6 +218,8 @@ final class DeltaAppPreferencesTests: XCTestCase {
             let schedule = BackupProfileDefaults.schedule()
             let retention = BackupProfileDefaults.retention()
 
+            XCTAssertEqual(schedule.kind, .daily(hour: 20, minute: 0))
+            XCTAssertTrue(schedule.isEnabled)
             XCTAssertTrue(schedule.catchUpMissedRuns)
             XCTAssertTrue(schedule.runOnBattery)
             XCTAssertFalse(schedule.runInLowPowerMode)
@@ -239,6 +241,11 @@ final class DeltaAppPreferencesTests: XCTestCase {
 
     func testBackupProfileDefaultsReadSharedSettingsForNewProfiles() {
         withClearedBackupProfileDefaults {
+            sharedSuite?.set(false, forKey: DeltaAppPreferenceKeys.defaultProfileScheduleEnabled)
+            sharedSuite?.set(DefaultBackupScheduleKind.weekly.rawValue, forKey: DeltaAppPreferenceKeys.defaultProfileScheduleKind)
+            sharedSuite?.set(4, forKey: DeltaAppPreferenceKeys.defaultProfileScheduleWeekday)
+            sharedSuite?.set(3, forKey: DeltaAppPreferenceKeys.defaultProfileScheduleHour)
+            sharedSuite?.set(30, forKey: DeltaAppPreferenceKeys.defaultProfileScheduleMinute)
             sharedSuite?.set(false, forKey: DeltaAppPreferenceKeys.defaultProfileCatchUpMissedRuns)
             sharedSuite?.set(false, forKey: DeltaAppPreferenceKeys.defaultProfileRunOnBattery)
             sharedSuite?.set(true, forKey: DeltaAppPreferenceKeys.defaultProfileRunInLowPowerMode)
@@ -259,6 +266,8 @@ final class DeltaAppPreferencesTests: XCTestCase {
             let schedule = BackupProfileDefaults.schedule()
             let retention = BackupProfileDefaults.retention()
 
+            XCTAssertEqual(schedule.kind, .weekly(weekday: 4, hour: 3, minute: 30))
+            XCTAssertFalse(schedule.isEnabled)
             XCTAssertFalse(schedule.catchUpMissedRuns)
             XCTAssertFalse(schedule.runOnBattery)
             XCTAssertTrue(schedule.runInLowPowerMode)
@@ -280,6 +289,12 @@ final class DeltaAppPreferencesTests: XCTestCase {
 
     func testBackupProfileDefaultsNormalizeStoredMaintenanceValues() {
         withClearedBackupProfileDefaults {
+            sharedSuite?.set("invalid-schedule", forKey: DeltaAppPreferenceKeys.defaultProfileScheduleKind)
+            sharedSuite?.set(99, forKey: DeltaAppPreferenceKeys.defaultProfileScheduleHour)
+            sharedSuite?.set(-12, forKey: DeltaAppPreferenceKeys.defaultProfileScheduleMinute)
+            sharedSuite?.set(99, forKey: DeltaAppPreferenceKeys.defaultProfileScheduleWeekday)
+            sharedSuite?.set(0, forKey: DeltaAppPreferenceKeys.defaultProfileScheduleDay)
+            sharedSuite?.set(0, forKey: DeltaAppPreferenceKeys.defaultProfileScheduleIntervalMinutes)
             sharedSuite?.set(-1, forKey: DeltaAppPreferenceKeys.defaultProfileUploadLimitKiB)
             sharedSuite?.set(0, forKey: DeltaAppPreferenceKeys.defaultProfileDownloadLimitKiB)
             sharedSuite?.set(-1, forKey: DeltaAppPreferenceKeys.defaultProfileKeepHourly)
@@ -294,6 +309,7 @@ final class DeltaAppPreferencesTests: XCTestCase {
             let schedule = BackupProfileDefaults.schedule()
             let retention = BackupProfileDefaults.retention()
 
+            XCTAssertEqual(schedule.kind, .daily(hour: 23, minute: 0))
             XCTAssertNil(schedule.uploadLimitKiB)
             XCTAssertNil(schedule.downloadLimitKiB)
             XCTAssertEqual(retention.keepHourly, 0)
@@ -353,6 +369,13 @@ final class DeltaAppPreferencesTests: XCTestCase {
 
     private func withClearedBackupProfileDefaults(_ body: () -> Void) {
         let keys = [
+            DeltaAppPreferenceKeys.defaultProfileScheduleEnabled,
+            DeltaAppPreferenceKeys.defaultProfileScheduleKind,
+            DeltaAppPreferenceKeys.defaultProfileScheduleHour,
+            DeltaAppPreferenceKeys.defaultProfileScheduleMinute,
+            DeltaAppPreferenceKeys.defaultProfileScheduleWeekday,
+            DeltaAppPreferenceKeys.defaultProfileScheduleDay,
+            DeltaAppPreferenceKeys.defaultProfileScheduleIntervalMinutes,
             DeltaAppPreferenceKeys.defaultProfileCatchUpMissedRuns,
             DeltaAppPreferenceKeys.defaultProfileRunOnBattery,
             DeltaAppPreferenceKeys.defaultProfileRunInLowPowerMode,

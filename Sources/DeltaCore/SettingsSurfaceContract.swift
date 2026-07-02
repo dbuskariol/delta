@@ -59,6 +59,8 @@ public enum SettingsSurfaceContract {
         "Backup freshness",
         "Destination checks",
         "Destination free space",
+        "Schedule new profiles",
+        "Default schedule",
         "Catch up missed runs",
         "Run on battery",
         "Run in Low Power Mode",
@@ -122,6 +124,7 @@ public enum SettingsSurfaceContract {
         "Idle-sleep protection",
         "Expandable Scheduled Backups explanation",
         "Reset controls for recommended backup and restore defaults",
+        "Configurable new-profile schedule defaults",
         "Backup freshness warning control",
         "Source access warning visibility through dashboard health",
         "Destination check warning control",
@@ -164,6 +167,8 @@ public enum SettingsSurfaceContract {
         require(controlTitles, contains: "Backup freshness", in: "controls", failures: &failures)
         require(controlTitles, contains: "Destination checks", in: "controls", failures: &failures)
         require(controlTitles, contains: "Destination free space", in: "controls", failures: &failures)
+        require(controlTitles, contains: "Schedule new profiles", in: "controls", failures: &failures)
+        require(controlTitles, contains: "Default schedule", in: "controls", failures: &failures)
         require(controlTitles, contains: "Activity log detail", in: "controls", failures: &failures)
         require(controlTitles, contains: "History retention", in: "controls", failures: &failures)
         require(actionTitles, contains: "Run Due Now", in: "actions", failures: &failures)
@@ -176,6 +181,7 @@ public enum SettingsSurfaceContract {
         require(requiredManualAcceptanceCoverage, contains: "Source access warning visibility through dashboard health", in: "manual coverage", failures: &failures)
         require(requiredManualAcceptanceCoverage, contains: "Password access repair", in: "manual coverage", failures: &failures)
         require(requiredManualAcceptanceCoverage, contains: "Destination free-space warning control", in: "manual coverage", failures: &failures)
+        require(requiredManualAcceptanceCoverage, contains: "Configurable new-profile schedule defaults", in: "manual coverage", failures: &failures)
         require(requiredManualAcceptanceCoverage, contains: "Expandable Scheduled Backups explanation", in: "manual coverage", failures: &failures)
 
         let visibleStrings = allVisibleStrings()

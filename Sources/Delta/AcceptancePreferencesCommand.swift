@@ -63,6 +63,12 @@ enum AcceptancePreferencesCommand {
     }
 
     private static func writeInvalidPreferences(to store: UserDefaults) {
+        store.set("invalid-schedule", forKey: DeltaAppPreferenceKeys.defaultProfileScheduleKind)
+        store.set(99, forKey: DeltaAppPreferenceKeys.defaultProfileScheduleHour)
+        store.set(-12, forKey: DeltaAppPreferenceKeys.defaultProfileScheduleMinute)
+        store.set(99, forKey: DeltaAppPreferenceKeys.defaultProfileScheduleWeekday)
+        store.set(0, forKey: DeltaAppPreferenceKeys.defaultProfileScheduleDay)
+        store.set(0, forKey: DeltaAppPreferenceKeys.defaultProfileScheduleIntervalMinutes)
         store.set(-1, forKey: DeltaAppPreferenceKeys.defaultProfileUploadLimitKiB)
         store.set(0, forKey: DeltaAppPreferenceKeys.defaultProfileDownloadLimitKiB)
         store.set(-1, forKey: DeltaAppPreferenceKeys.defaultProfileKeepHourly)
@@ -83,6 +89,11 @@ enum AcceptancePreferencesCommand {
     }
 
     private static func writeCustomPreferences(to store: UserDefaults) {
+        store.set(false, forKey: DeltaAppPreferenceKeys.defaultProfileScheduleEnabled)
+        store.set(DefaultBackupScheduleKind.weekly.rawValue, forKey: DeltaAppPreferenceKeys.defaultProfileScheduleKind)
+        store.set(4, forKey: DeltaAppPreferenceKeys.defaultProfileScheduleWeekday)
+        store.set(3, forKey: DeltaAppPreferenceKeys.defaultProfileScheduleHour)
+        store.set(30, forKey: DeltaAppPreferenceKeys.defaultProfileScheduleMinute)
         store.set(false, forKey: DeltaAppPreferenceKeys.defaultProfileCatchUpMissedRuns)
         store.set(false, forKey: DeltaAppPreferenceKeys.defaultProfileRunOnBattery)
         store.set(true, forKey: DeltaAppPreferenceKeys.defaultProfileRunInLowPowerMode)
@@ -149,6 +160,7 @@ enum AcceptancePreferencesCommand {
         let retention = BackupProfileDefaults.retention()
         let restore = RestoreDefaults.current()
 
+        try require(schedule.kind == .daily(hour: 23, minute: 0), "Invalid schedule defaults were not normalized.")
         try require(schedule.uploadLimitKiB == nil, "Invalid upload speed limit was not normalized.")
         try require(schedule.downloadLimitKiB == nil, "Invalid download speed limit was not normalized.")
         try require(retention.keepHourly == 0, "Hourly retention did not clamp to lower bound.")
@@ -216,6 +228,8 @@ enum AcceptancePreferencesCommand {
     }
 
     private static func requireCustomSchedule(_ schedule: BackupSchedule) throws {
+        try require(schedule.kind == .weekly(weekday: 4, hour: 3, minute: 30), "Custom schedule cadence was not loaded.")
+        try require(!schedule.isEnabled, "Custom schedule enabled default was not loaded.")
         try require(!schedule.catchUpMissedRuns, "Custom schedule should not catch up missed runs.")
         try require(!schedule.runOnBattery, "Custom schedule should not run on battery.")
         try require(schedule.runInLowPowerMode, "Custom schedule should run in Low Power Mode.")

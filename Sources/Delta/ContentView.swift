@@ -1321,6 +1321,34 @@ struct SettingsView: View {
         store: DeltaAppPreferences.sharedStore()
     ) private var pausesScheduledBackups = false
     @AppStorage(
+        DeltaAppPreferenceKeys.defaultProfileScheduleEnabled,
+        store: DeltaAppPreferences.sharedStore()
+    ) private var defaultProfileScheduleEnabled = true
+    @AppStorage(
+        DeltaAppPreferenceKeys.defaultProfileScheduleKind,
+        store: DeltaAppPreferences.sharedStore()
+    ) private var defaultProfileScheduleKindRawValue = DefaultBackupScheduleKind.daily.rawValue
+    @AppStorage(
+        DeltaAppPreferenceKeys.defaultProfileScheduleHour,
+        store: DeltaAppPreferences.sharedStore()
+    ) private var defaultProfileScheduleHour = 20
+    @AppStorage(
+        DeltaAppPreferenceKeys.defaultProfileScheduleMinute,
+        store: DeltaAppPreferences.sharedStore()
+    ) private var defaultProfileScheduleMinute = 0
+    @AppStorage(
+        DeltaAppPreferenceKeys.defaultProfileScheduleWeekday,
+        store: DeltaAppPreferences.sharedStore()
+    ) private var defaultProfileScheduleWeekday = 2
+    @AppStorage(
+        DeltaAppPreferenceKeys.defaultProfileScheduleDay,
+        store: DeltaAppPreferences.sharedStore()
+    ) private var defaultProfileScheduleDay = 1
+    @AppStorage(
+        DeltaAppPreferenceKeys.defaultProfileScheduleIntervalMinutes,
+        store: DeltaAppPreferences.sharedStore()
+    ) private var defaultProfileScheduleIntervalMinutes = 120
+    @AppStorage(
         DeltaAppPreferenceKeys.defaultProfileCatchUpMissedRuns,
         store: DeltaAppPreferences.sharedStore()
     ) private var defaultProfileCatchUpMissedRuns = true
@@ -1913,6 +1941,37 @@ struct SettingsView: View {
                 statusColor: backupDefaultsStatusColor
             ) {
                 SettingsControlRow(
+                    title: "Schedule new profiles",
+                    detail: "Create new backup profiles with scheduled runs enabled by default."
+                ) {
+                    Toggle("", isOn: $defaultProfileScheduleEnabled)
+                        .labelsHidden()
+                        .toggleStyle(.switch)
+                }
+
+                SettingsControlRow(
+                    title: "Default schedule",
+                    detail: "Initial cadence for newly-created profiles. Each profile can still be changed before saving."
+                ) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Picker("", selection: $defaultProfileScheduleKindRawValue) {
+                            ForEach(ScheduleEditorKind.allCases) { kind in
+                                Text(kind.displayName).tag(kind.rawValue)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.segmented)
+                        .frame(width: settingsControlRowControlWidth)
+                        .onChange(of: defaultProfileScheduleKindRawValue) { _, _ in
+                            normalizeBackupDefaults()
+                        }
+
+                        defaultScheduleControls
+                    }
+                    .disabled(!defaultProfileScheduleEnabled)
+                }
+
+                SettingsControlRow(
                     title: "Catch up missed runs",
                     detail: "Run one backup after a scheduled time was missed because the Mac was asleep, offline, or the destination was unavailable."
                 ) {
@@ -2015,7 +2074,7 @@ struct SettingsView: View {
                 }
 
                 SettingsFactGrid(items: [
-                    SettingsFact(title: "Schedule", value: "Daily 20:00"),
+                    SettingsFact(title: "Schedule", value: defaultScheduleSummary),
                     SettingsFact(title: "Retention", value: defaultRetentionSummary),
                     SettingsFact(title: "Bandwidth", value: defaultBandwidthSummary),
                     SettingsFact(title: "Cleanup", value: defaultCleanupSummary),
@@ -2724,8 +2783,69 @@ struct SettingsView: View {
         healthMonitoringStatusText == "Recommended" ? .green : .orange
     }
 
+    @ViewBuilder
+    private var defaultScheduleControls: some View {
+        switch defaultProfileScheduleKind {
+        case .hourly:
+            Stepper("Minute \(defaultProfileScheduleMinute)", value: $defaultProfileScheduleMinute, in: 0...59)
+                .frame(width: 126, alignment: .leading)
+        case .daily:
+            TimeControls(hour: $defaultProfileScheduleHour, minute: $defaultProfileScheduleMinute)
+        case .weekly:
+            HStack(spacing: 12) {
+                Picker("Weekday", selection: $defaultProfileScheduleWeekday) {
+                    ForEach(1...7, id: \.self) { value in
+                        Text(Calendar.current.weekdaySymbols[value - 1]).tag(value)
+                    }
+                }
+                .frame(width: 170)
+                TimeControls(hour: $defaultProfileScheduleHour, minute: $defaultProfileScheduleMinute)
+            }
+        case .monthly:
+            HStack(spacing: 12) {
+                Stepper("Day \(defaultProfileScheduleDay)", value: $defaultProfileScheduleDay, in: 1...31)
+                    .frame(width: 100, alignment: .leading)
+                TimeControls(hour: $defaultProfileScheduleHour, minute: $defaultProfileScheduleMinute)
+            }
+        case .custom:
+            Stepper("Every \(defaultProfileScheduleIntervalMinutes) minutes", value: $defaultProfileScheduleIntervalMinutes, in: 1...10_080, step: 15)
+                .frame(width: 196, alignment: .leading)
+        }
+    }
+
+    private var defaultProfileScheduleKind: ScheduleEditorKind {
+        ScheduleEditorKind(rawValue: defaultProfileScheduleKindRawValue) ?? .daily
+    }
+
+    private var defaultScheduleSummary: String {
+        guard defaultProfileScheduleEnabled else {
+            return "Off"
+        }
+
+        switch defaultProfileScheduleKind {
+        case .hourly:
+            return "Hourly min \(twoDigit(defaultProfileScheduleMinute))"
+        case .daily:
+            return "Daily \(twoDigit(defaultProfileScheduleHour)):\(twoDigit(defaultProfileScheduleMinute))"
+        case .weekly:
+            let weekday = Calendar.current.shortWeekdaySymbols[clamped(defaultProfileScheduleWeekday, to: 1...7) - 1]
+            return "\(weekday) \(twoDigit(defaultProfileScheduleHour)):\(twoDigit(defaultProfileScheduleMinute))"
+        case .monthly:
+            return "Day \(defaultProfileScheduleDay) \(twoDigit(defaultProfileScheduleHour)):\(twoDigit(defaultProfileScheduleMinute))"
+        case .custom:
+            return "Every \(defaultProfileScheduleIntervalMinutes)m"
+        }
+    }
+
     private var backupDefaultsStatusText: String {
-        !defaultProfileCatchUpMissedRuns
+        !defaultProfileScheduleEnabled
+            || defaultProfileScheduleKind != .daily
+            || defaultProfileScheduleHour != 20
+            || defaultProfileScheduleMinute != 0
+            || defaultProfileScheduleWeekday != 2
+            || defaultProfileScheduleDay != 1
+            || defaultProfileScheduleIntervalMinutes != 120
+            || !defaultProfileCatchUpMissedRuns
             || !defaultProfileRunOnBattery
             || defaultProfileRunInLowPowerMode
             || !defaultProfilePruneAfterForget
@@ -2901,6 +3021,15 @@ struct SettingsView: View {
     }
 
     private func normalizeBackupDefaults() {
+        let normalizedScheduleKind = DefaultBackupScheduleKind.normalized(defaultProfileScheduleKindRawValue).rawValue
+        if defaultProfileScheduleKindRawValue != normalizedScheduleKind {
+            defaultProfileScheduleKindRawValue = normalizedScheduleKind
+        }
+        defaultProfileScheduleHour = clamped(defaultProfileScheduleHour, to: 0...23)
+        defaultProfileScheduleMinute = clamped(defaultProfileScheduleMinute, to: 0...59)
+        defaultProfileScheduleWeekday = clamped(defaultProfileScheduleWeekday, to: 1...7)
+        defaultProfileScheduleDay = clamped(defaultProfileScheduleDay, to: 1...31)
+        defaultProfileScheduleIntervalMinutes = clamped(defaultProfileScheduleIntervalMinutes, to: 1...10_080)
         defaultProfileUploadLimitKiB = clamped(defaultProfileUploadLimitKiB, to: 0...1_048_576)
         defaultProfileDownloadLimitKiB = clamped(defaultProfileDownloadLimitKiB, to: 0...1_048_576)
         defaultProfileKeepHourly = clamped(defaultProfileKeepHourly, to: 0...168)
@@ -2920,6 +3049,13 @@ struct SettingsView: View {
     }
 
     private func resetBackupDefaults() {
+        defaultProfileScheduleEnabled = true
+        defaultProfileScheduleKindRawValue = DefaultBackupScheduleKind.daily.rawValue
+        defaultProfileScheduleHour = 20
+        defaultProfileScheduleMinute = 0
+        defaultProfileScheduleWeekday = 2
+        defaultProfileScheduleDay = 1
+        defaultProfileScheduleIntervalMinutes = 120
         defaultProfileCatchUpMissedRuns = true
         defaultProfileRunOnBattery = true
         defaultProfileRunInLowPowerMode = false

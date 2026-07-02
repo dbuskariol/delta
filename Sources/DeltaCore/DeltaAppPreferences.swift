@@ -20,6 +20,13 @@ public enum DeltaAppPreferenceKeys {
     public static let defaultProfilePruneAfterForget = "Delta.defaultProfilePruneAfterForget"
     public static let defaultProfileRunInLowPowerMode = "Delta.defaultProfileRunInLowPowerMode"
     public static let defaultProfileRunOnBattery = "Delta.defaultProfileRunOnBattery"
+    public static let defaultProfileScheduleDay = "Delta.defaultProfileScheduleDay"
+    public static let defaultProfileScheduleEnabled = "Delta.defaultProfileScheduleEnabled"
+    public static let defaultProfileScheduleHour = "Delta.defaultProfileScheduleHour"
+    public static let defaultProfileScheduleIntervalMinutes = "Delta.defaultProfileScheduleIntervalMinutes"
+    public static let defaultProfileScheduleKind = "Delta.defaultProfileScheduleKind"
+    public static let defaultProfileScheduleMinute = "Delta.defaultProfileScheduleMinute"
+    public static let defaultProfileScheduleWeekday = "Delta.defaultProfileScheduleWeekday"
     public static let defaultProfileUploadLimitKiB = "Delta.defaultProfileUploadLimitKiB"
     public static let defaultRestoreConflictPolicy = "Delta.defaultRestoreConflictPolicy"
     public static let operationalHistoryRetentionDays = "Delta.operationalHistoryRetentionDays"
@@ -34,6 +41,13 @@ public enum DeltaAppPreferenceKeys {
 
     public static let backupProfileDefaults = [
         defaultProfileCatchUpMissedRuns,
+        defaultProfileScheduleEnabled,
+        defaultProfileScheduleKind,
+        defaultProfileScheduleHour,
+        defaultProfileScheduleMinute,
+        defaultProfileScheduleWeekday,
+        defaultProfileScheduleDay,
+        defaultProfileScheduleIntervalMinutes,
         defaultProfileRunOnBattery,
         defaultProfileRunInLowPowerMode,
         defaultProfilePruneAfterForget,
