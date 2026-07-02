@@ -361,11 +361,19 @@ struct RestoreView: View {
             }
         }
         .onAppear {
-            repositoryID = repositoryID ?? model.repositories.first?.id
+            if repositoryID == nil {
+                repositoryID = model.repositories.first?.id
+                Task { @MainActor in
+                    refreshRestorePointsForSelectedRepository()
+                }
+            } else {
+                refreshRestorePointsForSelectedRepository()
+            }
         }
         .onChange(of: repositoryID) { _, _ in
             snapshotID = ""
             resetBrowser()
+            refreshRestorePointsForSelectedRepository()
         }
         .onChange(of: snapshotID) { _, _ in
             resetBrowser()
@@ -473,6 +481,13 @@ struct RestoreView: View {
             preRestoreBackupProfileID: preRestoreProfileID
         )
         model.runRestore(repository: repository, request: request)
+    }
+
+    private func refreshRestorePointsForSelectedRepository() {
+        guard let repository = selectedRepository, !model.isWorking else {
+            return
+        }
+        model.refreshSnapshots(repository: repository)
     }
 
     private func openBrowserDirectory(_ path: String) {

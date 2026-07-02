@@ -88,9 +88,35 @@ final class BackupCoordinatorPolicyTests: XCTestCase {
         let jobs = try fixture.database.fetchJobRuns(limit: 10)
 
         XCTAssertEqual(job.status, .succeeded)
-        XCTAssertEqual(runner.commands.map(\.resticSubcommand), ["init", "backup"])
+        XCTAssertEqual(runner.commands.map(\.resticSubcommand), ["init", "backup", "snapshots"])
         XCTAssertEqual(jobs.filter { $0.kind == .initializeRepository && $0.status == .succeeded }.count, 1)
         XCTAssertEqual(jobs.filter { $0.kind == .backup && $0.status == .succeeded }.count, 1)
+    }
+
+    func testSuccessfulBackupRefreshesRestorePointCache() throws {
+        let fixture = try Fixture()
+        let snapshotID = "snapshot-\(UUID().uuidString)"
+        let snapshotOutput = """
+        [{
+          "time": "2026-07-02T08:30:00Z",
+          "tree": "tree-id",
+          "paths": ["\(fixture.source.path)"],
+          "hostname": "mac",
+          "username": "me",
+          "id": "\(snapshotID)",
+          "tags": ["delta"]
+        }]
+        """
+        let runner = MockResticRunner(results: [.success, ResticRunResult(exitCode: 0, standardOutput: snapshotOutput, standardError: "")])
+        let coordinator = fixture.makeCoordinator(runner: runner)
+        let profile = fixture.profile()
+
+        let job = try coordinator.runBackup(profile: profile, repository: fixture.repository)
+        let snapshots = try fixture.database.fetchSnapshots(repositoryID: fixture.repository.id)
+
+        XCTAssertEqual(job.status, .succeeded)
+        XCTAssertEqual(runner.commands.map(\.resticSubcommand), ["backup", "snapshots"])
+        XCTAssertEqual(snapshots.map(\.id), [snapshotID])
     }
 
     func testRunBackupReportsCancelledWhenPreparationIsPaused() throws {
@@ -151,7 +177,7 @@ final class BackupCoordinatorPolicyTests: XCTestCase {
 
     func testScheduledMaintenanceRunsCleanupAndCheckWhenDue() throws {
         let fixture = try Fixture()
-        let runner = MockResticRunner(results: [.success, .success, .success])
+        let runner = MockResticRunner(results: [.success, .emptySnapshotList, .success, .success])
         let coordinator = fixture.makeCoordinator(runner: runner, scheduleEvaluator: ScheduleEvaluator(calendar: Self.utc))
         let createdAt = try XCTUnwrap(Self.utc.date(from: DateComponents(year: 2026, month: 7, day: 1, hour: 1, minute: 0)))
         let now = try XCTUnwrap(Self.utc.date(from: DateComponents(year: 2026, month: 7, day: 1, hour: 2, minute: 5)))
@@ -166,13 +192,13 @@ final class BackupCoordinatorPolicyTests: XCTestCase {
 
         let runs = try coordinator.runDueBackups(now: now)
 
-        XCTAssertEqual(runner.commands.map(\.resticSubcommand), ["backup", "forget", "check"])
+        XCTAssertEqual(runner.commands.map(\.resticSubcommand), ["backup", "snapshots", "forget", "check"])
         XCTAssertEqual(runs.map(\.kind), [.backup, .prune, .check])
     }
 
     func testScheduledMaintenanceDoesNotRunBeforeConfiguredTime() throws {
         let fixture = try Fixture()
-        let runner = MockResticRunner(results: [.success])
+        let runner = MockResticRunner(results: [.success, .emptySnapshotList])
         let coordinator = fixture.makeCoordinator(runner: runner, scheduleEvaluator: ScheduleEvaluator(calendar: Self.utc))
         let createdAt = try XCTUnwrap(Self.utc.date(from: DateComponents(year: 2026, month: 7, day: 1, hour: 1, minute: 0)))
         let now = try XCTUnwrap(Self.utc.date(from: DateComponents(year: 2026, month: 7, day: 1, hour: 1, minute: 30)))
@@ -187,14 +213,14 @@ final class BackupCoordinatorPolicyTests: XCTestCase {
 
         let runs = try coordinator.runDueBackups(now: now)
 
-        XCTAssertEqual(runner.commands.map(\.resticSubcommand), ["backup"])
+        XCTAssertEqual(runner.commands.map(\.resticSubcommand), ["backup", "snapshots"])
         XCTAssertEqual(runs.map(\.kind), [.backup])
     }
 
     func testScheduledMaintenanceSurfacesPostPruneCheckFailure() throws {
         let fixture = try Fixture()
         let checkFailure = ResticRunResult(exitCode: 1, standardOutput: "", standardError: "repository check failed")
-        let runner = MockResticRunner(results: [.success, .success, checkFailure])
+        let runner = MockResticRunner(results: [.success, .emptySnapshotList, .success, checkFailure])
         let coordinator = fixture.makeCoordinator(runner: runner, scheduleEvaluator: ScheduleEvaluator(calendar: Self.utc))
         let createdAt = try XCTUnwrap(Self.utc.date(from: DateComponents(year: 2026, month: 7, day: 1, hour: 1, minute: 0)))
         let now = try XCTUnwrap(Self.utc.date(from: DateComponents(year: 2026, month: 7, day: 1, hour: 2, minute: 5)))
@@ -209,13 +235,13 @@ final class BackupCoordinatorPolicyTests: XCTestCase {
 
         let runs = try coordinator.runDueBackups(now: now)
 
-        XCTAssertEqual(runner.commands.map(\.resticSubcommand), ["backup", "forget", "check"])
+        XCTAssertEqual(runner.commands.map(\.resticSubcommand), ["backup", "snapshots", "forget", "check"])
         XCTAssertEqual(runs.map(\.status), [.succeeded, .succeeded, .failed])
     }
 
     func testRestoreRunsRequestedPreRestoreBackupBeforeRestore() throws {
         let fixture = try Fixture()
-        let runner = MockResticRunner(results: [.success, .success])
+        let runner = MockResticRunner(results: [.success, .emptySnapshotList, .success])
         let coordinator = fixture.makeCoordinator(runner: runner)
         let profile = fixture.profile()
         try fixture.database.saveRepository(fixture.repository)
@@ -232,7 +258,7 @@ final class BackupCoordinatorPolicyTests: XCTestCase {
         let jobs = try fixture.database.fetchJobRuns(limit: 10)
 
         XCTAssertEqual(restoreRun.status, .succeeded)
-        XCTAssertEqual(runner.commands.map(\.resticSubcommand), ["backup", "restore"])
+        XCTAssertEqual(runner.commands.map(\.resticSubcommand), ["backup", "snapshots", "restore"])
         XCTAssertEqual(jobs.filter { $0.kind == .backup }.count, 1)
         XCTAssertEqual(jobs.filter { $0.kind == .restore }.count, 1)
     }
@@ -407,15 +433,15 @@ final class BackupCoordinatorPolicyTests: XCTestCase {
 
     func testDestinationLockIsReleasedAfterJobCompletes() throws {
         let fixture = try Fixture()
-        let firstRunner = MockResticRunner(results: [.success])
-        let secondRunner = MockResticRunner(results: [.success])
+        let firstRunner = MockResticRunner(results: [.success, .emptySnapshotList])
+        let secondRunner = MockResticRunner(results: [.success, .emptySnapshotList])
         let profile = fixture.profile()
 
         _ = try fixture.makeCoordinator(runner: firstRunner).runBackup(profile: profile, repository: fixture.repository)
         _ = try fixture.makeCoordinator(runner: secondRunner).runBackup(profile: profile, repository: fixture.repository)
 
-        XCTAssertEqual(firstRunner.commands.count, 1)
-        XCTAssertEqual(secondRunner.commands.count, 1)
+        XCTAssertEqual(firstRunner.commands.map(\.resticSubcommand), ["backup", "snapshots"])
+        XCTAssertEqual(secondRunner.commands.map(\.resticSubcommand), ["backup", "snapshots"])
     }
 
     func testRunPersistsStreamingJobLogsAndForwardsLiveEvents() throws {
@@ -613,6 +639,7 @@ private enum TestRunError: LocalizedError {
 
 private extension ResticRunResult {
     static let success = ResticRunResult(exitCode: 0, standardOutput: "ok", standardError: "")
+    static let emptySnapshotList = ResticRunResult(exitCode: 0, standardOutput: "[]", standardError: "")
 }
 
 private extension ResticCommand {

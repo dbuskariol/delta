@@ -128,7 +128,7 @@ public final class BackupCoordinator: @unchecked Sendable {
             }
         }
 
-        return try run(
+        let backupRun = try run(
             repositoryID: repository.id,
             profileID: profile.id,
             kind: .backup,
@@ -136,6 +136,8 @@ public final class BackupCoordinator: @unchecked Sendable {
         ) {
             try commandBuilder.backup(profile: resolvedProfile, repository: repository)
         }
+        refreshSnapshotsAfterCompletedBackup(backupRun, repository: repository)
+        return backupRun
     }
 
     @discardableResult
@@ -172,6 +174,22 @@ public final class BackupCoordinator: @unchecked Sendable {
             throw BackupCoordinatorError.resticFailed(result.userFacingMessage)
         }
         return try parser.parseSnapshotEntries(from: result.standardOutput)
+    }
+
+    private func refreshSnapshotsAfterCompletedBackup(_ run: JobRun, repository: BackupRepository) {
+        guard run.status == .succeeded || run.status == .warning else {
+            return
+        }
+        do {
+            _ = try refreshSnapshots(repository: repository)
+        } catch {
+            try? database.appendEvent(
+                EventLog(
+                    level: .warning,
+                    message: "Backup completed, but restore points could not be refreshed automatically: \(error.localizedDescription)"
+                )
+            )
+        }
     }
 
     @discardableResult
