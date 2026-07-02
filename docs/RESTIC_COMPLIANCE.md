@@ -129,6 +129,8 @@ snapshots --json
 
 The JSON parser is covered by unit tests.
 
+Every successful restore point refresh treats restic's `snapshots --json` response as authoritative for that destination. Delta replaces that destination's cached restore points in SQLite instead of only appending, so restore points removed by cleanup are not left selectable. Restore point reads are sorted newest-first.
+
 Delta browses files and folders inside a selected restore point with:
 
 ```text

@@ -243,6 +243,53 @@ final class DatabaseTests: XCTestCase {
         XCTAssertTrue(try database.fetchRepositories().isEmpty)
         XCTAssertTrue(try database.fetchSnapshots(repositoryID: repository.id).isEmpty)
     }
+
+    func testSaveSnapshotsReplacesOnlyThatRepositoryCacheAndSortsNewestFirst() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let database = try DeltaDatabase(url: directory.appendingPathComponent("Delta.sqlite"))
+        let primaryRepository = BackupRepository(name: "Primary", backend: .local(path: "/primary"))
+        let secondaryRepository = BackupRepository(name: "Secondary", backend: .local(path: "/secondary"))
+        try database.saveRepository(primaryRepository)
+        try database.saveRepository(secondaryRepository)
+        try database.saveSnapshots(
+            [
+                ResticSnapshot(id: "old-primary", time: Date(timeIntervalSince1970: 10), paths: ["/Users/me/Documents"]),
+                ResticSnapshot(id: "new-primary", time: Date(timeIntervalSince1970: 30), paths: ["/Users/me/Desktop"])
+            ],
+            repositoryID: primaryRepository.id
+        )
+        try database.saveSnapshots(
+            [
+                ResticSnapshot(id: "secondary", time: Date(timeIntervalSince1970: 20), paths: ["/Users/me/Pictures"])
+            ],
+            repositoryID: secondaryRepository.id
+        )
+
+        try database.saveSnapshots(
+            [
+                ResticSnapshot(id: "replacement-primary", time: Date(timeIntervalSince1970: 40), paths: ["/Users/me/Projects"])
+            ],
+            repositoryID: primaryRepository.id
+        )
+
+        XCTAssertEqual(try database.fetchSnapshots(repositoryID: primaryRepository.id).map(\.id), ["replacement-primary"])
+        XCTAssertEqual(try database.fetchSnapshots(repositoryID: secondaryRepository.id).map(\.id), ["secondary"])
+
+        try database.saveSnapshots(
+            [
+                ResticSnapshot(id: "older-primary", time: Date(timeIntervalSince1970: 50), paths: ["/Users/me/Archive"]),
+                ResticSnapshot(id: "newer-primary", time: Date(timeIntervalSince1970: 60), paths: ["/Users/me/Documents"])
+            ],
+            repositoryID: primaryRepository.id
+        )
+
+        let snapshotsByRepository = try database.fetchSnapshotsByRepository()
+        XCTAssertEqual(snapshotsByRepository[primaryRepository.id]?.map(\.id), ["newer-primary", "older-primary"])
+        XCTAssertEqual(snapshotsByRepository[secondaryRepository.id]?.map(\.id), ["secondary"])
+    }
 }
 
 private final class ErrorRecorder: @unchecked Sendable {

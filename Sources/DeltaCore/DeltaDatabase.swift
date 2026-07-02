@@ -134,13 +134,33 @@ public final class DeltaDatabase: @unchecked Sendable {
     }
 
     public func saveSnapshots(_ snapshots: [ResticSnapshot], repositoryID: UUID) throws {
-        for snapshot in snapshots {
-            try saveSnapshot(snapshot, repositoryID: repositoryID)
+        let encodedSnapshots = try snapshots.map { snapshot in
+            let payloadData = try encoder.encode(snapshot)
+            guard let payload = String(data: payloadData, encoding: .utf8) else {
+                throw DeltaDatabaseError.invalidPayload("snapshots")
+            }
+            return (id: snapshot.id, payload: payload)
+        }
+        let timestamp = Self.timestampString(Date())
+        let repositoryIDString = repositoryID.uuidString
+
+        try queue.write { db in
+            try db.execute(sql: "DELETE FROM snapshots WHERE repository_id = ?", arguments: [repositoryIDString])
+            for snapshot in encodedSnapshots {
+                try db.execute(
+                    sql: """
+                    INSERT INTO snapshots (id, repository_id, payload, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    arguments: [snapshot.id, repositoryIDString, snapshot.payload, timestamp, timestamp]
+                )
+            }
         }
     }
 
     public func fetchSnapshots(repositoryID: UUID? = nil) throws -> [ResticSnapshot] {
         try fetchAll(table: "snapshots", repositoryID: repositoryID?.uuidString)
+            .sorted { $0.time > $1.time }
     }
 
     public func fetchSnapshotsByRepository() throws -> [UUID: [ResticSnapshot]] {
@@ -161,6 +181,9 @@ public final class DeltaDatabase: @unchecked Sendable {
                 }
                 let snapshot = try decoder.decode(ResticSnapshot.self, from: data)
                 snapshotsByRepository[repositoryID, default: []].append(snapshot)
+            }
+            for repositoryID in snapshotsByRepository.keys {
+                snapshotsByRepository[repositoryID]?.sort { $0.time > $1.time }
             }
             return snapshotsByRepository
         }
