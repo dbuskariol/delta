@@ -207,19 +207,25 @@ public enum ResticBackendCredentialTemplates {
                 field("OS_AUTH_URL", "Auth URL", placeholder: "https://identity.example.com/v3", isSecret: false),
                 field("OS_REGION_NAME", "Region", isSecret: false),
                 field("OS_USERNAME", "Username", isSecret: false),
+                field("OS_USER_ID", "User ID", isSecret: false),
                 field("OS_PASSWORD", "Password"),
                 field("OS_TENANT_ID", "Tenant ID", isSecret: false),
                 field("OS_TENANT_NAME", "Tenant Name", isSecret: false),
                 field("OS_PROJECT_NAME", "Project Name", isSecret: false),
                 field("OS_PROJECT_DOMAIN_NAME", "Project Domain", isSecret: false),
+                field("OS_PROJECT_DOMAIN_ID", "Project Domain ID", isSecret: false),
                 field("OS_USER_DOMAIN_NAME", "User Domain", isSecret: false),
+                field("OS_USER_DOMAIN_ID", "User Domain ID", isSecret: false),
+                field("OS_TRUST_ID", "Trust ID", isSecret: false),
                 field("OS_APPLICATION_CREDENTIAL_ID", "Application Credential ID", isSecret: false),
+                field("OS_APPLICATION_CREDENTIAL_NAME", "Application Credential Name", isSecret: false),
                 field("OS_APPLICATION_CREDENTIAL_SECRET", "Application Credential Secret"),
                 field("OS_STORAGE_URL", "Storage URL", isSecret: false),
                 field("OS_AUTH_TOKEN", "Auth Token"),
                 field("ST_AUTH", "Swift Auth URL", isSecret: false),
                 field("ST_USER", "Swift User", isSecret: false),
-                field("ST_KEY", "Swift Key")
+                field("ST_KEY", "Swift Key"),
+                field("SWIFT_DEFAULT_CONTAINER_POLICY", "Default Container Policy", isSecret: false)
             ]
         case .rclone:
             [

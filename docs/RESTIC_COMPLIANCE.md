@@ -47,7 +47,7 @@ Delta supports the following restic backend families:
 
 URL construction is covered by `ResticCommandTests`.
 
-Delta validates destination inputs before saving them. The validator trims persisted fields, requires writable new or changed local destinations or writable parents, rejects relative local paths in the native destination form, requires absolute SFTP paths and valid ports, requires S3 endpoint and bucket fields, validates REST URLs as `http` or `https`, and rejects rclone remote names that already include a colon. Advanced raw restic URLs remain available through the custom destination type.
+Delta validates destination inputs before saving them. The validator trims persisted fields, requires writable new or changed local destinations or writable parents, rejects relative local paths in the native destination form, requires absolute SFTP paths and valid ports, normalizes optional SFTP SSH identity-file paths, requires the identity file to be readable when provided, requires S3 endpoint and bucket fields, validates REST URLs as `http` or `https`, and rejects rclone remote names that already include a colon. Advanced raw restic URLs remain available through the custom destination type.
 
 After a destination is created, Delta starts a prepare job that runs `restic init` with the saved encryption secret and backend credentials. The destination row action remains available as a retry path. Delta also keeps a first-backup safety net. For local and mounted destinations, a writable path with no restic `config` file is initialized before backup starts. For remote destinations that have not been verified yet, Delta first runs a lightweight `snapshots --json` probe. If the probe succeeds, the destination is treated as existing and verified. If restic reports a missing destination, Delta runs `restic init` before starting backup. Password, backend credential, lock, and network failures stop before source scanning begins.
 
@@ -66,7 +66,7 @@ Supported credential templates include:
 - Backblaze B2: `B2_ACCOUNT_ID`, `B2_ACCOUNT_KEY`
 - Azure Blob: `AZURE_ACCOUNT_NAME`, `AZURE_ACCOUNT_KEY`, `AZURE_ACCOUNT_SAS`, `AZURE_ENDPOINT_SUFFIX`
 - Google Cloud Storage: `GOOGLE_PROJECT_ID`, `GOOGLE_APPLICATION_CREDENTIALS`, `GOOGLE_ACCESS_TOKEN`
-- OpenStack Swift: Keystone, token, and Swift object storage variables
+- OpenStack Swift: `ST_AUTH`, `ST_USER`, `ST_KEY`, `OS_AUTH_URL`, `OS_REGION_NAME`, `OS_USERNAME`, `OS_USER_ID`, `OS_PASSWORD`, `OS_TENANT_ID`, `OS_TENANT_NAME`, `OS_PROJECT_NAME`, `OS_PROJECT_DOMAIN_NAME`, `OS_PROJECT_DOMAIN_ID`, `OS_USER_DOMAIN_NAME`, `OS_USER_DOMAIN_ID`, `OS_TRUST_ID`, `OS_APPLICATION_CREDENTIAL_ID`, `OS_APPLICATION_CREDENTIAL_NAME`, `OS_APPLICATION_CREDENTIAL_SECRET`, `OS_STORAGE_URL`, `OS_AUTH_TOKEN`, `SWIFT_DEFAULT_CONTAINER_POLICY`
 - rclone: `RCLONE_CONFIG`
 
 The destination editor presents these as provider-specific field labels instead of raw environment variable names. Actual passwords, secret keys, SAS tokens, and access tokens use secure fields; non-secret configuration values such as account IDs, project IDs, endpoint suffixes, and rclone config paths remain visible.
@@ -76,6 +76,20 @@ S3 region is passed as an explicit restic backend option:
 ```text
 -o s3.region=<region>
 ```
+
+SFTP destinations are always run with non-interactive SSH arguments:
+
+```text
+-o sftp.args="-o BatchMode=yes -o ServerAliveInterval=60 -o ServerAliveCountMax=240"
+```
+
+If the user chooses an SSH private key file, Delta adds:
+
+```text
+-i <identity-file> -o IdentitiesOnly=yes
+```
+
+This follows restic's SFTP guidance that automatic backups require passwordless SSH authentication. The identity file path is destination configuration, not a backend password; passphrase-protected keys must already be available through ssh-agent or the configured SSH environment.
 
 rclone is pinned to the bundled executable when available:
 
@@ -201,7 +215,7 @@ check --json --read-data-subset 1/100
 
 Scheduled maintenance is evaluated independently from backup due checks, but it uses the same profile, destination, power policy, and per-destination locking path. Background due checks use the latest backup and cleanup attempts, not only successful runs, so a failed destination or credential state is not retried every helper wake in the same schedule window.
 
-When a user saves an enabled scheduled profile, Delta requests Background Backups registration through `SMAppService` if the helper is not already registered. If macOS reports that Login Items approval is still required, Delta records the schedule and surfaces the approval action instead of silently leaving scheduled backups inert.
+When a user saves an enabled scheduled profile, Delta requests Background Scheduling registration through `SMAppService` if the helper is not already registered. If macOS reports that Login Items approval is still required, Delta records the schedule and surfaces the approval action instead of silently leaving scheduled backups inert.
 
 ## Locking
 

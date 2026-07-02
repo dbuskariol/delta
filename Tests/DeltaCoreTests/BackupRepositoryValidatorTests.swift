@@ -76,7 +76,7 @@ final class BackupRepositoryValidatorTests: XCTestCase {
         XCTAssertThrowsError(
             try BackupRepositoryValidator().validate(
                 name: "SFTP",
-                backend: .sftp(host: "nas.local", path: "relative/repo", username: nil, port: nil)
+                backend: .sftp(host: "nas.local", path: "relative/repo", username: nil, port: nil, identityFilePath: nil)
             )
         ) { error in
             XCTAssertEqual(error as? BackupRepositoryValidationError, .invalidSFTPPath("relative/repo"))
@@ -85,10 +85,50 @@ final class BackupRepositoryValidatorTests: XCTestCase {
         XCTAssertThrowsError(
             try BackupRepositoryValidator().validate(
                 name: "SFTP",
-                backend: .sftp(host: "nas.local", path: "/repo", username: nil, port: 70_000)
+                backend: .sftp(host: "nas.local", path: "/repo", username: nil, port: 70_000, identityFilePath: nil)
             )
         ) { error in
             XCTAssertEqual(error as? BackupRepositoryValidationError, .invalidPort(70_000))
+        }
+    }
+
+    func testNormalizesReadableSFTPIdentityFile() throws {
+        let fixture = try ValidatorFixture()
+        defer { fixture.cleanUp() }
+        let identityFile = fixture.directory.appendingPathComponent("id_ed25519")
+        FileManager.default.createFile(atPath: identityFile.path, contents: Data())
+
+        let result = try BackupRepositoryValidator().validate(
+            name: "SFTP",
+            backend: .sftp(
+                host: " nas.local ",
+                path: " /repo ",
+                username: " me ",
+                port: 22,
+                identityFilePath: " \(identityFile.path) "
+            )
+        )
+
+        XCTAssertEqual(
+            result.backend,
+            .sftp(host: "nas.local", path: "/repo", username: "me", port: 22, identityFilePath: identityFile.path)
+        )
+    }
+
+    func testRejectsUnreadableSFTPIdentityFile() {
+        XCTAssertThrowsError(
+            try BackupRepositoryValidator().validate(
+                name: "SFTP",
+                backend: .sftp(
+                    host: "nas.local",
+                    path: "/repo",
+                    username: nil,
+                    port: nil,
+                    identityFilePath: "/missing/id_ed25519"
+                )
+            )
+        ) { error in
+            XCTAssertEqual(error as? BackupRepositoryValidationError, .invalidSFTPIdentityFile("/missing/id_ed25519"))
         }
     }
 

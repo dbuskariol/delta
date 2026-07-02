@@ -11,6 +11,7 @@ fi
 
 HELP_DIR="$(/usr/bin/mktemp -d -t delta-restic-help.XXXXXX)"
 trap 'rm -rf "$HELP_DIR"' EXIT
+RESTIC_OPTIONS_OUTPUT="$("$RESTIC" options)"
 
 help_file() {
   local command="$1"
@@ -36,6 +37,14 @@ assert_help_contains() {
   path="$(help_file "$command")"
   if ! /usr/bin/grep -Eq -- "$pattern" "$path"; then
     printf "Bundled restic help for '%s' does not contain required pattern: %s\n" "$command" "$pattern" >&2
+    exit 1
+  fi
+}
+
+assert_options_contains() {
+  local pattern="$1"
+  if ! /usr/bin/grep -Eq -- "$pattern" <<<"$RESTIC_OPTIONS_OUTPUT"; then
+    printf "Bundled restic options do not contain required pattern: %s\n" "$pattern" >&2
     exit 1
   fi
 }
@@ -75,5 +84,11 @@ assert_help_contains forget "--group-by group"
 assert_help_contains forget "--prune"
 
 assert_help_contains check "--read-data-subset subset"
+
+assert_options_contains "sftp\\.args"
+assert_options_contains "sftp\\.command"
+assert_options_contains "sftp\\.connections"
+assert_options_contains "rclone\\.program"
+assert_options_contains "s3\\.region"
 
 printf "Bundled restic command surface verified: %s\n" "$("$RESTIC" version)"

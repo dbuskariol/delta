@@ -353,6 +353,8 @@ public struct ResticCommandBuilder: Sendable {
 
     private func backendOptionArguments(for repository: BackupRepository) -> [String] {
         switch repository.backend {
+        case let .sftp(_, _, _, _, identityFilePath):
+            return sftpBackendOptionArguments(identityFilePath: identityFilePath)
         case let .s3(_, _, _, region):
             guard let region = region?.trimmingCharacters(in: .whitespacesAndNewlines), !region.isEmpty else {
                 return []
@@ -367,6 +369,40 @@ public struct ResticCommandBuilder: Sendable {
         default:
             return []
         }
+    }
+
+    private func sftpBackendOptionArguments(identityFilePath: String?) -> [String] {
+        var arguments = [
+            "-o", "BatchMode=yes",
+            "-o", "ServerAliveInterval=60",
+            "-o", "ServerAliveCountMax=240"
+        ]
+
+        if let identityFilePath = normalizedLocalPath(identityFilePath) {
+            arguments += [
+                "-i", identityFilePath,
+                "-o", "IdentitiesOnly=yes"
+            ]
+        }
+
+        return ["-o", "sftp.args=\(shellWords(arguments))"]
+    }
+
+    private func normalizedLocalPath(_ path: String?) -> String? {
+        guard let path = path?.trimmingCharacters(in: .whitespacesAndNewlines), !path.isEmpty else {
+            return nil
+        }
+        return (path as NSString).expandingTildeInPath
+    }
+
+    private func shellWords(_ arguments: [String]) -> String {
+        arguments.map { argument in
+            if argument.rangeOfCharacter(from: .whitespacesAndNewlines) != nil || argument.contains("'") {
+                return ShellEscaper.singleQuoted(argument)
+            }
+            return argument
+        }
+        .joined(separator: " ")
     }
 
     private func resticEnvironment(toolDirectory: String) -> [String: String] {

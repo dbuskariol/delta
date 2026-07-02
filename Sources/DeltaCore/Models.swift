@@ -42,7 +42,7 @@ public enum RepositoryBackendKind: String, Codable, CaseIterable, Sendable {
 
 public enum RepositoryBackend: Codable, Equatable, Sendable {
     case local(path: String)
-    case sftp(host: String, path: String, username: String?, port: Int?)
+    case sftp(host: String, path: String, username: String?, port: Int?, identityFilePath: String?)
     case rest(url: String)
     case s3(endpoint: String?, bucket: String, path: String?, region: String?)
     case backblazeB2(bucket: String, path: String?)

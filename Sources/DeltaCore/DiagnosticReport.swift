@@ -166,7 +166,7 @@ public struct DiagnosticReportBuilder: Sendable {
             "",
             "## Status",
             "- Full Disk Access: \(snapshot.fullDiskAccessStatus)",
-            "- Background Backups: \(snapshot.backgroundBackupsStatus)",
+            "- Background Scheduling: \(snapshot.backgroundBackupsStatus)",
             "- Notifications: \(snapshot.notificationStatus)",
             "- Menu Bar: \(snapshot.menuBarStatus)",
             "- Restore Defaults: \(snapshot.restoreDefaultsStatus)",

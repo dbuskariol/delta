@@ -23,9 +23,9 @@ final class ResticCommandTests: XCTestCase {
         let builder = ResticBackendURLBuilder()
 
         XCTAssertEqual(try builder.repositoryURL(for: .local(path: "/Volumes/Backup/Delta")), "/Volumes/Backup/Delta")
-        XCTAssertEqual(try builder.repositoryURL(for: .sftp(host: "nas.local", path: "/tank/delta", username: "me", port: nil)), "sftp:me@nas.local:/tank/delta")
-        XCTAssertEqual(try builder.repositoryURL(for: .sftp(host: "nas.local", path: "/tank/delta", username: "me", port: 2222)), "sftp://me@nas.local:2222//tank/delta")
-        XCTAssertEqual(try builder.repositoryURL(for: .sftp(host: "::1", path: "/srv/restic-repo", username: "user", port: 2222)), "sftp://user@[::1]:2222//srv/restic-repo")
+        XCTAssertEqual(try builder.repositoryURL(for: .sftp(host: "nas.local", path: "/tank/delta", username: "me", port: nil, identityFilePath: nil)), "sftp:me@nas.local:/tank/delta")
+        XCTAssertEqual(try builder.repositoryURL(for: .sftp(host: "nas.local", path: "/tank/delta", username: "me", port: 2222, identityFilePath: nil)), "sftp://me@nas.local:2222//tank/delta")
+        XCTAssertEqual(try builder.repositoryURL(for: .sftp(host: "::1", path: "/srv/restic-repo", username: "user", port: 2222, identityFilePath: nil)), "sftp://user@[::1]:2222//srv/restic-repo")
         XCTAssertEqual(try builder.repositoryURL(for: .rest(url: "https://restic.example.com/user")), "rest:https://restic.example.com/user")
         XCTAssertEqual(try builder.repositoryURL(for: .s3(endpoint: "s3.us.test", bucket: "delta", path: "mac", region: nil)), "s3:s3.us.test/delta/mac")
         XCTAssertEqual(try builder.repositoryURL(for: .backblazeB2(bucket: "delta", path: "mac")), "b2:delta:mac")
@@ -296,6 +296,41 @@ final class ResticCommandTests: XCTestCase {
         XCTAssertTrue(command.arguments.contains("s3.region=ap-southeast-2"))
     }
 
+    func testSFTPCommandUsesNonInteractiveSSHOptions() throws {
+        let repository = BackupRepository(
+            name: "SFTP",
+            backend: .sftp(host: "nas.local", path: "/tank/delta", username: "me", port: nil, identityFilePath: nil)
+        )
+
+        let command = try makeBuilder().snapshots(repository: repository)
+        let optionValue = try XCTUnwrap(optionValues(in: command.arguments).first { $0.hasPrefix("sftp.args=") })
+
+        XCTAssertTrue(optionValue.contains("BatchMode=yes"))
+        XCTAssertTrue(optionValue.contains("ServerAliveInterval=60"))
+        XCTAssertTrue(optionValue.contains("ServerAliveCountMax=240"))
+        XCTAssertFalse(optionValue.contains("-i "))
+    }
+
+    func testSFTPCommandPassesConfiguredIdentityFile() throws {
+        let repository = BackupRepository(
+            name: "SFTP",
+            backend: .sftp(
+                host: "nas.local",
+                path: "/tank/delta",
+                username: "me",
+                port: nil,
+                identityFilePath: "/Users/me/.ssh/delta backup"
+            )
+        )
+
+        let command = try makeBuilder().snapshots(repository: repository)
+        let optionValue = try XCTUnwrap(optionValues(in: command.arguments).first { $0.hasPrefix("sftp.args=") })
+
+        XCTAssertTrue(optionValue.contains("-i '/Users/me/.ssh/delta backup'"))
+        XCTAssertTrue(optionValue.contains("IdentitiesOnly=yes"))
+        XCTAssertTrue(optionValue.contains("BatchMode=yes"))
+    }
+
     func testRcloneCommandPinsBundledRcloneExecutableWhenAvailable() throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("delta-rclone-test-\(UUID().uuidString)", isDirectory: true)
@@ -561,6 +596,12 @@ final class ResticCommandTests: XCTestCase {
         XCTAssertTrue(ResticBackendCredentialTemplates.keys(for: .azureBlob).contains("AZURE_ACCOUNT_SAS"))
         XCTAssertTrue(ResticBackendCredentialTemplates.keys(for: .googleCloudStorage).contains("GOOGLE_ACCESS_TOKEN"))
         XCTAssertTrue(ResticBackendCredentialTemplates.keys(for: .swiftObjectStorage).contains("ST_AUTH"))
+        XCTAssertTrue(ResticBackendCredentialTemplates.keys(for: .swiftObjectStorage).contains("OS_USER_ID"))
+        XCTAssertTrue(ResticBackendCredentialTemplates.keys(for: .swiftObjectStorage).contains("OS_USER_DOMAIN_ID"))
+        XCTAssertTrue(ResticBackendCredentialTemplates.keys(for: .swiftObjectStorage).contains("OS_PROJECT_DOMAIN_ID"))
+        XCTAssertTrue(ResticBackendCredentialTemplates.keys(for: .swiftObjectStorage).contains("OS_TRUST_ID"))
+        XCTAssertTrue(ResticBackendCredentialTemplates.keys(for: .swiftObjectStorage).contains("OS_APPLICATION_CREDENTIAL_NAME"))
+        XCTAssertTrue(ResticBackendCredentialTemplates.keys(for: .swiftObjectStorage).contains("SWIFT_DEFAULT_CONTAINER_POLICY"))
         XCTAssertEqual(ResticBackendCredentialTemplates.keys(for: .rclone), ["RCLONE_CONFIG"])
     }
 
@@ -589,6 +630,15 @@ final class ResticCommandTests: XCTestCase {
     private func includeArguments(in arguments: [String]) -> [String] {
         arguments.indices.compactMap { index in
             guard arguments[index] == "--include", arguments.indices.contains(index + 1) else {
+                return nil
+            }
+            return arguments[index + 1]
+        }
+    }
+
+    private func optionValues(in arguments: [String]) -> [String] {
+        arguments.indices.compactMap { index in
+            guard arguments[index] == "-o", arguments.indices.contains(index + 1) else {
                 return nil
             }
             return arguments[index + 1]

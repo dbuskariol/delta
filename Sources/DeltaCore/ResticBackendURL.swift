@@ -21,7 +21,7 @@ public struct ResticBackendURLBuilder: Sendable {
             try require(path, "local path")
             return (path.trimmingCharacters(in: .whitespacesAndNewlines) as NSString).expandingTildeInPath
 
-        case let .sftp(host, path, username, port):
+        case let .sftp(host, path, username, port, _):
             try require(host, "SFTP host")
             try require(path, "SFTP path")
             let trimmedHost = host.trimmingCharacters(in: .whitespacesAndNewlines)

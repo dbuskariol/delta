@@ -31,13 +31,13 @@ Record the app version, build number, macOS build, signing identity, date, and t
 | Area | Required evidence |
 | --- | --- |
 | Install identity | Install `/Applications/Delta.app`, launch it, quit, relaunch, and confirm macOS privacy prompts remain stable across rebuilds signed by the same identity. |
-| Settings surface | Confirm Settings shows plain-language Background Backups, not raw LaunchAgent status; the top status summary matches Full Disk Access, background service, update, and notification state; reset buttons restore recommended backup and restore defaults. |
+| Settings surface | Confirm Settings shows plain-language Background Scheduling, not raw LaunchAgent status; the top status summary matches Full Disk Access, schedules, updates, notifications, and bundled backup-tool state; reset buttons restore recommended backup and restore defaults. |
 | Full Disk Access | From Settings, open Privacy & Security, add Delta manually when required, recheck access, and confirm the dashboard only shows Readiness when action is needed. |
-| Background Backups | Create an enabled scheduled profile, approve Delta in Login Items if macOS asks, quit the main window, wait for the helper interval, and confirm the scheduled run appears in Dashboard, Activity, and menu bar state after relaunch. |
+| Background Scheduling | Create an enabled scheduled profile, approve Delta in Login Items if macOS asks, quit the main window, wait for the helper interval, and confirm the scheduled run appears in Dashboard, Activity, and menu bar state after relaunch. |
 | Keychain background access | Use an app-managed destination and a destination with backend credentials. Confirm a scheduled backup does not show interactive Keychain prompts after Repair Keychain Access has been run when needed. |
 | Local drive destination | Create a new local or external-drive destination, confirm automatic preparation runs, then run a first backup and a second no-change backup. |
 | Mounted network drive | Test at least one SMB or NFS mounted path under `/Volumes`, disconnect it, confirm Delta reports destination unavailable without invoking restic, reconnect it, and confirm backup resumes. |
-| SFTP destination | Test a real SFTP destination with a non-root absolute path, wrong credential failure, corrected credential success, restore point refresh, and restore. |
+| SFTP destination | Test a real SFTP destination with a non-root absolute path and non-interactive SSH authentication through a configured key file or ssh-agent; confirm wrong credential/key failure, corrected credential success, restore point refresh, and restore. |
 | S3-compatible destination | Test at least one S3-compatible provider with endpoint, bucket, optional region, missing credential failure, corrected credential success, backup, check, and restore. |
 | Remote first backup preparation | Add a new unprepared remote destination, start a backup without pressing Prepare first, and confirm Delta probes, prepares when missing, then runs the backup. Repeat with an existing remote destination and confirm Delta reuses it without reinitializing. |
 | Restore wizard | Test full restore, selected folder restore from the browser, selected file restore, dry-run preview, chosen-folder restore, original-path preview, original-path confirmation, and every overwrite policy. |

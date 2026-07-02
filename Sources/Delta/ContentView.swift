@@ -103,7 +103,7 @@ struct DashboardView: View {
                     HStack(alignment: .top, spacing: 14) {
                         StatusIcon(symbol: "clock.badge.exclamationmark", color: .orange)
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("Background Backups")
+                            Text("Scheduled Backups Need Approval")
                                 .font(.headline)
                             Text(model.launchAgentStatus.detail)
                                 .foregroundStyle(.secondary)
@@ -1071,19 +1071,19 @@ struct SettingsView: View {
             SettingsStatusGrid(items: settingsStatusItems)
 
             SettingsSectionLabel(
-                title: "Background",
+                title: "Scheduled Backups",
                 subtitle: "Keep scheduled protection running without keeping the main Delta window open."
             )
 
             SettingsCard(
                 symbol: "clock.badge.checkmark",
-                title: "Background Backups",
-                subtitle: "Run scheduled profiles while Delta's window is closed.",
+                title: "Background Scheduling",
+                subtitle: "Run scheduled backup profiles while Delta's window is closed.",
                 statusText: backgroundBackupsStatusText,
                 statusColor: backgroundBackupsStatusColor
             ) {
                 SettingsControlRow(
-                    title: "Allow scheduled backups",
+                    title: "Allow background scheduling",
                     detail: backgroundBackupsControlDetail
                 ) {
                     Toggle("", isOn: backgroundBackupsBinding)
@@ -1094,13 +1094,13 @@ struct SettingsView: View {
                 SettingsNotice(
                     symbol: "clock.arrow.circlepath",
                     title: "What this does",
-                    text: "Delta installs a signed per-user background backup service through macOS Login Items. It wakes for short schedule checks, starts due backups when policy allows it, then exits. It is not an admin service.",
+                    text: "Delta uses macOS Login Items to run a signed per-user scheduler. It wakes for short schedule checks, starts due backups when policy allows it, then exits. It is not an admin service.",
                     color: .blue
                 )
 
                 SettingsFactGrid(items: [
                     SettingsFact(title: "Scheduled profiles", value: "\(scheduledProfileCount)"),
-                    SettingsFact(title: "Check interval", value: "Every 5 min"),
+                    SettingsFact(title: "Schedule checks", value: "Automatic"),
                     SettingsFact(title: "Runs as", value: "Current user"),
                     SettingsFact(title: "Window required", value: "No"),
                     SettingsFact(title: "macOS approval", value: backgroundApprovalText)
@@ -1121,7 +1121,7 @@ struct SettingsView: View {
                     } label: {
                         Label("Open Login Items", systemImage: "gearshape")
                     }
-                    .deltaTooltip("Open macOS Login Items to approve or inspect Delta's background backup service.")
+                    .deltaTooltip("Open macOS Login Items to approve or inspect Delta's background scheduler.")
                     Button {
                         model.reload()
                     } label: {
@@ -1212,7 +1212,7 @@ struct SettingsView: View {
                 }
 
                 SettingsDescription(
-                    text: "This controls only Delta's visible menu bar item. Scheduled backups use Background Backups above and continue according to their own setting."
+                    text: "This controls only Delta's visible menu bar item. Scheduled backups use Background Scheduling above and continue according to their own setting."
                 )
             }
 
@@ -1562,7 +1562,7 @@ struct SettingsView: View {
                 detail: model.fullDiskAccessStatus.hasLikelyFullDiskAccess ? "Protected folders readable" : "Action required"
             ),
             SettingsStatusItem(
-                title: "Background",
+                title: "Schedules",
                 value: backgroundBackupsStatusText,
                 symbol: "clock.badge.checkmark",
                 color: backgroundBackupsStatusColor,
@@ -1581,6 +1581,13 @@ struct SettingsView: View {
                 symbol: "bell.badge",
                 color: notificationStatusColor,
                 detail: sendsJobNotifications ? "Job alerts configured" : "Alerts disabled"
+            ),
+            SettingsStatusItem(
+                title: "Backup Tools",
+                value: backupToolStatusText,
+                symbol: "externaldrive.badge.checkmark",
+                color: backupToolStatusColor,
+                detail: backupToolStatusDetail
             )
         ]
     }
@@ -1711,6 +1718,43 @@ struct SettingsView: View {
 
     private var appVersionStatusText: String {
         appVersion == "Unknown" ? "Unknown" : "Beta \(appVersion)"
+    }
+
+    private var resticToolURL: URL {
+        ResticExecutableLocator().locate(in: Bundle.main)
+    }
+
+    private var rcloneToolURL: URL {
+        resticToolURL.deletingLastPathComponent().appendingPathComponent("rclone")
+    }
+
+    private var isResticExecutableAvailable: Bool {
+        FileManager.default.isExecutableFile(atPath: resticToolURL.path)
+    }
+
+    private var isRcloneExecutableAvailable: Bool {
+        FileManager.default.isExecutableFile(atPath: rcloneToolURL.path)
+    }
+
+    private var backupToolStatusText: String {
+        isResticExecutableAvailable && isRcloneExecutableAvailable ? "Ready" : "Missing"
+    }
+
+    private var backupToolStatusColor: Color {
+        backupToolStatusText == "Ready" ? .green : .red
+    }
+
+    private var backupToolStatusDetail: String {
+        if isResticExecutableAvailable && isRcloneExecutableAvailable {
+            return "Bundled engines available"
+        }
+        if isResticExecutableAvailable {
+            return "Cloud helper missing"
+        }
+        if isRcloneExecutableAvailable {
+            return "Backup engine missing"
+        }
+        return "Backup engines missing"
     }
 
     private func applyUpdatePreferences() {
@@ -2072,10 +2116,11 @@ struct RepositoryRow: View {
         switch repository.backend {
         case let .local(path):
             return path
-        case let .sftp(host, path, username, port):
+        case let .sftp(host, path, username, port, identityFilePath):
             let user = username.map { "\($0)@" } ?? ""
             let portPart = port.map { ":\($0)" } ?? ""
-            return "\(user)\(host)\(portPart):\(path)"
+            let keyPart = identityFilePath == nil ? "" : " - key"
+            return "\(user)\(host)\(portPart):\(path)\(keyPart)"
         case let .rest(url):
             return url
         case let .s3(endpoint, bucket, path, _):
@@ -2546,6 +2591,7 @@ struct RepositoryEditorView: View {
     @State private var secondary = ""
     @State private var tertiary = ""
     @State private var quaternary = ""
+    @State private var sftpIdentityFilePath = ""
     @State private var storageMode: SecretStorageMode = .appManagedKeychain
     @State private var passphrase = ""
     @State private var passphraseConfirmation = ""
@@ -2560,6 +2606,7 @@ struct RepositoryEditorView: View {
         _secondary = State(initialValue: backendState.secondary)
         _tertiary = State(initialValue: backendState.tertiary)
         _quaternary = State(initialValue: backendState.quaternary)
+        _sftpIdentityFilePath = State(initialValue: backendState.sftpIdentityFilePath)
         _storageMode = State(initialValue: repository?.secretStorageMode ?? .appManagedKeychain)
         _credentialValues = State(initialValue: Dictionary(uniqueKeysWithValues: ResticBackendCredentialTemplates.fields(for: backendState.kind).map { ($0.environmentKey, "") }))
     }
@@ -2671,6 +2718,28 @@ struct RepositoryEditorView: View {
             FieldRow(title: "Path") { TextField("/absolute/destination/path", text: $secondary).textFieldStyle(.roundedBorder) }
             FieldRow(title: "Username") { TextField("Optional", text: $tertiary).textFieldStyle(.roundedBorder) }
             FieldRow(title: "Port") { TextField("Optional", text: $quaternary).textFieldStyle(.roundedBorder) }
+            FieldRow(title: "SSH key") {
+                HStack(spacing: 8) {
+                    TextField("Optional private key file", text: $sftpIdentityFilePath)
+                        .textFieldStyle(.roundedBorder)
+                    Button {
+                        if let path = model.chooseFile().first {
+                            sftpIdentityFilePath = path
+                        }
+                    } label: {
+                        Image(systemName: "key")
+                    }
+                    .deltaTooltip("Choose an SSH private key file for non-interactive SFTP backups.")
+                }
+            }
+            FieldRow(title: "") {
+                SettingsNotice(
+                    symbol: "key.horizontal",
+                    title: "Scheduled SFTP requires non-interactive SSH",
+                    text: "Delta runs SFTP with SSH batch mode so background backups fail clearly instead of waiting for a password prompt. Use a key file, ssh-agent, or your SSH config.",
+                    color: .blue
+                )
+            }
         case .rest:
             FieldRow(title: "URL") { TextField("https://backup.example.com/repo", text: $primary).textFieldStyle(.roundedBorder) }
         case .s3:
@@ -2720,7 +2789,13 @@ struct RepositoryEditorView: View {
     private var backend: RepositoryBackend {
         switch kind {
         case .local: .local(path: primary)
-        case .sftp: .sftp(host: primary, path: secondary, username: tertiary.isEmpty ? nil : tertiary, port: parsedPort)
+        case .sftp: .sftp(
+            host: primary,
+            path: secondary,
+            username: tertiary.isEmpty ? nil : tertiary,
+            port: parsedPort,
+            identityFilePath: sftpIdentityFilePath.isEmpty ? nil : sftpIdentityFilePath
+        )
         case .rest: .rest(url: primary)
         case .s3: .s3(endpoint: tertiary.isEmpty ? nil : tertiary, bucket: primary, path: secondary.isEmpty ? nil : secondary, region: quaternary.isEmpty ? nil : quaternary)
         case .backblazeB2: .backblazeB2(bucket: primary, path: secondary.isEmpty ? nil : secondary)
@@ -2790,8 +2865,15 @@ struct RepositoryEditorView: View {
         switch backend {
         case let .local(path):
             RepositoryEditorState(kind: .local, primary: path)
-        case let .sftp(host, path, username, port):
-            RepositoryEditorState(kind: .sftp, primary: host, secondary: path, tertiary: username ?? "", quaternary: port.map(String.init) ?? "")
+        case let .sftp(host, path, username, port, identityFilePath):
+            RepositoryEditorState(
+                kind: .sftp,
+                primary: host,
+                secondary: path,
+                tertiary: username ?? "",
+                quaternary: port.map(String.init) ?? "",
+                sftpIdentityFilePath: identityFilePath ?? ""
+            )
         case let .rest(url):
             RepositoryEditorState(kind: .rest, primary: url)
         case let .s3(endpoint, bucket, path, region):
@@ -2817,6 +2899,7 @@ struct RepositoryEditorView: View {
         var secondary = ""
         var tertiary = ""
         var quaternary = ""
+        var sftpIdentityFilePath = ""
     }
 }
 
@@ -3020,8 +3103,6 @@ struct SettingsStatusGrid: View {
 
     private var columns: [GridItem] {
         [
-            GridItem(.flexible(minimum: 190), spacing: 12),
-            GridItem(.flexible(minimum: 190), spacing: 12),
             GridItem(.flexible(minimum: 190), spacing: 12),
             GridItem(.flexible(minimum: 190), spacing: 12)
         ]

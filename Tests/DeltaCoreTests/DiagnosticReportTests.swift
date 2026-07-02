@@ -43,7 +43,7 @@ final class DiagnosticReportTests: XCTestCase {
         XCTAssertTrue(report.contains("# Delta Diagnostic Report"))
         XCTAssertTrue(report.contains("- Version: 0.1 (1)"))
         XCTAssertTrue(report.contains("- Full Disk Access: Ready"))
-        XCTAssertTrue(report.contains("- Background Backups: Enabled"))
+        XCTAssertTrue(report.contains("- Background Scheduling: Enabled"))
         XCTAssertTrue(report.contains("- Notifications: Enabled"))
         XCTAssertTrue(report.contains("- Menu Bar: Shown"))
         XCTAssertTrue(report.contains("- Restore Defaults: Preview first, verify files, Replace changed"))

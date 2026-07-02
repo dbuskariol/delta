@@ -6,6 +6,7 @@ public enum BackupRepositoryValidationError: Error, Equatable, LocalizedError {
     case relativeLocalPath(String)
     case localDestinationUnavailable(String)
     case invalidSFTPPath(String)
+    case invalidSFTPIdentityFile(String)
     case invalidPort(Int)
     case invalidURL(String)
     case invalidRcloneRemote(String)
@@ -22,6 +23,8 @@ public enum BackupRepositoryValidationError: Error, Equatable, LocalizedError {
             "Delta cannot write to the local destination or its parent folder: \(path)."
         case let .invalidSFTPPath(path):
             "Use an absolute SFTP destination path, not '\(path)'."
+        case let .invalidSFTPIdentityFile(path):
+            "Choose a readable local SSH private key file, not '\(path)'."
         case let .invalidPort(port):
             "Use a destination port from 1 to 65535, not \(port)."
         case let .invalidURL(value):
@@ -74,18 +77,20 @@ public struct BackupRepositoryValidator: Sendable {
             }
             return .local(path: expandedPath)
 
-        case let .sftp(host, path, username, port):
+        case let .sftp(host, path, username, port, identityFilePath):
             let host = try required(host, field: "SFTP host")
             let path = try required(path, field: "SFTP path")
             guard path.hasPrefix("/") else {
                 throw BackupRepositoryValidationError.invalidSFTPPath(path)
             }
             try validatePort(port)
+            let identityFilePath = try optionalReadableFilePath(identityFilePath)
             return .sftp(
                 host: host,
                 path: path,
                 username: optional(username),
-                port: port
+                port: port,
+                identityFilePath: identityFilePath
             )
 
         case let .rest(url):
@@ -163,6 +168,21 @@ public struct BackupRepositoryValidator: Sendable {
         }
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
+    }
+
+    private func optionalReadableFilePath(_ value: String?) throws -> String? {
+        guard let value = optional(value) else {
+            return nil
+        }
+        let expanded = (value as NSString).expandingTildeInPath
+        guard expanded.hasPrefix("/"), FileManager.default.isReadableFile(atPath: expanded) else {
+            throw BackupRepositoryValidationError.invalidSFTPIdentityFile(value)
+        }
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: expanded, isDirectory: &isDirectory), !isDirectory.boolValue else {
+            throw BackupRepositoryValidationError.invalidSFTPIdentityFile(value)
+        }
+        return expanded
     }
 
     private func trimmed(_ value: String) -> String {

@@ -640,7 +640,7 @@ final class DeltaAppModel: ObservableObject {
         do {
             try LaunchAgentController.unregister()
             launchAgentStatus = LaunchAgentController.status()
-            alertMessage = "Background Backups were turned off."
+            alertMessage = "Background Scheduling was turned off."
         } catch {
             launchAgentStatus = LaunchAgentController.status()
             alertMessage = error.localizedDescription
@@ -692,10 +692,10 @@ final class DeltaAppModel: ObservableObject {
             do {
                 try LaunchAgentController.register()
                 launchAgentStatus = LaunchAgentController.status()
-                try? database.appendEvent(EventLog(level: .info, message: "Background Backups registration was requested for scheduled profile '\(profile.name)'."))
+                try? database.appendEvent(EventLog(level: .info, message: "Background Scheduling registration was requested for scheduled profile '\(profile.name)'."))
             } catch {
                 launchAgentStatus = LaunchAgentController.status()
-                alertMessage = "Scheduled backups were saved, but Background Backups could not be requested: \(error.localizedDescription)"
+                alertMessage = "Scheduled backups were saved, but Background Scheduling could not be requested: \(error.localizedDescription)"
                 return
             }
         }
@@ -708,17 +708,17 @@ final class DeltaAppModel: ObservableObject {
     private func backgroundBackupsRegistrationMessage(for status: LaunchAgentRegistrationStatus) -> String {
         switch status {
         case .enabled:
-            return "Background Backups are on."
+            return "Background Scheduling is on."
         case .requiresApproval:
-            return "Background Backups were added. Approve Delta in Login Items so scheduled backups can run while the main window is closed."
+            return "Background Scheduling was added. Approve Delta in Login Items so scheduled backups can run while the main window is closed."
         case .notRegistered:
-            return "Background Backups are not on yet. Turn them on again or approve Delta in Login Items if macOS is waiting for approval."
+            return "Background Scheduling is not on yet. Turn it on again or approve Delta in Login Items if macOS is waiting for approval."
         case .notFound:
-            return "Background Backups could not start because the helper is missing from the app bundle."
+            return "Background Scheduling could not start because the helper is missing from the app bundle."
         case .unavailable:
-            return "Background Backups are unavailable on this macOS version."
+            return "Background Scheduling is unavailable on this macOS version."
         case let .unknown(rawValue):
-            return "Background Backups returned an unknown macOS status: \(rawValue)"
+            return "Background Scheduling returned an unknown macOS status: \(rawValue)"
         }
     }
 
@@ -777,6 +777,16 @@ final class DeltaAppModel: ObservableObject {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
+        panel.allowsMultipleSelection = allowsMultipleSelection
+        panel.prompt = "Choose"
+        guard panel.runModal() == .OK else { return [] }
+        return panel.urls.map(\.path)
+    }
+
+    func chooseFile(allowsMultipleSelection: Bool = false) -> [String] {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
         panel.allowsMultipleSelection = allowsMultipleSelection
         panel.prompt = "Choose"
         guard panel.runModal() == .OK else { return [] }
