@@ -14,7 +14,7 @@ The product goal is simple: make serious backup practices approachable without h
 - **Local and network destinations** including local paths, mounted SMB/NFS volumes, SFTP, REST server, S3-compatible storage, Backblaze B2, Azure Blob, Google Cloud Storage, OpenStack Swift, rclone remotes, and custom restic URLs.
 - **Destination validation before save** for required fields, new or changed writable local paths, REST URLs, SFTP paths/ports, S3 endpoint/bucket fields, and rclone remote syntax.
 - **Non-interactive SFTP scheduling** with optional SSH private-key file configuration, SSH batch mode, and keepalive options so scheduled jobs fail clearly instead of waiting for password prompts.
-- **Automatic destination preparation** after a destination is added, with a first-backup safety net for writable local/mounted destinations and unverified remote destinations that still have no encrypted backup metadata.
+- **Automatic destination preparation** after a destination is added, with a first-backup safety net for local/mounted destinations that pass a real write/delete probe and unverified remote destinations that still have no encrypted backup metadata.
 - **Scheduled backups** through Background Backups, a signed macOS Login Item helper registered with `SMAppService`, with helper-started jobs reflected back into the app and menu bar.
 - **Power-aware scheduling** with battery and Low Power Mode controls, plus optional idle-sleep protection while backup, restore, check, and cleanup jobs are actively running.
 - **Retention maintenance** with scheduled forget/prune/check windows.
@@ -135,7 +135,7 @@ Notification Center alerts are also separate from Background Backups. When enabl
 
 Retention maintenance can run `forget`, `prune`, and optional `check` based on the profile maintenance schedule. Post-prune checks are returned to the agent so failed validation is visible in job status and process exit status.
 
-For local and mounted destinations, scheduled maintenance fails fast with a clear reconnect/remount message when the destination folder is absent. Delta does not launch restic for cleanup or check work against a missing drive.
+For local and mounted destinations, scheduled maintenance fails fast with a clear reconnect/remount message when the destination folder is absent or unwritable. Delta proves local writability with a hidden temporary write/delete probe and does not launch restic for cleanup or check work against a missing or read-only drive.
 
 For remote destinations, Delta performs a one-time lightweight restore-point probe before the first backup if the destination has not been verified yet. If the remote already contains encrypted backup metadata, Delta uses it and caches the verified state. If restic reports that the destination is missing, Delta prepares it automatically before the backup starts. Password, credential, lock, or network failures stop before backup data is scanned.
 

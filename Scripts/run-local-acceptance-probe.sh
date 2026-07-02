@@ -280,7 +280,7 @@ else
   automated_gate_commit="$(gate_status_value git_commit)"
   if [[ "$automated_gate_status" == "Passed" && "$automated_gate_commit" == "$git_commit" ]]; then
     if [[ "$installed_local_status" -eq 0 ]]; then
-      append_row "local_drive_destination" "$(item_area local_drive_destination)" "Partial" "$installed_local_evidence Automated release gate also passed local restic lifecycle and source access preflight coverage for commit $git_commit." "Repeat through the installed app UI with the target local or external drive."
+      append_row "local_drive_destination" "$(item_area local_drive_destination)" "Partial" "$installed_local_evidence Automated release gate also passed local restic lifecycle, source access preflight, and destination write-probe coverage for commit $git_commit." "Repeat through the installed app UI with the target local or external drive."
       append_row "restore_wizard" "$(item_area restore_wizard)" "Partial" "$installed_local_evidence Automated release gate also passed dry-run restore command paths for commit $git_commit." "Exercise the installed Restore wizard UI, original-path confirmation, browser selection, and each overwrite policy."
     else
       append_row "local_drive_destination" "$(item_area local_drive_destination)" "Failed" "$installed_local_evidence" "Fix installed app local lifecycle acceptance, then repeat through the installed app UI."
@@ -316,7 +316,7 @@ else
       append_row "mounted_network_drive" "$(item_area mounted_network_drive)" "Failed" "$mounted_acceptance_evidence" "Fix the configured mounted /Volumes acceptance target and rerun."
       ;;
     *)
-      append_row "mounted_network_drive" "$(item_area mounted_network_drive)" "Manual Required" "No mounted SMB/NFS target is configured for non-interactive verification. Set DELTA_ACCEPTANCE_MOUNTED_PATH to run external backend acceptance." "Test a mounted /Volumes destination, disconnect, confirm Delta fails before invoking restic, reconnect, and resume."
+      append_row "mounted_network_drive" "$(item_area mounted_network_drive)" "Manual Required" "No mounted SMB/NFS target is configured for non-interactive verification. Set DELTA_ACCEPTANCE_MOUNTED_PATH to run external backend acceptance. Automated local tests cover missing and unwritable local destination preflight with a real write/delete probe." "Test a mounted /Volumes destination, disconnect, confirm Delta fails before invoking restic, reconnect, resume, then repeat with an unwritable mount."
       ;;
   esac
 

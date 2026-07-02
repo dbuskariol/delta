@@ -1,4 +1,5 @@
 import XCTest
+import Darwin
 @testable import DeltaCore
 
 final class RepositoryAvailabilityCheckerTests: XCTestCase {
@@ -38,6 +39,31 @@ final class RepositoryAvailabilityCheckerTests: XCTestCase {
         try Data("file".utf8).write(to: file)
 
         let repository = BackupRepository(name: "Local", backend: .local(path: file.path))
+
+        XCTAssertFalse(RepositoryAvailabilityChecker().isAvailable(repository))
+    }
+
+    func testLocalDestinationRejectsExistingDirectoryWhenWriteProbeFails() throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanUp() }
+        XCTAssertEqual(chmod(fixture.directory.path, 0o500), 0)
+        defer { _ = chmod(fixture.directory.path, 0o700) }
+
+        let repository = BackupRepository(name: "Local", backend: .local(path: fixture.directory.path))
+
+        XCTAssertFalse(RepositoryAvailabilityChecker().isAvailable(repository))
+    }
+
+    func testLocalDestinationRejectsCreatableChildWhenParentWriteProbeFails() throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanUp() }
+        let parent = fixture.directory.appendingPathComponent("read-only-parent", isDirectory: true)
+        try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
+        XCTAssertEqual(chmod(parent.path, 0o500), 0)
+        defer { _ = chmod(parent.path, 0o700) }
+        let child = parent.appendingPathComponent("new-repository", isDirectory: true)
+
+        let repository = BackupRepository(name: "Local", backend: .local(path: child.path))
 
         XCTAssertFalse(RepositoryAvailabilityChecker().isAvailable(repository))
     }
