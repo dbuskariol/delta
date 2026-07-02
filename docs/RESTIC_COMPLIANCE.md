@@ -45,6 +45,8 @@ Delta supports the following restic backend families:
 
 URL construction is covered by `ResticCommandTests`.
 
+Delta validates destination inputs before saving them. The validator trims persisted fields, requires writable new or changed local destinations or writable parents, rejects relative local paths in the native destination form, requires absolute SFTP paths and valid ports, validates REST URLs as `http` or `https`, and rejects rclone remote names that already include a colon. Advanced raw restic URLs remain available through the custom destination type.
+
 ## Backend Credentials
 
 Backend credentials are stored in Keychain and injected into a curated restic process environment only for the job run. Delta forwards operational values such as `PATH`, `HOME`, `TMPDIR`, locale, and `SSH_AUTH_SOCK`, but does not pass arbitrary ambient environment variables to restic.

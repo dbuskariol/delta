@@ -1164,8 +1164,9 @@ struct RepositoryEditorView: View {
             SheetActions {
                 Button("Cancel") { dismiss() }
                 Button(existingRepository == nil ? "Create" : "Save") {
-                    saveDestination()
-                    dismiss()
+                    if saveDestination() {
+                        dismiss()
+                    }
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(!canCreate)
@@ -1286,16 +1287,16 @@ struct RepositoryEditorView: View {
         return Int(value)
     }
 
-    private func saveDestination() {
+    private func saveDestination() -> Bool {
         if let existingRepository {
-            model.saveRepository(
+            return model.saveRepository(
                 existingRepository,
                 name: name,
                 backend: backend,
                 backendCredentials: sanitizedCredentialValues
             )
         } else {
-            model.createRepository(
+            return model.createRepository(
                 name: name,
                 backend: backend,
                 storageMode: storageMode,

@@ -44,6 +44,7 @@ final class DeltaAppModel: ObservableObject {
     private let secretStore = KeychainSecretStore()
     private let credentialResolver = RepositoryCredentialResolver()
     private let bookmarkStore = SecurityScopedBookmarkStore()
+    private let repositoryValidator = BackupRepositoryValidator()
 
     init() {
         let result = Self.openDatabase()
@@ -67,20 +68,22 @@ final class DeltaAppModel: ObservableObject {
         }
     }
 
+    @discardableResult
     func createRepository(
         name: String,
         backend: RepositoryBackend,
         storageMode: SecretStorageMode = .appManagedKeychain,
         passphrase: String? = nil,
         backendCredentials: [String: String] = [:]
-    ) {
+    ) -> Bool {
         do {
+            let validated = try repositoryValidator.validate(name: name, backend: backend)
             let repositoryID = UUID()
             let credentialReferences = try credentialResolver.saveCredentials(backendCredentials, repositoryID: repositoryID)
             let repository = BackupRepository(
                 id: repositoryID,
-                name: name,
-                backend: backend,
+                name: validated.name,
+                backend: validated.backend,
                 secretStorageMode: storageMode,
                 credentialReferences: credentialReferences
             )
@@ -96,21 +99,29 @@ final class DeltaAppModel: ObservableObject {
             try database.saveRepository(repository)
             try database.appendEvent(EventLog(level: .info, message: "Destination '\(repository.name)' was created."))
             reload()
+            return true
         } catch {
             alertMessage = error.localizedDescription
+            return false
         }
     }
 
+    @discardableResult
     func saveRepository(
         _ repository: BackupRepository,
         name: String,
         backend: RepositoryBackend,
         backendCredentials: [String: String] = [:]
-    ) {
+    ) -> Bool {
         do {
+            let validated = try repositoryValidator.validate(
+                name: name,
+                backend: backend,
+                validateLocalAvailability: backend != repository.backend
+            )
             var updatedRepository = repository
-            updatedRepository.name = name
-            updatedRepository.backend = backend
+            updatedRepository.name = validated.name
+            updatedRepository.backend = validated.backend
             updatedRepository.credentialReferences = try credentialResolver.updateCredentials(
                 backendCredentials,
                 existingReferences: repository.credentialReferences,
@@ -123,8 +134,10 @@ final class DeltaAppModel: ObservableObject {
             try database.saveRepository(updatedRepository)
             try database.appendEvent(EventLog(level: .info, message: "Destination '\(updatedRepository.name)' was updated."))
             reload()
+            return true
         } catch {
             alertMessage = error.localizedDescription
+            return false
         }
     }
 

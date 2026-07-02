@@ -10,6 +10,7 @@ The product goal is simple: make serious backup practices approachable without h
 - **Incremental restore points** with content-addressed deduplication, metadata tracking, and `--skip-if-unchanged`.
 - **Full-volume or custom-folder protection** with macOS-safe excludes and destination self-exclusion.
 - **Local and network destinations** including local paths, mounted SMB/NFS volumes, SFTP, REST server, S3-compatible storage, Backblaze B2, Azure Blob, Google Cloud Storage, OpenStack Swift, rclone remotes, and custom restic URLs.
+- **Destination validation before save** for required fields, new or changed writable local paths, REST URLs, SFTP paths/ports, and rclone remote syntax.
 - **Scheduled backups** through a bundled `DeltaAgent` LaunchAgent registered with `SMAppService`.
 - **Power-aware scheduling** with battery and Low Power Mode controls.
 - **Retention maintenance** with scheduled forget/prune/check windows.
