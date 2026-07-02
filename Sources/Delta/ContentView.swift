@@ -1012,15 +1012,20 @@ struct SettingsView: View {
                 }
             }
 
+            SettingsSectionLabel(
+                title: "Automation",
+                subtitle: "Run scheduled backups reliably without keeping the main window open."
+            )
+
             SettingsCard(
                 symbol: "clock.badge.checkmark",
                 title: "Background Backups",
-                subtitle: "Run scheduled profiles when the main Delta window is closed.",
+                subtitle: "Delta's signed macOS helper checks schedules and starts due backups in the background.",
                 statusText: backgroundBackupsStatusText,
                 statusColor: launchAgentStatusColor
             ) {
                 SettingsControlRow(
-                    title: "Scheduled automation",
+                    title: "Allow scheduled backups",
                     detail: backgroundBackupsControlDetail
                 ) {
                     Toggle("", isOn: backgroundBackupsBinding)
@@ -1030,30 +1035,26 @@ struct SettingsView: View {
 
                 SettingsNotice(
                     symbol: "clock.arrow.circlepath",
-                    title: "What this does",
-                    text: "Delta uses a signed macOS Login Item helper that runs as your user account. It wakes briefly, checks schedules, starts due backups, enforces destination and power policies, runs cleanup when scheduled, then exits.",
+                    title: "How background backups work",
+                    text: "The helper runs as your macOS user, needs no admin privileges, wakes briefly every few minutes, applies destination, network, battery, and low-power rules, then exits.",
                     color: .blue
                 )
 
                 SettingsFactGrid(items: [
                     SettingsFact(title: "Scheduled profiles", value: "\(scheduledProfileCount)"),
-                    SettingsFact(title: "Wake cadence", value: "Every 5 min"),
-                    SettingsFact(title: "Privileges", value: "No admin access")
+                    SettingsFact(title: "Check interval", value: "Every 5 min"),
+                    SettingsFact(title: "Runs as", value: "Current user"),
+                    SettingsFact(title: "Admin access", value: "Not required")
                 ])
 
-                SettingsNotice(
-                    symbol: "person.crop.circle.badge.exclamationmark",
-                    title: "macOS approval",
-                    text: "Delta can register the helper and open Login Items, but macOS requires you to approve background items yourself when it asks.",
-                    color: model.launchAgentStatus == .enabled ? .secondary : .orange
-                )
-
-                SettingsNotice(
-                    symbol: "key",
-                    title: "Scheduled password access",
-                    text: "If macOS asks for DeltaSecretBridge Keychain access or scheduled backups cannot read a destination password, repair Keychain access once from here.",
-                    color: .teal
-                )
+                if model.launchAgentStatus != .enabled {
+                    SettingsNotice(
+                        symbol: "person.crop.circle.badge.exclamationmark",
+                        title: "macOS approval required",
+                        text: "Delta can request the helper, but macOS may still require approval in Login Items before scheduled backups can run while the app is closed.",
+                        color: .orange
+                    )
+                }
 
                 HStack(spacing: 8) {
                     Button {
@@ -1069,14 +1070,19 @@ struct SettingsView: View {
                     Button {
                         model.repairBackgroundSecretAccess()
                     } label: {
-                        Label("Repair Keychain Access", systemImage: "key")
+                        Label("Repair Password Access", systemImage: "key")
                     }
                     .disabled(model.repositories.isEmpty || model.isWorking || !model.isPersistentStoreAvailable)
-                    .deltaTooltip("Rewrite saved destination passwords and backend credentials so scheduled backups can read them without Keychain prompts.")
+                    .deltaTooltip("Refresh saved destination passwords so scheduled backups can read them without interactive Keychain prompts.")
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
             }
+
+            SettingsSectionLabel(
+                title: "System Access",
+                subtitle: "macOS privacy permissions Delta needs to read protected folders."
+            )
 
             SettingsCard(
                 symbol: "lock.shield",
@@ -1091,7 +1097,7 @@ struct SettingsView: View {
 
                 SettingsFactGrid(items: [
                     SettingsFact(title: "Protected folders", value: model.fullDiskAccessStatus.hasLikelyFullDiskAccess ? "Readable" : "Blocked"),
-                    SettingsFact(title: "Install location", value: "/Applications"),
+                    SettingsFact(title: "App location", value: appBundleLocation),
                     SettingsFact(title: "Approval", value: "Manual in macOS")
                 ])
 
@@ -1120,6 +1126,11 @@ struct SettingsView: View {
                 .controlSize(.small)
             }
 
+            SettingsSectionLabel(
+                title: "Preferences",
+                subtitle: "App-level preferences that apply across destinations and backup profiles."
+            )
+
             SettingsCard(
                 symbol: "menubar.rectangle",
                 title: "Menu Bar",
@@ -1143,7 +1154,7 @@ struct SettingsView: View {
 
             SettingsCard(
                 symbol: "slider.horizontal.3",
-                title: "Profiles and Destinations",
+                title: "Backup Defaults",
                 subtitle: "Operational backup behavior is configured where it applies."
             ) {
                 SettingsFactGrid(items: [
@@ -1216,6 +1227,11 @@ struct SettingsView: View {
                 .buttonStyle(.bordered)
                 .controlSize(.small)
             }
+
+            SettingsSectionLabel(
+                title: "Support",
+                subtitle: "Diagnostics and local files for troubleshooting without exposing secrets."
+            )
 
             SettingsCard(
                 symbol: "folder.badge.gearshape",
@@ -1319,6 +1335,10 @@ struct SettingsView: View {
         model.fullDiskAccessStatus.hasLikelyFullDiskAccess
             ? "Protected locations look readable for full-volume and selected-folder backups."
             : "Protected locations are not readable yet. Open Privacy & Security, add Delta with the + button if needed, then recheck access."
+    }
+
+    private var appBundleLocation: String {
+        Bundle.main.bundleURL.path
     }
 
     private func applyUpdatePreferences() {
@@ -2617,6 +2637,24 @@ struct SettingsFact: Identifiable {
     var id: String { title }
     var title: String
     var value: String
+}
+
+struct SettingsSectionLabel: View {
+    var title: String
+    var subtitle: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+            Text(subtitle)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.top, 4)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
 }
 
 struct SettingsFactGrid: View {
