@@ -1689,28 +1689,40 @@ struct SettingsView: View {
                 SettingsFactGrid(items: [
                     SettingsFact(title: "macOS permission", value: notificationAuthorizationState.displayName),
                     SettingsFact(title: "Failure alerts", value: sendsJobNotifications ? "On" : "Off"),
-                    SettingsFact(title: "Success alerts", value: sendsSuccessfulBackupNotifications ? "On" : "Off")
+                    SettingsFact(title: "Success alerts", value: sendsSuccessfulBackupNotifications ? "On" : "Off"),
+                    SettingsFact(title: "Test alert", value: notificationTestAlertStatusText)
                 ])
 
                 SettingsActionBar {
+                    Button {
+                        sendTestNotification()
+                    } label: {
+                        Label("Send Test Alert", systemImage: "bell.and.waves.left.and.right")
+                    }
+                    .disabled(!canSendTestNotification)
+                    .deltaTooltip(notificationTestAlertTooltip)
+
                     Button {
                         requestNotificationPermission()
                     } label: {
                         Label("Request Permission", systemImage: "bell.badge")
                     }
                     .disabled(notificationAuthorizationState.canDeliver)
+                    .deltaTooltip("Ask macOS for permission to show Delta backup alerts.")
 
                     Button {
                         model.openNotificationSettings()
                     } label: {
                         Label("Open Notifications", systemImage: "gearshape")
                     }
+                    .deltaTooltip("Open macOS Notifications settings for Delta.")
 
                     Button {
                         refreshNotificationAuthorization()
                     } label: {
                         Label("Refresh Status", systemImage: "arrow.clockwise")
                     }
+                    .deltaTooltip("Recheck macOS notification permission.")
                 }
             }
             }
@@ -2567,6 +2579,30 @@ struct SettingsView: View {
         }
     }
 
+    private var canSendTestNotification: Bool {
+        sendsJobNotifications && notificationAuthorizationState.canDeliver
+    }
+
+    private var notificationTestAlertStatusText: String {
+        if !sendsJobNotifications {
+            return "Enable alerts"
+        }
+        if !notificationAuthorizationState.canDeliver {
+            return "Needs Permission"
+        }
+        return "Ready"
+    }
+
+    private var notificationTestAlertTooltip: String {
+        if !sendsJobNotifications {
+            return "Enable job alerts before sending a test notification."
+        }
+        if !notificationAuthorizationState.canDeliver {
+            return "Allow Delta in macOS Notifications settings before sending a test alert."
+        }
+        return "Send a macOS notification now to confirm Delta alerts are working."
+    }
+
     private var automaticUpdatesStatusText: String {
         guard automaticallyChecksForUpdates else {
             return "Off"
@@ -2831,6 +2867,26 @@ struct SettingsView: View {
                 model.alertMessage = "Delta cannot send notifications until they are allowed in macOS Notifications settings."
             }
         }
+    }
+
+    private func sendTestNotification() {
+        let settings = JobNotificationSettings(
+            isEnabled: sendsJobNotifications,
+            includesSuccessfulBackups: sendsSuccessfulBackupNotifications
+        )
+        guard let content = JobNotificationPolicy.testAlertContent(
+            settings: settings,
+            authorizationState: notificationAuthorizationState,
+            identifier: UUID().uuidString
+        ) else {
+            if !sendsJobNotifications {
+                model.alertMessage = "Turn on job alerts before sending a test notification."
+            } else if !notificationAuthorizationState.canDeliver {
+                model.alertMessage = "Delta cannot send notifications until they are allowed in macOS Notifications settings."
+            }
+            return
+        }
+        DeltaUserNotifier.deliver(content)
     }
 
     private func normalizedOptionalPositiveInteger(from text: String, maximum: Int) -> Int {

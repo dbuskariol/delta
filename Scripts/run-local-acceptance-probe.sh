@@ -369,7 +369,14 @@ else
     append_row "remote_first_backup_preparation" "$(item_area remote_first_backup_preparation)" "Manual Required" "Remote destination preparation needs a real unprepared remote and an existing remote to avoid false confidence. Configure SFTP or S3 external acceptance to automate the backend lifecycle." "Start backup on new unprepared remote and existing remote; confirm init happens only when needed."
   fi
   append_row "menu_bar" "$(item_area menu_bar)" "Manual Required" "Native status item presentation and persistent popover behavior require visual macOS interaction." "Enable/disable the menu bar item and verify ready/running/attention states plus all popover actions."
-  append_row "notifications" "$(item_area notifications)" "Manual Required" "Notification Center authorization and delivery require user approval and real macOS delivery." "Enable alerts, grant macOS permission, trigger warning/failed helper jobs, and verify success summaries only when opted in."
+  if [[ "$automated_gate_status" == "Passed" && "$automated_gate_commit" == "$git_commit" ]] \
+    && grep -Fq "Send Test Alert" "$ROOT_DIR/Sources/Delta/ContentView.swift" \
+    && grep -Fq "testTestAlertRequiresEnabledNotificationsAndDeliverableAuthorization" "$ROOT_DIR/Tests/DeltaCoreTests/JobNotificationPolicyTests.swift"
+  then
+    append_row "notifications" "$(item_area notifications)" "Partial" "Automated release gate passed notification policy coverage for commit $git_commit, and Settings exposes a Send Test Alert control for user-verifiable macOS delivery." "Enable alerts, grant macOS permission, use Send Test Alert, trigger warning/failed helper jobs, and verify success summaries only when opted in."
+  else
+    append_row "notifications" "$(item_area notifications)" "Manual Required" "Notification Center authorization and delivery require user approval and real macOS delivery." "Enable alerts, grant macOS permission, trigger warning/failed helper jobs, and verify success summaries only when opted in."
+  fi
 
   sparkle_output="$(run_capture sparkle_artifacts "$ROOT_DIR/Scripts/verify-sparkle-update-artifacts.sh" "$ROOT_DIR/dist/Delta.app" "$ROOT_DIR/dist/updates")"
   sparkle_status="$(command_status sparkle_artifacts)"

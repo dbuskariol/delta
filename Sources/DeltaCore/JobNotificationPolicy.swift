@@ -23,6 +23,22 @@ public struct JobNotificationContent: Equatable, Sendable {
 }
 
 public enum JobNotificationPolicy {
+    public static func testAlertContent(
+        settings: JobNotificationSettings,
+        authorizationState: DeltaNotificationAuthorizationState,
+        identifier: String = "test-alert"
+    ) -> JobNotificationContent? {
+        guard settings.isEnabled, authorizationState.canDeliver else {
+            return nil
+        }
+
+        return JobNotificationContent(
+            identifier: identifier,
+            title: "Delta test alert",
+            body: "Backup notifications are ready."
+        )
+    }
+
     public static func content(
         for job: JobRun,
         settings: JobNotificationSettings,

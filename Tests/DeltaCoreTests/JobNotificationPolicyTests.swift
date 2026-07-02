@@ -2,6 +2,31 @@ import XCTest
 @testable import DeltaCore
 
 final class JobNotificationPolicyTests: XCTestCase {
+    func testTestAlertRequiresEnabledNotificationsAndDeliverableAuthorization() throws {
+        XCTAssertNil(JobNotificationPolicy.testAlertContent(
+            settings: JobNotificationSettings(isEnabled: false, includesSuccessfulBackups: true),
+            authorizationState: .authorized
+        ))
+        XCTAssertNil(JobNotificationPolicy.testAlertContent(
+            settings: JobNotificationSettings(isEnabled: true),
+            authorizationState: .notDetermined
+        ))
+        XCTAssertNil(JobNotificationPolicy.testAlertContent(
+            settings: JobNotificationSettings(isEnabled: true),
+            authorizationState: .denied
+        ))
+
+        let content = try XCTUnwrap(JobNotificationPolicy.testAlertContent(
+            settings: JobNotificationSettings(isEnabled: true),
+            authorizationState: .authorized,
+            identifier: "manual-test"
+        ))
+
+        XCTAssertEqual(content.identifier, "manual-test")
+        XCTAssertEqual(content.title, "Delta test alert")
+        XCTAssertEqual(content.body, "Backup notifications are ready.")
+    }
+
     func testNotificationsAreSuppressedWhenDisabled() {
         let job = JobRun(repositoryID: UUID(), kind: .backup, status: .failed, message: "Wrong password")
 
