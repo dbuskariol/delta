@@ -38,11 +38,12 @@ final class SettingsSurfaceContractTests: XCTestCase {
     func testSettingsSurfaceContractUsesProductLanguage() {
         let visibleText = SettingsSurfaceContract.allVisibleStrings().joined(separator: "\n")
 
-        XCTAssertFalse(visibleText.contains("LaunchAgent"))
-        XCTAssertFalse(visibleText.contains("Launch Agent"))
-        XCTAssertFalse(visibleText.contains("SMAppServiceStatus"))
-        XCTAssertFalse(visibleText.contains("rawValue"))
-        XCTAssertFalse(visibleText.contains("Background Backups"))
+        for term in SettingsSurfaceContract.forbiddenVisibleTerms {
+            XCTAssertFalse(
+                visibleText.localizedCaseInsensitiveContains(term),
+                "Settings visible text exposes implementation/control term: \(term)"
+            )
+        }
         XCTAssertTrue(SettingsSurfaceContract.validationFailures().isEmpty)
     }
 

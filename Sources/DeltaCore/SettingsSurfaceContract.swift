@@ -126,6 +126,16 @@ public enum SettingsSurfaceContract {
         "Activity history retention"
     ]
 
+    public static let forbiddenVisibleTerms = [
+        "Launch" + "Agent",
+        "Launch " + "Agent",
+        "SMAppService" + "Status",
+        "raw" + "Value",
+        "Background " + "Backups",
+        "Register",
+        "Unregister"
+    ]
+
     public static func validationFailures() -> [String] {
         var failures: [String] = []
         require(categoryTitles, contains: categoryGeneral, in: "categories", failures: &failures)
@@ -162,14 +172,7 @@ public enum SettingsSurfaceContract {
         require(requiredManualAcceptanceCoverage, contains: "Destination free-space warning control", in: "manual coverage", failures: &failures)
 
         let visibleStrings = allVisibleStrings()
-        let forbiddenTerms = [
-            "Launch" + "Agent",
-            "Launch " + "Agent",
-            "SMAppService" + "Status",
-            "raw" + "Value",
-            "Background " + "Backups"
-        ]
-        for term in forbiddenTerms where visibleStrings.contains(where: { $0.localizedCaseInsensitiveContains(term) }) {
+        for term in forbiddenVisibleTerms where visibleStrings.contains(where: { $0.localizedCaseInsensitiveContains(term) }) {
             failures.append("Settings contract exposes implementation term '\(term)'.")
         }
         return failures
