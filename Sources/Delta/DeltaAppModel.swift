@@ -793,6 +793,12 @@ final class DeltaAppModel: ObservableObject {
         }
     }
 
+    func revealBackupToolsFolder() {
+        let resticURL = ResticExecutableLocator().locate(in: Bundle.main)
+        let toolsURL = resticURL.deletingLastPathComponent()
+        NSWorkspace.shared.activateFileViewerSelecting([toolsURL])
+    }
+
     func copyDiagnosticReport() {
         let report = makeDiagnosticReport()
         NSPasteboard.general.clearContents()

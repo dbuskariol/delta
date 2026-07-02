@@ -1057,7 +1057,7 @@ struct SettingsView: View {
     var body: some View {
         PageScaffold(
             title: "Settings",
-            subtitle: "System access, background automation, updates, and support",
+            subtitle: "Backups, permissions, updates, and support",
             actions: {
                 Button {
                     model.reload()
@@ -1091,7 +1091,7 @@ struct SettingsView: View {
 
             SettingsSectionLabel(
                 title: "Scheduled Backups",
-                subtitle: "Keep scheduled protection running separately from the main window and menu bar."
+                subtitle: "Run due backups even when the main Delta window is closed."
             )
 
             SettingsCard(
@@ -1113,7 +1113,7 @@ struct SettingsView: View {
                 SettingsNotice(
                     symbol: "clock.arrow.circlepath",
                     title: "What this does",
-                    text: "Delta installs a signed per-user scheduler through macOS Login Items. It wakes for short checks, starts due backups when policy allows it, then exits. It is not an admin service and does not require Delta's window to stay open.",
+                    text: "Delta uses macOS Login Items to install a signed per-user scheduler. It wakes for short checks, starts due backups when policy allows it, then exits. It is not an admin service and it does not need the main window to stay open.",
                     color: .blue
                 )
 
@@ -1125,12 +1125,19 @@ struct SettingsView: View {
                     SettingsFact(title: "macOS approval", value: backgroundApprovalText)
                 ])
 
-                if model.launchAgentStatus != .enabled {
+                if shouldShowBackgroundSchedulingAttention {
                     SettingsNotice(
                         symbol: "person.crop.circle.badge.exclamationmark",
-                        title: "macOS approval required",
-                        text: "Delta can request the helper, but macOS may still require approval in Login Items before scheduled backups can run while the app is closed.",
+                        title: backgroundSchedulingAttentionTitle,
+                        text: backgroundSchedulingAttentionText,
                         color: .orange
+                    )
+                } else if scheduledProfileCount == 0 {
+                    SettingsNotice(
+                        symbol: "calendar.badge.plus",
+                        title: "No scheduled profiles",
+                        text: "Create an hourly, daily, weekly, monthly, or custom scheduled backup profile before this background scheduler is needed.",
+                        color: .secondary
                     )
                 }
 
@@ -1548,6 +1555,33 @@ struct SettingsView: View {
             }
 
             SettingsCard(
+                symbol: "externaldrive.badge.checkmark",
+                title: "Backup Tools",
+                subtitle: "Bundled engines Delta uses for encrypted backups and remote destinations.",
+                statusText: backupToolStatusText,
+                statusColor: backupToolStatusColor
+            ) {
+                SettingsFactGrid(items: [
+                    SettingsFact(title: "Backup engine", value: isResticExecutableAvailable ? "Ready" : "Missing"),
+                    SettingsFact(title: "Cloud helper", value: isRcloneExecutableAvailable ? "Ready" : "Missing"),
+                    SettingsFact(title: "Install mode", value: "Bundled")
+                ])
+
+                SettingsDescription(
+                    text: "Delta uses its bundled, signed backup tools so scheduled jobs and restores run with the same tested binaries as the app."
+                )
+
+                Button {
+                    model.revealBackupToolsFolder()
+                } label: {
+                    Label("Show Tools", systemImage: "folder")
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .deltaTooltip("Show Delta's bundled backup engine and cloud helper in Finder.")
+            }
+
+            SettingsCard(
                 symbol: "folder.badge.gearshape",
                 title: "Support Files",
                 subtitle: "Open local data and logs used for troubleshooting."
@@ -1657,6 +1691,10 @@ struct SettingsView: View {
     }
 
     private var backgroundBackupsStatusText: String {
+        if scheduledProfileCount == 0 && model.launchAgentStatus == .notRegistered {
+            return "Not Needed"
+        }
+
         switch model.launchAgentStatus {
         case .enabled:
             return "On"
@@ -1675,7 +1713,7 @@ struct SettingsView: View {
 
     private var backgroundBackupsControlDetail: String {
         if scheduledProfileCount == 0 {
-            return "Keep background automation ready for profiles that use hourly, daily, weekly, monthly, or custom schedules."
+            return "Optional until a backup profile has an hourly, daily, weekly, monthly, or custom schedule."
         }
         if model.launchAgentStatus == .enabled {
             return "Allow \(scheduledProfileCount) scheduled \(scheduledProfileCount == 1 ? "profile" : "profiles") to run while Delta's window is closed."
@@ -1688,6 +1726,44 @@ struct SettingsView: View {
             return model.launchAgentStatus == .enabled ? "Ready for future schedules" : "No scheduled profiles"
         }
         return model.launchAgentStatus == .enabled ? "Schedules can run closed" : "Scheduled runs need attention"
+    }
+
+    private var shouldShowBackgroundSchedulingAttention: Bool {
+        scheduledProfileCount > 0 && model.launchAgentStatus.blocksScheduledBackups
+    }
+
+    private var backgroundSchedulingAttentionTitle: String {
+        switch model.launchAgentStatus {
+        case .requiresApproval:
+            return "macOS approval required"
+        case .notRegistered:
+            return "Background scheduling is off"
+        case .notFound:
+            return "Background scheduler missing"
+        case .unavailable:
+            return "Background scheduling unavailable"
+        case .unknown:
+            return "Unknown scheduler status"
+        case .enabled:
+            return "Background scheduling ready"
+        }
+    }
+
+    private var backgroundSchedulingAttentionText: String {
+        switch model.launchAgentStatus {
+        case .requiresApproval:
+            return "Approve Delta in Login Items before scheduled backups can run while the main window is closed."
+        case .notRegistered:
+            return "Turn on background scheduling before scheduled profiles can run while the main window is closed."
+        case .notFound:
+            return "The signed scheduler is missing from the installed app bundle. Reinstall Delta from the latest build."
+        case .unavailable:
+            return "This macOS version cannot run Delta's background scheduler."
+        case let .unknown(rawValue):
+            return "macOS returned an unknown background scheduling status: \(rawValue)"
+        case .enabled:
+            return "Scheduled backups can run while the main window is closed."
+        }
     }
 
     private var fullDiskAccessStatusText: String {
@@ -1927,7 +2003,7 @@ struct SettingsView: View {
 
     private var backgroundBackupsBinding: Binding<Bool> {
         Binding(
-            get: { model.launchAgentStatus == .enabled },
+            get: { model.launchAgentStatus == .enabled || model.launchAgentStatus == .requiresApproval },
             set: { enabled in
                 if enabled {
                     model.registerAgent()

@@ -122,6 +122,22 @@ if [[ "$AGENT_DRY_RUN_OUTPUT" != *"dry run did not start scheduled backups"* ]];
   printf "DeltaAgent dry-run did not report non-mutating behavior: %s\n" "$AGENT_DRY_RUN_OUTPUT" >&2
   exit 1
 fi
+ISOLATED_AGENT_SUPPORT="$(/usr/bin/mktemp -d -t delta-agent-support.XXXXXX)"
+set +e
+AGENT_ISOLATED_OUTPUT="$(DELTA_APP_SUPPORT_DIR="$ISOLATED_AGENT_SUPPORT" "$DELTA_AGENT" 2>&1)"
+AGENT_ISOLATED_STATUS=$?
+set -e
+if [[ "$AGENT_ISOLATED_STATUS" -ne 0 || "$AGENT_ISOLATED_OUTPUT" != *"completed 0 due backup run(s)"* ]]; then
+  printf "DeltaAgent did not complete isolated no-profile due-run path. status=%s output=%s\n" "$AGENT_ISOLATED_STATUS" "$AGENT_ISOLATED_OUTPUT" >&2
+  /bin/rm -rf "$ISOLATED_AGENT_SUPPORT"
+  exit 1
+fi
+if [[ ! -f "$ISOLATED_AGENT_SUPPORT/Delta.sqlite" ]]; then
+  printf "DeltaAgent did not create an isolated app database at %s\n" "$ISOLATED_AGENT_SUPPORT/Delta.sqlite" >&2
+  /bin/rm -rf "$ISOLATED_AGENT_SUPPORT"
+  exit 1
+fi
+/bin/rm -rf "$ISOLATED_AGENT_SUPPORT"
 set +e
 AGENT_UNSUPPORTED_OUTPUT="$("$DELTA_AGENT" --status --dry-run 2>&1)"
 AGENT_UNSUPPORTED_STATUS=$?

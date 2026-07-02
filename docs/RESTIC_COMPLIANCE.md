@@ -236,6 +236,8 @@ If the app cannot open the Application Support database, backup, destination, br
 
 On app or agent startup, Delta also reconciles any persisted `running` job rows. A job is marked interrupted only when Delta can acquire the destination's per-process lock, which proves no app/agent process currently owns that destination. If the lock is still held, the job remains running and the UI continues to observe it through SQLite/log polling.
 
+Release smoke tests may set `DELTA_APP_SUPPORT_DIR` to point Delta and DeltaAgent at a temporary Application Support directory. Production launches do not set this variable, so normal app data remains under the user's Application Support folder. The release verifier uses the override to prove the packaged helper can open SQLite and run the real due-backup path without touching a developer's personal Delta data.
+
 ## Streaming Logs
 
 `ResticRunner` streams stdout and stderr while the process is running. The coordinator records start, streamed output, and finish lines as per-job SQLite log entries, while the UI also receives the same live events for Activity output. When a scheduled backup is started by `DeltaAgent`, the app polls the same SQLite job/log state so the dashboard, Activity page, and menu bar still show the active operation. Restic JSON status/error lines are formatted into readable messages before durable storage.

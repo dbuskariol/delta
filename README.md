@@ -79,6 +79,7 @@ Important implementation details:
 - **Bundled tools** are pinned and checksum-verified through `Scripts/bootstrap-tools.sh`.
 - **Packaged app verification** checks signatures, minimal hardened-runtime entitlements, Sparkle embedding, background helper plist integrity, helper smoke tests, signed Sparkle update metadata, bundled restic/rclone versions, and the restic command/flag surface Delta depends on.
 - **Sanitized diagnostic reports** can be copied or exported from Settings without including destination passwords or backend credential values.
+- **Isolated app-data smoke tests** use `DELTA_APP_SUPPORT_DIR` so release verification can exercise the installed background helper's real due-backup path without touching a developer's personal Delta database.
 
 ## Backup Behavior
 
