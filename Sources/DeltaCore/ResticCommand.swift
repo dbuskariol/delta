@@ -231,7 +231,7 @@ public struct ResticCommandBuilder: Sendable {
         if policy.pruneAfterForget {
             subcommand.append("--prune")
         }
-        return try command(repository: repository, subcommand: subcommand)
+        return try command(repository: repository, extraGlobalArguments: ["--json"], subcommand: subcommand)
     }
 
     public func check(repository: BackupRepository, readDataSubset: String? = nil) throws -> ResticCommand {

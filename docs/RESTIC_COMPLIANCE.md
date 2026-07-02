@@ -177,6 +177,7 @@ Delta retention maintenance uses:
 
 ```text
 forget
+--json
 --keep-hourly <n>
 --keep-daily <n>
 --keep-weekly <n>
@@ -240,6 +241,7 @@ This runs:
 
 - unit tests
 - restic/rclone bootstrap and checksum verification
+- bundled restic command and flag surface verification
 - local restic integration test with real init/backup/restore
 - packaged app build
 - codesign verification

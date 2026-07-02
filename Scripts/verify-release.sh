@@ -8,6 +8,7 @@ cd "$ROOT_DIR"
 
 "$ROOT_DIR/Scripts/bootstrap-tools.sh"
 "$ROOT_DIR/Scripts/verify-tools.sh"
+"$ROOT_DIR/Scripts/verify-restic-surface.sh"
 
 DELTA_RESTIC_INTEGRATION=1 \
 RESTIC_BINARY="$ROOT_DIR/Resources/Tools/bin/restic" \

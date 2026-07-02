@@ -129,6 +129,7 @@ final class ResticCommandTests: XCTestCase {
 
         let command = try makeBuilder().forgetAndPrune(profile: profile, repository: repository)
         XCTAssertTrue(command.arguments.contains("forget"))
+        XCTAssertTrue(command.arguments.contains("--json"))
         XCTAssertTrue(command.arguments.contains("--keep-hourly"))
         XCTAssertTrue(command.arguments.contains("24"))
         XCTAssertTrue(command.arguments.contains("--keep-yearly"))
