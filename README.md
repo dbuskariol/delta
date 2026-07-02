@@ -242,7 +242,7 @@ Scripts/generate-appcast.sh
 
 ## Release And Signing
 
-Local development builds prefer `DELTA_CODESIGN_IDENTITY` when set. If it is unset, the build script automatically uses the first available `Developer ID Application` or `Apple Development` signing identity before falling back to ad-hoc signing. Stable signing matters for macOS privacy permissions such as Full Disk Access; changing the signing identity changes the app identity macOS trusts.
+Local development builds prefer `DELTA_CODESIGN_IDENTITY` when set. If it is unset, the build script automatically uses the first available `Developer ID Application` or `Apple Development` signing identity before falling back to ad-hoc signing. Stable signing matters for macOS privacy permissions such as Full Disk Access; changing the signing identity changes the app identity macOS trusts. The release verifier rejects ad-hoc-signed app bundles because they are not production-ready and can invalidate privacy approvals between installs.
 
 Developer ID distribution should use:
 

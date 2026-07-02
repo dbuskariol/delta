@@ -18,6 +18,7 @@ The automated gate must pass before any beta or production build is shipped. It 
 - real local restic init, backup, incremental backup, full restore, selected restore, repository check, prune, and post-prune check
 - packaged app build
 - codesign validation for Delta, DeltaAgent, DeltaSecretBridge, restic, rclone, and Sparkle
+- non-ad-hoc app signing identity for stable macOS privacy permissions
 - hardened-runtime entitlement hygiene
 - bundled Login Item helper plist
 - app launch smoke test

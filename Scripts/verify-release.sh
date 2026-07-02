@@ -17,6 +17,16 @@ RESTIC_BINARY="$ROOT_DIR/Resources/Tools/bin/restic" \
 "$ROOT_DIR/Scripts/build-app.sh"
 /usr/bin/codesign --verify --strict --deep --verbose=2 "$ROOT_DIR/dist/Delta.app"
 
+SIGNING_DETAILS="$(/usr/bin/codesign -dv "$ROOT_DIR/dist/Delta.app" 2>&1)"
+if ! /usr/bin/grep -q '^TeamIdentifier=' <<<"$SIGNING_DETAILS"; then
+  printf "Delta.app is ad-hoc signed. Install an Apple Development or Developer ID certificate, or set DELTA_CODESIGN_IDENTITY, before release verification.\n" >&2
+  exit 1
+fi
+if /usr/bin/grep -q '^TeamIdentifier=not set$' <<<"$SIGNING_DETAILS"; then
+  printf "Delta.app has no TeamIdentifier. Stable macOS privacy permissions require a real signing identity.\n" >&2
+  exit 1
+fi
+
 assert_no_runtime_exception_entitlements() {
   local target="$1"
   local entitlements
