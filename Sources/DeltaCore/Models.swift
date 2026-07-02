@@ -248,18 +248,6 @@ public struct RetentionPolicy: Codable, Equatable, Sendable {
         case checkAfterPrune
         case maintenanceSchedule
     }
-
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        keepHourly = try container.decode(Int.self, forKey: .keepHourly)
-        keepDaily = try container.decode(Int.self, forKey: .keepDaily)
-        keepWeekly = try container.decode(Int.self, forKey: .keepWeekly)
-        keepMonthly = try container.decode(Int.self, forKey: .keepMonthly)
-        keepYearly = try container.decode(Int.self, forKey: .keepYearly)
-        pruneAfterForget = try container.decode(Bool.self, forKey: .pruneAfterForget)
-        checkAfterPrune = try container.decode(Bool.self, forKey: .checkAfterPrune)
-        maintenanceSchedule = try container.decodeIfPresent(RetentionMaintenanceSchedule.self, forKey: .maintenanceSchedule) ?? RetentionMaintenanceSchedule()
-    }
 }
 
 public struct BackupRepository: Codable, Identifiable, Equatable, Sendable {
@@ -302,18 +290,6 @@ public struct BackupRepository: Codable, Identifiable, Equatable, Sendable {
         case createdAt
         case lastVerifiedAt
     }
-
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        id = try container.decode(UUID.self, forKey: .id)
-        name = try container.decode(String.self, forKey: .name)
-        backend = try container.decode(RepositoryBackend.self, forKey: .backend)
-        secretStorageMode = try container.decode(SecretStorageMode.self, forKey: .secretStorageMode)
-        keychainAccount = try container.decode(String.self, forKey: .keychainAccount)
-        credentialReferences = try container.decodeIfPresent([RepositoryCredentialReference].self, forKey: .credentialReferences) ?? []
-        createdAt = try container.decode(Date.self, forKey: .createdAt)
-        lastVerifiedAt = try container.decodeIfPresent(Date.self, forKey: .lastVerifiedAt)
-    }
 }
 
 public struct BackupSchedule: Codable, Identifiable, Equatable, Sendable {
@@ -355,18 +331,6 @@ public struct BackupSchedule: Codable, Identifiable, Equatable, Sendable {
         case runInLowPowerMode
         case uploadLimitKiB
         case downloadLimitKiB
-    }
-
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        id = try container.decode(UUID.self, forKey: .id)
-        kind = try container.decode(ScheduleKind.self, forKey: .kind)
-        isEnabled = try container.decode(Bool.self, forKey: .isEnabled)
-        catchUpMissedRuns = try container.decode(Bool.self, forKey: .catchUpMissedRuns)
-        runOnBattery = try container.decode(Bool.self, forKey: .runOnBattery)
-        runInLowPowerMode = try container.decodeIfPresent(Bool.self, forKey: .runInLowPowerMode) ?? false
-        uploadLimitKiB = try container.decodeIfPresent(Int.self, forKey: .uploadLimitKiB)
-        downloadLimitKiB = try container.decodeIfPresent(Int.self, forKey: .downloadLimitKiB)
     }
 }
 
@@ -417,21 +381,6 @@ public struct BackupProfile: Codable, Identifiable, Equatable, Sendable {
         case excludePatterns
         case createdAt
         case updatedAt
-    }
-
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        id = try container.decode(UUID.self, forKey: .id)
-        name = try container.decode(String.self, forKey: .name)
-        sourceMode = try container.decode(BackupSourceMode.self, forKey: .sourceMode)
-        sources = try container.decode([BackupSource].self, forKey: .sources)
-        repositoryID = try container.decode(UUID.self, forKey: .repositoryID)
-        schedule = try container.decode(BackupSchedule.self, forKey: .schedule)
-        retention = try container.decode(RetentionPolicy.self, forKey: .retention)
-        excludePatterns = try container.decodeIfPresent([String].self, forKey: .excludePatterns)
-            ?? BackupExcludePolicy.defaultMacOSExcludes
-        createdAt = try container.decode(Date.self, forKey: .createdAt)
-        updatedAt = try container.decode(Date.self, forKey: .updatedAt)
     }
 }
 
@@ -653,21 +602,6 @@ public struct RestoreRequest: Codable, Identifiable, Equatable, Sendable {
         case confirmedOriginalPathRestore
         case preRestoreBackupProfileID
         case createdAt
-    }
-
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        id = try container.decode(UUID.self, forKey: .id)
-        repositoryID = try container.decode(UUID.self, forKey: .repositoryID)
-        snapshotID = try container.decode(String.self, forKey: .snapshotID)
-        scope = try container.decode(RestoreScope.self, forKey: .scope)
-        destination = try container.decode(RestoreDestination.self, forKey: .destination)
-        conflictPolicy = try container.decode(RestoreConflictPolicy.self, forKey: .conflictPolicy)
-        verifyRestoredFiles = try container.decode(Bool.self, forKey: .verifyRestoredFiles)
-        dryRun = try container.decode(Bool.self, forKey: .dryRun)
-        confirmedOriginalPathRestore = try container.decodeIfPresent(Bool.self, forKey: .confirmedOriginalPathRestore) ?? false
-        preRestoreBackupProfileID = try container.decodeIfPresent(UUID.self, forKey: .preRestoreBackupProfileID)
-        createdAt = try container.decode(Date.self, forKey: .createdAt)
     }
 }
 

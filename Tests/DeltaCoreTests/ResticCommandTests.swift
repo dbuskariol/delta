@@ -465,7 +465,22 @@ final class ResticCommandTests: XCTestCase {
         XCTAssertTrue(ResticBackendCredentialTemplates.keys(for: .azureBlob).contains("AZURE_ACCOUNT_SAS"))
         XCTAssertTrue(ResticBackendCredentialTemplates.keys(for: .googleCloudStorage).contains("GOOGLE_ACCESS_TOKEN"))
         XCTAssertTrue(ResticBackendCredentialTemplates.keys(for: .swiftObjectStorage).contains("ST_AUTH"))
-        XCTAssertTrue(ResticBackendCredentialTemplates.keys(for: .rclone).contains("RCLONE_BWLIMIT"))
+        XCTAssertEqual(ResticBackendCredentialTemplates.keys(for: .rclone), ["RCLONE_CONFIG"])
+    }
+
+    func testCredentialTemplatesSeparateSecretAndNonSecretFields() throws {
+        let restFields = ResticBackendCredentialTemplates.fields(for: .rest)
+        let restUsername = try XCTUnwrap(restFields.first { $0.environmentKey == "RESTIC_REST_USERNAME" })
+        let restPassword = try XCTUnwrap(restFields.first { $0.environmentKey == "RESTIC_REST_PASSWORD" })
+        XCTAssertEqual(restUsername.title, "Username")
+        XCTAssertFalse(restUsername.isSecret)
+        XCTAssertEqual(restPassword.title, "Password")
+        XCTAssertTrue(restPassword.isSecret)
+
+        let rcloneConfig = try XCTUnwrap(ResticBackendCredentialTemplates.fields(for: .rclone).first)
+        XCTAssertEqual(rcloneConfig.environmentKey, "RCLONE_CONFIG")
+        XCTAssertEqual(rcloneConfig.title, "Config File")
+        XCTAssertFalse(rcloneConfig.isSecret)
     }
 
     private func makeBuilder() -> ResticCommandBuilder {

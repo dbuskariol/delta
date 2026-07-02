@@ -41,7 +41,10 @@ let package = Package(
         ),
         .testTarget(
             name: "DeltaCoreTests",
-            dependencies: ["DeltaCore"]
+            dependencies: [
+                "DeltaCore",
+                .product(name: "GRDB", package: "GRDB.swift")
+            ]
         )
     ]
 )

@@ -17,13 +17,36 @@ fi
 
 /usr/bin/codesign --verify --strict --deep --verbose=2 "$APP_SOURCE"
 
-/usr/bin/osascript -e 'tell application id "com.delta.backup" to quit' >/dev/null 2>&1 || true
+quit_running_app() {
+  /usr/bin/osascript -e 'tell application id "com.delta.backup" to quit' >/dev/null 2>&1 &
+  local quit_pid=$!
+  for _ in {1..20}; do
+    if ! /bin/kill -0 "$quit_pid" >/dev/null 2>&1; then
+      wait "$quit_pid" >/dev/null 2>&1 || true
+      return
+    fi
+    /bin/sleep 0.25
+  done
+  /bin/kill "$quit_pid" >/dev/null 2>&1 || true
+  wait "$quit_pid" >/dev/null 2>&1 || true
+}
+
+quit_running_app
 for _ in {1..20}; do
   if ! /usr/bin/pgrep -x Delta >/dev/null 2>&1; then
     break
   fi
   /bin/sleep 0.25
 done
+if /usr/bin/pgrep -x Delta >/dev/null 2>&1; then
+  /usr/bin/pkill -x Delta >/dev/null 2>&1 || true
+  for _ in {1..20}; do
+    if ! /usr/bin/pgrep -x Delta >/dev/null 2>&1; then
+      break
+    fi
+    /bin/sleep 0.25
+  done
+fi
 
 /bin/mkdir -p "$INSTALL_DIR"
 /bin/rm -rf "$APP_TARGET"

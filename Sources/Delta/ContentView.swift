@@ -2146,7 +2146,7 @@ struct RepositoryEditorView: View {
         _tertiary = State(initialValue: backendState.tertiary)
         _quaternary = State(initialValue: backendState.quaternary)
         _storageMode = State(initialValue: repository?.secretStorageMode ?? .appManagedKeychain)
-        _credentialValues = State(initialValue: Dictionary(uniqueKeysWithValues: ResticBackendCredentialTemplates.keys(for: backendState.kind).map { ($0, "") }))
+        _credentialValues = State(initialValue: Dictionary(uniqueKeysWithValues: ResticBackendCredentialTemplates.fields(for: backendState.kind).map { ($0.environmentKey, "") }))
     }
 
     var body: some View {
@@ -2220,8 +2220,8 @@ struct RepositoryEditorView: View {
             }
         }
         .onChange(of: kind) { _, newKind in
-            let keys = ResticBackendCredentialTemplates.keys(for: newKind)
-            credentialValues = Dictionary(uniqueKeysWithValues: keys.map { ($0, credentialValues[$0] ?? "") })
+            let fields = ResticBackendCredentialTemplates.fields(for: newKind)
+            credentialValues = Dictionary(uniqueKeysWithValues: fields.map { ($0.environmentKey, credentialValues[$0.environmentKey] ?? "") })
         }
     }
 
@@ -2285,13 +2285,18 @@ struct RepositoryEditorView: View {
 
     @ViewBuilder
     private var credentialFields: some View {
-        let keys = ResticBackendCredentialTemplates.keys(for: kind)
-        if !keys.isEmpty {
+        let fields = ResticBackendCredentialTemplates.fields(for: kind)
+        if !fields.isEmpty {
             Divider()
-            ForEach(keys, id: \.self) { key in
-                FieldRow(title: key) {
-                    SecureField(key, text: credentialBinding(for: key))
-                        .textFieldStyle(.roundedBorder)
+            ForEach(fields) { field in
+                FieldRow(title: field.title) {
+                    if field.isSecret {
+                        SecureField(field.placeholder.isEmpty ? field.title : field.placeholder, text: credentialBinding(for: field.environmentKey))
+                            .textFieldStyle(.roundedBorder)
+                    } else {
+                        TextField(field.placeholder.isEmpty ? field.title : field.placeholder, text: credentialBinding(for: field.environmentKey))
+                            .textFieldStyle(.roundedBorder)
+                    }
                 }
             }
         }

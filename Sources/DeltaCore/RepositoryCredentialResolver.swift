@@ -104,42 +104,101 @@ public struct RepositoryCredentialResolver: Sendable {
     }
 }
 
+public struct ResticBackendCredentialField: Identifiable, Equatable, Sendable {
+    public var id: String { environmentKey }
+    public var environmentKey: String
+    public var title: String
+    public var placeholder: String
+    public var isSecret: Bool
+
+    public init(
+        environmentKey: String,
+        title: String,
+        placeholder: String = "",
+        isSecret: Bool = true
+    ) {
+        self.environmentKey = environmentKey
+        self.title = title
+        self.placeholder = placeholder
+        self.isSecret = isSecret
+    }
+}
+
 public enum ResticBackendCredentialTemplates {
     public static func keys(for kind: RepositoryBackendKind) -> [String] {
+        fields(for: kind).map(\.environmentKey)
+    }
+
+    public static func fields(for kind: RepositoryBackendKind) -> [ResticBackendCredentialField] {
         switch kind {
         case .rest:
-            ["RESTIC_REST_USERNAME", "RESTIC_REST_PASSWORD"]
+            [
+                field("RESTIC_REST_USERNAME", "Username", placeholder: "Optional", isSecret: false),
+                field("RESTIC_REST_PASSWORD", "Password", placeholder: "REST server password")
+            ]
         case .s3:
-            ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN"]
+            [
+                field("AWS_ACCESS_KEY_ID", "Access Key ID", placeholder: "AKIA...", isSecret: false),
+                field("AWS_SECRET_ACCESS_KEY", "Secret Access Key", placeholder: "Secret key"),
+                field("AWS_SESSION_TOKEN", "Session Token", placeholder: "Optional temporary token")
+            ]
         case .backblazeB2:
-            ["B2_ACCOUNT_ID", "B2_ACCOUNT_KEY"]
+            [
+                field("B2_ACCOUNT_ID", "Account ID", isSecret: false),
+                field("B2_ACCOUNT_KEY", "Application Key")
+            ]
         case .azureBlob:
-            ["AZURE_ACCOUNT_NAME", "AZURE_ACCOUNT_KEY", "AZURE_ACCOUNT_SAS", "AZURE_ENDPOINT_SUFFIX"]
+            [
+                field("AZURE_ACCOUNT_NAME", "Account Name", isSecret: false),
+                field("AZURE_ACCOUNT_KEY", "Account Key"),
+                field("AZURE_ACCOUNT_SAS", "SAS Token"),
+                field("AZURE_ENDPOINT_SUFFIX", "Endpoint Suffix", placeholder: "core.windows.net", isSecret: false)
+            ]
         case .googleCloudStorage:
-            ["GOOGLE_PROJECT_ID", "GOOGLE_APPLICATION_CREDENTIALS", "GOOGLE_ACCESS_TOKEN"]
+            [
+                field("GOOGLE_PROJECT_ID", "Project ID", isSecret: false),
+                field("GOOGLE_APPLICATION_CREDENTIALS", "Credentials File", placeholder: "/path/to/service-account.json", isSecret: false),
+                field("GOOGLE_ACCESS_TOKEN", "Access Token")
+            ]
         case .swiftObjectStorage:
             [
-                "OS_AUTH_URL",
-                "OS_REGION_NAME",
-                "OS_USERNAME",
-                "OS_PASSWORD",
-                "OS_TENANT_ID",
-                "OS_TENANT_NAME",
-                "OS_PROJECT_NAME",
-                "OS_PROJECT_DOMAIN_NAME",
-                "OS_USER_DOMAIN_NAME",
-                "OS_APPLICATION_CREDENTIAL_ID",
-                "OS_APPLICATION_CREDENTIAL_SECRET",
-                "OS_STORAGE_URL",
-                "OS_AUTH_TOKEN",
-                "ST_AUTH",
-                "ST_USER",
-                "ST_KEY"
+                field("OS_AUTH_URL", "Auth URL", placeholder: "https://identity.example.com/v3", isSecret: false),
+                field("OS_REGION_NAME", "Region", isSecret: false),
+                field("OS_USERNAME", "Username", isSecret: false),
+                field("OS_PASSWORD", "Password"),
+                field("OS_TENANT_ID", "Tenant ID", isSecret: false),
+                field("OS_TENANT_NAME", "Tenant Name", isSecret: false),
+                field("OS_PROJECT_NAME", "Project Name", isSecret: false),
+                field("OS_PROJECT_DOMAIN_NAME", "Project Domain", isSecret: false),
+                field("OS_USER_DOMAIN_NAME", "User Domain", isSecret: false),
+                field("OS_APPLICATION_CREDENTIAL_ID", "Application Credential ID", isSecret: false),
+                field("OS_APPLICATION_CREDENTIAL_SECRET", "Application Credential Secret"),
+                field("OS_STORAGE_URL", "Storage URL", isSecret: false),
+                field("OS_AUTH_TOKEN", "Auth Token"),
+                field("ST_AUTH", "Swift Auth URL", isSecret: false),
+                field("ST_USER", "Swift User", isSecret: false),
+                field("ST_KEY", "Swift Key")
             ]
         case .rclone:
-            ["RCLONE_CONFIG", "RCLONE_BWLIMIT", "RCLONE_VERBOSE"]
+            [
+                field("RCLONE_CONFIG", "Config File", placeholder: "/Users/me/.config/rclone/rclone.conf", isSecret: false)
+            ]
         default:
             []
         }
+    }
+
+    private static func field(
+        _ environmentKey: String,
+        _ title: String,
+        placeholder: String = "",
+        isSecret: Bool = true
+    ) -> ResticBackendCredentialField {
+        ResticBackendCredentialField(
+            environmentKey: environmentKey,
+            title: title,
+            placeholder: placeholder,
+            isSecret: isSecret
+        )
     }
 }

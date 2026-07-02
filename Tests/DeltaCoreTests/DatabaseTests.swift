@@ -1,9 +1,10 @@
 import XCTest
+import GRDB
 @testable import DeltaCore
 
 final class DatabaseTests: XCTestCase {
-    func testRetentionPolicyDecodesOldPayloadWithDefaultMaintenanceSchedule() throws {
-        let data = """
+    func testCurrentPayloadSchemaRequiresCurrentFields() throws {
+        let retentionPayloadWithoutMaintenance = """
         {
           "keepHourly": 24,
           "keepDaily": 30,
@@ -15,12 +16,8 @@ final class DatabaseTests: XCTestCase {
         }
         """.data(using: .utf8)!
 
-        let policy = try JSONDecoder().decode(RetentionPolicy.self, from: data)
+        XCTAssertThrowsError(try JSONDecoder().decode(RetentionPolicy.self, from: retentionPayloadWithoutMaintenance))
 
-        XCTAssertEqual(policy.maintenanceSchedule, RetentionMaintenanceSchedule())
-    }
-
-    func testBackupProfileDecodesOldPayloadWithDefaultExcludes() throws {
         let repositoryID = UUID()
         let profile = BackupProfile(
             name: "Documents",
@@ -32,12 +29,9 @@ final class DatabaseTests: XCTestCase {
         let encodedProfile = try JSONEncoder().encode(profile)
         var payload = try XCTUnwrap(JSONSerialization.jsonObject(with: encodedProfile) as? [String: Any])
         payload.removeValue(forKey: "excludePatterns")
-        let oldPayload = try JSONSerialization.data(withJSONObject: payload)
+        let profilePayloadWithoutExcludes = try JSONSerialization.data(withJSONObject: payload)
 
-        let decodedProfile = try JSONDecoder().decode(BackupProfile.self, from: oldPayload)
-
-        XCTAssertEqual(decodedProfile.repositoryID, repositoryID)
-        XCTAssertEqual(decodedProfile.excludePatterns, BackupExcludePolicy.defaultMacOSExcludes)
+        XCTAssertThrowsError(try JSONDecoder().decode(BackupProfile.self, from: profilePayloadWithoutExcludes))
     }
 
     func testDatabaseRoundTripsRepositoryProfileAndJob() throws {
@@ -318,6 +312,43 @@ final class DatabaseTests: XCTestCase {
         let snapshotsByRepository = try database.fetchSnapshotsByRepository()
         XCTAssertEqual(snapshotsByRepository[primaryRepository.id]?.map(\.id), [sharedSnapshotID])
         XCTAssertEqual(snapshotsByRepository[secondaryRepository.id]?.map(\.id), [sharedSnapshotID])
+    }
+
+    func testIncompatibleSnapshotCacheSchemaIsReset() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let databaseURL = directory.appendingPathComponent("Delta.sqlite")
+        let queue = try DatabaseQueue(path: databaseURL.path)
+        try queue.write { db in
+            try db.execute(sql: """
+            CREATE TABLE snapshots (
+                id TEXT PRIMARY KEY NOT NULL,
+                repository_id TEXT,
+                payload TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """)
+            try db.execute(
+                sql: """
+                INSERT INTO snapshots (id, repository_id, payload, created_at, updated_at)
+                VALUES ('cached', NULL, '{}', '2026-07-02T00:00:00.000Z', '2026-07-02T00:00:00.000Z')
+                """
+            )
+        }
+
+        let database = try DeltaDatabase(url: databaseURL)
+        let repository = BackupRepository(name: "Primary", backend: .local(path: "/primary"))
+        let snapshot = ResticSnapshot(id: "current", time: Date(timeIntervalSince1970: 60), paths: ["/Users/me/Documents"])
+
+        XCTAssertTrue(try database.fetchSnapshots().isEmpty)
+
+        try database.saveRepository(repository)
+        try database.saveSnapshot(snapshot, repositoryID: repository.id)
+
+        XCTAssertEqual(try database.fetchSnapshots(repositoryID: repository.id).map(\.id), ["current"])
     }
 }
 

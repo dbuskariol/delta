@@ -282,15 +282,8 @@ public final class DeltaDatabase: @unchecked Sendable {
             return
         }
 
-        try db.execute(sql: "ALTER TABLE snapshots RENAME TO snapshots_legacy")
+        try db.execute(sql: "DROP TABLE snapshots")
         try createSnapshotsTable(db)
-        try db.execute(sql: """
-            INSERT OR REPLACE INTO snapshots (id, repository_id, payload, created_at, updated_at)
-            SELECT id, repository_id, payload, created_at, updated_at
-            FROM snapshots_legacy
-            WHERE repository_id IS NOT NULL
-            """)
-        try db.execute(sql: "DROP TABLE snapshots_legacy")
     }
 
     private static func createSnapshotsTable(_ db: Database) throws {

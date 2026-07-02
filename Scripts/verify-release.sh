@@ -54,13 +54,28 @@ if [[ ! -f "$LAUNCH_AGENT_PLIST" ]]; then
 fi
 /usr/bin/plutil -lint "$LAUNCH_AGENT_PLIST" >/dev/null
 AGENT_BUNDLE_PROGRAM="$(/usr/libexec/PlistBuddy -c 'Print :BundleProgram' "$LAUNCH_AGENT_PLIST")"
-if [[ ! -x "$ROOT_DIR/dist/Delta.app/$AGENT_BUNDLE_PROGRAM" ]]; then
+AGENT_LABEL="$(/usr/libexec/PlistBuddy -c 'Print :Label' "$LAUNCH_AGENT_PLIST")"
+AGENT_PROCESS_TYPE="$(/usr/libexec/PlistBuddy -c 'Print :ProcessType' "$LAUNCH_AGENT_PLIST")"
+AGENT_ASSOCIATED_BUNDLE="$(/usr/libexec/PlistBuddy -c 'Print :AssociatedBundleIdentifiers:0' "$LAUNCH_AGENT_PLIST")"
+if [[ "$AGENT_LABEL" != "com.delta.backup.agent" ]]; then
+  printf "LaunchAgent label is invalid: %s\n" "$AGENT_LABEL" >&2
+  exit 1
+fi
+if [[ "$AGENT_BUNDLE_PROGRAM" != "Contents/MacOS/DeltaAgent" || ! -x "$ROOT_DIR/dist/Delta.app/$AGENT_BUNDLE_PROGRAM" ]]; then
   printf "LaunchAgent BundleProgram is not executable: %s\n" "$AGENT_BUNDLE_PROGRAM" >&2
+  exit 1
+fi
+if [[ "$AGENT_PROCESS_TYPE" != "Background" ]]; then
+  printf "LaunchAgent ProcessType is invalid: %s\n" "$AGENT_PROCESS_TYPE" >&2
+  exit 1
+fi
+if [[ "$AGENT_ASSOCIATED_BUNDLE" != "com.delta.backup" ]]; then
+  printf "LaunchAgent associated bundle identifier is invalid: %s\n" "$AGENT_ASSOCIATED_BUNDLE" >&2
   exit 1
 fi
 AGENT_RUN_AT_LOAD="$(/usr/libexec/PlistBuddy -c 'Print :RunAtLoad' "$LAUNCH_AGENT_PLIST")"
 AGENT_START_INTERVAL="$(/usr/libexec/PlistBuddy -c 'Print :StartInterval' "$LAUNCH_AGENT_PLIST")"
-if [[ "$AGENT_RUN_AT_LOAD" != "true" || "$AGENT_START_INTERVAL" -lt 60 ]]; then
+if [[ "$AGENT_RUN_AT_LOAD" != "true" || "$AGENT_START_INTERVAL" != "300" ]]; then
   printf "LaunchAgent schedule is invalid. RunAtLoad=%s StartInterval=%s\n" "$AGENT_RUN_AT_LOAD" "$AGENT_START_INTERVAL" >&2
   exit 1
 fi

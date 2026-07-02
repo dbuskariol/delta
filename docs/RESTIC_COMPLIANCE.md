@@ -57,7 +57,7 @@ Backup profiles are validated before save and again before execution. Delta trim
 
 ## Backend Credentials
 
-Backend credentials are stored in Keychain and injected into a curated restic process environment only for the job run. Keychain items are created with a trusted-application access list for the signed Delta app, DeltaAgent, and DeltaSecretBridge so scheduled jobs do not require interactive Keychain approval. New destination creation rolls back newly-created backend credential and repository password items if persistence fails, and partial backend credential saves roll back earlier saved items before returning the error. Delta also exposes a Background Secret Access repair operation that reloads and rewrites saved destination passwords plus backend credential items through the current signed app identity, then verifies they are readable with interaction disabled. Delta forwards operational values such as `PATH`, `HOME`, `TMPDIR`, locale, and `SSH_AUTH_SOCK`, but does not pass arbitrary ambient environment variables to restic.
+Backend credentials and backend configuration values are stored in Keychain and injected into a curated restic process environment only for the job run. Keychain items are created with a trusted-application access list for the signed Delta app, DeltaAgent, and DeltaSecretBridge so scheduled jobs do not require interactive Keychain approval. New destination creation rolls back newly-created backend credential/configuration and repository password items if persistence fails, and partial backend field saves roll back earlier saved items before returning the error. Delta also exposes a Background Secret Access repair operation that reloads and rewrites saved destination passwords plus backend credential/configuration items through the current signed app identity, then verifies they are readable with interaction disabled. Delta forwards operational values such as `PATH`, `HOME`, `TMPDIR`, locale, and `SSH_AUTH_SOCK`, but does not pass arbitrary ambient environment variables to restic.
 
 Supported credential templates include:
 
@@ -67,7 +67,9 @@ Supported credential templates include:
 - Azure Blob: `AZURE_ACCOUNT_NAME`, `AZURE_ACCOUNT_KEY`, `AZURE_ACCOUNT_SAS`, `AZURE_ENDPOINT_SUFFIX`
 - Google Cloud Storage: `GOOGLE_PROJECT_ID`, `GOOGLE_APPLICATION_CREDENTIALS`, `GOOGLE_ACCESS_TOKEN`
 - OpenStack Swift: Keystone, token, and Swift object storage variables
-- rclone: `RCLONE_CONFIG`, `RCLONE_BWLIMIT`, `RCLONE_VERBOSE`
+- rclone: `RCLONE_CONFIG`
+
+The destination editor presents these as provider-specific field labels instead of raw environment variable names. Actual passwords, secret keys, SAS tokens, and access tokens use secure fields; non-secret configuration values such as account IDs, project IDs, endpoint suffixes, and rclone config paths remain visible.
 
 S3 region is passed as an explicit restic backend option:
 
