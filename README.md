@@ -21,7 +21,7 @@ The product goal is simple: make serious backup practices approachable without h
 - **Pause, resume, and cancel controls** for active backups from the main window and macOS menu bar, including scheduled jobs started by Background Backups. Pause stops restic safely, keeps the profile visibly paused, and Resume continues from already saved backup data.
 - **Clear backup summaries** showing new, changed, unchanged, added, and checked data for each backup run.
 - **Backup health monitoring** with source-access warnings, configurable freshness and destination-verification warnings for scheduled profiles with no completed backup, stale restore points, failed runs, stopped runs, unchecked destinations, stale destination checks, or unavailable local/mounted destinations.
-- **Notification Center alerts** for failed or warning jobs, with optional successful-backup summaries and a Settings test alert. The signed background helper uses the same notification policy for scheduled runs.
+- **Notification Center alerts** for failed or warning jobs, with optional successful-backup summaries and a Settings test alert. The signed background backup service uses the same notification policy for scheduled runs.
 - **Full or browsed selected restore** with backup browsing, file/folder selection, configurable dry-run and verification defaults, overwrite policies, original-path restore, chosen-folder restore, and optional pre-restore backup.
 - **Streaming and saved backup logs** from restic stdout/stderr with source context, stable processed-file counters, clean change summaries, fixed-height live panes, and expandable per-job audit history.
 - **Settings and diagnostics** with a compact health summary for system access, schedules, background password access, updates, notifications, and bundled backup tools, plus controls for globally pausing scheduled automation, repairing password access for unattended backups, health monitoring thresholds, new-backup defaults, restore safety defaults, idle-sleep protection during active jobs, menu bar visibility, start-at-login, Activity log detail, scheduled-backup test runs, signed update checks/downloads, app version, background-backup status, tool paths, profile/destination counts, recent jobs, and local support paths.
@@ -82,9 +82,9 @@ Important implementation details:
 - **Durable run controls** let the app request pause/cancel for an agent-owned restic process without relying on in-memory UI state.
 - **Abandoned-job recovery** marks stale running jobs interrupted after restart only when the per-destination lock proves no restic process still owns the destination.
 - **Bundled tools** are pinned and checksum-verified through `Scripts/bootstrap-tools.sh`.
-- **Packaged app verification** checks signatures, minimal hardened-runtime entitlements, Sparkle embedding, background helper plist integrity, helper smoke tests, installed scheduled-helper backup acceptance, signed Sparkle update metadata, bundled restic/rclone versions, the restic command/flag surface Delta depends on, and a real local dry-run restore that must not write files.
+- **Packaged app verification** checks signatures, minimal hardened-runtime entitlements, Sparkle embedding, background service plist integrity, background service smoke tests, installed scheduled-service backup acceptance, signed Sparkle update metadata, bundled restic/rclone versions, the restic command/flag surface Delta depends on, and a real local dry-run restore that must not write files.
 - **Sanitized diagnostic reports** can be copied or exported from Settings without including destination passwords or backend credential values.
-- **Isolated app-data smoke tests** use `DELTA_APP_SUPPORT_DIR` so release verification can exercise the installed background helper's real due-backup path without touching a developer's personal Delta database.
+- **Isolated app-data smoke tests** use `DELTA_APP_SUPPORT_DIR` so release verification can exercise the installed background service's real due-backup path without touching a developer's personal Delta database.
 
 ## Backup Behavior
 
@@ -106,7 +106,9 @@ Custom-folder profiles use the selected source folders and stored security-scope
 
 Each profile keeps Delta's default macOS-safe excludes and can add extra restic exclude patterns. Extra excludes are saved with the profile and passed to restic as additional `--exclude` arguments.
 
-Settings include a global scheduled-backup pause for temporarily suspending automated due runs without editing profiles or removing Background Backups. Manual Back Up Now actions still work. Settings also include app-level defaults for newly-created backup profiles: missed-run catchup, battery policy, Low Power Mode policy, optional bandwidth limits, retention keep rules, cleanup space reclamation, cleanup verification, and cleanup cadence. Those defaults seed new profiles only. Existing profiles keep their own schedule, power, bandwidth, retention, and maintenance settings until edited.
+Settings are grouped into General, Defaults, Updates, and Advanced. General covers the background backup service, Full Disk Access, idle-sleep protection, menu bar/login behavior, and notifications. Defaults covers health monitoring plus new backup and restore defaults. Updates configures Sparkle's signed update checks and downloads. Advanced contains diagnostics, bundled backup-tool status, support files, and activity history retention.
+
+Settings include a global scheduled-backup pause for temporarily suspending automated due runs without editing profiles or removing Background Backups approval. Manual Back Up Now actions still work. Settings also include app-level defaults for newly-created backup profiles: missed-run catchup, battery policy, Low Power Mode policy, optional bandwidth limits, retention keep rules, cleanup space reclamation, cleanup verification, and cleanup cadence. Those defaults seed new profiles only. Existing profiles keep their own schedule, power, bandwidth, retention, and maintenance settings until edited.
 
 Delta can also hold a macOS activity assertion while a backup, restore, destination check, or cleanup is actively running. This is enabled by default to reduce the chance of long unattended jobs being interrupted by idle sleep. It does not force a scheduled backup to start on battery or in Low Power Mode; those profile policies are still evaluated before work begins.
 
@@ -114,7 +116,7 @@ Diagnostics settings include live-log detail and local activity history retentio
 
 ## Scheduling And Maintenance
 
-Background Backups let scheduled profiles run while the main Delta window is closed. The macOS implementation is `DeltaAgent`, a signed Login Item helper registered through `SMAppService`; macOS runs it as a per-user LaunchAgent under the hood. In user-facing UI, Delta presents this as Background Backups because LaunchAgent is the operating-system mechanism, not a product concept users should manage directly. It runs as the signed-in user, not as a privileged admin helper, wakes for short schedule checks, starts due backups when policy allows it, then exits.
+Background Backups let scheduled profiles run while the main Delta window is closed. The macOS implementation is `DeltaAgent`, a signed Login Item helper registered through `SMAppService`; macOS runs it as a per-user LaunchAgent under the hood. In user-facing UI, Delta presents this as the Background Backup Service because LaunchAgent is the operating-system mechanism, not a product concept users should manage directly. It runs as the signed-in user, not as a privileged admin helper, wakes for short schedule checks, starts due backups when policy allows it, then exits.
 
 On each check, Background Backups evaluate:
 

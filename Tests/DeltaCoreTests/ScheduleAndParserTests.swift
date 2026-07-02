@@ -136,7 +136,7 @@ final class ScheduleAndParserTests: XCTestCase {
         XCTAssertEqual(LaunchAgentRegistrationStatus.enabled.displayName, "Ready")
         XCTAssertEqual(LaunchAgentRegistrationStatus.requiresApproval.displayName, "Needs Approval")
         XCTAssertEqual(LaunchAgentRegistrationStatus.notRegistered.displayName, "Off")
-        XCTAssertEqual(LaunchAgentRegistrationStatus.notFound.displayName, "Missing Helper")
+        XCTAssertEqual(LaunchAgentRegistrationStatus.notFound.displayName, "Missing Service")
     }
 
     func testLaunchAgentStatusParserHandlesRawServiceManagementStates() {
@@ -151,6 +151,83 @@ final class ScheduleAndParserTests: XCTestCase {
 
         XCTAssertEqual(status.displayName, "Unknown")
         XCTAssertEqual(status.detail, "macOS returned an unknown background backup status.")
+    }
+
+    func testBackgroundBackupPresentationTreatsUnscheduledUnregisteredServiceAsNotNeeded() {
+        let presentation = BackgroundBackupServicePresentation.make(
+            status: .notRegistered,
+            scheduledProfileCount: 0,
+            pausesScheduledBackups: false
+        )
+
+        XCTAssertEqual(presentation.statusText, "Not Needed")
+        XCTAssertEqual(presentation.statusDetail, "No scheduled profiles")
+        XCTAssertEqual(presentation.approvalText, "Off")
+        XCTAssertEqual(presentation.severity, .inactive)
+        XCTAssertFalse(presentation.needsAttention)
+    }
+
+    func testBackgroundBackupPresentationSurfacesReadyScheduledService() {
+        let presentation = BackgroundBackupServicePresentation.make(
+            status: .enabled,
+            scheduledProfileCount: 2,
+            pausesScheduledBackups: false
+        )
+
+        XCTAssertEqual(presentation.statusText, "Ready")
+        XCTAssertEqual(presentation.statusDetail, "Schedules can run closed")
+        XCTAssertEqual(presentation.approvalText, "Approved")
+        XCTAssertEqual(presentation.severity, .ready)
+        XCTAssertFalse(presentation.needsAttention)
+        XCTAssertTrue(presentation.controlDetail.contains("2 scheduled profiles"))
+    }
+
+    func testBackgroundBackupPresentationShowsApprovalAsActionRequired() {
+        let presentation = BackgroundBackupServicePresentation.make(
+            status: .requiresApproval,
+            scheduledProfileCount: 1,
+            pausesScheduledBackups: false
+        )
+
+        XCTAssertEqual(presentation.statusText, "Needs Approval")
+        XCTAssertEqual(presentation.approvalText, "Needed")
+        XCTAssertEqual(presentation.attentionTitle, "macOS approval required")
+        XCTAssertEqual(
+            presentation.attentionText,
+            "Approve Delta in Login Items before scheduled backups can run while the main window is closed."
+        )
+        XCTAssertEqual(presentation.severity, .attention)
+    }
+
+    func testBackgroundBackupPresentationShowsPausedSchedulesWithoutRemovingApproval() {
+        let presentation = BackgroundBackupServicePresentation.make(
+            status: .enabled,
+            scheduledProfileCount: 1,
+            pausesScheduledBackups: true
+        )
+
+        XCTAssertEqual(presentation.statusText, "Paused")
+        XCTAssertEqual(presentation.statusDetail, "Automated runs paused")
+        XCTAssertEqual(presentation.approvalText, "Approved")
+        XCTAssertEqual(presentation.attentionTitle, "Scheduled backups paused")
+        XCTAssertEqual(presentation.severity, .attention)
+        XCTAssertTrue(presentation.controlDetail.contains("Keep the background service approved"))
+    }
+
+    func testBackgroundBackupPresentationUsesProductLanguageForMissingService() {
+        let presentation = BackgroundBackupServicePresentation.make(
+            status: .notFound,
+            scheduledProfileCount: 1,
+            pausesScheduledBackups: false
+        )
+
+        XCTAssertEqual(presentation.statusText, "Missing Service")
+        XCTAssertEqual(presentation.attentionTitle, "Background service missing")
+        XCTAssertEqual(
+            presentation.attentionText,
+            "The signed background backup service is missing from the installed app bundle. Reinstall Delta from the latest build."
+        )
+        XCTAssertEqual(presentation.severity, .blocked)
     }
 
     private func components(_ calendar: Calendar, year: Int, month: Int, day: Int, hour: Int, minute: Int) -> Date {

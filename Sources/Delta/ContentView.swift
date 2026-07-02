@@ -1223,10 +1223,10 @@ private enum ActivityLogDetail: String, CaseIterable, Identifiable {
 
 struct SettingsView: View {
     private enum SettingsCategory: String, CaseIterable, Identifiable {
-        case essentials = "Essentials"
+        case essentials = "General"
         case defaults = "Defaults"
         case updates = "Updates"
-        case support = "Support"
+        case support = "Advanced"
 
         var id: String { rawValue }
     }
@@ -1357,7 +1357,7 @@ struct SettingsView: View {
     var body: some View {
         PageScaffold(
             title: "Settings",
-            subtitle: "Background backups, permissions, notifications, and safe defaults",
+            subtitle: "System access, background backups, updates, and safe defaults",
             actions: {
                 Button {
                     model.reload()
@@ -1414,14 +1414,14 @@ struct SettingsView: View {
 
                 SettingsCard(
                     symbol: "clock.badge.checkmark",
-                    title: "Background Backups",
-                    subtitle: "Let scheduled profiles run while Delta's main window is closed.",
-                    statusText: backgroundBackupsStatusText,
+                    title: "Background Backup Service",
+                    subtitle: "Run scheduled profiles while Delta's main window is closed.",
+                    statusText: backgroundBackupsPresentation.statusText,
                     statusColor: backgroundBackupsStatusColor
                 ) {
                 SettingsControlRow(
-                    title: "Scheduled backups",
-                    detail: backgroundBackupsControlDetail
+                    title: "Background backups",
+                    detail: backgroundBackupsPresentation.controlDetail
                 ) {
                     Toggle("", isOn: backgroundBackupsBinding)
                         .labelsHidden()
@@ -1429,8 +1429,8 @@ struct SettingsView: View {
                 }
 
                 SettingsControlRow(
-                    title: "Pause schedules",
-                    detail: "Temporarily stop hourly, daily, weekly, monthly, and custom scheduled runs without editing profiles or removing the background helper."
+                    title: "Pause scheduled automation",
+                    detail: "Temporarily stop hourly, daily, weekly, monthly, and custom due runs without editing profiles or removing macOS approval."
                 ) {
                     Toggle("", isOn: $pausesScheduledBackups)
                         .labelsHidden()
@@ -1439,8 +1439,8 @@ struct SettingsView: View {
 
                 SettingsNotice(
                     symbol: "clock.arrow.circlepath",
-                    title: "What macOS runs",
-                    text: "macOS starts Delta's signed background backup helper at sign-in and during short schedule checks. It runs as your user account, uses the same saved destinations, starts due backups when policy allows, then exits when there is no work.",
+                    title: "What runs in the background",
+                    text: BackgroundBackupServicePresentation.purposeText,
                     color: .blue
                 )
 
@@ -1458,14 +1458,14 @@ struct SettingsView: View {
                     SettingsFact(title: "Sign-in check", value: "Enabled"),
                     SettingsFact(title: "Runs as", value: "Your user"),
                     SettingsFact(title: "Admin access", value: "No"),
-                    SettingsFact(title: "macOS approval", value: backgroundApprovalText)
+                    SettingsFact(title: "Login Items approval", value: backgroundBackupsPresentation.approvalText)
                 ])
 
-                if shouldShowBackgroundSchedulingAttention {
+                if backgroundBackupsPresentation.needsAttention {
                     SettingsNotice(
                         symbol: "person.crop.circle.badge.exclamationmark",
-                        title: backgroundSchedulingAttentionTitle,
-                        text: backgroundSchedulingAttentionText,
+                        title: backgroundBackupsPresentation.attentionTitle ?? "Background backups need attention",
+                        text: backgroundBackupsPresentation.attentionText ?? "Review Background Backups before relying on scheduled runs.",
                         color: .orange
                     )
                 }
@@ -1479,7 +1479,7 @@ struct SettingsView: View {
                     )
                 }
 
-                if scheduledProfileCount == 0 && !shouldShowBackgroundSchedulingAttention && !backgroundSecretAccessSummary.needsRepair {
+                if scheduledProfileCount == 0 && !backgroundBackupsPresentation.needsAttention && !backgroundSecretAccessSummary.needsRepair {
                     SettingsNotice(
                         symbol: "calendar.badge.plus",
                         title: "No scheduled profiles",
@@ -1501,7 +1501,7 @@ struct SettingsView: View {
                     } label: {
                         Label("Review Login Items", systemImage: "gearshape")
                     }
-                    .deltaTooltip("Open macOS Login Items to approve or inspect Delta's background backups.")
+                    .deltaTooltip("Open macOS Login Items to approve or inspect Delta's background backup service.")
                     Button {
                         model.reload()
                     } label: {
@@ -2240,6 +2240,14 @@ struct SettingsView: View {
         }
     }
 
+    private var backgroundBackupsPresentation: BackgroundBackupServicePresentation {
+        BackgroundBackupServicePresentation.make(
+            status: model.launchAgentStatus,
+            scheduledProfileCount: scheduledProfileCount,
+            pausesScheduledBackups: pausesScheduledBackups
+        )
+    }
+
     private var settingsOverviewTitle: String {
         if !model.isPersistentStoreAvailable {
             return "Local app data needs attention"
@@ -2256,7 +2264,7 @@ struct SettingsView: View {
         if pausesScheduledBackups && scheduledProfileCount > 0 {
             return "Scheduled backups are paused"
         }
-        if shouldShowBackgroundSchedulingAttention {
+        if backgroundBackupsPresentation.needsAttention {
             return "Scheduled backups need attention"
         }
         if sendsJobNotifications && !notificationAuthorizationState.canDeliver {
@@ -2291,8 +2299,8 @@ struct SettingsView: View {
         if pausesScheduledBackups && scheduledProfileCount > 0 {
             return "Automatic scheduled runs are paused. Manual Back Up Now actions still work for individual profiles."
         }
-        if shouldShowBackgroundSchedulingAttention {
-            return backgroundSchedulingAttentionText
+        if let attentionText = backgroundBackupsPresentation.attentionText {
+            return attentionText
         }
         if sendsJobNotifications && !notificationAuthorizationState.canDeliver {
             return "macOS notification permission is required before Delta can send backup alerts."
@@ -2311,7 +2319,7 @@ struct SettingsView: View {
         if !model.fullDiskAccessStatus.hasLikelyFullDiskAccess
             || backgroundSecretAccessSummary.needsRepair
             || (pausesScheduledBackups && scheduledProfileCount > 0)
-            || shouldShowBackgroundSchedulingAttention
+            || backgroundBackupsPresentation.needsAttention
             || (sendsJobNotifications && !notificationAuthorizationState.canDeliver) {
             return .orange
         }
@@ -2324,7 +2332,7 @@ struct SettingsView: View {
             || !model.fullDiskAccessStatus.hasLikelyFullDiskAccess
             || backgroundSecretAccessSummary.needsRepair
             || (pausesScheduledBackups && scheduledProfileCount > 0)
-            || shouldShowBackgroundSchedulingAttention
+            || backgroundBackupsPresentation.needsAttention
             || (sendsJobNotifications && !notificationAuthorizationState.canDeliver)
     }
 
@@ -2339,10 +2347,10 @@ struct SettingsView: View {
             ),
             SettingsStatusItem(
                 title: "Schedules",
-                value: backgroundBackupsStatusText,
+                value: backgroundBackupsPresentation.statusText,
                 symbol: "clock.badge.checkmark",
                 color: backgroundBackupsStatusColor,
-                detail: backgroundBackupsSummaryDetail
+                detail: backgroundBackupsPresentation.statusDetail
             ),
             SettingsStatusItem(
                 title: "Passwords",
@@ -2390,97 +2398,6 @@ struct SettingsView: View {
         OperationalHistoryRetention.normalized(operationalHistoryRetentionDays)
     }
 
-    private var backgroundBackupsStatusText: String {
-        if pausesScheduledBackups && scheduledProfileCount > 0 {
-            return "Paused"
-        }
-        if scheduledProfileCount == 0 && model.launchAgentStatus == .notRegistered {
-            return "Not Needed"
-        }
-
-        switch model.launchAgentStatus {
-        case .enabled:
-            return "Ready"
-        case .requiresApproval:
-            return "Needs Approval"
-        case .notRegistered:
-            return "Off"
-        case .notFound:
-            return "Missing Helper"
-        case .unavailable:
-            return "Unavailable"
-        case .unknown:
-            return "Unknown"
-        }
-    }
-
-    private var backgroundBackupsControlDetail: String {
-        if pausesScheduledBackups {
-            return "The background helper can stay approved, but scheduled runs are paused until automation is resumed."
-        }
-        if scheduledProfileCount == 0 {
-            return "Optional until a backup profile has an hourly, daily, weekly, monthly, or custom schedule."
-        }
-        if model.launchAgentStatus == .enabled {
-            return "Allow \(scheduledProfileCount) scheduled \(scheduledProfileCount == 1 ? "profile" : "profiles") to run while Delta's window is closed."
-        }
-        return model.launchAgentStatus.detail
-    }
-
-    private var backgroundBackupsSummaryDetail: String {
-        if pausesScheduledBackups && scheduledProfileCount > 0 {
-            return "Automated runs paused"
-        }
-        if scheduledProfileCount == 0 {
-            return model.launchAgentStatus == .enabled ? "Ready for future schedules" : "No scheduled profiles"
-        }
-        return model.launchAgentStatus == .enabled ? "Schedules can run closed" : "Scheduled runs need attention"
-    }
-
-    private var shouldShowBackgroundSchedulingAttention: Bool {
-        scheduledProfileCount > 0 && (pausesScheduledBackups || model.launchAgentStatus.blocksScheduledBackups)
-    }
-
-    private var backgroundSchedulingAttentionTitle: String {
-        if pausesScheduledBackups && scheduledProfileCount > 0 {
-            return "Scheduled backups paused"
-        }
-        switch model.launchAgentStatus {
-        case .requiresApproval:
-            return "macOS approval required"
-        case .notRegistered:
-            return "Background backups are off"
-        case .notFound:
-            return "Background helper missing"
-        case .unavailable:
-            return "Background backups unavailable"
-        case .unknown:
-            return "Unknown background status"
-        case .enabled:
-            return "Background backups ready"
-        }
-    }
-
-    private var backgroundSchedulingAttentionText: String {
-        if pausesScheduledBackups && scheduledProfileCount > 0 {
-            return "Automatic scheduled runs are paused. Resume scheduled automation here when you want due backups to run again."
-        }
-        switch model.launchAgentStatus {
-        case .requiresApproval:
-            return "Approve Delta in Login Items before scheduled backups can run while the main window is closed."
-        case .notRegistered:
-            return "Turn on Background Backups before scheduled profiles can run while the main window is closed."
-        case .notFound:
-            return "The signed background helper is missing from the installed app bundle. Reinstall Delta from the latest build."
-        case .unavailable:
-            return "This macOS version cannot run Delta's background backup helper."
-        case .unknown:
-            return "macOS returned an unknown background backup status. Refresh status, then review Login Items if scheduled backups do not run."
-        case .enabled:
-            return "Scheduled backups can run while the main window is closed."
-        }
-    }
-
     private var fullDiskAccessStatusText: String {
         model.fullDiskAccessStatus.hasLikelyFullDiskAccess ? "Ready" : "Needs Access"
     }
@@ -2493,23 +2410,6 @@ struct SettingsView: View {
         model.fullDiskAccessStatus.hasLikelyFullDiskAccess
             ? "Protected locations look readable for full-volume and selected-folder backups."
             : "Protected locations are not readable yet. Open Privacy & Security, add Delta with the + button if needed, then recheck access."
-    }
-
-    private var backgroundApprovalText: String {
-        switch model.launchAgentStatus {
-        case .enabled:
-            return "Approved"
-        case .requiresApproval:
-            return "Needed"
-        case .notRegistered:
-            return "Off"
-        case .notFound:
-            return "Missing"
-        case .unavailable:
-            return "Unavailable"
-        case .unknown:
-            return "Unknown"
-        }
     }
 
     private var appLoginItemStatusText: String {
@@ -2906,19 +2806,14 @@ struct SettingsView: View {
     }
 
     private var backgroundBackupsStatusColor: Color {
-        if pausesScheduledBackups && scheduledProfileCount > 0 {
-            return .orange
-        }
-        if scheduledProfileCount == 0 && model.launchAgentStatus == .notRegistered {
-            return .secondary
-        }
-
-        switch model.launchAgentStatus {
-        case .enabled:
+        switch backgroundBackupsPresentation.severity {
+        case .ready:
             return .green
-        case .requiresApproval, .notRegistered:
+        case .inactive:
+            return .secondary
+        case .attention:
             return .orange
-        case .notFound, .unavailable, .unknown:
+        case .blocked:
             return .red
         }
     }
