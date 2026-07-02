@@ -5,7 +5,7 @@ public enum ResticJSONParserError: Error, LocalizedError {
 
     public var errorDescription: String? {
         switch self {
-        case let .invalidSnapshotDate(value): "Invalid restic snapshot date: \(value)."
+        case let .invalidSnapshotDate(value): "Invalid restore point date: \(value)."
         }
     }
 }

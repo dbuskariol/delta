@@ -436,7 +436,7 @@ public enum BackupCoordinatorError: Error, LocalizedError {
 
     public var errorDescription: String? {
         switch self {
-        case let .resticFailed(message): "restic failed: \(message)"
+        case let .resticFailed(message): "Backup tool failed: \(message)"
         case .destinationBusy: "Destination is busy with another backup, restore, or maintenance job."
         }
     }

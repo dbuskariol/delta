@@ -6,8 +6,8 @@ public enum ResticBackendError: Error, Equatable, LocalizedError {
 
     public var errorDescription: String? {
         switch self {
-        case let .emptyRequiredField(field): "Missing required repository field: \(field)."
-        case let .invalidPath(path): "Invalid repository path: \(path)."
+        case let .emptyRequiredField(field): "Missing required destination field: \(field)."
+        case let .invalidPath(path): "Invalid destination path: \(path)."
         }
     }
 }
@@ -67,7 +67,7 @@ public struct ResticBackendURLBuilder: Sendable {
             return "rclone:\(remote):\(path)"
 
         case let .custom(repository):
-            try require(repository, "custom repository URL")
+            try require(repository, "custom destination URL")
             return repository
         }
     }

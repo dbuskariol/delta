@@ -547,7 +547,7 @@ struct ProfileRow: View {
                     model.runNow(profile: profile)
                 }
                 .disabled(model.isWorking)
-                IconButton(symbol: "scissors", help: "Apply retention and prune") {
+                IconButton(symbol: "scissors", help: "Clean up old restore points") {
                     model.prune(profile: profile)
                 }
                 .disabled(model.isWorking)
@@ -880,10 +880,10 @@ struct ProfileEditorView: View {
                             .frame(width: 122, alignment: .leading)
                     }
                     HStack(spacing: 18) {
-                        Toggle("Prune after forget", isOn: $pruneAfterForget)
+                        Toggle("Free space after cleanup", isOn: $pruneAfterForget)
                             .toggleStyle(.checkbox)
                             .frame(width: 170, alignment: .leading)
-                        Toggle("Check after prune", isOn: $checkAfterPrune)
+                        Toggle("Verify after cleanup", isOn: $checkAfterPrune)
                             .toggleStyle(.checkbox)
                             .frame(width: 170, alignment: .leading)
                     }
