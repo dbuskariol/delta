@@ -5,6 +5,10 @@ import SwiftUI
 struct DeltaMenuBarView: View {
     @EnvironmentObject private var model: DeltaAppModel
     @EnvironmentObject private var softwareUpdateController: SoftwareUpdateController
+    @AppStorage(
+        DeltaAppPreferenceKeys.pausesScheduledBackups,
+        store: DeltaAppPreferences.sharedStore()
+    ) private var pausesScheduledBackups = false
     var openApp: (DeltaAppModel.Section) -> Void
 
     init(openApp: @escaping (DeltaAppModel.Section) -> Void) {
@@ -167,11 +171,12 @@ struct DeltaMenuBarView: View {
             Button {
                 model.runDueBackups()
             } label: {
-                Label("Run Due Backups", systemImage: "calendar.badge.clock")
+                Label(pausesScheduledBackups ? "Scheduled Paused" : "Run Due Backups", systemImage: pausesScheduledBackups ? "pause.circle" : "calendar.badge.clock")
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.bordered)
-            .disabled(model.profiles.isEmpty || model.isWorking || !model.isPersistentStoreAvailable)
+            .disabled(model.profiles.isEmpty || model.isWorking || pausesScheduledBackups || !model.isPersistentStoreAvailable)
+            .deltaTooltip(pausesScheduledBackups ? "Scheduled backups are paused in Settings. Manual Back Up Now is still available." : "Run every backup profile that is currently due.")
         }
         .controlSize(.regular)
     }

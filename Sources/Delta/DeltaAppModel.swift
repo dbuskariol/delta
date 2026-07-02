@@ -549,6 +549,10 @@ final class DeltaAppModel: ObservableObject {
     func runDueBackups() {
         guardPersistentStoreAvailable()
         guard isPersistentStoreAvailable else { return }
+        guard !DeltaAppPreferences.bool(for: DeltaAppPreferenceKeys.pausesScheduledBackups, default: false) else {
+            alertMessage = "Scheduled backups are paused. Resume scheduled backups in Settings or run a manual backup from a profile."
+            return
+        }
         let coordinator = makeCoordinator()
         performBackgroundJobWork(
             activeOperation: ActiveOperation(

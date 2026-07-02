@@ -17,6 +17,7 @@ public enum DeltaAppPreferenceKeys {
     public static let defaultProfileUploadLimitKiB = "Delta.defaultProfileUploadLimitKiB"
     public static let defaultRestoreConflictPolicy = "Delta.defaultRestoreConflictPolicy"
     public static let operationalHistoryRetentionDays = "Delta.operationalHistoryRetentionDays"
+    public static let pausesScheduledBackups = "Delta.pausesScheduledBackups"
     public static let preventsIdleSleepDuringJobs = "Delta.preventsIdleSleepDuringJobs"
     public static let previewsRestoresByDefault = "Delta.previewsRestoresByDefault"
     public static let sendsJobNotifications = "Delta.sendsJobNotifications"

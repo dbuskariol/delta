@@ -43,6 +43,7 @@ public struct DiagnosticSnapshotCollector {
             logPath: diagnosticPath(fileManager: fileManager) { try AppDirectories.logDirectory(fileManager: fileManager) },
             fullDiskAccessStatus: fullDiskAccessStatus.hasLikelyFullDiskAccess ? "Ready" : "Needs Access",
             backgroundBackupsStatus: LaunchAgentController.status().displayName,
+            scheduledAutomationStatus: DeltaAppPreferences.bool(for: DeltaAppPreferenceKeys.pausesScheduledBackups, default: false) ? "Paused" : "Running",
             appLoginItemStatus: AppLoginItemController.status().displayName,
             notificationStatus: DeltaAppPreferences.bool(for: DeltaAppPreferenceKeys.sendsJobNotifications, default: false) ? "Enabled" : "Disabled",
             menuBarStatus: DeltaAppPreferences.bool(for: DeltaAppPreferenceKeys.showsMenuBarExtra, default: true) ? "Shown" : "Hidden",

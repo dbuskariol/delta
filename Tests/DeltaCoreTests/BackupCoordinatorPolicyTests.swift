@@ -26,6 +26,32 @@ final class BackupCoordinatorPolicyTests: XCTestCase {
         XCTAssertTrue(try fixture.database.fetchEvents().contains { $0.message.contains("Low Power Mode") })
     }
 
+    func testRunDueBackupsSkipsAllScheduledWorkWhenAutomationIsPaused() throws {
+        let fixture = try Fixture()
+        let runner = MockResticRunner(results: [.success, .success])
+        let coordinator = fixture.makeCoordinator(
+            runner: runner,
+            scheduleEvaluator: ScheduleEvaluator(calendar: Self.utc),
+            scheduledBackupsArePaused: { true }
+        )
+        let createdAt = try XCTUnwrap(Self.utc.date(from: DateComponents(year: 2026, month: 7, day: 1, hour: 1, minute: 0)))
+        let now = try XCTUnwrap(Self.utc.date(from: DateComponents(year: 2026, month: 7, day: 1, hour: 2, minute: 5)))
+        let profile = fixture.profile(
+            retention: RetentionPolicy(
+                maintenanceSchedule: RetentionMaintenanceSchedule(intervalDays: 1, hour: 2, minute: 0)
+            ),
+            createdAt: createdAt
+        )
+        try fixture.database.saveRepository(fixture.repository)
+        try fixture.database.saveProfile(profile)
+
+        let runs = try coordinator.runDueBackups(now: now)
+
+        XCTAssertTrue(runs.isEmpty)
+        XCTAssertTrue(runner.commands.isEmpty)
+        XCTAssertTrue(try fixture.database.fetchJobRuns(limit: 10).isEmpty)
+    }
+
     func testRunBackupFailsClosedForInvalidProfile() throws {
         let fixture = try Fixture()
         let runner = MockResticRunner(results: [.success])
@@ -1326,7 +1352,8 @@ private struct Fixture {
         powerState: PowerState = PowerState(isOnBatteryPower: false, isLowPowerModeEnabled: false),
         systemActivityManager: any SystemActivityManaging = NoOpSystemActivityManager(),
         runControlStore: ResticRunControlStore? = nil,
-        outputHandler: (@Sendable (UUID, ResticOutputEvent) -> Void)? = nil
+        outputHandler: (@Sendable (UUID, ResticOutputEvent) -> Void)? = nil,
+        scheduledBackupsArePaused: @escaping @Sendable () -> Bool = { false }
     ) -> BackupCoordinator {
         BackupCoordinator(
             database: database,
@@ -1340,6 +1367,7 @@ private struct Fixture {
             systemActivityManager: systemActivityManager,
             lockManager: lockManager,
             runControlStore: runControlStore,
+            scheduledBackupsArePaused: scheduledBackupsArePaused,
             outputHandler: outputHandler
         )
     }

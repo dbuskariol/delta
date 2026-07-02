@@ -15,6 +15,7 @@ final class DiagnosticReportTests: XCTestCase {
             logPath: "/Users/me/Library/Application Support/Delta/Logs",
             fullDiskAccessStatus: "Ready",
             backgroundBackupsStatus: "Ready",
+            scheduledAutomationStatus: "Paused",
             appLoginItemStatus: "Ready",
             notificationStatus: "Enabled",
             menuBarStatus: "Shown",
@@ -49,6 +50,7 @@ final class DiagnosticReportTests: XCTestCase {
         XCTAssertTrue(report.contains("- Version: 0.1 (1)"))
         XCTAssertTrue(report.contains("- Full Disk Access: Ready"))
         XCTAssertTrue(report.contains("- Background Backups: Ready"))
+        XCTAssertTrue(report.contains("- Scheduled Automation: Paused"))
         XCTAssertTrue(report.contains("- Start at Login: Ready"))
         XCTAssertTrue(report.contains("- Notifications: Enabled"))
         XCTAssertTrue(report.contains("- Menu Bar: Shown"))

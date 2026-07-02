@@ -66,6 +66,10 @@ struct DashboardView: View {
         DeltaAppPreferenceKeys.destinationVerificationWarningHours,
         store: DeltaAppPreferences.sharedStore()
     ) private var destinationVerificationWarningHours = DestinationVerificationWarningThreshold.thirtyDays.rawValue
+    @AppStorage(
+        DeltaAppPreferenceKeys.pausesScheduledBackups,
+        store: DeltaAppPreferences.sharedStore()
+    ) private var pausesScheduledBackups = false
 
     var body: some View {
         PageScaffold(
@@ -75,11 +79,11 @@ struct DashboardView: View {
                 Button {
                     model.runDueBackups()
                 } label: {
-                    Label(model.isWorking ? "Running" : "Run due", systemImage: model.isWorking ? "arrow.triangle.2.circlepath" : "play.fill")
+                    Label(dashboardRunDueTitle, systemImage: model.isWorking ? "arrow.triangle.2.circlepath" : "play.fill")
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(model.profiles.isEmpty || model.isWorking || !model.isPersistentStoreAvailable)
-                .deltaTooltip(model.isWorking ? "A Delta job is already running." : "Run every backup profile that is currently due.")
+                .disabled(model.profiles.isEmpty || model.isWorking || pausesScheduledBackups || !model.isPersistentStoreAvailable)
+                .deltaTooltip(dashboardRunDueTooltip)
             }
         ) {
             LazyVGrid(columns: DeltaTheme.statColumns, spacing: 12) {
@@ -106,7 +110,7 @@ struct DashboardView: View {
                 }
             }
 
-            if model.scheduledBackupsNeedAgentSetup {
+            if model.scheduledBackupsNeedAgentSetup && !pausesScheduledBackups {
                 Card {
                     HStack(alignment: .top, spacing: 14) {
                         StatusIcon(symbol: "clock.badge.exclamationmark", color: .orange)
@@ -123,6 +127,28 @@ struct DashboardView: View {
                             Label("Review", systemImage: "arrow.right")
                         }
                         .buttonStyle(.bordered)
+                        .controlSize(.small)
+                    }
+                }
+            }
+
+            if pausesScheduledBackups && scheduledProfileCount > 0 {
+                Card {
+                    HStack(alignment: .top, spacing: 14) {
+                        StatusIcon(symbol: "pause.circle", color: .orange)
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Scheduled Backups Paused")
+                                .font(.headline)
+                            Text("Automatic due runs are paused. Manual Back Up Now actions still work for individual profiles.")
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Button {
+                            pausesScheduledBackups = false
+                        } label: {
+                            Label("Resume", systemImage: "play.fill")
+                        }
+                        .buttonStyle(.borderedProminent)
                         .controlSize(.small)
                     }
                 }
@@ -225,6 +251,30 @@ struct DashboardView: View {
 
     private var sourceHealthWarnings: [DashboardHealthWarning] {
         model.sourceHealthWarnings
+    }
+
+    private var scheduledProfileCount: Int {
+        model.profiles.filter { $0.schedule.isEnabled }.count
+    }
+
+    private var dashboardRunDueTitle: String {
+        if model.isWorking {
+            return "Running"
+        }
+        if pausesScheduledBackups {
+            return "Paused"
+        }
+        return "Run due"
+    }
+
+    private var dashboardRunDueTooltip: String {
+        if model.isWorking {
+            return "A Delta job is already running."
+        }
+        if pausesScheduledBackups {
+            return "Scheduled backups are paused in Settings. Manual profile backups are still available."
+        }
+        return "Run every backup profile that is currently due."
     }
 }
 
@@ -1188,6 +1238,10 @@ struct SettingsView: View {
         store: DeltaAppPreferences.sharedStore()
     ) private var defaultRestoreConflictPolicyRawValue = RestoreConflictPolicy.ifChanged.rawValue
     @AppStorage(
+        DeltaAppPreferenceKeys.pausesScheduledBackups,
+        store: DeltaAppPreferences.sharedStore()
+    ) private var pausesScheduledBackups = false
+    @AppStorage(
         DeltaAppPreferenceKeys.defaultProfileCatchUpMissedRuns,
         store: DeltaAppPreferences.sharedStore()
     ) private var defaultProfileCatchUpMissedRuns = true
@@ -1325,6 +1379,15 @@ struct SettingsView: View {
                         .toggleStyle(.switch)
                 }
 
+                SettingsControlRow(
+                    title: "Pause scheduled automation",
+                    detail: "Temporarily stop hourly, daily, weekly, monthly, and custom scheduled runs without editing profiles or removing the background helper."
+                ) {
+                    Toggle("", isOn: $pausesScheduledBackups)
+                        .labelsHidden()
+                        .toggleStyle(.switch)
+                }
+
                 SettingsNotice(
                     symbol: "clock.arrow.circlepath",
                     title: "How it works",
@@ -1340,6 +1403,7 @@ struct SettingsView: View {
 
                 SettingsFactGrid(items: [
                     SettingsFact(title: "Scheduled profiles", value: "\(scheduledProfileCount)"),
+                    SettingsFact(title: "Automation", value: pausesScheduledBackups ? "Paused" : "Running"),
                     SettingsFact(title: "Schedule checks", value: "Every 5 min"),
                     SettingsFact(title: "Runs at sign-in", value: "Yes"),
                     SettingsFact(title: "Runs as", value: "Your user"),
@@ -1369,8 +1433,8 @@ struct SettingsView: View {
                     } label: {
                         Label("Run Due Now", systemImage: "play.fill")
                     }
-                    .disabled(model.profiles.isEmpty || model.isWorking || !model.isPersistentStoreAvailable)
-                    .deltaTooltip("Run every backup profile that is currently due using the same scheduler path.")
+                    .disabled(model.profiles.isEmpty || model.isWorking || pausesScheduledBackups || !model.isPersistentStoreAvailable)
+                    .deltaTooltip(pausesScheduledBackups ? "Scheduled automation is paused. Resume it here or run a manual profile backup." : "Run every backup profile that is currently due using the same scheduler path.")
                     Button {
                         model.openLoginItemsSettings()
                     } label: {
@@ -2071,6 +2135,9 @@ struct SettingsView: View {
         if !model.fullDiskAccessStatus.hasLikelyFullDiskAccess {
             return "System access needs attention"
         }
+        if pausesScheduledBackups && scheduledProfileCount > 0 {
+            return "Scheduled backups are paused"
+        }
         if shouldShowBackgroundSchedulingAttention {
             return "Scheduled backups need attention"
         }
@@ -2100,6 +2167,9 @@ struct SettingsView: View {
         if !model.fullDiskAccessStatus.hasLikelyFullDiskAccess {
             return fullDiskAccessDescription
         }
+        if pausesScheduledBackups && scheduledProfileCount > 0 {
+            return "Automatic scheduled runs are paused. Manual Back Up Now actions still work for individual profiles."
+        }
         if shouldShowBackgroundSchedulingAttention {
             return backgroundSchedulingAttentionText
         }
@@ -2118,6 +2188,7 @@ struct SettingsView: View {
             return .red
         }
         if !model.fullDiskAccessStatus.hasLikelyFullDiskAccess
+            || (pausesScheduledBackups && scheduledProfileCount > 0)
             || shouldShowBackgroundSchedulingAttention
             || (sendsJobNotifications && !notificationAuthorizationState.canDeliver) {
             return .orange
@@ -2129,6 +2200,7 @@ struct SettingsView: View {
         !model.isPersistentStoreAvailable
             || backupToolStatusText != "Ready"
             || !model.fullDiskAccessStatus.hasLikelyFullDiskAccess
+            || (pausesScheduledBackups && scheduledProfileCount > 0)
             || shouldShowBackgroundSchedulingAttention
             || (sendsJobNotifications && !notificationAuthorizationState.canDeliver)
     }
@@ -2189,6 +2261,9 @@ struct SettingsView: View {
     }
 
     private var backgroundBackupsStatusText: String {
+        if pausesScheduledBackups && scheduledProfileCount > 0 {
+            return "Paused"
+        }
         if scheduledProfileCount == 0 && model.launchAgentStatus == .notRegistered {
             return "Not Needed"
         }
@@ -2210,6 +2285,9 @@ struct SettingsView: View {
     }
 
     private var backgroundBackupsControlDetail: String {
+        if pausesScheduledBackups {
+            return "The background helper can stay approved, but scheduled runs are paused until automation is resumed."
+        }
         if scheduledProfileCount == 0 {
             return "Optional until a backup profile has an hourly, daily, weekly, monthly, or custom schedule."
         }
@@ -2220,6 +2298,9 @@ struct SettingsView: View {
     }
 
     private var backgroundBackupsSummaryDetail: String {
+        if pausesScheduledBackups && scheduledProfileCount > 0 {
+            return "Automated runs paused"
+        }
         if scheduledProfileCount == 0 {
             return model.launchAgentStatus == .enabled ? "Ready for future schedules" : "No scheduled profiles"
         }
@@ -2227,10 +2308,13 @@ struct SettingsView: View {
     }
 
     private var shouldShowBackgroundSchedulingAttention: Bool {
-        scheduledProfileCount > 0 && model.launchAgentStatus.blocksScheduledBackups
+        scheduledProfileCount > 0 && (pausesScheduledBackups || model.launchAgentStatus.blocksScheduledBackups)
     }
 
     private var backgroundSchedulingAttentionTitle: String {
+        if pausesScheduledBackups && scheduledProfileCount > 0 {
+            return "Scheduled backups paused"
+        }
         switch model.launchAgentStatus {
         case .requiresApproval:
             return "macOS approval required"
@@ -2248,6 +2332,9 @@ struct SettingsView: View {
     }
 
     private var backgroundSchedulingAttentionText: String {
+        if pausesScheduledBackups && scheduledProfileCount > 0 {
+            return "Automatic scheduled runs are paused. Resume scheduled automation here when you want due backups to run again."
+        }
         switch model.launchAgentStatus {
         case .requiresApproval:
             return "Approve Delta in Login Items before scheduled backups can run while the main window is closed."
@@ -2616,6 +2703,9 @@ struct SettingsView: View {
     }
 
     private var backgroundBackupsStatusColor: Color {
+        if pausesScheduledBackups && scheduledProfileCount > 0 {
+            return .orange
+        }
         if scheduledProfileCount == 0 && model.launchAgentStatus == .notRegistered {
             return .secondary
         }

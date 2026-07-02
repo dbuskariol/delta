@@ -135,6 +135,30 @@ final class DeltaAppPreferencesTests: XCTestCase {
         XCTAssertFalse(DeltaAppPreferences.bool(for: key, default: true))
     }
 
+    func testScheduledBackupPausePreferenceDefaultsToRunning() {
+        let key = DeltaAppPreferenceKeys.pausesScheduledBackups
+        let standardValue = UserDefaults.standard.object(forKey: key)
+        let sharedValue = sharedSuite?.object(forKey: key)
+        UserDefaults.standard.removeObject(forKey: key)
+        sharedSuite?.removeObject(forKey: key)
+        defer {
+            UserDefaults.standard.removeObject(forKey: key)
+            sharedSuite?.removeObject(forKey: key)
+            if let standardValue {
+                UserDefaults.standard.set(standardValue, forKey: key)
+            }
+            if let sharedValue {
+                sharedSuite?.set(sharedValue, forKey: key)
+            }
+        }
+
+        XCTAssertFalse(DeltaAppPreferences.bool(for: key, default: false))
+
+        sharedSuite?.set(true, forKey: key)
+
+        XCTAssertTrue(DeltaAppPreferences.bool(for: key, default: false))
+    }
+
     func testUpdateCheckIntervalNormalizesUnsupportedValues() {
         XCTAssertEqual(AppUpdateCheckInterval.normalized(AppUpdateCheckInterval.daily.rawValue), .daily)
         XCTAssertEqual(AppUpdateCheckInterval.normalized(AppUpdateCheckInterval.weekly.rawValue), .weekly)

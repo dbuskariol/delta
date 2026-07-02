@@ -14,6 +14,7 @@ public final class BackupCoordinator: @unchecked Sendable {
     private let systemActivityManager: any SystemActivityManaging
     private let lockManager: any RepositoryLocking
     private let runControlStore: ResticRunControlStore?
+    private let scheduledBackupsArePaused: @Sendable () -> Bool
     private let outputHandler: (@Sendable (UUID, ResticOutputEvent) -> Void)?
 
     public init(
@@ -30,6 +31,9 @@ public final class BackupCoordinator: @unchecked Sendable {
         systemActivityManager: any SystemActivityManaging = ProcessInfoSystemActivityManager(),
         lockManager: any RepositoryLocking = RepositoryJobLockManager(),
         runControlStore: ResticRunControlStore? = nil,
+        scheduledBackupsArePaused: @escaping @Sendable () -> Bool = {
+            DeltaAppPreferences.bool(for: DeltaAppPreferenceKeys.pausesScheduledBackups, default: false)
+        },
         outputHandler: (@Sendable (UUID, ResticOutputEvent) -> Void)? = nil
     ) {
         self.database = database
@@ -45,6 +49,7 @@ public final class BackupCoordinator: @unchecked Sendable {
         self.systemActivityManager = systemActivityManager
         self.lockManager = lockManager
         self.runControlStore = runControlStore
+        self.scheduledBackupsArePaused = scheduledBackupsArePaused
         self.outputHandler = outputHandler
     }
 
@@ -314,10 +319,13 @@ public final class BackupCoordinator: @unchecked Sendable {
     }
 
     public func runDueBackups(now: Date = Date()) throws -> [JobRun] {
+        let profiles = try database.fetchProfiles()
+        guard !scheduledBackupsArePaused() else {
+            return []
+        }
+
         let repositories = Dictionary(uniqueKeysWithValues: try database.fetchRepositories().map { ($0.id, $0) })
         let jobRuns = try database.fetchJobRuns(limit: 500)
-        let profiles = try database.fetchProfiles()
-
         var runs: [JobRun] = []
         let powerState = powerStateProvider.current()
         for profile in profiles where profile.schedule.isEnabled {
