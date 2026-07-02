@@ -62,6 +62,9 @@ append_command "Background Backups Helper Dry Run" "$APP_PATH/Contents/MacOS/Del
 ISOLATED_AGENT_SUPPORT="$(/usr/bin/mktemp -d -t delta-agent-support.XXXXXX)"
 append_command "Background Backups Isolated Due-Run" /bin/sh -c "DELTA_APP_SUPPORT_DIR='$ISOLATED_AGENT_SUPPORT' '$APP_PATH/Contents/MacOS/DeltaAgent' && test -f '$ISOLATED_AGENT_SUPPORT/Delta.sqlite'"
 /bin/rm -rf "$ISOLATED_AGENT_SUPPORT"
+if [[ -d "/Applications/Delta.app" ]]; then
+  append_command "Installed App Smoke Verification" "$ROOT_DIR/Scripts/verify-installed-app.sh" "/Applications/Delta.app"
+fi
 append_command "Bundled Backup Engine" "$APP_PATH/Contents/MacOS/restic" version
 append_command "Bundled Cloud Helper" "$APP_PATH/Contents/MacOS/rclone" version
 append_command "Secret Bridge Fail-Closed Check" /bin/sh -c "'$APP_PATH/Contents/MacOS/DeltaSecretBridge' 2>&1; test \$? -eq 64"

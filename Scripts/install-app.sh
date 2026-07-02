@@ -51,6 +51,6 @@ fi
 /bin/mkdir -p "$INSTALL_DIR"
 /bin/rm -rf "$APP_TARGET"
 /usr/bin/ditto "$APP_SOURCE" "$APP_TARGET"
-/usr/bin/codesign --verify --strict --deep --verbose=2 "$APP_TARGET"
+"$ROOT_DIR/Scripts/verify-installed-app.sh" "$APP_TARGET"
 
 printf "Installed %s\n" "$APP_TARGET"

@@ -7,13 +7,21 @@ cd "$ROOT_DIR"
 /usr/bin/swift test
 
 "$ROOT_DIR/Scripts/verify-product-language.sh"
-/bin/bash -n "$ROOT_DIR/Scripts/package-update.sh" "$ROOT_DIR/Scripts/notarize-release.sh" "$ROOT_DIR/Scripts/collect-release-evidence.sh"
+/bin/bash -n \
+  "$ROOT_DIR/Scripts/package-update.sh" \
+  "$ROOT_DIR/Scripts/notarize-release.sh" \
+  "$ROOT_DIR/Scripts/collect-release-evidence.sh" \
+  "$ROOT_DIR/Scripts/verify-installed-app.sh"
 if [[ ! -x "$ROOT_DIR/Scripts/notarize-release.sh" ]]; then
   printf "Scripts/notarize-release.sh must be executable.\n" >&2
   exit 1
 fi
 if [[ ! -x "$ROOT_DIR/Scripts/collect-release-evidence.sh" ]]; then
   printf "Scripts/collect-release-evidence.sh must be executable.\n" >&2
+  exit 1
+fi
+if [[ ! -x "$ROOT_DIR/Scripts/verify-installed-app.sh" ]]; then
+  printf "Scripts/verify-installed-app.sh must be executable.\n" >&2
   exit 1
 fi
 "$ROOT_DIR/Scripts/bootstrap-tools.sh"

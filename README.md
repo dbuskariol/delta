@@ -223,6 +223,12 @@ Install the verified app bundle locally:
 Scripts/install-app.sh
 ```
 
+Verify the installed `/Applications/Delta.app` copy:
+
+```sh
+Scripts/verify-installed-app.sh
+```
+
 Full release verification:
 
 ```sh

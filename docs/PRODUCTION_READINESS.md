@@ -25,6 +25,7 @@ The automated gate must pass before any beta or production build is shipped. It 
 - app launch smoke test
 - DeltaAgent status, dry-run, and fail-closed argument smoke tests
 - isolated DeltaAgent due-run smoke test using temporary Application Support data
+- installed `/Applications/Delta.app` smoke verification when present
 - Sparkle update archive and signed appcast metadata
 - notarization workflow syntax and executable-bit hygiene
 
