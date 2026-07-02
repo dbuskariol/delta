@@ -80,6 +80,7 @@ public struct DiagnosticReportSnapshot: Equatable, Sendable {
     public var logPath: String
     public var fullDiskAccessStatus: String
     public var backgroundBackupsStatus: String
+    public var menuBarStatus: String
     public var activeOperation: String?
     public var profileCount: Int
     public var destinationCount: Int
@@ -102,6 +103,7 @@ public struct DiagnosticReportSnapshot: Equatable, Sendable {
         logPath: String,
         fullDiskAccessStatus: String,
         backgroundBackupsStatus: String,
+        menuBarStatus: String,
         activeOperation: String?,
         profileCount: Int,
         destinationCount: Int,
@@ -123,6 +125,7 @@ public struct DiagnosticReportSnapshot: Equatable, Sendable {
         self.logPath = logPath
         self.fullDiskAccessStatus = fullDiskAccessStatus
         self.backgroundBackupsStatus = backgroundBackupsStatus
+        self.menuBarStatus = menuBarStatus
         self.activeOperation = activeOperation
         self.profileCount = profileCount
         self.destinationCount = destinationCount
@@ -158,6 +161,7 @@ public struct DiagnosticReportBuilder: Sendable {
             "## Status",
             "- Full Disk Access: \(snapshot.fullDiskAccessStatus)",
             "- Background Backups: \(snapshot.backgroundBackupsStatus)",
+            "- Menu Bar: \(snapshot.menuBarStatus)",
             "- Active Operation: \(snapshot.activeOperation ?? "None")",
             "",
             "## Counts",

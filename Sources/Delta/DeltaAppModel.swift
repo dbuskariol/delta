@@ -819,6 +819,7 @@ final class DeltaAppModel: ObservableObject {
             logPath: diagnosticPath { try AppDirectories.logDirectory() },
             fullDiskAccessStatus: fullDiskAccessStatus.hasLikelyFullDiskAccess ? "Ready" : "Needs Access",
             backgroundBackupsStatus: launchAgentStatus.displayName,
+            menuBarStatus: DeltaAppPreferences.bool(for: DeltaAppPreferenceKeys.showsMenuBarExtra, default: true) ? "Shown" : "Hidden",
             activeOperation: activeOperation.map { "\($0.kind.displayName): \($0.title)" },
             profileCount: profiles.count,
             destinationCount: repositories.count,

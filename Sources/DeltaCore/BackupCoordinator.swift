@@ -339,11 +339,11 @@ public final class BackupCoordinator: @unchecked Sendable {
                 try database.appendEvent(EventLog(level: .info, message: "Skipped '\(profile.name)' because Low Power Mode is enabled."))
                 continue
             }
-            let lastRun = jobRuns
-                .filter { $0.profileID == profile.id && $0.kind == .backup && ($0.status == .succeeded || $0.status == .warning) }
-                .map(\.startedAt)
-                .max()
-            let decision = scheduleEvaluator.decision(for: profile.schedule, lastRun: lastRun, now: now)
+            let decision = scheduleEvaluator.decision(
+                for: profile.schedule,
+                lastRun: latestBackupAttemptDate(for: profile, jobRuns: jobRuns),
+                now: now
+            )
             var backupRun: JobRun?
             if decision.isDue {
                 let run = try runBackup(profile: profile, repository: repository)
@@ -362,17 +362,27 @@ public final class BackupCoordinator: @unchecked Sendable {
         return runs
     }
 
-    private func isMaintenanceDue(for profile: BackupProfile, jobRuns: [JobRun], now: Date) -> Bool {
-        let lastMaintenanceRun = jobRuns
-            .filter { $0.profileID == profile.id && $0.kind == .prune && ($0.status == .succeeded || $0.status == .warning) }
+    private func latestBackupAttemptDate(for profile: BackupProfile, jobRuns: [JobRun]) -> Date? {
+        jobRuns
+            .filter { $0.profileID == profile.id && $0.kind == .backup && $0.status != .queued }
             .compactMap { $0.finishedAt ?? $0.startedAt }
             .max()
+    }
+
+    private func isMaintenanceDue(for profile: BackupProfile, jobRuns: [JobRun], now: Date) -> Bool {
         return scheduleEvaluator.maintenanceDecision(
             for: profile.retention.maintenanceSchedule,
             profileCreatedAt: profile.createdAt,
-            lastMaintenanceRun: lastMaintenanceRun,
+            lastMaintenanceRun: latestMaintenanceAttemptDate(for: profile, jobRuns: jobRuns),
             now: now
         ).isDue
+    }
+
+    private func latestMaintenanceAttemptDate(for profile: BackupProfile, jobRuns: [JobRun]) -> Date? {
+        jobRuns
+            .filter { $0.profileID == profile.id && $0.kind == .prune && $0.status != .queued }
+            .compactMap { $0.finishedAt ?? $0.startedAt }
+            .max()
     }
 
     private func localRepositoryNeedsPreparation(_ repository: BackupRepository) -> Bool {

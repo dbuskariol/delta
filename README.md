@@ -110,6 +110,8 @@ Background Backups let scheduled profiles run while the main Delta window is clo
 
 When an enabled scheduled profile is saved, Delta requests Background Backups registration automatically. If macOS still requires approval, Delta shows an action-needed Background Backups card on the dashboard and a detailed status in Settings. macOS may require manual approval in Login Items; apps cannot approve their own background items.
 
+The visible menu bar dropdown is separate from Background Backups. Users can show or hide the menu bar item from Settings without changing scheduled backup execution. The menu bar item provides quick access to Back Up Now, Run Due Backups, Pause, Stop, Activity, update checks, and last-backup status.
+
 Retention maintenance can run `forget`, `prune`, and optional `check` based on the profile maintenance schedule. Post-prune checks are returned to the agent so failed validation is visible in job status and process exit status.
 
 For local and mounted destinations, scheduled maintenance fails fast with a clear reconnect/remount message when the destination folder is absent. Delta does not launch restic for cleanup or check work against a missing drive.

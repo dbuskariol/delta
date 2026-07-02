@@ -859,7 +859,7 @@ private extension Array where Element == ResticSnapshotEntry {
 
 struct ActivityView: View {
     @EnvironmentObject private var model: DeltaAppModel
-    @AppStorage("Delta.activityLogDetail") private var activityLogDetailRawValue = ActivityLogDetail.standard.rawValue
+    @AppStorage(DeltaAppPreferenceKeys.activityLogDetail) private var activityLogDetailRawValue = ActivityLogDetail.standard.rawValue
 
     var body: some View {
         PageScaffold(title: "Activity", subtitle: "Jobs, destination checks, and system events") {
@@ -974,8 +974,9 @@ private enum ActivityLogDetail: String, CaseIterable, Identifiable {
 struct SettingsView: View {
     @EnvironmentObject private var model: DeltaAppModel
     @EnvironmentObject private var softwareUpdateController: SoftwareUpdateController
-    @AppStorage("Delta.updateCheckIntervalSeconds") private var updateCheckIntervalSeconds = UpdateCheckInterval.daily.rawValue
-    @AppStorage("Delta.activityLogDetail") private var activityLogDetailRawValue = ActivityLogDetail.standard.rawValue
+    @AppStorage(DeltaAppPreferenceKeys.updateCheckIntervalSeconds) private var updateCheckIntervalSeconds = UpdateCheckInterval.daily.rawValue
+    @AppStorage(DeltaAppPreferenceKeys.activityLogDetail) private var activityLogDetailRawValue = ActivityLogDetail.standard.rawValue
+    @AppStorage(DeltaAppPreferenceKeys.showsMenuBarExtra) private var showsMenuBarExtra = true
     @State private var automaticallyChecksForUpdates = true
 
     var body: some View {
@@ -1027,22 +1028,31 @@ struct SettingsView: View {
                         .toggleStyle(.switch)
                 }
 
-                SettingsDescription(
-                    text: "Delta uses a signed macOS Login Item helper for this. It runs as your user account, wakes briefly, starts due backups, enforces destination and power policies, runs cleanup when scheduled, then exits. It is not an admin service."
+                SettingsNotice(
+                    symbol: "clock.arrow.circlepath",
+                    title: "What this does",
+                    text: "Delta uses a signed macOS Login Item helper that runs as your user account. It wakes briefly, checks schedules, starts due backups, enforces destination and power policies, runs cleanup when scheduled, then exits.",
+                    color: .blue
                 )
 
                 SettingsFactGrid(items: [
                     SettingsFact(title: "Scheduled profiles", value: "\(scheduledProfileCount)"),
                     SettingsFact(title: "Wake cadence", value: "Every 5 min"),
-                    SettingsFact(title: "Privileges", value: "Current user")
+                    SettingsFact(title: "Privileges", value: "No admin access")
                 ])
 
-                SettingsDescription(
-                    text: "macOS may require approval in Login Items before this helper can run. Delta can open the correct pane, but macOS does not allow apps to approve their own background items."
+                SettingsNotice(
+                    symbol: "person.crop.circle.badge.exclamationmark",
+                    title: "macOS approval",
+                    text: "Delta can register the helper and open Login Items, but macOS requires you to approve background items yourself when it asks.",
+                    color: model.launchAgentStatus == .enabled ? .secondary : .orange
                 )
 
-                SettingsDescription(
-                    text: "If macOS asks DeltaSecretBridge for Keychain access or a scheduled job reports that a destination password is unavailable, repair saved secret access once from here."
+                SettingsNotice(
+                    symbol: "key",
+                    title: "Scheduled password access",
+                    text: "If macOS asks for DeltaSecretBridge Keychain access or scheduled backups cannot read a destination password, repair Keychain access once from here.",
+                    color: .teal
                 )
 
                 HStack(spacing: 8) {
@@ -1059,7 +1069,7 @@ struct SettingsView: View {
                     Button {
                         model.repairBackgroundSecretAccess()
                     } label: {
-                        Label("Repair Secret Access", systemImage: "key")
+                        Label("Repair Keychain Access", systemImage: "key")
                     }
                     .disabled(model.repositories.isEmpty || model.isWorking || !model.isPersistentStoreAvailable)
                     .deltaTooltip("Rewrite saved destination passwords and backend credentials so scheduled backups can read them without Keychain prompts.")
@@ -1108,6 +1118,27 @@ struct SettingsView: View {
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
+            }
+
+            SettingsCard(
+                symbol: "menubar.rectangle",
+                title: "Menu Bar",
+                subtitle: "Show quick backup actions and current status in the macOS menu bar.",
+                statusText: showsMenuBarExtra ? "Shown" : "Hidden",
+                statusColor: showsMenuBarExtra ? .green : .secondary
+            ) {
+                SettingsControlRow(
+                    title: "Status menu",
+                    detail: "Keep Back Up Now, Run Due Backups, Pause, Stop, last backup status, activity, and update checks available outside the main window."
+                ) {
+                    Toggle("", isOn: $showsMenuBarExtra)
+                        .labelsHidden()
+                        .toggleStyle(.switch)
+                }
+
+                SettingsDescription(
+                    text: "This controls only Delta's visible menu bar item. Background Backups use the signed helper above and continue according to their own setting."
+                )
             }
 
             SettingsCard(
@@ -2653,6 +2684,38 @@ struct SettingsDescription: View {
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+struct SettingsNotice: View {
+    var symbol: String
+    var title: String
+    var text: String
+    var color: Color
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: symbol)
+                .font(.system(size: 13, weight: .semibold))
+                .frame(width: 22, height: 22)
+                .foregroundStyle(color)
+                .background(color.opacity(0.14))
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.caption.weight(.semibold))
+                Text(text)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(DeltaTheme.badge.opacity(0.55))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 }
 

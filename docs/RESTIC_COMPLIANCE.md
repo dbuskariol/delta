@@ -195,7 +195,7 @@ When post-prune validation is enabled, Delta runs:
 check --json --read-data-subset 1/100
 ```
 
-Scheduled maintenance is evaluated independently from backup due checks, but it uses the same profile, destination, power policy, and per-destination locking path.
+Scheduled maintenance is evaluated independently from backup due checks, but it uses the same profile, destination, power policy, and per-destination locking path. Background due checks use the latest backup and cleanup attempts, not only successful runs, so a failed destination or credential state is not retried every helper wake in the same schedule window.
 
 When a user saves an enabled scheduled profile, Delta requests Background Backups registration through `SMAppService` if the helper is not already registered. If macOS reports that Login Items approval is still required, Delta records the schedule and surfaces the approval action instead of silently leaving scheduled backups inert.
 

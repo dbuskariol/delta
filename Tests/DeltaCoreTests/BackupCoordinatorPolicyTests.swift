@@ -663,6 +663,86 @@ final class BackupCoordinatorPolicyTests: XCTestCase {
         XCTAssertTrue(runner.commands.isEmpty)
     }
 
+    func testRunDueBackupsDoesNotRepeatFailedAttemptUntilNextScheduleWindow() throws {
+        let fixture = try Fixture()
+        let runner = MockResticRunner(results: [.success, .emptySnapshotList])
+        let coordinator = fixture.makeCoordinator(runner: runner, scheduleEvaluator: ScheduleEvaluator(calendar: Self.utc))
+        let profile = fixture.profile(schedule: BackupSchedule(kind: .daily(hour: 20, minute: 0)))
+        let failedAttempt = try XCTUnwrap(Self.utc.date(from: DateComponents(year: 2026, month: 7, day: 1, hour: 20, minute: 2)))
+        let sameWindow = try XCTUnwrap(Self.utc.date(from: DateComponents(year: 2026, month: 7, day: 1, hour: 20, minute: 10)))
+        let nextWindow = try XCTUnwrap(Self.utc.date(from: DateComponents(year: 2026, month: 7, day: 2, hour: 20, minute: 1)))
+        try fixture.database.saveRepository(fixture.repository)
+        try fixture.database.saveProfile(profile)
+        try fixture.database.saveJobRun(
+            JobRun(
+                profileID: profile.id,
+                repositoryID: fixture.repository.id,
+                kind: .backup,
+                status: .failed,
+                startedAt: failedAttempt,
+                finishedAt: failedAttempt,
+                message: "Destination is not available."
+            )
+        )
+
+        let sameWindowRuns = try coordinator.runDueBackups(now: sameWindow)
+        let nextWindowRuns = try coordinator.runDueBackups(now: nextWindow)
+
+        XCTAssertTrue(sameWindowRuns.isEmpty)
+        XCTAssertEqual(nextWindowRuns.map(\.kind), [.backup])
+        XCTAssertEqual(nextWindowRuns.map(\.status), [.succeeded])
+        XCTAssertEqual(runner.commands.map(\.resticSubcommand), ["backup", "snapshots"])
+    }
+
+    func testRunDueBackupsDoesNotRepeatFailedMaintenanceUntilNextMaintenanceWindow() throws {
+        let fixture = try Fixture()
+        let runner = MockResticRunner(results: [.success, .success])
+        let coordinator = fixture.makeCoordinator(runner: runner, scheduleEvaluator: ScheduleEvaluator(calendar: Self.utc))
+        let createdAt = try XCTUnwrap(Self.utc.date(from: DateComponents(year: 2026, month: 7, day: 1, hour: 1, minute: 0)))
+        let lastBackup = try XCTUnwrap(Self.utc.date(from: DateComponents(year: 2026, month: 7, day: 1, hour: 1, minute: 5)))
+        let failedMaintenance = try XCTUnwrap(Self.utc.date(from: DateComponents(year: 2026, month: 7, day: 1, hour: 2, minute: 5)))
+        let sameWindow = try XCTUnwrap(Self.utc.date(from: DateComponents(year: 2026, month: 7, day: 1, hour: 2, minute: 10)))
+        let nextWindow = try XCTUnwrap(Self.utc.date(from: DateComponents(year: 2026, month: 7, day: 2, hour: 2, minute: 5)))
+        let profile = fixture.profile(
+            schedule: BackupSchedule(kind: .customInterval(seconds: 7 * 86_400)),
+            retention: RetentionPolicy(
+                maintenanceSchedule: RetentionMaintenanceSchedule(intervalDays: 1, hour: 2, minute: 0)
+            ),
+            createdAt: createdAt
+        )
+        try fixture.database.saveRepository(fixture.repository)
+        try fixture.database.saveProfile(profile)
+        try fixture.database.saveJobRun(
+            JobRun(
+                profileID: profile.id,
+                repositoryID: fixture.repository.id,
+                kind: .backup,
+                status: .succeeded,
+                startedAt: lastBackup,
+                finishedAt: lastBackup
+            )
+        )
+        try fixture.database.saveJobRun(
+            JobRun(
+                profileID: profile.id,
+                repositoryID: fixture.repository.id,
+                kind: .prune,
+                status: .failed,
+                startedAt: failedMaintenance,
+                finishedAt: failedMaintenance,
+                message: "Destination is not available."
+            )
+        )
+
+        let sameWindowRuns = try coordinator.runDueBackups(now: sameWindow)
+        let nextWindowRuns = try coordinator.runDueBackups(now: nextWindow)
+
+        XCTAssertTrue(sameWindowRuns.isEmpty)
+        XCTAssertEqual(nextWindowRuns.map(\.kind), [.prune, .check])
+        XCTAssertEqual(nextWindowRuns.map(\.status), [.succeeded, .succeeded])
+        XCTAssertEqual(runner.commands.map(\.resticSubcommand), ["forget", "check"])
+    }
+
     func testRunBackupRecordsFailureWhenSourceBookmarkCannotResolve() throws {
         let fixture = try Fixture()
         let runner = MockResticRunner(results: [.success])

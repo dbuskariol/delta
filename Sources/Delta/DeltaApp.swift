@@ -4,6 +4,7 @@ import SwiftUI
 struct DeltaApp: App {
     @StateObject private var model = DeltaAppModel()
     @StateObject private var softwareUpdateController = SoftwareUpdateController()
+    @AppStorage(DeltaAppPreferenceKeys.showsMenuBarExtra) private var showsMenuBarExtra = true
 
     var body: some Scene {
         WindowGroup(id: "main") {
@@ -14,13 +15,11 @@ struct DeltaApp: App {
         }
         .windowStyle(.hiddenTitleBar)
 
-        MenuBarExtra {
+        MenuBarExtra("Delta", systemImage: "externaldrive.badge.checkmark", isInserted: $showsMenuBarExtra) {
             DeltaMenuBarView()
                 .environmentObject(model)
                 .environmentObject(softwareUpdateController)
                 .frame(width: 340)
-        } label: {
-            Label("Delta", systemImage: "externaldrive.badge.checkmark")
         }
         .menuBarExtraStyle(.window)
     }

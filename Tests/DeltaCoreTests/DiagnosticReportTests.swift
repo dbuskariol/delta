@@ -15,6 +15,7 @@ final class DiagnosticReportTests: XCTestCase {
             logPath: "/Users/me/Library/Application Support/Delta/Logs",
             fullDiskAccessStatus: "Ready",
             backgroundBackupsStatus: "Enabled",
+            menuBarStatus: "Shown",
             activeOperation: "Backup: Backing up Mac",
             profileCount: 1,
             destinationCount: 1,
@@ -41,6 +42,7 @@ final class DiagnosticReportTests: XCTestCase {
         XCTAssertTrue(report.contains("- Version: 0.1 (1)"))
         XCTAssertTrue(report.contains("- Full Disk Access: Ready"))
         XCTAssertTrue(report.contains("- Background Backups: Enabled"))
+        XCTAssertTrue(report.contains("- Menu Bar: Shown"))
         XCTAssertTrue(report.contains("- restic: executable at /Applications/Delta.app/Contents/MacOS/restic"))
         XCTAssertTrue(report.contains("- rclone: missing at /Applications/Delta.app/Contents/MacOS/rclone"))
         XCTAssertTrue(report.contains("- Primary: Local or mounted drive; verified 1970-01-01T00:00:10Z"))
@@ -63,6 +65,7 @@ final class DiagnosticReportTests: XCTestCase {
             logPath: "/support/Logs",
             fullDiskAccessStatus: "Needs Access",
             backgroundBackupsStatus: "Not Registered",
+            menuBarStatus: "Hidden",
             activeOperation: nil,
             profileCount: 0,
             destinationCount: 0,
