@@ -15,6 +15,7 @@ cd "$ROOT_DIR"
   "$ROOT_DIR/Scripts/create-manual-acceptance-report.sh" \
   "$ROOT_DIR/Scripts/verify-installed-app.sh" \
   "$ROOT_DIR/Scripts/verify-manual-acceptance.sh" \
+  "$ROOT_DIR/Scripts/run-local-acceptance-probe.sh" \
   "$ROOT_DIR/Scripts/verify-production-readiness.sh"
 if [[ ! -x "$ROOT_DIR/Scripts/notarize-release.sh" ]]; then
   printf "Scripts/notarize-release.sh must be executable.\n" >&2
@@ -34,6 +35,10 @@ if [[ ! -x "$ROOT_DIR/Scripts/create-manual-acceptance-report.sh" ]]; then
 fi
 if [[ ! -x "$ROOT_DIR/Scripts/verify-manual-acceptance.sh" ]]; then
   printf "Scripts/verify-manual-acceptance.sh must be executable.\n" >&2
+  exit 1
+fi
+if [[ ! -x "$ROOT_DIR/Scripts/run-local-acceptance-probe.sh" ]]; then
+  printf "Scripts/run-local-acceptance-probe.sh must be executable.\n" >&2
   exit 1
 fi
 if [[ ! -x "$ROOT_DIR/Scripts/verify-production-readiness.sh" ]]; then

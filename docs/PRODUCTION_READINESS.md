@@ -35,7 +35,15 @@ After the automated gate, collect a release evidence report:
 Scripts/collect-release-evidence.sh
 ```
 
-The automated gate writes `dist/release-evidence/automated-gate-status` when it passes. The release evidence report is written under `dist/release-evidence/` and records the exact app path, version, git commit, signature details, helper/tool smoke output, Sparkle update artifacts, installed app smoke output, Gatekeeper/notarization status, automated gate status, and manual acceptance verification.
+The automated gate writes `dist/release-evidence/automated-gate-status` when it passes. The release evidence report is written under `dist/release-evidence/` and records the exact app path, version, git commit, signature details, helper/tool smoke output, Sparkle update artifacts, installed app smoke output, Gatekeeper/notarization status, automated gate status, local acceptance probe output, and manual acceptance verification.
+
+For a faster local readiness picture, run:
+
+```sh
+Scripts/run-local-acceptance-probe.sh
+```
+
+The probe writes `dist/local-acceptance/latest.md`. It only marks machine-verifiable evidence as automated or partial evidence. It intentionally keeps Full Disk Access, closed-window schedule behavior, real SMB/NFS/SFTP/S3 targets, menu bar interaction, notifications, Sparkle install flow, and notarization as explicit manual follow-up where a shell process would give weak or misleading evidence.
 
 After manual acceptance, Developer ID notarization, and local installation of the exact release candidate, run the external distribution gate:
 
@@ -71,6 +79,8 @@ Fill in `dist/manual-acceptance/latest.md` as each check is performed. Use exact
 ```sh
 Scripts/verify-manual-acceptance.sh
 ```
+
+Use the local acceptance probe report as supporting evidence while filling this matrix, but do not convert `Partial` probe rows into manual `Passed` rows until the requested human interaction or provider test has actually been completed.
 
 | Area | Required evidence |
 | --- | --- |

@@ -104,6 +104,13 @@ if [[ -f "$GATE_STATUS_FILE" ]]; then
   append_command "Automated Gate Status File" /bin/cat "$GATE_STATUS_FILE"
 fi
 
+if [[ -x "$ROOT_DIR/Scripts/run-local-acceptance-probe.sh" ]]; then
+  append_command "Local Acceptance Probe" "$ROOT_DIR/Scripts/run-local-acceptance-probe.sh" "$APP_PATH"
+  if [[ -f "$ROOT_DIR/dist/local-acceptance/latest.md" ]]; then
+    append_command "Local Acceptance Probe Report" /bin/cat "$ROOT_DIR/dist/local-acceptance/latest.md"
+  fi
+fi
+
 MANUAL_MATRIX_PASSED="No"
 if [[ -f "$MANUAL_ACCEPTANCE_REPORT" ]]; then
   MANUAL_ACCEPTANCE_OUTPUT="$(/usr/bin/mktemp -t delta-manual-acceptance.XXXXXX)"
