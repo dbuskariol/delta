@@ -97,6 +97,8 @@ Custom-folder profiles use the selected source folders and stored security-scope
 - per-destination lock state
 - scheduled retention maintenance
 
+If any enabled backup profile needs background scheduling and macOS reports that `DeltaAgent` is not enabled, Delta shows an action-needed Background Backups card on the dashboard and a detailed status in Settings.
+
 Retention maintenance can run `forget`, `prune`, and optional `check` based on the profile maintenance schedule. Post-prune checks are returned to the agent so failed validation is visible in job status and process exit status.
 
 ## Restore Workflow

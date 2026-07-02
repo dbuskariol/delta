@@ -56,9 +56,14 @@ final class DeltaAppModel: ObservableObject {
     @Published var activeProgress: ResticProgressSnapshot?
     @Published var activeStopRequest: ResticRunStopReason?
     @Published private(set) var persistentStoreErrorMessage: String?
+    @Published private(set) var launchAgentStatus = LaunchAgentController.status()
 
     var isPersistentStoreAvailable: Bool {
         persistentStoreErrorMessage == nil
+    }
+
+    var scheduledBackupsNeedAgentSetup: Bool {
+        profiles.contains { $0.schedule.isEnabled } && launchAgentStatus.blocksScheduledBackups
     }
 
     private var database: DeltaDatabase
@@ -90,6 +95,7 @@ final class DeltaAppModel: ObservableObject {
     func reload() {
         guard reopenPersistentStoreIfNeeded() else {
             fullDiskAccessStatus = FullDiskAccessProbe().check()
+            launchAgentStatus = LaunchAgentController.status()
             return
         }
         do {
@@ -108,6 +114,7 @@ final class DeltaAppModel: ObservableObject {
             snapshotsByRepository = try database.fetchSnapshotsByRepository()
             events = try database.fetchEvents(limit: 200)
             fullDiskAccessStatus = FullDiskAccessProbe().check()
+            launchAgentStatus = LaunchAgentController.status()
             reconcileObservedActiveJob(
                 jobs: storedJobs,
                 jobLogs: storedJobLogs,
@@ -586,8 +593,10 @@ final class DeltaAppModel: ObservableObject {
     func registerAgent() {
         do {
             try LaunchAgentController.register()
+            launchAgentStatus = LaunchAgentController.status()
             alertMessage = "DeltaAgent registration requested. macOS may ask for confirmation in Login Items."
         } catch {
+            launchAgentStatus = LaunchAgentController.status()
             alertMessage = error.localizedDescription
         }
     }
@@ -595,8 +604,10 @@ final class DeltaAppModel: ObservableObject {
     func unregisterAgent() {
         do {
             try LaunchAgentController.unregister()
+            launchAgentStatus = LaunchAgentController.status()
             alertMessage = "DeltaAgent was unregistered."
         } catch {
+            launchAgentStatus = LaunchAgentController.status()
             alertMessage = error.localizedDescription
         }
     }
@@ -605,9 +616,25 @@ final class DeltaAppModel: ObservableObject {
         NSWorkspace.shared.open(FullDiskAccessGuide.settingsURL)
     }
 
+    func openLoginItemsSettings() {
+        NSWorkspace.shared.open(LoginItemsGuide.settingsURL)
+    }
+
     func revealInstalledAppInFinder() {
         let installedApp = URL(fileURLWithPath: "/Applications/Delta.app")
         NSWorkspace.shared.activateFileViewerSelecting([installedApp])
+    }
+
+    func revealApplicationSupportFolder() {
+        revealDirectory {
+            try AppDirectories.applicationSupportDirectory()
+        }
+    }
+
+    func revealLogFolder() {
+        revealDirectory {
+            try AppDirectories.logDirectory()
+        }
     }
 
     func chooseFolder(allowsMultipleSelection: Bool = false) -> [String] {
@@ -618,6 +645,15 @@ final class DeltaAppModel: ObservableObject {
         panel.prompt = "Choose"
         guard panel.runModal() == .OK else { return [] }
         return panel.urls.map(\.path)
+    }
+
+    private func revealDirectory(_ resolve: () throws -> URL) {
+        do {
+            let url = try resolve()
+            NSWorkspace.shared.activateFileViewerSelecting([url])
+        } catch {
+            alertMessage = error.localizedDescription
+        }
     }
 
     func chooseBackupSources(allowsMultipleSelection: Bool = false, includeSubvolumes: Bool = false) -> [BackupSource] {

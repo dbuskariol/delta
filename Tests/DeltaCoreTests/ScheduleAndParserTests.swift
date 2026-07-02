@@ -123,6 +123,15 @@ final class ScheduleAndParserTests: XCTestCase {
         XCTAssertNotNil(entries[1].modifiedAt)
     }
 
+    func testLaunchAgentStatusParserHandlesKnownServiceManagementStates() {
+        XCTAssertEqual(LaunchAgentRegistrationStatus.parse("enabled"), .enabled)
+        XCTAssertEqual(LaunchAgentRegistrationStatus.parse("requiresApproval"), .requiresApproval)
+        XCTAssertEqual(LaunchAgentRegistrationStatus.parse("notRegistered"), .notRegistered)
+        XCTAssertEqual(LaunchAgentRegistrationStatus.parse("notFound"), .notFound)
+        XCTAssertEqual(LaunchAgentRegistrationStatus.parse("unavailable"), .unavailable)
+        XCTAssertEqual(LaunchAgentRegistrationStatus.parse("futureState"), .unknown("futureState"))
+    }
+
     private func components(_ calendar: Calendar, year: Int, month: Int, day: Int, hour: Int, minute: Int) -> Date {
         calendar.date(from: DateComponents(year: year, month: month, day: day, hour: hour, minute: minute, second: 0))!
     }

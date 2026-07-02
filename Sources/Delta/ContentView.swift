@@ -98,6 +98,28 @@ struct DashboardView: View {
                 }
             }
 
+            if model.scheduledBackupsNeedAgentSetup {
+                Card {
+                    HStack(alignment: .top, spacing: 14) {
+                        StatusIcon(symbol: "clock.badge.exclamationmark", color: .orange)
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Background Backups")
+                                .font(.headline)
+                            Text(model.launchAgentStatus.detail)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Button {
+                            model.selectedSection = .settings
+                        } label: {
+                            Label("Review", systemImage: "arrow.right")
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                    }
+                }
+            }
+
             if let operation = model.activeOperation {
                 ActiveOperationBanner(
                     operation: operation,
@@ -904,27 +926,70 @@ struct SettingsView: View {
                 }
             }
 
-            SettingsCard(symbol: "clock.badge.checkmark", title: "LaunchAgent") {
-                HStack {
-                    Text("Status")
+            SettingsCard(symbol: "clock.badge.checkmark", title: "Background Backups") {
+                Toggle("Run scheduled backups in the background", isOn: backgroundBackupsBinding)
+                    .toggleStyle(.checkbox)
+                HStack(spacing: 8) {
+                    StateBadge(text: model.launchAgentStatus.displayName, color: launchAgentStatusColor)
+                    Text(model.launchAgentStatus.detail)
                         .foregroundStyle(.secondary)
-                    Text(LaunchAgentController.status())
-                        .font(.system(.body, design: .monospaced))
                 }
-                HStack {
-                    Button("Register") {
-                        model.registerAgent()
-                    }
-                    Button("Unregister") {
-                        model.unregisterAgent()
-                    }
+                ActionLine(
+                    description: "Approve Delta in Login Items if macOS is waiting for confirmation.",
+                    buttonTitle: "Open Login Items",
+                    symbol: "gearshape",
+                    action: model.openLoginItemsSettings
+                )
+                Button {
+                    model.reload()
+                } label: {
+                    Label("Refresh Status", systemImage: "arrow.clockwise")
                 }
+            }
+
+            SettingsCard(symbol: "folder.badge.gearshape", title: "App Data") {
+                ActionLine(
+                    description: "Open Delta's local database, lock, control, and support files.",
+                    buttonTitle: "Show App Data",
+                    symbol: "folder",
+                    action: model.revealApplicationSupportFolder
+                )
+                ActionLine(
+                    description: "Open saved job output for troubleshooting backup and restore runs.",
+                    buttonTitle: "Show Logs",
+                    symbol: "doc.text.magnifyingglass",
+                    action: model.revealLogFolder
+                )
             }
         }
         .onAppear {
             automaticallyChecksForUpdates = softwareUpdateController.automaticallyChecksForUpdates
             softwareUpdateController.updateCheckInterval = 86_400
         }
+    }
+
+    private var launchAgentStatusColor: Color {
+        switch model.launchAgentStatus {
+        case .enabled:
+            return .green
+        case .requiresApproval, .notRegistered:
+            return .orange
+        case .notFound, .unavailable, .unknown:
+            return .red
+        }
+    }
+
+    private var backgroundBackupsBinding: Binding<Bool> {
+        Binding(
+            get: { model.launchAgentStatus == .enabled },
+            set: { enabled in
+                if enabled {
+                    model.registerAgent()
+                } else {
+                    model.unregisterAgent()
+                }
+            }
+        )
     }
 }
 
