@@ -961,6 +961,21 @@ struct SettingsView: View {
                     action: model.revealLogFolder
                 )
             }
+
+            SettingsCard(symbol: "stethoscope", title: "Diagnostics") {
+                ActionLine(
+                    description: "Copy a sanitized report with app, helper, destination, profile, and recent job state.",
+                    buttonTitle: "Copy Report",
+                    symbol: "doc.on.doc",
+                    action: model.copyDiagnosticReport
+                )
+                ActionLine(
+                    description: "Save the same report as a Markdown file.",
+                    buttonTitle: "Export Report",
+                    symbol: "square.and.arrow.down",
+                    action: model.exportDiagnosticReport
+                )
+            }
         }
         .onAppear {
             automaticallyChecksForUpdates = softwareUpdateController.automaticallyChecksForUpdates

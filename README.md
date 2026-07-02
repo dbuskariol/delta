@@ -20,6 +20,7 @@ The product goal is simple: make serious backup practices approachable without h
 - **Clear backup summaries** showing new, changed, unchanged, added, and checked data for each backup run.
 - **Full or browsed selected restore** with backup browsing, file/folder selection, dry-run preview, overwrite policies, verification, original-path restore, chosen-folder restore, and optional pre-restore backup.
 - **Streaming and saved backup logs** from restic stdout/stderr with source context, stable processed-file counters, clean change summaries, fixed-height live panes, and expandable per-job audit history.
+- **Sanitized diagnostics** from Settings for app version, helper status, tool paths, profile/destination counts, recent jobs, and local support paths.
 - **Sparkle automatic updates** with generated appcast/update archive support.
 
 ## How It Works
@@ -68,6 +69,7 @@ Important implementation details:
 - **Abandoned-job recovery** marks stale running jobs interrupted after restart only when the per-destination lock proves no restic process still owns the destination.
 - **Bundled tools** are pinned and checksum-verified through `Scripts/bootstrap-tools.sh`.
 - **Packaged app verification** checks signatures, Sparkle embedding, LaunchAgent plist integrity, helper smoke tests, Sparkle update metadata, and bundled restic/rclone versions.
+- **Sanitized diagnostic reports** can be copied or exported from Settings without including repository passwords or backend credential values.
 
 ## Backup Behavior
 

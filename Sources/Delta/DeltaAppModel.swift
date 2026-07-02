@@ -2,6 +2,7 @@ import AppKit
 import DeltaCore
 import Foundation
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct ActiveOperation: Identifiable, Equatable {
     var id = UUID()
@@ -640,6 +641,28 @@ final class DeltaAppModel: ObservableObject {
         }
     }
 
+    func copyDiagnosticReport() {
+        let report = makeDiagnosticReport()
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(report, forType: .string)
+        alertMessage = "Diagnostic report copied."
+    }
+
+    func exportDiagnosticReport() {
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = diagnosticReportFilename()
+        panel.canCreateDirectories = true
+        panel.allowedContentTypes = [UTType(filenameExtension: "md") ?? .plainText]
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        do {
+            try makeDiagnosticReport().write(to: url, atomically: true, encoding: .utf8)
+            alertMessage = "Diagnostic report exported."
+        } catch {
+            alertMessage = error.localizedDescription
+        }
+    }
+
     func chooseFolder(allowsMultipleSelection: Bool = false) -> [String] {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
@@ -657,6 +680,93 @@ final class DeltaAppModel: ObservableObject {
         } catch {
             alertMessage = error.localizedDescription
         }
+    }
+
+    private func makeDiagnosticReport() -> String {
+        DiagnosticReportBuilder().makeReport(snapshot: diagnosticSnapshot())
+    }
+
+    private func diagnosticSnapshot() -> DiagnosticReportSnapshot {
+        let bundle = Bundle.main
+        let info = bundle.infoDictionary ?? [:]
+        let resticURL = ResticExecutableLocator().locate(in: bundle)
+        let rcloneURL = resticURL.deletingLastPathComponent().appendingPathComponent("rclone")
+        let recentJobs = jobs
+            .sorted { $0.startedAt > $1.startedAt }
+            .prefix(10)
+            .map {
+                DiagnosticJobSummary(
+                    kind: $0.kind.displayName,
+                    status: $0.status.rawValue,
+                    startedAt: $0.startedAt,
+                    exitCode: $0.exitCode,
+                    message: $0.message
+                )
+            }
+
+        return DiagnosticReportSnapshot(
+            generatedAt: Date(),
+            appVersion: info["CFBundleShortVersionString"] as? String ?? "Unknown",
+            buildVersion: info["CFBundleVersion"] as? String ?? "Unknown",
+            bundleIdentifier: bundle.bundleIdentifier ?? "Unknown",
+            bundlePath: bundle.bundleURL.path,
+            executablePath: bundle.executableURL?.path ?? "Unknown",
+            applicationSupportPath: diagnosticPath { try AppDirectories.applicationSupportDirectory() },
+            databasePath: diagnosticPath { try AppDirectories.databaseURL() },
+            logPath: diagnosticPath { try AppDirectories.logDirectory() },
+            fullDiskAccessStatus: fullDiskAccessStatus.hasLikelyFullDiskAccess ? "Ready" : "Needs Access",
+            backgroundBackupsStatus: launchAgentStatus.displayName,
+            activeOperation: activeOperation.map { "\($0.kind.displayName): \($0.title)" },
+            profileCount: profiles.count,
+            destinationCount: repositories.count,
+            restorePointCount: snapshots.count,
+            recentJobCount: jobs.count,
+            tools: [
+                DiagnosticToolSummary(
+                    name: "restic",
+                    path: resticURL.path,
+                    isExecutable: FileManager.default.isExecutableFile(atPath: resticURL.path)
+                ),
+                DiagnosticToolSummary(
+                    name: "rclone",
+                    path: rcloneURL.path,
+                    isExecutable: FileManager.default.isExecutableFile(atPath: rcloneURL.path)
+                )
+            ],
+            destinations: repositories.map {
+                DiagnosticDestinationSummary(
+                    name: $0.name,
+                    kind: $0.backend.kind.displayName,
+                    lastVerifiedAt: $0.lastVerifiedAt
+                )
+            },
+            profiles: profiles.map {
+                DiagnosticProfileSummary(
+                    name: $0.name,
+                    sourceMode: $0.sourceMode.displayName,
+                    sourceCount: $0.sources.count,
+                    scheduleEnabled: $0.schedule.isEnabled,
+                    customExcludeCount: BackupExcludePatternParser.customPatterns(from: $0.excludePatterns).count
+                )
+            },
+            recentJobs: Array(recentJobs)
+        )
+    }
+
+    private func diagnosticPath(_ resolve: () throws -> URL) -> String {
+        do {
+            return try resolve().path
+        } catch {
+            return "Unavailable: \(error.localizedDescription)"
+        }
+    }
+
+    private func diagnosticReportFilename() -> String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withFullDate, .withTime, .withDashSeparatorInDate]
+        let timestamp = formatter.string(from: Date())
+            .replacingOccurrences(of: ":", with: "")
+        return "Delta-Diagnostics-\(timestamp).md"
     }
 
     func chooseBackupSources(allowsMultipleSelection: Bool = false, includeSubvolumes: Bool = false) -> [BackupSource] {
