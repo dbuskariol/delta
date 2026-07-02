@@ -73,6 +73,7 @@ final class DeltaAppModel: ObservableObject {
     private let bookmarkStore = SecurityScopedBookmarkStore()
     private let volumeSourceFactory = BackupVolumeSourceFactory()
     private let repositoryValidator = BackupRepositoryValidator()
+    private let profileValidator = BackupProfileValidator()
     private let runController = ResticRunController()
     private let runControlStore = ResticRunControlStore()
     private var localOperationIsRunning = false
@@ -323,9 +324,6 @@ final class DeltaAppModel: ObservableObject {
         guardPersistentStoreAvailable()
         guard isPersistentStoreAvailable else { return }
         do {
-            guard !sources.isEmpty else {
-                throw DeltaUIError.message("Choose at least one source.")
-            }
             let profile = BackupProfile(
                 name: name,
                 sourceMode: mode,
@@ -335,8 +333,12 @@ final class DeltaAppModel: ObservableObject {
                 retention: retention,
                 excludePatterns: excludePatterns
             )
-            try database.saveProfile(profile)
-            try database.appendEvent(EventLog(level: .info, message: "Backup profile '\(profile.name)' was created."))
+            let validatedProfile = try profileValidator.validate(
+                profile,
+                knownRepositoryIDs: knownRepositoryIDs()
+            ).profile
+            try database.saveProfile(validatedProfile)
+            try database.appendEvent(EventLog(level: .info, message: "Backup profile '\(validatedProfile.name)' was created."))
             reload()
         } catch {
             alertMessage = error.localizedDescription
@@ -347,8 +349,14 @@ final class DeltaAppModel: ObservableObject {
         guardPersistentStoreAvailable()
         guard isPersistentStoreAvailable else { return }
         do {
-            try database.saveProfile(profile)
-            try database.appendEvent(EventLog(level: .info, message: "Backup profile '\(profile.name)' was updated."))
+            var profile = profile
+            profile.updatedAt = Date()
+            let validatedProfile = try profileValidator.validate(
+                profile,
+                knownRepositoryIDs: knownRepositoryIDs()
+            ).profile
+            try database.saveProfile(validatedProfile)
+            try database.appendEvent(EventLog(level: .info, message: "Backup profile '\(validatedProfile.name)' was updated."))
             reload()
         } catch {
             alertMessage = error.localizedDescription
@@ -873,6 +881,10 @@ final class DeltaAppModel: ObservableObject {
                 }
             }
         )
+    }
+
+    private func knownRepositoryIDs() throws -> Set<UUID> {
+        Set(try database.fetchRepositories().map(\.id))
     }
 
     private func guardPersistentStoreAvailable() {

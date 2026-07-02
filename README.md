@@ -61,6 +61,7 @@ Important implementation details:
 
 - **SQLite persistence** lives under Application Support through `AppDirectories.databaseURL()` with WAL mode and a busy timeout for app/agent concurrent access.
 - **Durable-state fail closed** behavior prevents backup, destination, and restore operations if the Application Support database cannot be opened. Delta shows a blocked state instead of continuing against throwaway state.
+- **Profile validation** normalizes source paths, schedule values, bandwidth limits, retention limits, cleanup windows, and exclude patterns before saving or running backups.
 - **Keychain secrets** use `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly` and a trusted-application access list for the signed Delta app, agent, and secret bridge. Background secret reads fail closed instead of showing system prompts.
 - **Security-scoped bookmarks** preserve access to selected source folders where macOS requires it.
 - **Per-destination locks** prevent overlapping backup, restore, prune, and check jobs across app/agent processes.

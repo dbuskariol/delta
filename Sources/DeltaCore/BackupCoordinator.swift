@@ -7,6 +7,7 @@ public final class BackupCoordinator: @unchecked Sendable {
     private let parser: ResticJSONParser
     private let availabilityChecker: RepositoryAvailabilityChecker
     private let scheduleEvaluator: ScheduleEvaluator
+    private let profileValidator: BackupProfileValidator
     private let bookmarkStore: SecurityScopedBookmarkStore
     private let powerStateProvider: PowerStateProvider
     private let lockManager: any RepositoryLocking
@@ -20,6 +21,7 @@ public final class BackupCoordinator: @unchecked Sendable {
         parser: ResticJSONParser = ResticJSONParser(),
         availabilityChecker: RepositoryAvailabilityChecker = RepositoryAvailabilityChecker(),
         scheduleEvaluator: ScheduleEvaluator = ScheduleEvaluator(),
+        profileValidator: BackupProfileValidator = BackupProfileValidator(),
         bookmarkStore: SecurityScopedBookmarkStore = SecurityScopedBookmarkStore(),
         powerStateProvider: PowerStateProvider = PowerStateProvider(),
         lockManager: any RepositoryLocking = RepositoryJobLockManager(),
@@ -32,6 +34,7 @@ public final class BackupCoordinator: @unchecked Sendable {
         self.parser = parser
         self.availabilityChecker = availabilityChecker
         self.scheduleEvaluator = scheduleEvaluator
+        self.profileValidator = profileValidator
         self.bookmarkStore = bookmarkStore
         self.powerStateProvider = powerStateProvider
         self.lockManager = lockManager
@@ -80,59 +83,42 @@ public final class BackupCoordinator: @unchecked Sendable {
 
     @discardableResult
     public func runBackup(profile: BackupProfile, repository: BackupRepository) throws -> JobRun {
+        let validatedProfile: BackupProfile
+        do {
+            validatedProfile = try profileValidator.validate(profile, knownRepositoryIDs: [repository.id]).profile
+        } catch {
+            return try failedBackupRun(
+                profileID: profile.id,
+                repositoryID: repository.id,
+                message: "Backup was not started because the profile is invalid: \(error.localizedDescription)"
+            )
+        }
+
         guard availabilityChecker.isAvailable(repository) else {
-            let message = "Destination is not available."
-            let run = JobRun(
-                profileID: profile.id,
+            return try failedBackupRun(
+                profileID: validatedProfile.id,
                 repositoryID: repository.id,
-                kind: .backup,
-                status: .failed,
-                finishedAt: Date(),
-                message: message
+                message: "Destination is not available."
             )
-            try database.saveJobRun(run)
-            try database.appendEvent(EventLog(level: .error, message: message))
-            recordJobLog(
-                jobID: run.id,
-                profileID: profile.id,
-                repositoryID: repository.id,
-                stream: .standardError,
-                message: message
-            )
-            return run
         }
 
         let resolvedSources: [ResolvedSecurityScopedURL]
         do {
-            resolvedSources = try profile.sources.map { try bookmarkStore.resolve($0) }
+            resolvedSources = try validatedProfile.sources.map { try bookmarkStore.resolve($0) }
         } catch {
-            let message = "Could not access selected backup sources: \(error.localizedDescription)"
-            let run = JobRun(
-                profileID: profile.id,
+            return try failedBackupRun(
+                profileID: validatedProfile.id,
                 repositoryID: repository.id,
-                kind: .backup,
-                status: .failed,
-                finishedAt: Date(),
-                message: message
+                message: "Could not access selected backup sources: \(error.localizedDescription)"
             )
-            try database.saveJobRun(run)
-            try database.appendEvent(EventLog(level: .error, message: message))
-            recordJobLog(
-                jobID: run.id,
-                profileID: profile.id,
-                repositoryID: repository.id,
-                stream: .standardError,
-                message: message
-            )
-            return run
         }
         defer {
             for source in resolvedSources {
                 source.stopAccessing()
             }
         }
-        var resolvedProfile = profile
-        resolvedProfile.sources = zip(profile.sources, resolvedSources).map { original, resolved in
+        var resolvedProfile = validatedProfile
+        resolvedProfile.sources = zip(validatedProfile.sources, resolvedSources).map { original, resolved in
             BackupSource(id: original.id, path: resolved.url.path, bookmarkData: original.bookmarkData, includeSubvolumes: original.includeSubvolumes)
         }
 
@@ -143,7 +129,7 @@ public final class BackupCoordinator: @unchecked Sendable {
                     ? (preparationRun.message ?? "Backup was paused while preparing the destination.")
                     : "Backup was not started because the destination could not be prepared."
                 let run = JobRun(
-                    profileID: profile.id,
+                    profileID: validatedProfile.id,
                     repositoryID: repository.id,
                     kind: .backup,
                     status: preparationRun.status == .cancelled ? .cancelled : .failed,
@@ -154,7 +140,7 @@ public final class BackupCoordinator: @unchecked Sendable {
                 try database.appendEvent(EventLog(level: .error, message: message))
                 recordJobLog(
                     jobID: run.id,
-                    profileID: profile.id,
+                    profileID: validatedProfile.id,
                     repositoryID: repository.id,
                     stream: run.status == .cancelled ? .standardOutput : .standardError,
                     message: message
@@ -165,7 +151,7 @@ public final class BackupCoordinator: @unchecked Sendable {
 
         let backupRun = try run(
             repositoryID: repository.id,
-            profileID: profile.id,
+            profileID: validatedProfile.id,
             kind: .backup,
             initialLogMessages: sourceSummaryMessages(for: resolvedProfile)
         ) {
@@ -386,6 +372,27 @@ public final class BackupCoordinator: @unchecked Sendable {
         )
         try database.saveJobRun(run)
         try database.appendEvent(EventLog(level: .error, message: message))
+        return run
+    }
+
+    private func failedBackupRun(profileID: UUID, repositoryID: UUID, message: String) throws -> JobRun {
+        let run = JobRun(
+            profileID: profileID,
+            repositoryID: repositoryID,
+            kind: .backup,
+            status: .failed,
+            finishedAt: Date(),
+            message: message
+        )
+        try database.saveJobRun(run)
+        try database.appendEvent(EventLog(level: .error, message: message))
+        recordJobLog(
+            jobID: run.id,
+            profileID: profileID,
+            repositoryID: repositoryID,
+            stream: .standardError,
+            message: message
+        )
         return run
     }
 

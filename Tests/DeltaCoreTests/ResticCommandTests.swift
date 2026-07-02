@@ -136,6 +136,22 @@ final class ResticCommandTests: XCTestCase {
         XCTAssertTrue(command.arguments.contains("--prune"))
     }
 
+    func testBackupCommandIgnoresNonPositiveBandwidthLimits() throws {
+        let repository = BackupRepository(name: "Local", backend: .local(path: "/repo"))
+        let profile = BackupProfile(
+            name: "Mac",
+            sourceMode: .customFolders,
+            sources: [BackupSource(path: "/Users/me/Documents")],
+            repositoryID: repository.id,
+            schedule: BackupSchedule(uploadLimitKiB: 0, downloadLimitKiB: -20)
+        )
+
+        let command = try makeBuilder().backup(profile: profile, repository: repository)
+
+        XCTAssertFalse(command.arguments.contains("--limit-upload"))
+        XCTAssertFalse(command.arguments.contains("--limit-download"))
+    }
+
     func testRestoreCommandSupportsSelectedFolderDryRun() throws {
         let repository = BackupRepository(name: "Local", backend: .local(path: "/repo"))
         let request = RestoreRequest(

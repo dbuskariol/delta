@@ -26,6 +26,25 @@ final class BackupCoordinatorPolicyTests: XCTestCase {
         XCTAssertTrue(try fixture.database.fetchEvents().contains { $0.message.contains("Low Power Mode") })
     }
 
+    func testRunBackupFailsClosedForInvalidProfile() throws {
+        let fixture = try Fixture()
+        let runner = MockResticRunner(results: [.success])
+        let coordinator = fixture.makeCoordinator(runner: runner)
+        let invalidProfile = BackupProfile(
+            name: " ",
+            sourceMode: .customFolders,
+            sources: [BackupSource(path: fixture.source.path)],
+            repositoryID: fixture.repository.id
+        )
+
+        let run = try coordinator.runBackup(profile: invalidProfile, repository: fixture.repository)
+
+        XCTAssertEqual(run.status, .failed)
+        XCTAssertTrue(run.message?.localizedCaseInsensitiveContains("profile is invalid") == true)
+        XCTAssertTrue(runner.commands.isEmpty)
+        XCTAssertTrue(try fixture.database.fetchJobLogs(jobID: run.id).contains { $0.message.contains("profile is invalid") })
+    }
+
     func testPruneRunsRepositoryCheckWhenRetentionRequestsIt() throws {
         let fixture = try Fixture()
         let runner = MockResticRunner(results: [.success, .success])

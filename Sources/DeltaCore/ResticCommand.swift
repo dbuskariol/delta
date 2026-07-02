@@ -249,10 +249,10 @@ public struct ResticCommandBuilder: Sendable {
 
     private func bandwidthArguments(from schedule: BackupSchedule) -> [String] {
         var arguments: [String] = []
-        if let uploadLimitKiB = schedule.uploadLimitKiB {
+        if let uploadLimitKiB = schedule.uploadLimitKiB, uploadLimitKiB > 0 {
             arguments += ["--limit-upload", "\(uploadLimitKiB)"]
         }
-        if let downloadLimitKiB = schedule.downloadLimitKiB {
+        if let downloadLimitKiB = schedule.downloadLimitKiB, downloadLimitKiB > 0 {
             arguments += ["--limit-download", "\(downloadLimitKiB)"]
         }
         return arguments
