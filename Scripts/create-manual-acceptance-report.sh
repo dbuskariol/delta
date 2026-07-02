@@ -9,6 +9,7 @@ APP_PATH="${1:-${DELTA_ACCEPTANCE_APP:-/Applications/Delta.app}}"
 OUTPUT_DIR="${DELTA_ACCEPTANCE_DIR:-$ROOT_DIR/dist/manual-acceptance}"
 TESTER="${DELTA_ACCEPTANCE_TESTER:-$(/usr/bin/id -F 2>/dev/null || /usr/bin/whoami)}"
 NOTES="${DELTA_ACCEPTANCE_NOTES:-}"
+LOCAL_ACCEPTANCE_REPORT="${DELTA_LOCAL_ACCEPTANCE_REPORT:-$ROOT_DIR/dist/local-acceptance/latest.md}"
 
 if [[ ! -d "$APP_PATH" ]]; then
   printf "Delta app bundle not found at %s\n" "$APP_PATH" >&2
@@ -27,6 +28,38 @@ if [[ -z "$SIGNING_IDENTITY" ]]; then
   SIGNING_IDENTITY="Unknown"
 fi
 
+sanitize_cell() {
+  printf "%s" "$1" \
+    | /usr/bin/tr '\r\n\t' '   ' \
+    | /usr/bin/sed -e 's/\\/\\\\/g' -e 's/|/\\|/g' -e 's/[[:space:]][[:space:]]*/ /g' -e 's/^ //g' -e 's/ $//g'
+}
+
+local_probe_evidence_for_id() {
+  local wanted_id="$1"
+  if [[ ! -f "$LOCAL_ACCEPTANCE_REPORT" ]]; then
+    return
+  fi
+
+  /usr/bin/awk -F'|' -v wanted_id="$wanted_id" '
+    function trim(value) {
+      gsub(/^[ \t]+|[ \t]+$/, "", value)
+      return value
+    }
+    /^\|/ {
+      id = trim($2)
+      if (id == wanted_id) {
+        status = trim($4)
+        evidence = trim($5)
+        follow_up = trim($6)
+        if (status != "" && evidence != "") {
+          print "Local probe: " status ". " evidence " Follow-up still required: " follow_up
+        }
+        exit
+      }
+    }
+  ' "$LOCAL_ACCEPTANCE_REPORT"
+}
+
 mkdir -p "$OUTPUT_DIR"
 TIMESTAMP="$(/bin/date -u +%Y%m%dT%H%M%SZ)"
 OUTPUT="$OUTPUT_DIR/Delta-manual-acceptance-$TIMESTAMP.md"
@@ -44,6 +77,7 @@ cat >"$OUTPUT" <<EOF
 - Git Commit: $(/usr/bin/git -C "$ROOT_DIR" rev-parse --short HEAD 2>/dev/null || printf "unknown")
 - Host macOS: $(/usr/bin/sw_vers -productVersion) ($(/usr/bin/sw_vers -buildVersion))
 - Signing Identity: $SIGNING_IDENTITY
+- Local Acceptance Probe: $([[ -f "$LOCAL_ACCEPTANCE_REPORT" ]] && printf "%s" "$LOCAL_ACCEPTANCE_REPORT" || printf "Not found")
 - Notes: $NOTES
 
 ## Result Values
@@ -62,7 +96,12 @@ Use exactly one of these values in the Result column:
 EOF
 
 while IFS=$'\t' read -r id area required_evidence; do
-  printf '| %s | %s | Not run |  | %s |\n' "$id" "$area" "$required_evidence" >>"$OUTPUT"
+  probe_evidence="$(local_probe_evidence_for_id "$id")"
+  printf '| %s | %s | Not run | %s | %s |\n' \
+    "$(sanitize_cell "$id")" \
+    "$(sanitize_cell "$area")" \
+    "$(sanitize_cell "$probe_evidence")" \
+    "$(sanitize_cell "$required_evidence")" >>"$OUTPUT"
 done < <(manual_acceptance_items)
 
 cat >>"$OUTPUT" <<'EOF'

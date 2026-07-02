@@ -261,7 +261,7 @@ After Developer ID notarization and installing the exact release candidate, run 
 Scripts/verify-production-readiness.sh
 ```
 
-The local acceptance probe writes `dist/local-acceptance/latest.md` and separates automated evidence from human-only checks. It is useful release evidence, but it does not replace the manual macOS acceptance matrix for Full Disk Access, closed-window scheduling, real SMB/NFS/SFTP/S3 destinations, menu bar interaction, notifications, Sparkle update installation, or notarization.
+The local acceptance probe writes `dist/local-acceptance/latest.md` and separates automated evidence from human-only checks. New manual reports copy that local evidence into the Evidence / Notes column while keeping every Result as `Not run`. It is useful release evidence, but it does not replace the manual macOS acceptance matrix for Full Disk Access, closed-window scheduling, real SMB/NFS/SFTP/S3 destinations, menu bar interaction, notifications, Sparkle update installation, or notarization.
 
 The release evidence report is written under `dist/release-evidence/` and records the app version, git commit, signing details, helper/tool smoke output, Sparkle artifacts, automated gate status, local acceptance probe output, installed app smoke output, notarization ticket status, and manual acceptance report verification. `Scripts/verify-production-readiness.sh` fails unless that evidence, the current manual acceptance report, notarization, Gatekeeper, and the installed app all prove the same current git commit is ready for external distribution.
 
