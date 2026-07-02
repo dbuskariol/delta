@@ -27,6 +27,14 @@ The automated gate must pass before any beta or production build is shipped. It 
 - Sparkle update archive and signed appcast metadata
 - notarization workflow syntax and executable-bit hygiene
 
+After the automated gate, collect a release evidence report:
+
+```sh
+Scripts/collect-release-evidence.sh
+```
+
+The report is written under `dist/release-evidence/` and records the exact app path, version, git commit, signature details, helper/tool smoke output, Sparkle update artifacts, Gatekeeper/notarization status, and manual acceptance matrix placeholders.
+
 ## Notarization Gate
 
 External distribution builds must be notarized after the automated gate passes:

@@ -228,6 +228,14 @@ Full release verification:
 Scripts/verify-release.sh
 ```
 
+Collect a release evidence report for the verified app:
+
+```sh
+Scripts/collect-release-evidence.sh
+```
+
+The report is written under `dist/release-evidence/` and records the app version, git commit, signing details, helper/tool smoke output, Sparkle artifacts, notarization ticket status, and manual acceptance matrix placeholders.
+
 Production readiness and manual macOS acceptance:
 
 ```text
