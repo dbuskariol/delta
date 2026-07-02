@@ -77,6 +77,59 @@ final class RepositorySecretAccessRepairerTests: XCTestCase {
         XCTAssertEqual(report.repairedAccounts, 1)
         XCTAssertEqual(report.failures.map(\.account), ["missing-secret"])
     }
+
+    func testCleanerDeletesDestinationPasswordAndBackendCredentialsOnce() {
+        let repository = BackupRepository(
+            name: "S3",
+            backend: .s3(endpoint: "s3.amazonaws.com", bucket: "delta", path: nil, region: nil),
+            keychainAccount: "repo",
+            credentialReferences: [
+                RepositoryCredentialReference(environmentKey: "AWS_ACCESS_KEY_ID", keychainAccount: "access-key"),
+                RepositoryCredentialReference(environmentKey: "AWS_SECRET_ACCESS_KEY", keychainAccount: "secret-key"),
+                RepositoryCredentialReference(environmentKey: "DUPLICATE", keychainAccount: "secret-key")
+            ]
+        )
+        let recorder = SecretCleanupRecorder()
+        let cleaner = RepositorySecretCleaner { account in
+            recorder.delete(account: account)
+        }
+
+        let report = cleaner.cleanup(repository: repository)
+
+        XCTAssertTrue(report.isFullyCleaned)
+        XCTAssertEqual(report.checkedAccounts, 3)
+        XCTAssertEqual(report.deletedAccounts, 3)
+        XCTAssertEqual(recorder.deletedAccounts, ["repo", "access-key", "secret-key"])
+    }
+
+    func testCleanerReportsFailuresAndContinuesDeletingOtherAccounts() {
+        enum TestError: Error {
+            case deleteFailed
+        }
+
+        let repository = BackupRepository(
+            name: "S3",
+            backend: .s3(endpoint: "s3.amazonaws.com", bucket: "delta", path: nil, region: nil),
+            keychainAccount: "repo",
+            credentialReferences: [
+                RepositoryCredentialReference(environmentKey: "AWS_ACCESS_KEY_ID", keychainAccount: "broken-key"),
+                RepositoryCredentialReference(environmentKey: "AWS_SECRET_ACCESS_KEY", keychainAccount: "secret-key")
+            ]
+        )
+        let recorder = SecretCleanupRecorder(failingAccount: "broken-key")
+        let cleaner = RepositorySecretCleaner { account in
+            try recorder.delete(account: account, error: TestError.deleteFailed)
+        }
+
+        let report = cleaner.cleanup(repository: repository)
+
+        XCTAssertFalse(report.isFullyCleaned)
+        XCTAssertEqual(report.checkedAccounts, 3)
+        XCTAssertEqual(report.deletedAccounts, 2)
+        XCTAssertEqual(report.failures.map(\.account), ["broken-key"])
+        XCTAssertEqual(report.failures.map(\.purpose), ["Backend credential AWS_ACCESS_KEY_ID"])
+        XCTAssertEqual(recorder.deletedAccounts, ["repo", "secret-key"])
+    }
 }
 
 private final class RepairableSecretStore: @unchecked Sendable {
@@ -129,5 +182,36 @@ private final class RepairableSecretStore: @unchecked Sendable {
             throw KeychainSecretError.interactionNotAllowed
         }
         return value
+    }
+}
+
+private final class SecretCleanupRecorder: @unchecked Sendable {
+    private let failingAccount: String?
+    private var deleted: [String] = []
+    private let lock = NSLock()
+
+    init(failingAccount: String? = nil) {
+        self.failingAccount = failingAccount
+    }
+
+    var deletedAccounts: [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        return deleted
+    }
+
+    func delete(account: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        deleted.append(account)
+    }
+
+    func delete(account: String, error: Error) throws {
+        lock.lock()
+        defer { lock.unlock() }
+        if account == failingAccount {
+            throw error
+        }
+        deleted.append(account)
     }
 }

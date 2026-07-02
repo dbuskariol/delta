@@ -408,19 +408,35 @@ final class DeltaAppModel: ObservableObject {
         guard isPersistentStoreAvailable else { return }
         do {
             let currentProfiles = try database.fetchProfiles()
-            guard !currentProfiles.contains(where: { $0.repositoryID == repository.id }) else {
-                throw DeltaUIError.message("This destination is still used by one or more backup profiles.")
+            let referencingProfileNames = currentProfiles
+                .filter { $0.repositoryID == repository.id }
+                .map(\.name)
+                .sorted()
+            guard referencingProfileNames.isEmpty else {
+                throw DeltaUIError.message(destinationRemovalBlockedMessage(profileNames: referencingProfileNames))
             }
-            try secretStore.delete(account: repository.keychainAccount)
-            for reference in repository.credentialReferences {
-                try secretStore.delete(account: reference.keychainAccount)
-            }
+
             try database.deleteRepository(id: repository.id)
-            try database.appendEvent(EventLog(level: .info, message: "Destination '\(repository.name)' was removed from Delta."))
+            let cleanupReport = RepositorySecretCleaner(secretStore: secretStore).cleanup(repository: repository)
+            if cleanupReport.isFullyCleaned {
+                try? database.appendEvent(EventLog(level: .info, message: "Destination '\(repository.name)' was removed from Delta."))
+            } else {
+                let message = "Destination '\(repository.name)' was removed from Delta, but \(cleanupReport.failures.count) saved password \(cleanupReport.failures.count == 1 ? "item" : "items") could not be removed."
+                try? database.appendEvent(EventLog(level: .warning, message: message))
+                alertMessage = "\(message) The first failure was \(cleanupReport.failures[0].purpose): \(cleanupReport.failures[0].message)"
+            }
             reload()
         } catch {
             alertMessage = error.localizedDescription
         }
+    }
+
+    private func destinationRemovalBlockedMessage(profileNames: [String]) -> String {
+        let prefix = profileNames.prefix(3).joined(separator: ", ")
+        let remainder = profileNames.count - min(profileNames.count, 3)
+        let suffix = remainder > 0 ? " and \(remainder) more" : ""
+        let noun = profileNames.count == 1 ? "backup profile" : "backup profiles"
+        return "Move or delete the \(noun) using this destination before removing it: \(prefix)\(suffix)."
     }
 
     func runNow(profile: BackupProfile) {

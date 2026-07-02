@@ -159,6 +159,7 @@ The browser loads source roots from the selected restore point immediately and a
 - Destination passwords and backend credentials are stored in Keychain under Delta's destination-secret namespace.
 - New user-managed encryption passphrases must be entered twice before the destination can be saved.
 - Restic receives the destination password through a short-lived password command, not a long-lived plaintext environment variable.
+- Removing a destination from Delta first verifies no backup profile still uses it, removes cached app state, then cleans up saved password and credential items without deleting backup data at the destination.
 - Command, stream, and final-message redaction hides destination URLs, repository-file paths, password-command values, and common backend secret assignments from logs/descriptions.
 - Backend credentials are injected only into a curated child-process environment for the restic run; Delta does not forward arbitrary ambient environment secrets.
 - Empty-password restic repositories are not used.
