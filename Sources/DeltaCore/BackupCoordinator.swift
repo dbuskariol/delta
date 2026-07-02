@@ -44,7 +44,16 @@ public final class BackupCoordinator: @unchecked Sendable {
 
     @discardableResult
     public func initializeRepository(_ repository: BackupRepository) throws -> JobRun {
-        try run(repositoryID: repository.id, profileID: nil, kind: .initializeRepository) {
+        guard availabilityChecker.isAvailable(repository, allowingCreation: true) else {
+            return try failedRun(
+                profileID: nil,
+                repositoryID: repository.id,
+                kind: .initializeRepository,
+                message: destinationUnavailableMessage
+            )
+        }
+
+        return try run(repositoryID: repository.id, profileID: nil, kind: .initializeRepository) {
             try commandBuilder.initializeRepository(repository: repository)
         }
     }
@@ -94,11 +103,11 @@ public final class BackupCoordinator: @unchecked Sendable {
             )
         }
 
-        guard availabilityChecker.isAvailable(repository) else {
+        guard availabilityChecker.isAvailable(repository, allowingCreation: true) else {
             return try failedBackupRun(
                 profileID: validatedProfile.id,
                 repositoryID: repository.id,
-                message: "Destination is not available."
+                message: destinationUnavailableMessage
             )
         }
 
@@ -163,6 +172,10 @@ public final class BackupCoordinator: @unchecked Sendable {
 
     @discardableResult
     public func refreshSnapshots(repository: BackupRepository) throws -> [ResticSnapshot] {
+        guard availabilityChecker.isAvailable(repository, allowingCreation: false) else {
+            throw BackupCoordinatorError.destinationUnavailable
+        }
+
         guard let lock = try lockManager.acquire(repositoryID: repository.id) else {
             throw BackupCoordinatorError.destinationBusy
         }
@@ -179,6 +192,10 @@ public final class BackupCoordinator: @unchecked Sendable {
     }
 
     public func listSnapshotEntries(repository: BackupRepository, snapshotID: String, directoryPath: String? = nil) throws -> [ResticSnapshotEntry] {
+        guard availabilityChecker.isAvailable(repository, allowingCreation: false) else {
+            throw BackupCoordinatorError.destinationUnavailable
+        }
+
         guard let lock = try lockManager.acquire(repositoryID: repository.id) else {
             throw BackupCoordinatorError.destinationBusy
         }
@@ -222,6 +239,12 @@ public final class BackupCoordinator: @unchecked Sendable {
                 message: "Restore was not started because original-path restore was not explicitly confirmed."
             )
         }
+        guard availabilityChecker.isAvailable(repository, allowingCreation: false) else {
+            return try failedRestoreRun(
+                repositoryID: repository.id,
+                message: destinationUnavailableMessage
+            )
+        }
         if !request.dryRun, let preRestoreProfileID = request.preRestoreBackupProfileID {
             let profiles = try database.fetchProfiles()
             let repositories = Dictionary(uniqueKeysWithValues: try database.fetchRepositories().map { ($0.id, $0) })
@@ -263,6 +286,16 @@ public final class BackupCoordinator: @unchecked Sendable {
             try database.appendEvent(EventLog(level: .warning, message: "Cleanup skipped for '\(profile.name)' because no retention keep rules are configured."))
             return [run]
         }
+        guard availabilityChecker.isAvailable(repository, allowingCreation: false) else {
+            return [
+                try failedRun(
+                    profileID: profile.id,
+                    repositoryID: repository.id,
+                    kind: .prune,
+                    message: destinationUnavailableMessage
+                )
+            ]
+        }
         let pruneRun = try run(repositoryID: repository.id, profileID: profile.id, kind: .prune) {
             try commandBuilder.forgetAndPrune(profile: profile, repository: repository)
         }
@@ -275,7 +308,15 @@ public final class BackupCoordinator: @unchecked Sendable {
 
     @discardableResult
     public func check(repository: BackupRepository, readDataSubset: String? = nil) throws -> JobRun {
-        try run(repositoryID: repository.id, profileID: nil, kind: .check) {
+        guard availabilityChecker.isAvailable(repository, allowingCreation: false) else {
+            return try failedRun(
+                profileID: nil,
+                repositoryID: repository.id,
+                kind: .check,
+                message: destinationUnavailableMessage
+            )
+        }
+        return try run(repositoryID: repository.id, profileID: nil, kind: .check) {
             try commandBuilder.check(repository: repository, readDataSubset: readDataSubset)
         }
     }
@@ -362,24 +403,18 @@ public final class BackupCoordinator: @unchecked Sendable {
     }
 
     private func failedRestoreRun(repositoryID: UUID, message: String) throws -> JobRun {
-        let run = JobRun(
-            profileID: nil,
-            repositoryID: repositoryID,
-            kind: .restore,
-            status: .failed,
-            finishedAt: Date(),
-            message: message
-        )
-        try database.saveJobRun(run)
-        try database.appendEvent(EventLog(level: .error, message: message))
-        return run
+        try failedRun(profileID: nil, repositoryID: repositoryID, kind: .restore, message: message)
     }
 
     private func failedBackupRun(profileID: UUID, repositoryID: UUID, message: String) throws -> JobRun {
+        try failedRun(profileID: profileID, repositoryID: repositoryID, kind: .backup, message: message)
+    }
+
+    private func failedRun(profileID: UUID?, repositoryID: UUID, kind: JobKind, message: String) throws -> JobRun {
         let run = JobRun(
             profileID: profileID,
             repositoryID: repositoryID,
-            kind: .backup,
+            kind: kind,
             status: .failed,
             finishedAt: Date(),
             message: message
@@ -394,6 +429,10 @@ public final class BackupCoordinator: @unchecked Sendable {
             message: message
         )
         return run
+    }
+
+    private var destinationUnavailableMessage: String {
+        "Destination is not available. Connect or mount the destination and try again."
     }
 
     private func skippedMaintenanceRun(profile: BackupProfile, repository: BackupRepository) -> JobRun {
@@ -623,11 +662,13 @@ public final class BackupCoordinator: @unchecked Sendable {
 public enum BackupCoordinatorError: Error, LocalizedError {
     case resticFailed(String)
     case destinationBusy
+    case destinationUnavailable
 
     public var errorDescription: String? {
         switch self {
         case let .resticFailed(message): "Backup tool failed: \(message)"
         case .destinationBusy: "Destination is busy with another backup, restore, or maintenance job."
+        case .destinationUnavailable: "Destination is not available. Connect or mount the destination and try again."
         }
     }
 }

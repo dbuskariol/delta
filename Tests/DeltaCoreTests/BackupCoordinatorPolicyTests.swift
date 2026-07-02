@@ -501,10 +501,122 @@ final class BackupCoordinatorPolicyTests: XCTestCase {
         let logs = try fixture.database.fetchJobLogs(jobID: job.id)
 
         XCTAssertEqual(job.status, .failed)
-        XCTAssertEqual(job.message, "Destination is not available.")
+        XCTAssertTrue(job.message?.contains("Destination is not available") == true, job.message ?? "")
         XCTAssertTrue(runner.commands.isEmpty)
-        XCTAssertTrue(try fixture.database.fetchEvents().contains { $0.message == "Destination is not available." })
-        XCTAssertTrue(logs.contains { $0.stream == .standardError && $0.message == "Destination is not available." })
+        XCTAssertTrue(try fixture.database.fetchEvents().contains { $0.message.contains("Destination is not available") })
+        XCTAssertTrue(logs.contains { $0.stream == .standardError && $0.message.contains("Destination is not available") })
+    }
+
+    func testRefreshSnapshotsDoesNotRunResticWhenDestinationIsUnavailable() throws {
+        let fixture = try Fixture()
+        let runner = MockResticRunner(results: [.success])
+        let coordinator = fixture.makeCoordinator(runner: runner)
+        let unavailableRepository = fixture.unavailableRepository()
+
+        XCTAssertThrowsError(try coordinator.refreshSnapshots(repository: unavailableRepository)) { error in
+            XCTAssertTrue(error.localizedDescription.contains("Destination is not available"), error.localizedDescription)
+        }
+        XCTAssertTrue(runner.commands.isEmpty)
+    }
+
+    func testBrowseRestorePointDoesNotRunResticWhenDestinationIsUnavailable() throws {
+        let fixture = try Fixture()
+        let runner = MockResticRunner(results: [.success])
+        let coordinator = fixture.makeCoordinator(runner: runner)
+        let unavailableRepository = fixture.unavailableRepository()
+
+        XCTAssertThrowsError(
+            try coordinator.listSnapshotEntries(
+                repository: unavailableRepository,
+                snapshotID: "snapshot",
+                directoryPath: fixture.source.path
+            )
+        ) { error in
+            XCTAssertTrue(error.localizedDescription.contains("Destination is not available"), error.localizedDescription)
+        }
+        XCTAssertTrue(runner.commands.isEmpty)
+    }
+
+    func testRestoreRecordsFailureWhenDestinationIsUnavailable() throws {
+        let fixture = try Fixture()
+        let runner = MockResticRunner(results: [.success])
+        let coordinator = fixture.makeCoordinator(runner: runner)
+        let unavailableRepository = fixture.unavailableRepository()
+        let request = RestoreRequest(
+            repositoryID: unavailableRepository.id,
+            snapshotID: "snapshot",
+            destination: .chosenFolder(fixture.root.appendingPathComponent("restore").path)
+        )
+
+        let job = try coordinator.restore(request: request, repository: unavailableRepository)
+
+        XCTAssertEqual(job.status, .failed)
+        XCTAssertTrue(job.message?.contains("Destination is not available") == true, job.message ?? "")
+        XCTAssertTrue(runner.commands.isEmpty)
+        XCTAssertTrue(try fixture.database.fetchJobLogs(jobID: job.id).contains { $0.message.contains("Destination is not available") })
+    }
+
+    func testCheckRecordsFailureWhenDestinationIsUnavailable() throws {
+        let fixture = try Fixture()
+        let runner = MockResticRunner(results: [.success])
+        let coordinator = fixture.makeCoordinator(runner: runner)
+        let unavailableRepository = fixture.unavailableRepository()
+
+        let job = try coordinator.check(repository: unavailableRepository)
+
+        XCTAssertEqual(job.status, .failed)
+        XCTAssertTrue(job.message?.contains("Destination is not available") == true, job.message ?? "")
+        XCTAssertTrue(runner.commands.isEmpty)
+    }
+
+    func testRetentionMaintenanceRecordsFailureWhenDestinationIsUnavailable() throws {
+        let fixture = try Fixture()
+        let runner = MockResticRunner(results: [.success])
+        let coordinator = fixture.makeCoordinator(runner: runner)
+        let unavailableRepository = fixture.unavailableRepository()
+        let profile = fixture.profile()
+
+        let runs = try coordinator.runRetentionMaintenance(profile: profile, repository: unavailableRepository)
+
+        XCTAssertEqual(runs.map(\.kind), [.prune])
+        XCTAssertEqual(runs.map(\.status), [.failed])
+        XCTAssertTrue(runs.first?.message?.contains("Destination is not available") == true, runs.first?.message ?? "")
+        XCTAssertTrue(runner.commands.isEmpty)
+    }
+
+    func testRunDueBackupsDoesNotRunMaintenanceResticWhenDestinationIsUnavailable() throws {
+        let fixture = try Fixture()
+        let runner = MockResticRunner(results: [.success])
+        let coordinator = fixture.makeCoordinator(runner: runner, scheduleEvaluator: ScheduleEvaluator(calendar: Self.utc))
+        let unavailableRepository = fixture.unavailableRepository()
+        let createdAt = try XCTUnwrap(Self.utc.date(from: DateComponents(year: 2026, month: 7, day: 1, hour: 1, minute: 0)))
+        let lastBackup = try XCTUnwrap(Self.utc.date(from: DateComponents(year: 2026, month: 7, day: 1, hour: 20, minute: 0)))
+        let now = try XCTUnwrap(Self.utc.date(from: DateComponents(year: 2026, month: 7, day: 2, hour: 2, minute: 5)))
+        let profile = fixture.profile(
+            schedule: BackupSchedule(kind: .daily(hour: 20, minute: 0)),
+            retention: RetentionPolicy(
+                maintenanceSchedule: RetentionMaintenanceSchedule(intervalDays: 1, hour: 2, minute: 0)
+            ),
+            createdAt: createdAt
+        )
+        try fixture.database.saveRepository(unavailableRepository)
+        try fixture.database.saveProfile(profile)
+        try fixture.database.saveJobRun(
+            JobRun(
+                profileID: profile.id,
+                repositoryID: unavailableRepository.id,
+                kind: .backup,
+                status: .succeeded,
+                startedAt: lastBackup,
+                finishedAt: lastBackup
+            )
+        )
+
+        let runs = try coordinator.runDueBackups(now: now)
+
+        XCTAssertEqual(runs.map(\.kind), [.prune])
+        XCTAssertEqual(runs.map(\.status), [.failed])
+        XCTAssertTrue(runner.commands.isEmpty)
     }
 
     func testRunBackupRecordsFailureWhenSourceBookmarkCannotResolve() throws {
@@ -839,6 +951,14 @@ private struct Fixture {
             retention: retention,
             createdAt: createdAt,
             updatedAt: createdAt
+        )
+    }
+
+    func unavailableRepository() -> BackupRepository {
+        BackupRepository(
+            id: repository.id,
+            name: "Unavailable",
+            backend: .local(path: root.appendingPathComponent("missing-destination", isDirectory: true).path)
         )
     }
 

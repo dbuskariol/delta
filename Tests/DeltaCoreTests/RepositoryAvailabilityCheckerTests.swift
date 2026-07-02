@@ -21,6 +21,16 @@ final class RepositoryAvailabilityCheckerTests: XCTestCase {
         XCTAssertTrue(RepositoryAvailabilityChecker().isAvailable(repository))
     }
 
+    func testLocalDestinationRequiresExistingDirectoryWhenCreationIsNotAllowed() throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanUp() }
+        let child = fixture.directory.appendingPathComponent("new-repository", isDirectory: true)
+
+        let repository = BackupRepository(name: "Local", backend: .local(path: child.path))
+
+        XCTAssertFalse(RepositoryAvailabilityChecker().isAvailable(repository, allowingCreation: false))
+    }
+
     func testLocalDestinationRejectsExistingFilePath() throws {
         let fixture = try Fixture()
         defer { fixture.cleanUp() }

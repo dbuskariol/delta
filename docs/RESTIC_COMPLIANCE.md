@@ -51,6 +51,8 @@ Delta validates destination inputs before saving them. The validator trims persi
 
 After a destination is created, Delta starts a prepare job that runs `restic init` with the saved encryption secret and backend credentials. The destination row action remains available as a retry path. For local and mounted destinations, Delta also keeps a first-backup safety net: if the writable destination has no restic `config` file yet, it runs `restic init` before starting backup.
 
+Destination availability checks are operation-aware. Creating or preparing a local destination may use an existing writable parent directory, but restore point refresh, backup browsing, restore, integrity check, and cleanup require the destination directory itself to exist and be writable before Delta invokes restic. If a mounted drive is missing, Delta records or throws a user-facing unavailable-destination result instead of starting restic and surfacing backend noise.
+
 Backup profiles are validated before save and again before execution. Delta trims and deduplicates source paths, rejects empty or relative source paths, verifies the profile still points at an existing destination, normalizes schedule and cleanup windows, clamps retention and bandwidth limits to product-supported ranges, and keeps default macOS-safe excludes present. If a persisted profile is invalid, Delta records a failed job and does not invoke restic.
 
 ## Backend Credentials
