@@ -42,4 +42,28 @@ wait "$DELTA_PID" >/dev/null 2>&1 || true
 "$ROOT_DIR/dist/Delta.app/Contents/MacOS/restic" version
 "$ROOT_DIR/dist/Delta.app/Contents/MacOS/rclone" version | /usr/bin/head -n 1
 
+"$ROOT_DIR/Scripts/package-update.sh"
+"$ROOT_DIR/Scripts/generate-appcast.sh"
+
+SHORT_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$ROOT_DIR/dist/Delta.app/Contents/Info.plist")"
+BUILD_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$ROOT_DIR/dist/Delta.app/Contents/Info.plist")"
+ARCHIVE_NAME="Delta-$SHORT_VERSION-$BUILD_VERSION.zip"
+APPCAST="$ROOT_DIR/dist/updates/appcast.xml"
+if [[ ! -f "$ROOT_DIR/dist/updates/$ARCHIVE_NAME" ]]; then
+  printf "Sparkle update archive %s was not generated.\n" "$ARCHIVE_NAME" >&2
+  exit 1
+fi
+if ! /usr/bin/grep -q "<sparkle:shortVersionString>$SHORT_VERSION</sparkle:shortVersionString>" "$APPCAST"; then
+  printf "Sparkle appcast does not contain short version %s.\n" "$SHORT_VERSION" >&2
+  exit 1
+fi
+if ! /usr/bin/grep -q "<sparkle:version>$BUILD_VERSION</sparkle:version>" "$APPCAST"; then
+  printf "Sparkle appcast does not contain build version %s.\n" "$BUILD_VERSION" >&2
+  exit 1
+fi
+if ! /usr/bin/grep -q "$ARCHIVE_NAME" "$APPCAST"; then
+  printf "Sparkle appcast does not reference %s.\n" "$ARCHIVE_NAME" >&2
+  exit 1
+fi
+
 printf "Release verification passed for %s\n" "$ROOT_DIR/dist/Delta.app"
