@@ -46,6 +46,7 @@ public struct DiagnosticSnapshotCollector {
             appLoginItemStatus: AppLoginItemController.status().displayName,
             notificationStatus: DeltaAppPreferences.bool(for: DeltaAppPreferenceKeys.sendsJobNotifications, default: false) ? "Enabled" : "Disabled",
             menuBarStatus: DeltaAppPreferences.bool(for: DeltaAppPreferenceKeys.showsMenuBarExtra, default: true) ? "Shown" : "Hidden",
+            idleSleepProtectionStatus: DeltaAppPreferences.bool(for: DeltaAppPreferenceKeys.preventsIdleSleepDuringJobs, default: true) ? "Enabled" : "Disabled",
             operationalHistoryRetentionStatus: OperationalHistoryRetention.current().summaryText,
             backupFreshnessStatus: BackupFreshnessWarningThreshold
                 .normalized(

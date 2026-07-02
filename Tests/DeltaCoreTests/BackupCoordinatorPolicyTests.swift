@@ -975,6 +975,33 @@ final class BackupCoordinatorPolicyTests: XCTestCase {
         XCTAssertTrue(logs.contains { $0.stream == .standardError && $0.message.contains("Failed Backup") })
     }
 
+    func testRunBackupKeepsMacAwakeDuringResticWork() throws {
+        let fixture = try Fixture()
+        let runner = MockResticRunner(results: [.success, .emptySnapshotList])
+        let activityManager = RecordingSystemActivityManager()
+        let coordinator = fixture.makeCoordinator(runner: runner, systemActivityManager: activityManager)
+        let profile = fixture.profile()
+
+        let job = try coordinator.runBackup(profile: profile, repository: fixture.repository)
+
+        XCTAssertEqual(job.status, .succeeded)
+        XCTAssertEqual(activityManager.beginReasons, ["Delta Backup"])
+        XCTAssertEqual(activityManager.endCount, 1)
+    }
+
+    func testRunBackupReleasesActivityAssertionWhenRunnerThrows() throws {
+        let fixture = try Fixture()
+        let runner = ThrowingResticRunner(error: TestRunError.processLaunchFailed)
+        let activityManager = RecordingSystemActivityManager()
+        let coordinator = fixture.makeCoordinator(runner: runner, systemActivityManager: activityManager)
+        let profile = fixture.profile()
+
+        XCTAssertThrowsError(try coordinator.runBackup(profile: profile, repository: fixture.repository))
+
+        XCTAssertEqual(activityManager.beginReasons, ["Delta Backup"])
+        XCTAssertEqual(activityManager.endCount, 1)
+    }
+
     func testMockedResticFailuresProduceUserFacingJobMessages() throws {
         let cases: [(String, ResticRunResult, JobStatus, ResticFailureKind, String)] = [
             (
@@ -1184,6 +1211,42 @@ private final class ThrowingResticRunner: ResticRunning, @unchecked Sendable {
     }
 }
 
+private struct NoOpSystemActivityManager: SystemActivityManaging {
+    func beginActivity(named reason: String) -> SystemActivityAssertion? {
+        nil
+    }
+}
+
+private final class RecordingSystemActivityManager: SystemActivityManaging, @unchecked Sendable {
+    private let lock = NSLock()
+    private var storedBeginReasons: [String] = []
+    private var storedEndCount = 0
+
+    var beginReasons: [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        return storedBeginReasons
+    }
+
+    var endCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return storedEndCount
+    }
+
+    func beginActivity(named reason: String) -> SystemActivityAssertion? {
+        lock.lock()
+        storedBeginReasons.append(reason)
+        lock.unlock()
+        return SystemActivityAssertion { [weak self] in
+            guard let self else { return }
+            self.lock.lock()
+            self.storedEndCount += 1
+            self.lock.unlock()
+        }
+    }
+}
+
 private enum TestRunError: LocalizedError {
     case processLaunchFailed
 
@@ -1261,6 +1324,7 @@ private struct Fixture {
         runner: any ResticRunning,
         scheduleEvaluator: ScheduleEvaluator = ScheduleEvaluator(),
         powerState: PowerState = PowerState(isOnBatteryPower: false, isLowPowerModeEnabled: false),
+        systemActivityManager: any SystemActivityManaging = NoOpSystemActivityManager(),
         runControlStore: ResticRunControlStore? = nil,
         outputHandler: (@Sendable (UUID, ResticOutputEvent) -> Void)? = nil
     ) -> BackupCoordinator {
@@ -1273,6 +1337,7 @@ private struct Fixture {
             runner: runner,
             scheduleEvaluator: scheduleEvaluator,
             powerStateProvider: PowerStateProvider(currentPowerState: { powerState }),
+            systemActivityManager: systemActivityManager,
             lockManager: lockManager,
             runControlStore: runControlStore,
             outputHandler: outputHandler

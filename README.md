@@ -16,7 +16,7 @@ The product goal is simple: make serious backup practices approachable without h
 - **Non-interactive SFTP scheduling** with optional SSH private-key file configuration, SSH batch mode, and keepalive options so scheduled jobs fail clearly instead of waiting for password prompts.
 - **Automatic destination preparation** after a destination is added, with a first-backup safety net for writable local/mounted destinations and unverified remote destinations that still have no encrypted backup metadata.
 - **Scheduled backups** through Background Backups, a signed macOS Login Item helper registered with `SMAppService`, with helper-started jobs reflected back into the app and menu bar.
-- **Power-aware scheduling** with battery and Low Power Mode controls.
+- **Power-aware scheduling** with battery and Low Power Mode controls, plus optional idle-sleep protection while backup, restore, check, and cleanup jobs are actively running.
 - **Retention maintenance** with scheduled forget/prune/check windows.
 - **Pause, resume, and cancel controls** for active backups from the main window and macOS menu bar, including scheduled jobs started by Background Backups. Pause stops restic safely, keeps the profile visibly paused, and Resume continues from already saved backup data.
 - **Clear backup summaries** showing new, changed, unchanged, added, and checked data for each backup run.
@@ -24,7 +24,7 @@ The product goal is simple: make serious backup practices approachable without h
 - **Notification Center alerts** for failed or warning jobs, with optional successful-backup summaries. The signed background helper uses the same notification policy for scheduled runs.
 - **Full or browsed selected restore** with backup browsing, file/folder selection, configurable dry-run and verification defaults, overwrite policies, original-path restore, chosen-folder restore, and optional pre-restore backup.
 - **Streaming and saved backup logs** from restic stdout/stderr with source context, stable processed-file counters, clean change summaries, fixed-height live panes, and expandable per-job audit history.
-- **Settings and diagnostics** with a compact health summary for system access, schedules, updates, notifications, and bundled backup tools, plus controls for health monitoring thresholds, new-backup defaults, restore safety defaults, menu bar visibility, start-at-login, Activity log detail, scheduled-backup test runs, signed update checks/downloads, app version, background-backup status, tool paths, profile/destination counts, recent jobs, and local support paths.
+- **Settings and diagnostics** with a compact health summary for system access, schedules, updates, notifications, and bundled backup tools, plus controls for health monitoring thresholds, new-backup defaults, restore safety defaults, idle-sleep protection during active jobs, menu bar visibility, start-at-login, Activity log detail, scheduled-backup test runs, signed update checks/downloads, app version, background-backup status, tool paths, profile/destination counts, recent jobs, and local support paths.
 - **Sparkle automatic updates** with generated appcast/update archive support.
 
 ## How It Works
@@ -107,6 +107,8 @@ Custom-folder profiles use the selected source folders and stored security-scope
 Each profile keeps Delta's default macOS-safe excludes and can add extra restic exclude patterns. Extra excludes are saved with the profile and passed to restic as additional `--exclude` arguments.
 
 Settings include app-level defaults for newly-created backup profiles: missed-run catchup, battery policy, Low Power Mode policy, optional bandwidth limits, cleanup space reclamation, cleanup verification, and cleanup cadence. Those defaults seed new profiles only. Existing profiles keep their own schedule, power, bandwidth, retention, and maintenance settings until edited.
+
+Delta can also hold a macOS activity assertion while a backup, restore, destination check, or cleanup is actively running. This is enabled by default to reduce the chance of long unattended jobs being interrupted by idle sleep. It does not force a scheduled backup to start on battery or in Low Power Mode; those profile policies are still evaluated before work begins.
 
 Diagnostics settings include live-log detail and local activity history retention. History retention removes old job summaries, saved output, restore requests, and app events from Delta's SQLite database. It does not remove restore points or backup data from any destination.
 

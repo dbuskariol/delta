@@ -1230,6 +1230,10 @@ struct SettingsView: View {
         store: DeltaAppPreferences.sharedStore()
     ) private var sendsSuccessfulBackupNotifications = false
     @AppStorage(
+        DeltaAppPreferenceKeys.preventsIdleSleepDuringJobs,
+        store: DeltaAppPreferences.sharedStore()
+    ) private var preventsIdleSleepDuringJobs = true
+    @AppStorage(
         DeltaAppPreferenceKeys.showsMenuBarExtra,
         store: DeltaAppPreferences.sharedStore()
     ) private var showsMenuBarExtra = true
@@ -1409,6 +1413,33 @@ struct SettingsView: View {
                     }
                     .deltaTooltip("Recheck whether protected folders are readable.")
                 }
+            }
+
+            SettingsCard(
+                symbol: "powerplug",
+                title: "Power & Reliability",
+                subtitle: "Reduce the chance of long-running work being interrupted by idle sleep.",
+                statusText: preventsIdleSleepDuringJobs ? "Protected" : "Off",
+                statusColor: preventsIdleSleepDuringJobs ? .green : .secondary
+            ) {
+                SettingsControlRow(
+                    title: "Keep Mac awake during backup work",
+                    detail: "Prevent idle sleep while Delta is actively preparing, backing up, restoring, checking, or cleaning up a destination."
+                ) {
+                    Toggle("", isOn: $preventsIdleSleepDuringJobs)
+                        .labelsHidden()
+                        .toggleStyle(.switch)
+                }
+
+                SettingsFactGrid(items: [
+                    SettingsFact(title: "Applies to", value: "Active jobs"),
+                    SettingsFact(title: "Sleep type", value: "Idle sleep"),
+                    SettingsFact(title: "Scheduling", value: "Policy honored")
+                ])
+
+                SettingsDescription(
+                    text: "This does not override battery or Low Power Mode scheduling rules. It only keeps an already-started job from being paused because the Mac went idle."
+                )
             }
 
             SettingsSectionLabel(

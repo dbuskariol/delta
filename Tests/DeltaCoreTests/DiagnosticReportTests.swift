@@ -18,6 +18,7 @@ final class DiagnosticReportTests: XCTestCase {
             appLoginItemStatus: "Ready",
             notificationStatus: "Enabled",
             menuBarStatus: "Shown",
+            idleSleepProtectionStatus: "Enabled",
             operationalHistoryRetentionStatus: "Keep 90 days",
             backupFreshnessStatus: "Warn after 3 days",
             destinationVerificationStatus: "Warn after 30 days",
@@ -51,6 +52,7 @@ final class DiagnosticReportTests: XCTestCase {
         XCTAssertTrue(report.contains("- Start at Login: Ready"))
         XCTAssertTrue(report.contains("- Notifications: Enabled"))
         XCTAssertTrue(report.contains("- Menu Bar: Shown"))
+        XCTAssertTrue(report.contains("- Idle Sleep Protection: Enabled"))
         XCTAssertTrue(report.contains("- Activity History Retention: Keep 90 days"))
         XCTAssertTrue(report.contains("- Backup Freshness: Warn after 3 days"))
         XCTAssertTrue(report.contains("- Destination Verification: Warn after 30 days"))
@@ -80,6 +82,7 @@ final class DiagnosticReportTests: XCTestCase {
             appLoginItemStatus: "Off",
             notificationStatus: "Disabled",
             menuBarStatus: "Hidden",
+            idleSleepProtectionStatus: "Disabled",
             operationalHistoryRetentionStatus: "Keep 90 days",
             backupFreshnessStatus: "Warn after 3 days",
             destinationVerificationStatus: "Warn after 30 days",
@@ -117,6 +120,7 @@ final class DiagnosticReportTests: XCTestCase {
             appLoginItemStatus: "Ready",
             notificationStatus: "Disabled",
             menuBarStatus: "Shown",
+            idleSleepProtectionStatus: "Enabled",
             operationalHistoryRetentionStatus: "Keep 90 days",
             backupFreshnessStatus: "Warn after 3 days",
             destinationVerificationStatus: "Warn after 30 days",
@@ -177,6 +181,7 @@ final class DiagnosticReportTests: XCTestCase {
             appLoginItemStatus: "Ready",
             notificationStatus: "Disabled",
             menuBarStatus: "Shown",
+            idleSleepProtectionStatus: "Enabled",
             operationalHistoryRetentionStatus: "Keep 90 days",
             backupFreshnessStatus: "Warn after 3 days",
             destinationVerificationStatus: "Warn after 30 days",
@@ -223,6 +228,7 @@ final class DiagnosticReportTests: XCTestCase {
             appLoginItemStatus: "Ready",
             notificationStatus: "Disabled",
             menuBarStatus: "Shown",
+            idleSleepProtectionStatus: "Enabled",
             operationalHistoryRetentionStatus: "Keep 90 days",
             backupFreshnessStatus: "Warn after 3 days",
             destinationVerificationStatus: "Warn after 30 days",

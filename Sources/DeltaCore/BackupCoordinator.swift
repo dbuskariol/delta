@@ -11,6 +11,7 @@ public final class BackupCoordinator: @unchecked Sendable {
     private let bookmarkStore: SecurityScopedBookmarkStore
     private let sourceAccessChecker: BackupSourceAccessChecker
     private let powerStateProvider: PowerStateProvider
+    private let systemActivityManager: any SystemActivityManaging
     private let lockManager: any RepositoryLocking
     private let runControlStore: ResticRunControlStore?
     private let outputHandler: (@Sendable (UUID, ResticOutputEvent) -> Void)?
@@ -26,6 +27,7 @@ public final class BackupCoordinator: @unchecked Sendable {
         bookmarkStore: SecurityScopedBookmarkStore = SecurityScopedBookmarkStore(),
         sourceAccessChecker: BackupSourceAccessChecker = BackupSourceAccessChecker(),
         powerStateProvider: PowerStateProvider = PowerStateProvider(),
+        systemActivityManager: any SystemActivityManaging = ProcessInfoSystemActivityManager(),
         lockManager: any RepositoryLocking = RepositoryJobLockManager(),
         runControlStore: ResticRunControlStore? = nil,
         outputHandler: (@Sendable (UUID, ResticOutputEvent) -> Void)? = nil
@@ -40,6 +42,7 @@ public final class BackupCoordinator: @unchecked Sendable {
         self.bookmarkStore = bookmarkStore
         self.sourceAccessChecker = sourceAccessChecker
         self.powerStateProvider = powerStateProvider
+        self.systemActivityManager = systemActivityManager
         self.lockManager = lockManager
         self.runControlStore = runControlStore
         self.outputHandler = outputHandler
@@ -604,6 +607,10 @@ public final class BackupCoordinator: @unchecked Sendable {
         )
 
         let result: ResticRunResult
+        let activity = systemActivityManager.beginActivity(named: "Delta \(kind.displayName)")
+        defer {
+            activity?.end()
+        }
         do {
             if let controlledRunner = runner as? any ResticControlledStreamingRunning {
                 let jobID = job.id

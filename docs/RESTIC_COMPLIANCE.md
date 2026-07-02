@@ -230,6 +230,8 @@ Scheduled maintenance is evaluated independently from backup due checks, but it 
 
 When a user saves an enabled scheduled profile, Delta requests Background Backups registration through `SMAppService` if the helper is not already registered. If macOS reports that Login Items approval is still required, Delta records the schedule and surfaces the approval action instead of silently leaving scheduled backups inert.
 
+When idle-sleep protection is enabled, Delta holds a macOS `ProcessInfo` activity assertion only around active restic jobs. This does not change restic command semantics and does not override the profile battery or Low Power Mode policy that is evaluated before scheduled work starts.
+
 ## Locking
 
 Delta uses two lock layers:
