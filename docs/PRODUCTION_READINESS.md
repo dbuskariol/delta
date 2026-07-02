@@ -23,6 +23,7 @@ The automated gate must pass before any beta or production build is shipped. It 
 - non-ad-hoc app signing identity for stable macOS privacy permissions
 - hardened-runtime entitlement hygiene
 - same-executable scheduled password resolution and non-interactive password-bridge acceptance
+- installed-app diagnostic export with redaction of seeded destination and backend credential values
 - source access preflight before restic starts or a new destination is prepared
 - bundled Login Item helper plist
 - app launch smoke test
@@ -46,7 +47,7 @@ For a faster local readiness picture, run:
 Scripts/run-local-acceptance-probe.sh
 ```
 
-The probe writes `dist/local-acceptance/latest.md`. It also runs `Scripts/run-installed-keychain-access-acceptance.sh`, which creates a throwaway destination-secret item through the installed Delta app, proves the installed password bridge mode can read it without interaction, then deletes it. It also runs `Scripts/run-installed-local-backup-acceptance.sh`, which uses the app bundle's own restic binary to initialize a temporary encrypted local destination, run first and deduplicated second backups, restore a full restore point, restore a selected folder, check, prune, and run a post-prune check.
+The probe writes `dist/local-acceptance/latest.md`. It also runs `Scripts/run-installed-keychain-access-acceptance.sh`, which creates a throwaway destination-secret item through the installed Delta app, proves the installed password bridge mode can read it without interaction, then deletes it. It runs `Scripts/run-installed-diagnostics-acceptance.sh`, which seeds isolated installed-app state, exports diagnostics through the installed app, and proves seeded destination/backend credential values are redacted. It also runs `Scripts/run-installed-local-backup-acceptance.sh`, which uses the app bundle's own restic binary to initialize a temporary encrypted local destination, run first and deduplicated second backups, restore a full restore point, restore a selected folder, check, prune, and run a post-prune check.
 
 External backend evidence is opt-in because it needs real infrastructure. Configure these variables before running the local probe when those targets are available:
 

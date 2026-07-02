@@ -224,6 +224,14 @@ else
     installed_local_evidence="Installed-bundle local backup acceptance failed: $installed_local_output"
   fi
 
+  installed_diagnostics_output="$(run_capture installed_diagnostics "$ROOT_DIR/Scripts/run-installed-diagnostics-acceptance.sh" "$APP_PATH")"
+  installed_diagnostics_status="$(command_status installed_diagnostics)"
+  if [[ "$installed_diagnostics_status" -eq 0 ]]; then
+    installed_diagnostics_evidence="Installed diagnostics acceptance passed: isolated installed-app diagnostic export generated a redacted report and proved seeded destination/backend credential values were absent. $installed_diagnostics_output"
+  else
+    installed_diagnostics_evidence="Installed diagnostics acceptance failed: $installed_diagnostics_output"
+  fi
+
   mounted_acceptance_status="not_configured"
   mounted_acceptance_evidence=""
   if [[ -n "${DELTA_ACCEPTANCE_MOUNTED_PATH:-}" ]]; then
@@ -281,7 +289,11 @@ else
     append_row "browse_restore_points" "$(item_area browse_restore_points)" "Partial" "Automated release gate passed restore-point parsing, cache replacement, newest-first reads, and browser path command validation for commit $git_commit." "Open Restore, confirm restore points load on tab selection, refresh returns all current points, and pruned points disappear."
     append_row "pause_resume_cancel" "$(item_area pause_resume_cancel)" "Partial" "Automated release gate passed durable run-control and stopped-job model coverage for commit $git_commit." "Pause, resume, and cancel a real large backup from the main app and menu bar."
     append_row "streaming_logs" "$(item_area streaming_logs)" "Partial" "Automated release gate passed log formatting and persistence coverage for commit $git_commit." "Watch a real large backup and confirm fixed-height live logs, auto-scroll, source context, and expandable saved job logs."
-    append_row "diagnostics_redaction" "$(item_area diagnostics_redaction)" "Partial" "Automated release gate passed diagnostic redaction coverage for commit $git_commit." "Copy and export a report from Settings and manually confirm no secrets appear."
+    if [[ "$installed_diagnostics_status" -eq 0 ]]; then
+      append_row "diagnostics_redaction" "$(item_area diagnostics_redaction)" "Partial" "$installed_diagnostics_evidence Automated release gate also passed diagnostic redaction coverage for commit $git_commit." "Copy and export a report from Settings and manually confirm no secrets appear."
+    else
+      append_row "diagnostics_redaction" "$(item_area diagnostics_redaction)" "Failed" "$installed_diagnostics_evidence" "Fix installed-app diagnostics export and redaction, then copy/export diagnostics from Settings."
+    fi
   else
     gate_evidence="Automated release gate is not passed for current commit $git_commit. Recorded status='${automated_gate_status:-missing}' commit='${automated_gate_commit:-missing}'."
     append_row "local_drive_destination" "$(item_area local_drive_destination)" "Failed" "$gate_evidence" "Run Scripts/verify-release.sh, then repeat through the installed app UI."

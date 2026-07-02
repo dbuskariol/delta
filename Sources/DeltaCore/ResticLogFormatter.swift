@@ -199,6 +199,10 @@ public enum ResticLogFormatter {
             return summaryMessage(from: object)
         case "error":
             return errorMessage(from: object)
+        case "exit_error":
+            return errorMessage(from: object)
+        case "initialized":
+            return "Destination prepared"
         default:
             if let message = object["message"] as? String, !message.isEmpty {
                 return message

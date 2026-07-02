@@ -186,7 +186,7 @@ public struct DiagnosticReportBuilder: Sendable {
             "- Backup Freshness: \(snapshot.backupFreshnessStatus)",
             "- Destination Verification: \(snapshot.destinationVerificationStatus)",
             "- Restore Defaults: \(snapshot.restoreDefaultsStatus)",
-            "- Active Operation: \(snapshot.activeOperation ?? "None")",
+            "- Active Operation: \(snapshot.activeOperation.map { diagnosticText($0) } ?? "None")",
             "",
             "## Counts",
             "- Profiles: \(snapshot.profileCount)",
@@ -204,19 +204,19 @@ public struct DiagnosticReportBuilder: Sendable {
         lines += ["", "## Destinations"]
         lines += listOrEmpty(snapshot.destinations) { destination in
             let verified = destination.lastVerifiedAt.map { "; verified \(timestamp($0))" } ?? ""
-            return "- \(destination.name): \(destination.kind)\(verified)"
+            return "- \(diagnosticText(destination.name)): \(destination.kind)\(verified)"
         }
 
         lines += ["", "## Profiles"]
         lines += listOrEmpty(snapshot.profiles) { profile in
             let schedule = profile.scheduleEnabled ? "scheduled" : "manual"
-            return "- \(profile.name): \(profile.sourceMode); \(profile.sourceCount) source(s); \(schedule); \(profile.customExcludeCount) extra exclude(s)"
+            return "- \(diagnosticText(profile.name)): \(profile.sourceMode); \(profile.sourceCount) source(s); \(schedule); \(profile.customExcludeCount) extra exclude(s)"
         }
 
         lines += ["", "## Recent Jobs"]
         lines += listOrEmpty(snapshot.recentJobs) { job in
             let exitCode = job.exitCode.map { "; exit \($0)" } ?? ""
-            let message = job.message.map { "; \($0)" } ?? ""
+            let message = job.message.map { "; \(diagnosticText($0))" } ?? ""
             return "- \(timestamp(job.startedAt)): \(job.kind) \(job.status)\(exitCode)\(message)"
         }
 
@@ -229,5 +229,22 @@ public struct DiagnosticReportBuilder: Sendable {
 
     private func timestamp(_ date: Date) -> String {
         ISO8601DateFormatter().string(from: date)
+    }
+
+    private func diagnosticText(_ value: String, limit: Int = 240) -> String {
+        let summarized = ResticLogFormatter.finalSummaryMessage(from: value)
+            ?? value
+                .split(whereSeparator: \.isNewline)
+                .prefix(3)
+                .map { ResticLogFormatter.displayMessage(for: String($0)) }
+                .joined(separator: " · ")
+        let collapsed = SensitiveLogRedactor.redact(summarized)
+            .components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+        guard collapsed.count > limit else {
+            return collapsed
+        }
+        return String(collapsed.prefix(limit)) + "..."
     }
 }

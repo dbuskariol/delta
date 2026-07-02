@@ -121,6 +121,9 @@ if [[ -x "$ROOT_DIR/Scripts/run-local-acceptance-probe.sh" ]]; then
   if [[ -f "$ROOT_DIR/dist/local-acceptance/installed-keychain-access-latest.md" ]]; then
     append_command "Installed Keychain Access Acceptance Report" /bin/cat "$ROOT_DIR/dist/local-acceptance/installed-keychain-access-latest.md"
   fi
+  if [[ -f "$ROOT_DIR/dist/local-acceptance/installed-diagnostics-latest.md" ]]; then
+    append_command "Installed Diagnostics Acceptance Report" /bin/cat "$ROOT_DIR/dist/local-acceptance/installed-diagnostics-latest.md"
+  fi
   for external_report in "$ROOT_DIR"/dist/local-acceptance/external-*-acceptance-latest.md; do
     if [[ -f "$external_report" ]]; then
       append_command "External Backend Acceptance Report: $(/usr/bin/basename "$external_report")" /bin/cat "$external_report"
