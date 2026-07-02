@@ -186,9 +186,18 @@ else
   else
     installed_diagnostics_evidence="Installed diagnostics acceptance failed: $installed_diagnostics_output"
   fi
+  installed_preferences_output="$(run_capture installed_preferences "$ROOT_DIR/Scripts/run-installed-preferences-acceptance.sh" "$APP_PATH")"
+  installed_preferences_status="$(command_status installed_preferences)"
+  if [[ "$installed_preferences_status" -eq 0 ]]; then
+    installed_preferences_evidence="Installed preferences acceptance passed: the signed app verified recommended defaults, invalid preference normalization, custom backup defaults persisted to a new profile, custom restore defaults, diagnostic preference summaries, and preference restoration. $installed_preferences_output"
+  else
+    installed_preferences_evidence="Installed preferences acceptance failed: $installed_preferences_output"
+  fi
 
-  if [[ "$language_status" -eq 0 && "$installed_diagnostics_status" -eq 0 ]]; then
-    append_row "settings_surface" "$(item_area settings_surface)" "Partial" "Product-language verifier passed; raw Repository/LaunchAgent terminology is blocked from user-facing strings. Installed diagnostics reported Background Password Access as Ready and Full Disk Access as $installed_full_disk_access_status." "Open Settings and confirm visual grouping, status summary, Run Due Now scheduler action, Sparkle automatic check/download controls, idle-sleep protection, reset controls, backup freshness warnings, source-access warnings, destination-check warning controls, and activity history retention in the running app."
+  if [[ "$language_status" -eq 0 && "$installed_diagnostics_status" -eq 0 && "$installed_preferences_status" -eq 0 ]]; then
+    append_row "settings_surface" "$(item_area settings_surface)" "Partial" "Product-language verifier passed; raw Repository/LaunchAgent terminology is blocked from user-facing strings. Installed diagnostics reported Background Password Access as Ready and Full Disk Access as $installed_full_disk_access_status. $installed_preferences_evidence" "Open Settings and confirm visual grouping, status summary, Run Due Now scheduler action, Sparkle automatic check/download controls, idle-sleep protection, reset controls, backup freshness warnings, source-access warnings, destination-check warning controls, and activity history retention in the running app."
+  elif [[ "$language_status" -eq 0 && "$installed_diagnostics_status" -eq 0 ]]; then
+    append_row "settings_surface" "$(item_area settings_surface)" "Failed" "Product-language verifier and installed diagnostics passed, but installed preferences did not: $installed_preferences_evidence" "Fix installed preferences/defaults behavior before manual Settings acceptance."
   elif [[ "$language_status" -eq 0 ]]; then
     append_row "settings_surface" "$(item_area settings_surface)" "Failed" "Product-language verifier passed, but installed diagnostics did not prove Background Password Access: $installed_diagnostics_evidence" "Fix installed diagnostics and background password-access health before manual Settings acceptance."
   else
@@ -343,8 +352,13 @@ else
       append_row "local_drive_destination" "$(item_area local_drive_destination)" "Failed" "$installed_local_evidence" "Fix installed app local lifecycle acceptance, then repeat through the installed app UI."
       append_row "restore_wizard" "$(item_area restore_wizard)" "Failed" "$installed_local_evidence" "Fix installed app restore acceptance, then exercise the installed Restore wizard UI."
     fi
-    append_row "new_backup_defaults" "$(item_area new_backup_defaults)" "Partial" "Automated release gate passed backup-default preference, health-threshold normalization, source-access dashboard health evaluation, and schedule policy tests for commit $git_commit." "Change defaults in Settings and confirm newly-created UI profiles inherit them without mutating existing profiles. Confirm Health Monitoring thresholds change dashboard attention timing without mutating profiles."
-    append_row "restore_defaults" "$(item_area restore_defaults)" "Partial" "Automated release gate passed restore-default preference normalization, shared-settings reads, diagnostic summaries, and restore command safety coverage for commit $git_commit." "Change Settings > Restore Defaults, reopen Restore, and confirm defaults apply while remaining editable."
+    if [[ "$installed_preferences_status" -eq 0 ]]; then
+      append_row "new_backup_defaults" "$(item_area new_backup_defaults)" "Partial" "$installed_preferences_evidence Automated release gate also passed backup-default preference, health-threshold normalization, source-access dashboard health evaluation, and schedule policy tests for commit $git_commit." "Use the Settings UI to change defaults and confirm newly-created UI profiles inherit them without mutating existing profiles. Confirm Health Monitoring thresholds change dashboard attention timing without mutating profiles."
+      append_row "restore_defaults" "$(item_area restore_defaults)" "Partial" "$installed_preferences_evidence Automated release gate also passed restore-default preference normalization, shared-settings reads, diagnostic summaries, and restore command safety coverage for commit $git_commit." "Use the Settings UI to change Restore Defaults, reopen Restore, and confirm defaults apply while remaining editable."
+    else
+      append_row "new_backup_defaults" "$(item_area new_backup_defaults)" "Failed" "$installed_preferences_evidence" "Fix installed-app settings/defaults behavior, then verify Settings defaults in the UI."
+      append_row "restore_defaults" "$(item_area restore_defaults)" "Failed" "$installed_preferences_evidence" "Fix installed-app restore defaults behavior, then verify Restore defaults in the UI."
+    fi
     append_row "browse_restore_points" "$(item_area browse_restore_points)" "Partial" "Automated release gate passed restore-point parsing, cache replacement, newest-first reads, and browser path command validation for commit $git_commit." "Open Restore, confirm restore points load on tab selection, refresh returns all current points, and pruned points disappear."
     append_row "pause_resume_cancel" "$(item_area pause_resume_cancel)" "Partial" "Automated release gate passed durable run-control and stopped-job model coverage for commit $git_commit." "Pause, resume, and cancel a real large backup from the main app and menu bar."
     append_row "streaming_logs" "$(item_area streaming_logs)" "Partial" "Automated release gate passed log formatting and persistence coverage for commit $git_commit." "Watch a real large backup and confirm fixed-height live logs, auto-scroll, source context, and expandable saved job logs."

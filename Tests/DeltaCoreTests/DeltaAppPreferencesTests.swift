@@ -6,6 +6,14 @@ final class DeltaAppPreferencesTests: XCTestCase {
         UserDefaults(suiteName: DeltaAppPreferences.sharedSuiteName)
     }
 
+    func testPreferenceKeyGroupsContainUniqueValues() {
+        XCTAssertEqual(Set(DeltaAppPreferenceKeys.backupProfileDefaults).count, DeltaAppPreferenceKeys.backupProfileDefaults.count)
+        XCTAssertEqual(Set(DeltaAppPreferenceKeys.restoreDefaults).count, DeltaAppPreferenceKeys.restoreDefaults.count)
+        XCTAssertEqual(Set(DeltaAppPreferenceKeys.healthMonitoring).count, DeltaAppPreferenceKeys.healthMonitoring.count)
+        XCTAssertEqual(Set(DeltaAppPreferenceKeys.appBehavior).count, DeltaAppPreferenceKeys.appBehavior.count)
+        XCTAssertEqual(Set(DeltaAppPreferenceKeys.all).count, DeltaAppPreferenceKeys.all.count)
+    }
+
     func testBoolReadsSharedSuiteAndIgnoresStandardDefaults() {
         let key = "Delta.test.\(UUID().uuidString)"
         sharedSuite?.set(true, forKey: key)

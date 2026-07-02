@@ -30,6 +30,49 @@ public enum DeltaAppPreferenceKeys {
     public static let showsMenuBarExtra = "Delta.showsMenuBarExtra"
     public static let updateCheckIntervalSeconds = "Delta.updateCheckIntervalSeconds"
     public static let verifiesRestoresByDefault = "Delta.verifiesRestoresByDefault"
+
+    public static let backupProfileDefaults = [
+        defaultProfileCatchUpMissedRuns,
+        defaultProfileRunOnBattery,
+        defaultProfileRunInLowPowerMode,
+        defaultProfilePruneAfterForget,
+        defaultProfileCheckAfterPrune,
+        defaultProfileUploadLimitKiB,
+        defaultProfileDownloadLimitKiB,
+        defaultProfileKeepHourly,
+        defaultProfileKeepDaily,
+        defaultProfileKeepWeekly,
+        defaultProfileKeepMonthly,
+        defaultProfileKeepYearly,
+        defaultProfileMaintenanceEnabled,
+        defaultProfileMaintenanceIntervalDays,
+        defaultProfileMaintenanceHour,
+        defaultProfileMaintenanceMinute
+    ]
+
+    public static let restoreDefaults = [
+        previewsRestoresByDefault,
+        verifiesRestoresByDefault,
+        defaultRestoreConflictPolicy
+    ]
+
+    public static let healthMonitoring = [
+        backupFreshnessWarningHours,
+        destinationVerificationWarningHours
+    ]
+
+    public static let appBehavior = [
+        activityLogDetail,
+        operationalHistoryRetentionDays,
+        pausesScheduledBackups,
+        preventsIdleSleepDuringJobs,
+        sendsJobNotifications,
+        sendsSuccessfulBackupNotifications,
+        showsMenuBarExtra,
+        updateCheckIntervalSeconds
+    ]
+
+    public static let all = backupProfileDefaults + restoreDefaults + healthMonitoring + appBehavior
 }
 
 public enum DeltaAppPreferences {

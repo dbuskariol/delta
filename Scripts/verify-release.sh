@@ -242,6 +242,7 @@ if [[ "$SECRET_BRIDGE_EXTRA_STATUS" -ne 64 || "$SECRET_BRIDGE_EXTRA_OUTPUT" != *
 fi
 "$ROOT_DIR/Scripts/run-installed-keychain-access-acceptance.sh" "$ROOT_DIR/dist/Delta.app"
 "$ROOT_DIR/Scripts/run-installed-diagnostics-acceptance.sh" "$ROOT_DIR/dist/Delta.app"
+"$ROOT_DIR/Scripts/run-installed-preferences-acceptance.sh" "$ROOT_DIR/dist/Delta.app"
 "$ROOT_DIR/Scripts/run-installed-scheduled-agent-acceptance.sh" "$ROOT_DIR/dist/Delta.app"
 
 DELTA_SKIP_BUILD=1 "$ROOT_DIR/Scripts/package-update.sh"
