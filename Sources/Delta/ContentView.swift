@@ -1522,9 +1522,9 @@ struct SettingsView: View {
                     ) {
                         SettingsDescription(text: BackgroundBackupServicePresentation.purposeText)
                         SettingsCapabilityList(items: [
-                            SettingsCapability(symbol: "checkmark.seal", title: "Approved by macOS", detail: "macOS approves Delta's bundled scheduler in Login Items before unattended runs are allowed."),
+                            SettingsCapability(symbol: "checkmark.seal", title: "Approved by macOS", detail: "macOS approves Delta's scheduled-backup service in Login Items before unattended runs are allowed."),
                             SettingsCapability(symbol: "moon.zzz", title: "Runs while Delta is closed", detail: "Scheduled profiles can run after sign-in without keeping the main window open."),
-                            SettingsCapability(symbol: "person.crop.circle", title: "No admin privileges", detail: "The scheduler runs as your user account with the same file permissions granted to Delta."),
+                            SettingsCapability(symbol: "person.crop.circle", title: "No admin privileges", detail: "The service runs as your user account with the same file permissions granted to Delta."),
                             SettingsCapability(symbol: "bolt.badge.checkmark", title: "Checks policy first", detail: "Battery, Low Power Mode, speed limits, destination availability, and locking are checked before work starts.")
                         ])
                     }
@@ -2288,7 +2288,7 @@ struct SettingsView: View {
                 ])
 
                 ActionLine(
-                    description: "Copy a sanitized report with app, scheduler, destination, profile, and recent job state.",
+                    description: "Copy a sanitized report with app, scheduled-backup, destination, profile, and recent job state.",
                     buttonTitle: "Copy Report",
                     symbol: "doc.on.doc",
                     action: model.copyDiagnosticReport
@@ -4422,7 +4422,10 @@ struct SettingsCard<Content: View>: View {
                         }
                     }
 
-                    content
+                    VStack(alignment: .leading, spacing: 12) {
+                        content
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -4525,6 +4528,9 @@ struct SettingsFactGrid: View {
     }
 }
 
+private let settingsControlRowLabelWidth: CGFloat = 260
+private let settingsControlRowControlWidth: CGFloat = 340
+
 struct SettingsControlRow<Control: View>: View {
     var title: String
     var detail: String
@@ -4539,12 +4545,14 @@ struct SettingsControlRow<Control: View>: View {
     }
 
     private var horizontalLayout: some View {
-        HStack(alignment: .center, spacing: 16) {
+        HStack(alignment: .top, spacing: 18) {
             label
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(width: settingsControlRowLabelWidth, alignment: .leading)
 
             control
-                .frame(width: 320, alignment: .trailing)
+                .frame(width: settingsControlRowControlWidth, alignment: .leading)
+
+            Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -4562,9 +4570,11 @@ struct SettingsControlRow<Control: View>: View {
         VStack(alignment: .leading, spacing: 3) {
             Text(title)
                 .font(.subheadline.weight(.semibold))
+                .lineLimit(2)
             Text(detail)
                 .font(.callout)
                 .foregroundStyle(.secondary)
+                .lineLimit(3)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -4576,14 +4586,15 @@ struct SettingsActionBar<Content: View>: View {
     var body: some View {
         ViewThatFits(in: .horizontal) {
             HStack(spacing: 8) {
+                Spacer(minLength: 0)
                 content
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .trailing)
 
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .trailing, spacing: 8) {
                 content
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .trailing)
         }
         .buttonStyle(.bordered)
         .controlSize(.small)

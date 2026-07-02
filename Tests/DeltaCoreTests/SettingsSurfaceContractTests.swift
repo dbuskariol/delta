@@ -53,7 +53,7 @@ final class SettingsSurfaceContractTests: XCTestCase {
         XCTAssertTrue(SettingsSurfaceContract.requiredManualAcceptanceCoverage.contains("Plain-language Scheduled Backups status"))
         XCTAssertTrue(SettingsSurfaceContract.requiredManualAcceptanceCoverage.contains("Password access repair"))
         XCTAssertTrue(SettingsSurfaceContract.requiredManualAcceptanceCoverage.contains("Compact status summary"))
-        XCTAssertTrue(SettingsSurfaceContract.requiredManualAcceptanceCoverage.contains("Run Due Now scheduler action"))
+        XCTAssertTrue(SettingsSurfaceContract.requiredManualAcceptanceCoverage.contains("Run Due Now scheduled-backup action"))
         XCTAssertTrue(SettingsSurfaceContract.requiredManualAcceptanceCoverage.contains("Expandable Scheduled Backups explanation"))
         XCTAssertTrue(SettingsSurfaceContract.requiredManualAcceptanceCoverage.contains("Sparkle automatic check and download controls"))
         XCTAssertTrue(SettingsSurfaceContract.requiredManualAcceptanceCoverage.contains("Idle-sleep protection"))

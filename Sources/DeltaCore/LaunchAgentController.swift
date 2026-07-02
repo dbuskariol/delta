@@ -17,7 +17,7 @@ public enum LaunchAgentRegistrationStatus: Equatable, Sendable {
         case .enabled: "Ready"
         case .requiresApproval: "Needs Approval"
         case .notRegistered: "Off"
-        case .notFound: "Missing Scheduler"
+        case .notFound: "Needs Reinstall"
         case .unavailable: "Unavailable"
         case .unknown: "Unknown"
         }
@@ -32,7 +32,7 @@ public enum LaunchAgentRegistrationStatus: Equatable, Sendable {
         case .notRegistered:
             return "Turn on Scheduled Backups to run scheduled profiles while Delta is closed."
         case .notFound:
-            return "Delta's scheduler could not be found in the app bundle."
+            return "Delta's scheduled-backup service could not be found in the app bundle."
         case .unavailable:
             return "Scheduled Backups are unavailable on this macOS version."
         case .unknown:

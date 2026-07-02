@@ -116,7 +116,7 @@ public enum SettingsSurfaceContract {
         "Plain-language Scheduled Backups status",
         "Password access repair",
         "Compact status summary",
-        "Run Due Now scheduler action",
+        "Run Due Now scheduled-backup action",
         "Start at Login separate from Scheduled Backups",
         "Sparkle automatic check and download controls",
         "Idle-sleep protection",
@@ -135,6 +135,8 @@ public enum SettingsSurfaceContract {
         "SMAppService" + "Status",
         "raw" + "Value",
         "Background " + "Backups",
+        "Missing " + "Scheduler",
+        "Scheduler",
         "Register",
         "Unregister"
     ]

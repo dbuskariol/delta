@@ -19,6 +19,7 @@ The automated gate must pass before any beta or production build is shipped. It 
 - product-language checks for user-facing app strings and Keychain wording
 - manual acceptance matrix consistency between this document and the generated report source
 - restic command and flag surface
+- external backend parser and credential-policy contract coverage for mounted paths, SFTP, REST, S3-compatible, Backblaze B2, Azure Blob, Google Cloud Storage, OpenStack Swift, rclone, and custom restic URLs
 - real local restic init, backup, incremental backup, full restore, selected restore, dry-run restore without writes, repository check, prune, and post-prune check
 - installed Delta local lifecycle acceptance through the app coordinator, SQLite store, Keychain password command, bundled restic, newest-first restore-point cache, backup browser listing with nested file metadata, full restore, selected folder restore, selected file restore, dry-run restore with no writes, every overwrite policy, destination check, cleanup, post-cleanup check, post-cleanup cache refresh, and saved backup log source/summary evidence
 - warning-free packaged app build

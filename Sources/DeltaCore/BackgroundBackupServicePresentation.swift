@@ -147,7 +147,7 @@ public struct BackgroundBackupServicePresentation: Equatable, Sendable {
         case .notRegistered:
             return "Scheduled backups are off"
         case .notFound:
-            return "Scheduler missing"
+            return "Scheduled backups need reinstall"
         case .unavailable:
             return "Scheduled backups unavailable"
         case .unknown:
@@ -174,9 +174,9 @@ public struct BackgroundBackupServicePresentation: Equatable, Sendable {
         case .notRegistered:
             return "Turn on Scheduled Backups before scheduled profiles can run while the main window is closed."
         case .notFound:
-            return "Delta's signed scheduler is missing from the installed app bundle. Reinstall Delta from the latest build."
+            return "Delta's signed scheduled-backup service is missing from the installed app bundle. Reinstall Delta from the latest build."
         case .unavailable:
-            return "This macOS version cannot run Delta's scheduler."
+            return "This macOS version cannot run Delta's scheduled-backup service."
         case .unknown:
             return "macOS returned an unknown schedule status. Refresh status, then review Login Items if scheduled backups do not run."
         }

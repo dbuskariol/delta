@@ -136,7 +136,7 @@ final class ScheduleAndParserTests: XCTestCase {
         XCTAssertEqual(LaunchAgentRegistrationStatus.enabled.displayName, "Ready")
         XCTAssertEqual(LaunchAgentRegistrationStatus.requiresApproval.displayName, "Needs Approval")
         XCTAssertEqual(LaunchAgentRegistrationStatus.notRegistered.displayName, "Off")
-        XCTAssertEqual(LaunchAgentRegistrationStatus.notFound.displayName, "Missing Scheduler")
+        XCTAssertEqual(LaunchAgentRegistrationStatus.notFound.displayName, "Needs Reinstall")
     }
 
     func testLaunchAgentStatusParserHandlesRawServiceManagementStates() {
@@ -172,7 +172,7 @@ final class ScheduleAndParserTests: XCTestCase {
 
         XCTAssertTrue(text.contains("Scheduled Backups"))
         XCTAssertTrue(text.contains("signed macOS background service"))
-        for forbiddenTerm in ["LaunchAgent", "Launch Agent", "SMAppService", "rawValue", "Register", "Unregister"] {
+        for forbiddenTerm in ["LaunchAgent", "Launch Agent", "SMAppService", "rawValue", "Scheduler", "Register", "Unregister"] {
             XCTAssertFalse(
                 text.localizedCaseInsensitiveContains(forbiddenTerm),
                 "Scheduled backup explanation exposes implementation term: \(forbiddenTerm)"
@@ -234,11 +234,11 @@ final class ScheduleAndParserTests: XCTestCase {
             pausesScheduledBackups: false
         )
 
-        XCTAssertEqual(presentation.statusText, "Missing Scheduler")
-        XCTAssertEqual(presentation.attentionTitle, "Scheduler missing")
+        XCTAssertEqual(presentation.statusText, "Needs Reinstall")
+        XCTAssertEqual(presentation.attentionTitle, "Scheduled backups need reinstall")
         XCTAssertEqual(
             presentation.attentionText,
-            "Delta's signed scheduler is missing from the installed app bundle. Reinstall Delta from the latest build."
+            "Delta's signed scheduled-backup service is missing from the installed app bundle. Reinstall Delta from the latest build."
         )
         XCTAssertEqual(presentation.severity, .blocked)
     }
