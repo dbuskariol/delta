@@ -48,6 +48,23 @@ public struct ResticCommand: Equatable, Sendable {
     ]
 }
 
+public enum ResticCommandValidationError: Error, Equatable, LocalizedError {
+    case missingSnapshotID
+    case missingRestoreTarget
+    case invalidRestorePath(String)
+
+    public var errorDescription: String? {
+        switch self {
+        case .missingSnapshotID:
+            return "Choose a restore point before starting restore."
+        case .missingRestoreTarget:
+            return "Choose a destination folder or restore to original paths before starting restore."
+        case let .invalidRestorePath(path):
+            return "Restore path must be an absolute path inside the restore point: \(path)"
+        }
+    }
+}
+
 public struct ResticExecutableLocator: Sendable {
     public var bundledExecutableName: String
     public var fallbackExecutableName: String
@@ -153,7 +170,12 @@ public struct ResticCommandBuilder: Sendable {
     }
 
     public func restore(request: RestoreRequest, repository: BackupRepository) throws -> ResticCommand {
-        var snapshotArgument = request.snapshotID
+        let snapshotID = request.snapshotID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !snapshotID.isEmpty else {
+            throw ResticCommandValidationError.missingSnapshotID
+        }
+
+        var snapshotArgument = snapshotID
         var subcommand = [
             "restore",
             "--json",
@@ -164,10 +186,11 @@ public struct ResticCommandBuilder: Sendable {
         case .fullSnapshot:
             break
         case let .selectedPaths(paths):
-            if paths.count == 1, let first = paths.first {
-                snapshotArgument = "\(request.snapshotID):\(first)"
+            let normalizedPaths = try Self.normalizedRestorePaths(paths)
+            if normalizedPaths.count == 1, let first = normalizedPaths.first {
+                snapshotArgument = "\(snapshotID):\(first)"
             } else {
-                for path in paths {
+                for path in normalizedPaths {
                     subcommand += ["--include", path]
                 }
             }
@@ -183,7 +206,11 @@ public struct ResticCommandBuilder: Sendable {
 
         switch request.destination {
         case let .chosenFolder(path):
-            subcommand += ["--target", path]
+            let target = Self.normalizedRestoreTarget(path)
+            guard !target.isEmpty else {
+                throw ResticCommandValidationError.missingRestoreTarget
+            }
+            subcommand += ["--target", target]
         case .originalPaths:
             subcommand += ["--target", "/"]
         }
@@ -256,6 +283,47 @@ public struct ResticCommandBuilder: Sendable {
             arguments += ["--limit-download", "\(downloadLimitKiB)"]
         }
         return arguments
+    }
+
+    private static func normalizedRestoreTarget(_ path: String) -> String {
+        let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return ""
+        }
+        return (trimmed as NSString).expandingTildeInPath
+    }
+
+    private static func normalizedRestorePaths(_ paths: [String]) throws -> [String] {
+        var normalized = Set<String>()
+        for path in paths {
+            let normalizedPath = normalizedRestorePath(path)
+            guard !normalizedPath.isEmpty else {
+                continue
+            }
+            guard normalizedPath.hasPrefix("/") else {
+                throw ResticCommandValidationError.invalidRestorePath(path)
+            }
+            normalized.insert(normalizedPath)
+        }
+
+        return normalized
+            .filter { path in
+                !normalized.contains { candidate in
+                    candidate != path && path.hasPrefix(candidate == "/" ? "/" : "\(candidate)/")
+                }
+            }
+            .sorted()
+    }
+
+    private static func normalizedRestorePath(_ path: String) -> String {
+        var trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return ""
+        }
+        while trimmed.count > 1 && trimmed.hasSuffix("/") {
+            trimmed.removeLast()
+        }
+        return trimmed
     }
 
     private func backendOptionArguments(for repository: BackupRepository) -> [String] {

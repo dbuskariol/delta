@@ -532,7 +532,7 @@ struct RestoreView: View {
     }
 
     private var canRestore: Bool {
-        let destinationIsValid = restoreOriginalPaths || !destinationPath.isEmpty
+        let destinationIsValid = restoreOriginalPaths || !destinationPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         let inPlaceIsAcknowledged = !restoreOriginalPaths || dryRun || acknowledgedInPlaceRestore
         return selectedRepository != nil && !snapshotID.isEmpty && destinationIsValid && inPlaceIsAcknowledged
     }
@@ -544,7 +544,7 @@ struct RestoreView: View {
             repositoryID: repository.id,
             snapshotID: snapshotID,
             scope: paths.isEmpty ? .fullSnapshot : .selectedPaths(paths),
-            destination: restoreOriginalPaths ? .originalPaths : .chosenFolder(destinationPath),
+            destination: restoreOriginalPaths ? .originalPaths : .chosenFolder(destinationPath.trimmingCharacters(in: .whitespacesAndNewlines)),
             conflictPolicy: conflictPolicy,
             verifyRestoredFiles: verify,
             dryRun: dryRun,

@@ -139,7 +139,7 @@ The UI starts from the restore point's backed-up source roots and loads one dire
 
 ## Restore
 
-Delta restore commands use:
+Delta trims and validates restore requests before building restic arguments. Restore point IDs must be non-empty, chosen restore targets must be non-empty, and selected restore paths must be absolute paths from the restore point. Duplicate selected paths and children of an already selected parent are collapsed before command construction. Delta restore commands use:
 
 ```text
 restore

@@ -176,6 +176,70 @@ final class ResticCommandTests: XCTestCase {
         XCTAssertTrue(command.arguments.contains("abc123:/Users/me/Documents"))
     }
 
+    func testRestoreCommandNormalizesSelectedPathsAndTarget() throws {
+        let repository = BackupRepository(name: "Local", backend: .local(path: "/repo"))
+        let target = "~/Delta Restore"
+        let request = RestoreRequest(
+            repositoryID: repository.id,
+            snapshotID: " abc123 ",
+            scope: .selectedPaths([
+                " /Users/me/Documents/ ",
+                "/Users/me/Documents/Nested/",
+                "/Users/me/Desktop/"
+            ]),
+            destination: .chosenFolder(" \(target) "),
+            dryRun: true
+        )
+
+        let command = try makeBuilder().restore(request: request, repository: repository)
+        let includeValues = includeArguments(in: command.arguments)
+
+        XCTAssertEqual(includeValues, ["/Users/me/Desktop", "/Users/me/Documents"])
+        XCTAssertFalse(includeValues.contains("/Users/me/Documents/Nested"))
+        XCTAssertTrue(command.arguments.contains((target as NSString).expandingTildeInPath))
+        XCTAssertEqual(command.arguments.last, "abc123")
+    }
+
+    func testRestoreCommandRejectsBlankRestoreTarget() {
+        let repository = BackupRepository(name: "Local", backend: .local(path: "/repo"))
+        let request = RestoreRequest(
+            repositoryID: repository.id,
+            snapshotID: "abc123",
+            destination: .chosenFolder("   ")
+        )
+
+        XCTAssertThrowsError(try makeBuilder().restore(request: request, repository: repository)) { error in
+            XCTAssertEqual(error as? ResticCommandValidationError, .missingRestoreTarget)
+        }
+    }
+
+    func testRestoreCommandRejectsRelativeSelectedPath() {
+        let repository = BackupRepository(name: "Local", backend: .local(path: "/repo"))
+        let request = RestoreRequest(
+            repositoryID: repository.id,
+            snapshotID: "abc123",
+            scope: .selectedPaths(["Users/me/Documents"]),
+            destination: .chosenFolder("/tmp/restore")
+        )
+
+        XCTAssertThrowsError(try makeBuilder().restore(request: request, repository: repository)) { error in
+            XCTAssertEqual(error as? ResticCommandValidationError, .invalidRestorePath("Users/me/Documents"))
+        }
+    }
+
+    func testRestoreCommandRejectsBlankSnapshotID() {
+        let repository = BackupRepository(name: "Local", backend: .local(path: "/repo"))
+        let request = RestoreRequest(
+            repositoryID: repository.id,
+            snapshotID: " ",
+            destination: .chosenFolder("/tmp/restore")
+        )
+
+        XCTAssertThrowsError(try makeBuilder().restore(request: request, repository: repository)) { error in
+            XCTAssertEqual(error as? ResticCommandValidationError, .missingSnapshotID)
+        }
+    }
+
     func testListSnapshotEntriesCommandUsesResticJSONAndDirectoryFilter() throws {
         let repository = BackupRepository(name: "Local", backend: .local(path: "/repo"))
 
@@ -349,6 +413,15 @@ final class ResticCommandTests: XCTestCase {
             resticExecutableURL: URL(fileURLWithPath: "/usr/bin/restic"),
             secretBridgeURL: URL(fileURLWithPath: "/Applications/Delta.app/Contents/MacOS/DeltaSecretBridge")
         )
+    }
+
+    private func includeArguments(in arguments: [String]) -> [String] {
+        arguments.indices.compactMap { index in
+            guard arguments[index] == "--include", arguments.indices.contains(index + 1) else {
+                return nil
+            }
+            return arguments[index + 1]
+        }
     }
 }
 
