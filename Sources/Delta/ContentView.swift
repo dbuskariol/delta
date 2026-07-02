@@ -1044,6 +1044,30 @@ struct SettingsView: View {
         store: DeltaAppPreferences.sharedStore()
     ) private var defaultProfileCheckAfterPrune = true
     @AppStorage(
+        DeltaAppPreferenceKeys.defaultProfileUploadLimitKiB,
+        store: DeltaAppPreferences.sharedStore()
+    ) private var defaultProfileUploadLimitKiB = 0
+    @AppStorage(
+        DeltaAppPreferenceKeys.defaultProfileDownloadLimitKiB,
+        store: DeltaAppPreferences.sharedStore()
+    ) private var defaultProfileDownloadLimitKiB = 0
+    @AppStorage(
+        DeltaAppPreferenceKeys.defaultProfileMaintenanceEnabled,
+        store: DeltaAppPreferences.sharedStore()
+    ) private var defaultProfileMaintenanceEnabled = true
+    @AppStorage(
+        DeltaAppPreferenceKeys.defaultProfileMaintenanceIntervalDays,
+        store: DeltaAppPreferences.sharedStore()
+    ) private var defaultProfileMaintenanceIntervalDays = 7
+    @AppStorage(
+        DeltaAppPreferenceKeys.defaultProfileMaintenanceHour,
+        store: DeltaAppPreferences.sharedStore()
+    ) private var defaultProfileMaintenanceHour = 2
+    @AppStorage(
+        DeltaAppPreferenceKeys.defaultProfileMaintenanceMinute,
+        store: DeltaAppPreferences.sharedStore()
+    ) private var defaultProfileMaintenanceMinute = 0
+    @AppStorage(
         DeltaAppPreferenceKeys.sendsJobNotifications,
         store: DeltaAppPreferences.sharedStore()
     ) private var sendsJobNotifications = false
@@ -1094,19 +1118,19 @@ struct SettingsView: View {
             SettingsStatusGrid(items: settingsStatusItems)
 
             SettingsSectionLabel(
-                title: "Scheduled Backups",
-                subtitle: "Run due backups even when the main Delta window is closed."
+                title: "Background Backups",
+                subtitle: "Let scheduled profiles run without keeping the main Delta window open."
             )
 
             SettingsCard(
                 symbol: "clock.badge.checkmark",
-                title: "Background Scheduling",
-                subtitle: "Run scheduled backup profiles while Delta's window is closed.",
+                title: "Background Backups",
+                subtitle: "A signed macOS Login Item checks schedules, starts due backups, then exits.",
                 statusText: backgroundBackupsStatusText,
                 statusColor: backgroundBackupsStatusColor
             ) {
                 SettingsControlRow(
-                    title: "Allow background scheduling",
+                    title: "Run scheduled backups in background",
                     detail: backgroundBackupsControlDetail
                 ) {
                     Toggle("", isOn: backgroundBackupsBinding)
@@ -1116,8 +1140,8 @@ struct SettingsView: View {
 
                 SettingsNotice(
                     symbol: "clock.arrow.circlepath",
-                    title: "What this does",
-                    text: "Delta uses macOS Login Items to install a signed per-user scheduler. It wakes for short checks, starts due backups when policy allows it, then exits. It is not an admin service and it does not need the main window to stay open.",
+                    title: "How it works",
+                    text: "macOS runs Delta's signed per-user helper for short schedule checks. It runs as you, never as an admin service, and scheduled backups continue even after the main window is closed.",
                     color: .blue
                 )
 
@@ -1140,7 +1164,7 @@ struct SettingsView: View {
                     SettingsNotice(
                         symbol: "calendar.badge.plus",
                         title: "No scheduled profiles",
-                        text: "Create an hourly, daily, weekly, monthly, or custom scheduled backup profile before this background scheduler is needed.",
+                        text: "Create an hourly, daily, weekly, monthly, or custom scheduled backup profile before background backups are needed.",
                         color: .secondary
                     )
                 }
@@ -1151,7 +1175,7 @@ struct SettingsView: View {
                     } label: {
                         Label("Open Login Items", systemImage: "gearshape")
                     }
-                    .deltaTooltip("Open macOS Login Items to approve or inspect Delta's background scheduler.")
+                    .deltaTooltip("Open macOS Login Items to approve or inspect Delta's background backups.")
                     Button {
                         model.reload()
                     } label: {
@@ -1164,7 +1188,7 @@ struct SettingsView: View {
                         Label("Repair Password Access", systemImage: "key")
                     }
                     .disabled(model.repositories.isEmpty || model.isWorking || !model.isPersistentStoreAvailable)
-                    .deltaTooltip("Refresh saved destination passwords so scheduled backups can read them without interactive Keychain prompts.")
+                    .deltaTooltip("Refresh saved destination passwords so background backups can read them without interactive Keychain prompts.")
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
@@ -1253,11 +1277,11 @@ struct SettingsView: View {
                 SettingsFactGrid(items: [
                     SettingsFact(title: "Menu bar", value: showsMenuBarExtra ? "Shown" : "Hidden"),
                     SettingsFact(title: "Start at login", value: appLoginItemStatusText),
-                    SettingsFact(title: "Scheduled backups", value: "Separate")
+                    SettingsFact(title: "Background backups", value: "Separate")
                 ])
 
                 SettingsDescription(
-                    text: "Start at login opens Delta for convenience. Background Scheduling above is what actually runs scheduled backups when the window is closed."
+                    text: "Start at login opens Delta for convenience. Background Backups above are what actually run scheduled backups when the window is closed."
                 )
 
                 if model.appLoginItemStatus == .requiresApproval {
@@ -1402,10 +1426,46 @@ struct SettingsView: View {
                         .toggleStyle(.switch)
                 }
 
+                SettingsControlRow(
+                    title: "Default speed limits",
+                    detail: "Optional upload and download caps for new profiles. Leave blank for unlimited."
+                ) {
+                    HStack(spacing: 8) {
+                        TextField("Upload KiB/s", text: defaultUploadLimitBinding)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 112)
+                        TextField("Download KiB/s", text: defaultDownloadLimitBinding)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 128)
+                    }
+                }
+
+                SettingsControlRow(
+                    title: "Automatic cleanup",
+                    detail: "Create new profiles with scheduled cleanup for old restore points."
+                ) {
+                    Toggle("", isOn: $defaultProfileMaintenanceEnabled)
+                        .labelsHidden()
+                        .toggleStyle(.switch)
+                }
+
+                SettingsControlRow(
+                    title: "Cleanup cadence",
+                    detail: "How often new profiles should free unneeded data and run post-cleanup checks."
+                ) {
+                    HStack(spacing: 10) {
+                        Stepper("Every \(defaultProfileMaintenanceIntervalDays)d", value: $defaultProfileMaintenanceIntervalDays, in: 1...90)
+                            .frame(width: 130, alignment: .leading)
+                        TimeControls(hour: $defaultProfileMaintenanceHour, minute: $defaultProfileMaintenanceMinute)
+                    }
+                    .disabled(!defaultProfileMaintenanceEnabled)
+                }
+
                 SettingsFactGrid(items: [
                     SettingsFact(title: "Schedule", value: "Daily 20:00"),
                     SettingsFact(title: "Retention", value: "24h / 30d / 12w / 12m"),
-                    SettingsFact(title: "Bandwidth", value: "Unlimited"),
+                    SettingsFact(title: "Bandwidth", value: defaultBandwidthSummary),
+                    SettingsFact(title: "Cleanup", value: defaultCleanupSummary),
                     SettingsFact(title: "Destination locks", value: "Automatic"),
                     SettingsFact(title: "Backup type", value: "Incremental"),
                     SettingsFact(title: "Existing profiles", value: "Unchanged")
@@ -1640,6 +1700,7 @@ struct SettingsView: View {
         .onAppear {
             automaticallyChecksForUpdates = softwareUpdateController.automaticallyChecksForUpdates
             activityLogDetailRawValue = activityLogDetail.rawValue
+            normalizeBackupDefaults()
             normalizeRestorePreferences()
             applyUpdatePreferences()
             refreshNotificationAuthorization()
@@ -1741,15 +1802,15 @@ struct SettingsView: View {
         case .requiresApproval:
             return "macOS approval required"
         case .notRegistered:
-            return "Background scheduling is off"
+            return "Background backups are off"
         case .notFound:
-            return "Background scheduler missing"
+            return "Background helper missing"
         case .unavailable:
-            return "Background scheduling unavailable"
+            return "Background backups unavailable"
         case .unknown:
-            return "Unknown scheduler status"
+            return "Unknown background status"
         case .enabled:
-            return "Background scheduling ready"
+            return "Background backups ready"
         }
     }
 
@@ -1758,13 +1819,13 @@ struct SettingsView: View {
         case .requiresApproval:
             return "Approve Delta in Login Items before scheduled backups can run while the main window is closed."
         case .notRegistered:
-            return "Turn on background scheduling before scheduled profiles can run while the main window is closed."
+            return "Turn on Background Backups before scheduled profiles can run while the main window is closed."
         case .notFound:
-            return "The signed scheduler is missing from the installed app bundle. Reinstall Delta from the latest build."
+            return "The signed background helper is missing from the installed app bundle. Reinstall Delta from the latest build."
         case .unavailable:
-            return "This macOS version cannot run Delta's background scheduler."
+            return "This macOS version cannot run Delta's background backup helper."
         case let .unknown(rawValue):
-            return "macOS returned an unknown background scheduling status: \(rawValue)"
+            return "macOS returned an unknown background backup status: \(rawValue)"
         case .enabled:
             return "Scheduled backups can run while the main window is closed."
         }
@@ -1882,6 +1943,12 @@ struct SettingsView: View {
             || defaultProfileRunInLowPowerMode
             || !defaultProfilePruneAfterForget
             || !defaultProfileCheckAfterPrune
+            || defaultProfileUploadLimitKiB > 0
+            || defaultProfileDownloadLimitKiB > 0
+            || !defaultProfileMaintenanceEnabled
+            || defaultProfileMaintenanceIntervalDays != 7
+            || defaultProfileMaintenanceHour != 2
+            || defaultProfileMaintenanceMinute != 0
             ? "Custom"
             : "Recommended"
     }
@@ -1943,6 +2010,40 @@ struct SettingsView: View {
         return "Backup engines missing"
     }
 
+    private var defaultUploadLimitBinding: Binding<String> {
+        Binding(
+            get: { defaultProfileUploadLimitKiB > 0 ? String(defaultProfileUploadLimitKiB) : "" },
+            set: { defaultProfileUploadLimitKiB = normalizedOptionalPositiveInteger(from: $0, maximum: 1_048_576) }
+        )
+    }
+
+    private var defaultDownloadLimitBinding: Binding<String> {
+        Binding(
+            get: { defaultProfileDownloadLimitKiB > 0 ? String(defaultProfileDownloadLimitKiB) : "" },
+            set: { defaultProfileDownloadLimitKiB = normalizedOptionalPositiveInteger(from: $0, maximum: 1_048_576) }
+        )
+    }
+
+    private var defaultBandwidthSummary: String {
+        switch (defaultProfileUploadLimitKiB, defaultProfileDownloadLimitKiB) {
+        case let (upload, download) where upload > 0 && download > 0:
+            return "Up \(upload) / Down \(download)"
+        case let (upload, _) where upload > 0:
+            return "Upload \(upload)"
+        case let (_, download) where download > 0:
+            return "Download \(download)"
+        default:
+            return "Unlimited"
+        }
+    }
+
+    private var defaultCleanupSummary: String {
+        guard defaultProfileMaintenanceEnabled else {
+            return "Manual"
+        }
+        return "Every \(defaultProfileMaintenanceIntervalDays)d at \(twoDigit(defaultProfileMaintenanceHour)):\(twoDigit(defaultProfileMaintenanceMinute))"
+    }
+
     private func applyUpdatePreferences() {
         let interval = AppUpdateCheckInterval.normalized(updateCheckIntervalSeconds)
         if updateCheckIntervalSeconds != interval.rawValue {
@@ -1958,12 +2059,26 @@ struct SettingsView: View {
         }
     }
 
+    private func normalizeBackupDefaults() {
+        defaultProfileUploadLimitKiB = clamped(defaultProfileUploadLimitKiB, to: 0...1_048_576)
+        defaultProfileDownloadLimitKiB = clamped(defaultProfileDownloadLimitKiB, to: 0...1_048_576)
+        defaultProfileMaintenanceIntervalDays = clamped(defaultProfileMaintenanceIntervalDays, to: 1...90)
+        defaultProfileMaintenanceHour = clamped(defaultProfileMaintenanceHour, to: 0...23)
+        defaultProfileMaintenanceMinute = clamped(defaultProfileMaintenanceMinute, to: 0...59)
+    }
+
     private func resetBackupDefaults() {
         defaultProfileCatchUpMissedRuns = true
         defaultProfileRunOnBattery = true
         defaultProfileRunInLowPowerMode = false
         defaultProfilePruneAfterForget = true
         defaultProfileCheckAfterPrune = true
+        defaultProfileUploadLimitKiB = 0
+        defaultProfileDownloadLimitKiB = 0
+        defaultProfileMaintenanceEnabled = true
+        defaultProfileMaintenanceIntervalDays = 7
+        defaultProfileMaintenanceHour = 2
+        defaultProfileMaintenanceMinute = 0
     }
 
     private func resetRestoreDefaults() {
@@ -1988,6 +2103,22 @@ struct SettingsView: View {
                 model.alertMessage = "Delta cannot send notifications until they are allowed in macOS Notifications settings."
             }
         }
+    }
+
+    private func normalizedOptionalPositiveInteger(from text: String, maximum: Int) -> Int {
+        let digits = text.filter(\.isNumber)
+        guard let value = Int(digits), value > 0 else {
+            return 0
+        }
+        return min(value, maximum)
+    }
+
+    private func clamped(_ value: Int, to range: ClosedRange<Int>) -> Int {
+        min(max(value, range.lowerBound), range.upperBound)
+    }
+
+    private func twoDigit(_ value: Int) -> String {
+        String(format: "%02d", value)
     }
 
     private var backgroundBackupsStatusColor: Color {
@@ -3302,8 +3433,7 @@ struct SettingsStatusGrid: View {
 
     private var columns: [GridItem] {
         [
-            GridItem(.flexible(minimum: 190), spacing: 12),
-            GridItem(.flexible(minimum: 190), spacing: 12)
+            GridItem(.adaptive(minimum: 150), spacing: 10)
         ]
     }
 }
@@ -3312,34 +3442,32 @@ struct SettingsStatusTile: View {
     var item: SettingsStatusItem
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .top, spacing: 10) {
-                Image(systemName: item.symbol)
-                    .font(.system(size: 14, weight: .semibold))
-                    .frame(width: 28, height: 28)
-                    .foregroundStyle(item.color)
-                    .background(item.color.opacity(0.14))
-                    .clipShape(RoundedRectangle(cornerRadius: 7))
+        HStack(alignment: .center, spacing: 10) {
+            Image(systemName: item.symbol)
+                .font(.system(size: 13, weight: .semibold))
+                .frame(width: 26, height: 26)
+                .foregroundStyle(item.color)
+                .background(item.color.opacity(0.14))
+                .clipShape(RoundedRectangle(cornerRadius: 7))
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(item.title)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                    Text(item.value)
-                        .font(.headline)
-                        .lineLimit(1)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(item.title)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                Text(item.value)
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+                Text(item.detail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
-
-            Text(item.detail)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(2)
-                .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, minHeight: 112, alignment: .topLeading)
+        .padding(.vertical, 10)
+        .padding(.horizontal, 12)
+        .frame(maxWidth: .infinity, minHeight: 70, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 8)
                 .fill(DeltaTheme.panel)

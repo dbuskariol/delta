@@ -57,10 +57,10 @@ append_command "Code Signature Verification" /usr/bin/codesign --verify --strict
 append_command "Code Signature Details" /usr/bin/codesign -dv "$APP_PATH"
 append_command "Gatekeeper Assessment" /usr/sbin/spctl --assess --type execute --verbose=4 "$APP_PATH"
 append_command "Stapled Notarization Ticket" /usr/bin/stapler validate "$APP_PATH"
-append_command "Background Scheduling Helper Status" "$APP_PATH/Contents/MacOS/DeltaAgent" --status
-append_command "Background Scheduling Helper Dry Run" "$APP_PATH/Contents/MacOS/DeltaAgent" --dry-run
+append_command "Background Backups Helper Status" "$APP_PATH/Contents/MacOS/DeltaAgent" --status
+append_command "Background Backups Helper Dry Run" "$APP_PATH/Contents/MacOS/DeltaAgent" --dry-run
 ISOLATED_AGENT_SUPPORT="$(/usr/bin/mktemp -d -t delta-agent-support.XXXXXX)"
-append_command "Background Scheduling Isolated Due-Run" /bin/sh -c "DELTA_APP_SUPPORT_DIR='$ISOLATED_AGENT_SUPPORT' '$APP_PATH/Contents/MacOS/DeltaAgent' && test -f '$ISOLATED_AGENT_SUPPORT/Delta.sqlite'"
+append_command "Background Backups Isolated Due-Run" /bin/sh -c "DELTA_APP_SUPPORT_DIR='$ISOLATED_AGENT_SUPPORT' '$APP_PATH/Contents/MacOS/DeltaAgent' && test -f '$ISOLATED_AGENT_SUPPORT/Delta.sqlite'"
 /bin/rm -rf "$ISOLATED_AGENT_SUPPORT"
 append_command "Bundled Backup Engine" "$APP_PATH/Contents/MacOS/restic" version
 append_command "Bundled Cloud Helper" "$APP_PATH/Contents/MacOS/rclone" version
@@ -80,7 +80,7 @@ Record tester, date, macOS build, signing identity, and notes beside each item b
 | Install identity and privacy stability | Not run | |
 | Settings surface | Not run | |
 | Full Disk Access | Not run | |
-| Background Scheduling and Login Items approval | Not run | |
+| Background Backups and Login Items approval | Not run | |
 | Keychain background access without prompts | Not run | |
 | Local or external drive destination | Not run | |
 | Mounted SMB or NFS destination | Not run | |

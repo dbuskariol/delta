@@ -28,7 +28,7 @@ UI_STRING_VIOLATIONS="$(
 
 if [[ -n "$UI_STRING_VIOLATIONS" ]]; then
   printf "%s" "$UI_STRING_VIOLATIONS"
-  printf "User-facing app strings must use Delta product language: Destinations, Restore Points, and Background Scheduling.\n" >&2
+  printf "User-facing app strings must use Delta product language: Destinations, Restore Points, and Background Backups.\n" >&2
   exit 1
 fi
 

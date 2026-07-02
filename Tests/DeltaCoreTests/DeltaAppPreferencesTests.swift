@@ -125,8 +125,14 @@ final class DeltaAppPreferencesTests: XCTestCase {
             XCTAssertTrue(schedule.catchUpMissedRuns)
             XCTAssertTrue(schedule.runOnBattery)
             XCTAssertFalse(schedule.runInLowPowerMode)
+            XCTAssertNil(schedule.uploadLimitKiB)
+            XCTAssertNil(schedule.downloadLimitKiB)
             XCTAssertTrue(retention.pruneAfterForget)
             XCTAssertTrue(retention.checkAfterPrune)
+            XCTAssertTrue(retention.maintenanceSchedule.isEnabled)
+            XCTAssertEqual(retention.maintenanceSchedule.intervalDays, 7)
+            XCTAssertEqual(retention.maintenanceSchedule.hour, 2)
+            XCTAssertEqual(retention.maintenanceSchedule.minute, 0)
         }
     }
 
@@ -137,6 +143,12 @@ final class DeltaAppPreferencesTests: XCTestCase {
             sharedSuite?.set(true, forKey: DeltaAppPreferenceKeys.defaultProfileRunInLowPowerMode)
             sharedSuite?.set(false, forKey: DeltaAppPreferenceKeys.defaultProfilePruneAfterForget)
             sharedSuite?.set(false, forKey: DeltaAppPreferenceKeys.defaultProfileCheckAfterPrune)
+            sharedSuite?.set(1_024, forKey: DeltaAppPreferenceKeys.defaultProfileUploadLimitKiB)
+            sharedSuite?.set(2_048, forKey: DeltaAppPreferenceKeys.defaultProfileDownloadLimitKiB)
+            sharedSuite?.set(false, forKey: DeltaAppPreferenceKeys.defaultProfileMaintenanceEnabled)
+            sharedSuite?.set(14, forKey: DeltaAppPreferenceKeys.defaultProfileMaintenanceIntervalDays)
+            sharedSuite?.set(3, forKey: DeltaAppPreferenceKeys.defaultProfileMaintenanceHour)
+            sharedSuite?.set(30, forKey: DeltaAppPreferenceKeys.defaultProfileMaintenanceMinute)
 
             let schedule = BackupProfileDefaults.schedule()
             let retention = BackupProfileDefaults.retention()
@@ -144,8 +156,33 @@ final class DeltaAppPreferencesTests: XCTestCase {
             XCTAssertFalse(schedule.catchUpMissedRuns)
             XCTAssertFalse(schedule.runOnBattery)
             XCTAssertTrue(schedule.runInLowPowerMode)
+            XCTAssertEqual(schedule.uploadLimitKiB, 1_024)
+            XCTAssertEqual(schedule.downloadLimitKiB, 2_048)
             XCTAssertFalse(retention.pruneAfterForget)
             XCTAssertFalse(retention.checkAfterPrune)
+            XCTAssertFalse(retention.maintenanceSchedule.isEnabled)
+            XCTAssertEqual(retention.maintenanceSchedule.intervalDays, 14)
+            XCTAssertEqual(retention.maintenanceSchedule.hour, 3)
+            XCTAssertEqual(retention.maintenanceSchedule.minute, 30)
+        }
+    }
+
+    func testBackupProfileDefaultsNormalizeStoredMaintenanceValues() {
+        withClearedBackupProfileDefaults {
+            sharedSuite?.set(-1, forKey: DeltaAppPreferenceKeys.defaultProfileUploadLimitKiB)
+            sharedSuite?.set(0, forKey: DeltaAppPreferenceKeys.defaultProfileDownloadLimitKiB)
+            sharedSuite?.set(0, forKey: DeltaAppPreferenceKeys.defaultProfileMaintenanceIntervalDays)
+            sharedSuite?.set(99, forKey: DeltaAppPreferenceKeys.defaultProfileMaintenanceHour)
+            sharedSuite?.set(-12, forKey: DeltaAppPreferenceKeys.defaultProfileMaintenanceMinute)
+
+            let schedule = BackupProfileDefaults.schedule()
+            let retention = BackupProfileDefaults.retention()
+
+            XCTAssertNil(schedule.uploadLimitKiB)
+            XCTAssertNil(schedule.downloadLimitKiB)
+            XCTAssertEqual(retention.maintenanceSchedule.intervalDays, 1)
+            XCTAssertEqual(retention.maintenanceSchedule.hour, 23)
+            XCTAssertEqual(retention.maintenanceSchedule.minute, 0)
         }
     }
 
@@ -155,7 +192,13 @@ final class DeltaAppPreferencesTests: XCTestCase {
             DeltaAppPreferenceKeys.defaultProfileRunOnBattery,
             DeltaAppPreferenceKeys.defaultProfileRunInLowPowerMode,
             DeltaAppPreferenceKeys.defaultProfilePruneAfterForget,
-            DeltaAppPreferenceKeys.defaultProfileCheckAfterPrune
+            DeltaAppPreferenceKeys.defaultProfileCheckAfterPrune,
+            DeltaAppPreferenceKeys.defaultProfileUploadLimitKiB,
+            DeltaAppPreferenceKeys.defaultProfileDownloadLimitKiB,
+            DeltaAppPreferenceKeys.defaultProfileMaintenanceEnabled,
+            DeltaAppPreferenceKeys.defaultProfileMaintenanceIntervalDays,
+            DeltaAppPreferenceKeys.defaultProfileMaintenanceHour,
+            DeltaAppPreferenceKeys.defaultProfileMaintenanceMinute
         ]
         let standardValues = keys.reduce(into: [String: Any]()) { values, key in
             values[key] = UserDefaults.standard.object(forKey: key)

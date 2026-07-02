@@ -33,7 +33,7 @@ cat > "${ARCHIVE%.zip}.md" <<EOF
 # Delta $SHORT_VERSION Beta
 
 - Encrypted backup destinations
-- Background Scheduling for scheduled backups
+- Background Backups for scheduled backups
 - Local drives, mounted network drives, and cloud destinations
 - Full and selected-path restore
 - Saved per-job backup and restore logs

@@ -14,15 +14,15 @@ The product goal is simple: make serious backup practices approachable without h
 - **Destination validation before save** for required fields, new or changed writable local paths, REST URLs, SFTP paths/ports, S3 endpoint/bucket fields, and rclone remote syntax.
 - **Non-interactive SFTP scheduling** with optional SSH private-key file configuration, SSH batch mode, and keepalive options so scheduled jobs fail clearly instead of waiting for password prompts.
 - **Automatic destination preparation** after a destination is added, with a first-backup safety net for writable local/mounted destinations and unverified remote destinations that still have no encrypted backup metadata.
-- **Scheduled backups** through Background Scheduling, a signed macOS Login Item helper registered with `SMAppService`, with helper-started jobs reflected back into the app and menu bar.
+- **Scheduled backups** through Background Backups, a signed macOS Login Item helper registered with `SMAppService`, with helper-started jobs reflected back into the app and menu bar.
 - **Power-aware scheduling** with battery and Low Power Mode controls.
 - **Retention maintenance** with scheduled forget/prune/check windows.
-- **Pause, resume, and cancel controls** for active backups from the main window and macOS menu bar, including scheduled jobs started by Background Scheduling. Pause stops restic safely, keeps the profile visibly paused, and Resume continues from already saved backup data.
+- **Pause, resume, and cancel controls** for active backups from the main window and macOS menu bar, including scheduled jobs started by Background Backups. Pause stops restic safely, keeps the profile visibly paused, and Resume continues from already saved backup data.
 - **Clear backup summaries** showing new, changed, unchanged, added, and checked data for each backup run.
 - **Notification Center alerts** for failed or warning jobs, with optional successful-backup summaries. The signed background helper uses the same notification policy for scheduled runs.
 - **Full or browsed selected restore** with backup browsing, file/folder selection, configurable dry-run and verification defaults, overwrite policies, original-path restore, chosen-folder restore, and optional pre-restore backup.
 - **Streaming and saved backup logs** from restic stdout/stderr with source context, stable processed-file counters, clean change summaries, fixed-height live panes, and expandable per-job audit history.
-- **Settings and diagnostics** with a top health summary for system access, schedules, updates, notifications, and bundled backup tools, plus controls for new-backup defaults, restore safety defaults, menu bar visibility, start-at-login, Activity log detail, app version, helper status, tool paths, profile/destination counts, recent jobs, and local support paths.
+- **Settings and diagnostics** with a compact health summary for system access, schedules, updates, notifications, and bundled backup tools, plus controls for new-backup defaults, restore safety defaults, menu bar visibility, start-at-login, Activity log detail, app version, helper status, tool paths, profile/destination counts, recent jobs, and local support paths.
 - **Sparkle automatic updates** with generated appcast/update archive support.
 
 ## How It Works
@@ -55,7 +55,7 @@ Delta intentionally uses user-facing language instead of restic internals:
 The app is split into signed targets:
 
 - `Delta`: SwiftUI macOS app, menu bar item, settings, backup/restore UI, Sparkle update controller.
-- `DeltaAgent`: signed Background Scheduling Login Item helper for scheduled runs.
+- `DeltaAgent`: signed Background Backups Login Item helper for scheduled runs.
 - `DeltaSecretBridge`: CLI password bridge used by restic `--password-command`.
 - `DeltaCore`: shared models, database, command builder, scheduling, restic runner, parser, Keychain, bookmarks, locks, job logs, and policy code.
 
@@ -73,7 +73,7 @@ Important implementation details:
 - **Per-destination locks** prevent overlapping backup, restore, prune, and check jobs across app/agent processes.
 - **Per-job output logs** persist formatted restic progress, warnings, errors, start lines, and finish lines for troubleshooting after relaunch or scheduled agent runs.
 - **Compact backup summaries** persist structured new/changed/unchanged/add/check counts on job records without storing full restic stdout in the job message.
-- **Notification policy** is shared by the app and Background Scheduling helper. Failure and warning alerts are opt-in; successful backup summaries require a second opt-in to avoid alert fatigue.
+- **Notification policy** is shared by the app and Background Backups helper. Failure and warning alerts are opt-in; successful backup summaries require a second opt-in to avoid alert fatigue.
 - **Durable run controls** let the app request pause/cancel for an agent-owned restic process without relying on in-memory UI state.
 - **Abandoned-job recovery** marks stale running jobs interrupted after restart only when the per-destination lock proves no restic process still owns the destination.
 - **Bundled tools** are pinned and checksum-verified through `Scripts/bootstrap-tools.sh`.
@@ -101,13 +101,13 @@ Custom-folder profiles use the selected source folders and stored security-scope
 
 Each profile keeps Delta's default macOS-safe excludes and can add extra restic exclude patterns. Extra excludes are saved with the profile and passed to restic as additional `--exclude` arguments.
 
-Settings include app-level defaults for newly-created backup profiles: missed-run catchup, battery policy, Low Power Mode policy, cleanup space reclamation, and cleanup verification. Those defaults seed new profiles only. Existing profiles keep their own schedule, power, bandwidth, retention, and maintenance settings until edited.
+Settings include app-level defaults for newly-created backup profiles: missed-run catchup, battery policy, Low Power Mode policy, optional bandwidth limits, cleanup space reclamation, cleanup verification, and cleanup cadence. Those defaults seed new profiles only. Existing profiles keep their own schedule, power, bandwidth, retention, and maintenance settings until edited.
 
 ## Scheduling And Maintenance
 
-Background Scheduling lets scheduled profiles run while the main Delta window is closed. The macOS implementation is `DeltaAgent`, a signed Login Item helper registered through `SMAppService` and implemented as a per-user LaunchAgent. In user-facing UI, Delta presents this as Background Scheduling because LaunchAgent is the macOS scheduling mechanism, not a user-facing product feature. It runs as the signed-in user, not as a privileged admin helper, wakes for short schedule checks, starts due backups when policy allows it, then exits.
+Background Backups let scheduled profiles run while the main Delta window is closed. The macOS implementation is `DeltaAgent`, a signed Login Item helper registered through `SMAppService` and implemented as a per-user LaunchAgent. In user-facing UI, Delta presents this as Background Backups because LaunchAgent is the macOS scheduling mechanism, not a product feature. It runs as the signed-in user, not as a privileged admin helper, wakes for short schedule checks, starts due backups when policy allows it, then exits.
 
-On each check, Background Scheduling evaluates:
+On each check, Background Backups evaluate:
 
 - backup schedule: hourly, daily, weekly, monthly, or custom interval
 - missed-run catchup policy
@@ -118,11 +118,11 @@ On each check, Background Scheduling evaluates:
 - per-destination lock state
 - scheduled retention maintenance
 
-When an enabled scheduled profile is saved, Delta requests Background Scheduling registration automatically. If macOS still requires approval, Delta shows an action-needed scheduled-backup card on the dashboard and a detailed status in Settings. macOS may require manual approval in Login Items; apps cannot approve their own background items.
+When an enabled scheduled profile is saved, Delta requests Background Backups registration automatically. If macOS still requires approval, Delta shows an action-needed scheduled-backup card on the dashboard and a detailed status in Settings. macOS may require manual approval in Login Items; apps cannot approve their own background items.
 
-The visible menu bar dropdown and Start at Login setting are separate from Background Scheduling. Users can show or hide the menu bar item and choose whether Delta opens after sign-in without changing scheduled backup execution. Delta uses a native AppKit status item with a SwiftUI popover so long-running backup status updates do not dismiss the dropdown. The menu bar item changes symbol for ready, running, and attention states, and provides quick access to Back Up Now, Run Due Backups, Pause, Stop, Activity, update checks, and last-backup status.
+The visible menu bar dropdown and Start at Login setting are separate from Background Backups. Users can show or hide the menu bar item and choose whether Delta opens after sign-in without changing scheduled backup execution. Delta uses a native AppKit status item with a SwiftUI popover so long-running backup status updates do not dismiss the dropdown. The menu bar item changes symbol for ready, running, and attention states, and provides quick access to Back Up Now, Run Due Backups, Pause, Stop, Activity, update checks, and last-backup status.
 
-Notification Center alerts are also separate from Background Scheduling. When enabled in Settings and allowed by macOS, Delta alerts on failed or warning jobs from either the app or the signed helper. Successful backup summaries are available as a separate opt-in.
+Notification Center alerts are also separate from Background Backups. When enabled in Settings and allowed by macOS, Delta alerts on failed or warning jobs from either the app or the signed helper. Successful backup summaries are available as a separate opt-in.
 
 Retention maintenance can run `forget`, `prune`, and optional `check` based on the profile maintenance schedule. Post-prune checks are returned to the agent so failed validation is visible in job status and process exit status.
 
