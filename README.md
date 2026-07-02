@@ -212,6 +212,12 @@ Full release verification:
 Scripts/verify-release.sh
 ```
 
+Production readiness and manual macOS acceptance:
+
+```text
+docs/PRODUCTION_READINESS.md
+```
+
 Package Sparkle update assets:
 
 ```sh
