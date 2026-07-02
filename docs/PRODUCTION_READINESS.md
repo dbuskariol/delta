@@ -22,6 +22,7 @@ The automated gate must pass before any beta or production build is shipped. It 
 - non-ad-hoc app signing identity for stable macOS privacy permissions
 - hardened-runtime entitlement hygiene
 - same-executable scheduled password resolution and non-interactive password-bridge acceptance
+- source access preflight before restic starts or a new destination is prepared
 - bundled Login Item helper plist
 - app launch smoke test
 - DeltaAgent status, dry-run, and fail-closed argument smoke tests

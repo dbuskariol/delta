@@ -9,6 +9,7 @@ The product goal is simple: make serious backup practices approachable without h
 - **Encrypted backups by default** using restic repositories. There is no unencrypted backup mode.
 - **Incremental restore points** with content-addressed deduplication, metadata tracking, and `--skip-if-unchanged`.
 - **Full-volume or custom-folder protection** with macOS-safe excludes and destination self-exclusion.
+- **Source preflight before backup** so moved, missing, file-only, or unreadable source selections fail before restic starts or a new destination is prepared.
 - **Per-profile extra exclusions** for large generated folders, transient files, disk images, or other paths that should not consume backup storage.
 - **Local and network destinations** including local paths, mounted SMB/NFS volumes, SFTP, REST server, S3-compatible storage, Backblaze B2, Azure Blob, Google Cloud Storage, OpenStack Swift, rclone remotes, and custom restic URLs.
 - **Destination validation before save** for required fields, new or changed writable local paths, REST URLs, SFTP paths/ports, S3 endpoint/bucket fields, and rclone remote syntax.
@@ -65,6 +66,7 @@ Important implementation details:
 - **SQLite persistence** lives under Application Support through `AppDirectories.databaseURL()` with WAL mode and a busy timeout for app/agent concurrent access.
 - **Durable-state fail closed** behavior prevents backup, destination, and restore operations if the Application Support database cannot be opened. Delta shows a blocked state instead of continuing against throwaway state.
 - **Profile validation** normalizes source paths, schedule values, bandwidth limits, retention limits, cleanup windows, and exclude patterns before saving or running backups.
+- **Source access preflight** runs after security-scoped bookmark resolution and before destination preparation so unattended jobs fail clearly when a selected folder was moved, removed, replaced by a file, or is no longer readable.
 - **Operation-aware destination checks** allow a first backup to prepare a writable new local destination or an uninitialized remote destination, while restore, browse, check, and cleanup require an existing destination before restic is invoked.
 - **Keychain secrets** use `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly` and are read by the same signed Delta executable in app, scheduled, and restic password-command paths. Background secret reads fail closed instead of showing system prompts. The tiny `DeltaSecurity` compatibility shim is kept only for trusted-application access-list support in local development.
 - **Background secret repair** rewrites saved destination passwords and backend credentials through the current signed app identity if a development build or old local Keychain item would otherwise prompt during scheduled jobs.

@@ -878,6 +878,41 @@ final class BackupCoordinatorPolicyTests: XCTestCase {
         XCTAssertTrue(logs.contains { $0.stream == .standardError && $0.message.contains("Could not access selected backup sources") })
     }
 
+    func testRunBackupFailsBeforeResticWhenSelectedSourceIsMissing() throws {
+        let fixture = try Fixture(repositoryPrepared: false)
+        let runner = MockResticRunner(results: [.success, .success])
+        let coordinator = fixture.makeCoordinator(runner: runner)
+        let profile = fixture.profile()
+        try FileManager.default.removeItem(at: fixture.source)
+
+        let job = try coordinator.runBackup(profile: profile, repository: fixture.repository)
+        let jobs = try fixture.database.fetchJobRuns(limit: 10)
+        let logs = try fixture.database.fetchJobLogs(jobID: job.id)
+
+        XCTAssertEqual(job.status, .failed)
+        XCTAssertTrue(job.message?.contains("selected source is not ready") == true)
+        XCTAssertTrue(job.message?.contains("no longer available") == true)
+        XCTAssertTrue(runner.commands.isEmpty)
+        XCTAssertEqual(jobs.map(\.kind), [.backup])
+        XCTAssertTrue(logs.contains { $0.stream == .standardError && $0.message.contains("no longer available") })
+    }
+
+    func testRunBackupFailsBeforeResticWhenSelectedSourceIsAFile() throws {
+        let fixture = try Fixture()
+        let runner = MockResticRunner(results: [.success])
+        let coordinator = fixture.makeCoordinator(runner: runner)
+        let fileURL = fixture.root.appendingPathComponent("source-file.txt")
+        try Data("not a folder".utf8).write(to: fileURL)
+        var profile = fixture.profile()
+        profile.sources = [BackupSource(path: fileURL.path)]
+
+        let job = try coordinator.runBackup(profile: profile, repository: fixture.repository)
+
+        XCTAssertEqual(job.status, .failed)
+        XCTAssertTrue(job.message?.contains("not a folder") == true)
+        XCTAssertTrue(runner.commands.isEmpty)
+    }
+
     func testDestinationLockIsReleasedAfterJobCompletes() throws {
         let fixture = try Fixture()
         let firstRunner = MockResticRunner(results: [.success, .emptySnapshotList])

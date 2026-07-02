@@ -9,6 +9,7 @@ public final class BackupCoordinator: @unchecked Sendable {
     private let scheduleEvaluator: ScheduleEvaluator
     private let profileValidator: BackupProfileValidator
     private let bookmarkStore: SecurityScopedBookmarkStore
+    private let sourceAccessChecker: BackupSourceAccessChecker
     private let powerStateProvider: PowerStateProvider
     private let lockManager: any RepositoryLocking
     private let runControlStore: ResticRunControlStore?
@@ -23,6 +24,7 @@ public final class BackupCoordinator: @unchecked Sendable {
         scheduleEvaluator: ScheduleEvaluator = ScheduleEvaluator(),
         profileValidator: BackupProfileValidator = BackupProfileValidator(),
         bookmarkStore: SecurityScopedBookmarkStore = SecurityScopedBookmarkStore(),
+        sourceAccessChecker: BackupSourceAccessChecker = BackupSourceAccessChecker(),
         powerStateProvider: PowerStateProvider = PowerStateProvider(),
         lockManager: any RepositoryLocking = RepositoryJobLockManager(),
         runControlStore: ResticRunControlStore? = nil,
@@ -36,6 +38,7 @@ public final class BackupCoordinator: @unchecked Sendable {
         self.scheduleEvaluator = scheduleEvaluator
         self.profileValidator = profileValidator
         self.bookmarkStore = bookmarkStore
+        self.sourceAccessChecker = sourceAccessChecker
         self.powerStateProvider = powerStateProvider
         self.lockManager = lockManager
         self.runControlStore = runControlStore
@@ -129,6 +132,15 @@ public final class BackupCoordinator: @unchecked Sendable {
         var resolvedProfile = validatedProfile
         resolvedProfile.sources = zip(validatedProfile.sources, resolvedSources).map { original, resolved in
             BackupSource(id: original.id, path: resolved.url.path, bookmarkData: original.bookmarkData, includeSubvolumes: original.includeSubvolumes)
+        }
+        do {
+            try sourceAccessChecker.validate(resolvedProfile.sources)
+        } catch {
+            return try failedBackupRun(
+                profileID: validatedProfile.id,
+                repositoryID: repository.id,
+                message: "Backup was not started because a selected source is not ready: \(error.localizedDescription)"
+            )
         }
 
         if let preparationFailure = try prepareRepositoryForBackupIfNeeded(repository, profileID: validatedProfile.id) {

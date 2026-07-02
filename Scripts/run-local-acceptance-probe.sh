@@ -270,7 +270,7 @@ else
   automated_gate_commit="$(gate_status_value git_commit)"
   if [[ "$automated_gate_status" == "Passed" && "$automated_gate_commit" == "$git_commit" ]]; then
     if [[ "$installed_local_status" -eq 0 ]]; then
-      append_row "local_drive_destination" "$(item_area local_drive_destination)" "Partial" "$installed_local_evidence Automated release gate also passed local restic lifecycle coverage for commit $git_commit." "Repeat through the installed app UI with the target local or external drive."
+      append_row "local_drive_destination" "$(item_area local_drive_destination)" "Partial" "$installed_local_evidence Automated release gate also passed local restic lifecycle and source access preflight coverage for commit $git_commit." "Repeat through the installed app UI with the target local or external drive."
       append_row "restore_wizard" "$(item_area restore_wizard)" "Partial" "$installed_local_evidence Automated release gate also passed dry-run restore command paths for commit $git_commit." "Exercise the installed Restore wizard UI, original-path confirmation, browser selection, and each overwrite policy."
     else
       append_row "local_drive_destination" "$(item_area local_drive_destination)" "Failed" "$installed_local_evidence" "Fix installed-bundle local backup acceptance, then repeat through the installed app UI."

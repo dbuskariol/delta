@@ -140,6 +140,8 @@ Expected restic backup exit handling:
 
 Generic `permission denied` or `operation not permitted` failures are not treated as unreadable-source warnings unless restic exits with code `3` or explicitly reports unreadable source data. Delta shows a broader permissions message for restore target, destination, or source permission failures so users are not sent only to Full Disk Access when the write target is the problem.
 
+Before invoking restic for a backup, Delta resolves security-scoped source bookmarks, then verifies each selected source still exists, is a folder, and is readable. This check happens before first-backup destination preparation, so an invalid source cannot accidentally initialize a new destination and then fail later. Full-volume backups still rely on restic's own traversal and exit-code behavior for protected files inside an otherwise readable volume.
+
 Restic progress totals can change while it scans sources, so Delta does not expose volatile live percentages as authoritative completion. The UI uses a monotonic estimated progress bar that never moves backward during a running job, paired with stable processed-file and processed-byte counters. Backup jobs record source paths at job start, and saved logs are grouped by job with expandable full-log loading from SQLite. Restic summary JSON is parsed into explicit new, changed, unchanged, added, and checked counts so unchanged successful runs are clearly distinguished from runs that created new backup data. Delta stores those counts as compact structured job metadata, including restic `snapshot_id` when present, instead of storing the complete restic stdout stream in the job message.
 
 Saved activity output is operational history, not backup data. Delta applies a configurable local retention policy to job summaries, saved stdout/stderr lines, restore request records, and app events from both the main app and Background Backups helper. Cleanup keeps a minimum set of recent job summaries for UI continuity and never deletes cached restore points or restic repository data.
@@ -274,6 +276,7 @@ This runs:
 - restic/rclone bootstrap and checksum verification
 - bundled restic command and flag surface verification
 - local restic integration test with real init/backup/restore, dry-run restore without writes, check, prune, and post-prune check
+- backup source preflight coverage for moved, invalid, and unreadable source selections
 - packaged app build
 - codesign verification
 - minimal hardened-runtime entitlement checks for Delta, DeltaAgent, DeltaSecretBridge, restic, and rclone
