@@ -431,7 +431,7 @@ final class DeltaAppModel: ObservableObject {
             return
         }
         let coordinator = makeCoordinator()
-        performBackgroundWork(
+        performBackgroundJobWork(
             activeOperation: ActiveOperation(
                 kind: .backup,
                 profileID: profile.id,
@@ -440,7 +440,7 @@ final class DeltaAppModel: ObservableObject {
                 detail: "\(isResume ? "Continuing backup to" : "Saving to") \(repository.name)"
             )
         ) {
-            _ = try coordinator.runBackup(profile: profile, repository: repository)
+            [try coordinator.runBackup(profile: profile, repository: repository)]
         }
     }
 
@@ -466,7 +466,7 @@ final class DeltaAppModel: ObservableObject {
         guardPersistentStoreAvailable()
         guard isPersistentStoreAvailable else { return }
         let coordinator = makeCoordinator()
-        performBackgroundWork(
+        performBackgroundJobWork(
             activeOperation: ActiveOperation(
                 kind: .initializeRepository,
                 profileID: nil,
@@ -475,7 +475,7 @@ final class DeltaAppModel: ObservableObject {
                 detail: "Creating encrypted destination metadata"
             )
         ) {
-            _ = try coordinator.initializeRepository(repository)
+            [try coordinator.initializeRepository(repository)]
         }
     }
 
@@ -483,7 +483,7 @@ final class DeltaAppModel: ObservableObject {
         guardPersistentStoreAvailable()
         guard isPersistentStoreAvailable else { return }
         let coordinator = makeCoordinator()
-        performBackgroundWork(
+        performBackgroundJobWork(
             activeOperation: ActiveOperation(
                 kind: .check,
                 profileID: nil,
@@ -492,7 +492,7 @@ final class DeltaAppModel: ObservableObject {
                 detail: "Verifying destination integrity"
             )
         ) {
-            _ = try coordinator.check(repository: repository, readDataSubset: "1/100")
+            [try coordinator.check(repository: repository, readDataSubset: "1/100")]
         }
     }
 
@@ -504,7 +504,7 @@ final class DeltaAppModel: ObservableObject {
             return
         }
         let coordinator = makeCoordinator()
-        performBackgroundWork(
+        performBackgroundJobWork(
             activeOperation: ActiveOperation(
                 kind: .prune,
                 profileID: profile.id,
@@ -513,7 +513,7 @@ final class DeltaAppModel: ObservableObject {
                 detail: "Applying retention rules to \(repository.name)"
             )
         ) {
-            _ = try coordinator.forgetAndPrune(profile: profile, repository: repository)
+            [try coordinator.forgetAndPrune(profile: profile, repository: repository)]
         }
     }
 
@@ -521,7 +521,7 @@ final class DeltaAppModel: ObservableObject {
         guardPersistentStoreAvailable()
         guard isPersistentStoreAvailable else { return }
         let coordinator = makeCoordinator()
-        performBackgroundWork(
+        performBackgroundJobWork(
             activeOperation: ActiveOperation(
                 kind: .backup,
                 profileID: nil,
@@ -530,7 +530,7 @@ final class DeltaAppModel: ObservableObject {
                 detail: "Checking due profiles and available destinations"
             )
         ) {
-            _ = try coordinator.runDueBackups()
+            try coordinator.runDueBackups()
         }
     }
 
@@ -609,7 +609,7 @@ final class DeltaAppModel: ObservableObject {
         guardPersistentStoreAvailable()
         guard isPersistentStoreAvailable else { return }
         let coordinator = makeCoordinator()
-        performBackgroundWork(
+        performBackgroundJobWork(
             activeOperation: ActiveOperation(
                 kind: .restore,
                 profileID: request.preRestoreBackupProfileID,
@@ -618,7 +618,7 @@ final class DeltaAppModel: ObservableObject {
                 detail: "Reading from \(repository.name)"
             )
         ) {
-            _ = try coordinator.restore(request: request, repository: repository)
+            [try coordinator.restore(request: request, repository: repository)]
         }
     }
 
@@ -727,6 +727,10 @@ final class DeltaAppModel: ObservableObject {
         NSWorkspace.shared.open(LoginItemsGuide.settingsURL)
     }
 
+    func openNotificationSettings() {
+        NSWorkspace.shared.open(NotificationSettingsGuide.settingsURL)
+    }
+
     func revealInstalledAppInFinder() {
         let installedApp = URL(fileURLWithPath: "/Applications/Delta.app")
         NSWorkspace.shared.activateFileViewerSelecting([installedApp])
@@ -819,7 +823,9 @@ final class DeltaAppModel: ObservableObject {
             logPath: diagnosticPath { try AppDirectories.logDirectory() },
             fullDiskAccessStatus: fullDiskAccessStatus.hasLikelyFullDiskAccess ? "Ready" : "Needs Access",
             backgroundBackupsStatus: launchAgentStatus.displayName,
+            notificationStatus: DeltaAppPreferences.bool(for: DeltaAppPreferenceKeys.sendsJobNotifications, default: false) ? "Enabled" : "Disabled",
             menuBarStatus: DeltaAppPreferences.bool(for: DeltaAppPreferenceKeys.showsMenuBarExtra, default: true) ? "Shown" : "Hidden",
+            restoreDefaultsStatus: restoreDefaultsDiagnosticStatus(),
             activeOperation: activeOperation.map { "\($0.kind.displayName): \($0.title)" },
             profileCount: profiles.count,
             destinationCount: repositories.count,
@@ -863,6 +869,17 @@ final class DeltaAppModel: ObservableObject {
         } catch {
             return "Unavailable: \(error.localizedDescription)"
         }
+    }
+
+    private func restoreDefaultsDiagnosticStatus() -> String {
+        let preview = DeltaAppPreferences.bool(for: DeltaAppPreferenceKeys.previewsRestoresByDefault, default: true)
+        let verify = DeltaAppPreferences.bool(for: DeltaAppPreferenceKeys.verifiesRestoresByDefault, default: true)
+        let rawConflictPolicy = DeltaAppPreferences.string(
+            for: DeltaAppPreferenceKeys.defaultRestoreConflictPolicy,
+            default: RestoreConflictPolicy.ifChanged.rawValue
+        )
+        let conflictPolicy = RestoreConflictPolicy(rawValue: rawConflictPolicy) ?? .ifChanged
+        return "\(preview ? "Preview first" : "Direct restore"), \(verify ? "verify files" : "no verification"), \(conflictPolicy.displayName)"
     }
 
     private func diagnosticReportFilename() -> String {
@@ -921,6 +938,13 @@ final class DeltaAppModel: ObservableObject {
     }
 
     private func performBackgroundWork(activeOperation: ActiveOperation, _ operation: @escaping @Sendable () throws -> Void) {
+        performBackgroundJobWork(activeOperation: activeOperation) {
+            try operation()
+            return []
+        }
+    }
+
+    private func performBackgroundJobWork(activeOperation: ActiveOperation, _ operation: @escaping @Sendable () throws -> [JobRun]) {
         guardPersistentStoreAvailable()
         guard isPersistentStoreAvailable else { return }
         runController.reset()
@@ -934,7 +958,7 @@ final class DeltaAppModel: ObservableObject {
         lastLiveLogWasStatus = false
         Task.detached(priority: .userInitiated) {
             do {
-                try operation()
+                let completedJobs = try operation()
                 await MainActor.run {
                     self.localOperationIsRunning = false
                     self.isWorking = false
@@ -944,6 +968,7 @@ final class DeltaAppModel: ObservableObject {
                     self.activeProgress = nil
                     self.runController.reset()
                     self.reload()
+                    self.notifyCompletedJobs(completedJobs)
                 }
             } catch {
                 await MainActor.run {
@@ -958,6 +983,36 @@ final class DeltaAppModel: ObservableObject {
                     self.reload()
                 }
             }
+        }
+    }
+
+    private func notifyCompletedJobs(_ completedJobs: [JobRun]) {
+        let settings = JobNotificationSettings(
+            isEnabled: DeltaAppPreferences.bool(
+                for: DeltaAppPreferenceKeys.sendsJobNotifications,
+                default: false
+            ),
+            includesSuccessfulBackups: DeltaAppPreferences.bool(
+                for: DeltaAppPreferenceKeys.sendsSuccessfulBackupNotifications,
+                default: false
+            )
+        )
+        guard settings.isEnabled else {
+            return
+        }
+
+        let profilesByID = Dictionary(uniqueKeysWithValues: profiles.map { ($0.id, $0.name) })
+        let repositoriesByID = Dictionary(uniqueKeysWithValues: repositories.map { ($0.id, $0.name) })
+        for job in completedJobs {
+            guard let content = JobNotificationPolicy.content(
+                for: job,
+                settings: settings,
+                profileName: job.profileID.flatMap { profilesByID[$0] },
+                repositoryName: repositoriesByID[job.repositoryID]
+            ) else {
+                continue
+            }
+            DeltaUserNotifier.deliver(content)
         }
     }
 

@@ -253,6 +253,9 @@ struct RepositoriesView: View {
 
 struct RestoreView: View {
     @EnvironmentObject private var model: DeltaAppModel
+    @AppStorage(DeltaAppPreferenceKeys.previewsRestoresByDefault) private var previewsRestoresByDefault = true
+    @AppStorage(DeltaAppPreferenceKeys.verifiesRestoresByDefault) private var verifiesRestoresByDefault = true
+    @AppStorage(DeltaAppPreferenceKeys.defaultRestoreConflictPolicy) private var defaultRestoreConflictPolicyRawValue = RestoreConflictPolicy.ifChanged.rawValue
     @State private var repositoryID: UUID?
     @State private var snapshotID = ""
     @State private var selectedRestorePaths: Set<String> = []
@@ -264,6 +267,7 @@ struct RestoreView: View {
     @State private var verify = true
     @State private var preRestoreProfileID: UUID?
     @State private var acknowledgedInPlaceRestore = false
+    @State private var didApplyRestoreDefaults = false
 
     var body: some View {
         PageScaffold(
@@ -410,6 +414,7 @@ struct RestoreView: View {
             }
         }
         .onAppear {
+            applyRestoreDefaultsIfNeeded()
             if repositoryID == nil {
                 repositoryID = model.repositories.first?.id
                 Task { @MainActor in
@@ -552,6 +557,16 @@ struct RestoreView: View {
             preRestoreBackupProfileID: preRestoreProfileID
         )
         model.runRestore(repository: repository, request: request)
+    }
+
+    private func applyRestoreDefaultsIfNeeded() {
+        guard !didApplyRestoreDefaults else {
+            return
+        }
+        dryRun = previewsRestoresByDefault
+        verify = verifiesRestoresByDefault
+        conflictPolicy = RestoreConflictPolicy(rawValue: defaultRestoreConflictPolicyRawValue) ?? .ifChanged
+        didApplyRestoreDefaults = true
     }
 
     private func restorePointLabel(for snapshot: ResticSnapshot) -> String {
@@ -976,8 +991,20 @@ struct SettingsView: View {
     @EnvironmentObject private var softwareUpdateController: SoftwareUpdateController
     @AppStorage(DeltaAppPreferenceKeys.updateCheckIntervalSeconds) private var updateCheckIntervalSeconds = UpdateCheckInterval.daily.rawValue
     @AppStorage(DeltaAppPreferenceKeys.activityLogDetail) private var activityLogDetailRawValue = ActivityLogDetail.standard.rawValue
+    @AppStorage(DeltaAppPreferenceKeys.previewsRestoresByDefault) private var previewsRestoresByDefault = true
+    @AppStorage(DeltaAppPreferenceKeys.verifiesRestoresByDefault) private var verifiesRestoresByDefault = true
+    @AppStorage(DeltaAppPreferenceKeys.defaultRestoreConflictPolicy) private var defaultRestoreConflictPolicyRawValue = RestoreConflictPolicy.ifChanged.rawValue
+    @AppStorage(
+        DeltaAppPreferenceKeys.sendsJobNotifications,
+        store: UserDefaults(suiteName: DeltaAppPreferences.sharedSuiteName)
+    ) private var sendsJobNotifications = false
+    @AppStorage(
+        DeltaAppPreferenceKeys.sendsSuccessfulBackupNotifications,
+        store: UserDefaults(suiteName: DeltaAppPreferences.sharedSuiteName)
+    ) private var sendsSuccessfulBackupNotifications = false
     @AppStorage(DeltaAppPreferenceKeys.showsMenuBarExtra) private var showsMenuBarExtra = true
     @State private var automaticallyChecksForUpdates = true
+    @State private var notificationAuthorizationState: DeltaNotificationAuthorizationState = .notDetermined
 
     var body: some View {
         PageScaffold(
@@ -1035,16 +1062,16 @@ struct SettingsView: View {
 
                 SettingsNotice(
                     symbol: "clock.arrow.circlepath",
-                    title: "How background backups work",
-                    text: "The helper runs as your macOS user, needs no admin privileges, wakes briefly every few minutes, applies destination, network, battery, and low-power rules, then exits.",
+                    title: "Managed by macOS",
+                    text: "Delta registers a signed Login Item helper. macOS starts it for short schedule checks, then the helper applies destination, network, battery, and low-power rules before running due backups.",
                     color: .blue
                 )
 
                 SettingsFactGrid(items: [
                     SettingsFact(title: "Scheduled profiles", value: "\(scheduledProfileCount)"),
                     SettingsFact(title: "Check interval", value: "Every 5 min"),
-                    SettingsFact(title: "Runs as", value: "Current user"),
-                    SettingsFact(title: "Admin access", value: "Not required")
+                    SettingsFact(title: "macOS item", value: "Login Item"),
+                    SettingsFact(title: "Privileges", value: "Current user")
                 ])
 
                 if model.launchAgentStatus != .enabled {
@@ -1148,8 +1175,71 @@ struct SettingsView: View {
                 }
 
                 SettingsDescription(
-                    text: "This controls only Delta's visible menu bar item. Background Backups use the signed helper above and continue according to their own setting."
+                    text: "This controls only Delta's visible menu bar item. Scheduled backups use Background Backups above and continue according to their own setting."
                 )
+            }
+
+            SettingsCard(
+                symbol: "bell.badge",
+                title: "Notifications",
+                subtitle: "Show macOS alerts when backup work needs attention.",
+                statusText: notificationStatusText,
+                statusColor: notificationStatusColor
+            ) {
+                SettingsControlRow(
+                    title: "Job alerts",
+                    detail: "Notify when a backup, restore, destination check, or cleanup fails or finishes with warnings."
+                ) {
+                    Toggle("", isOn: $sendsJobNotifications)
+                        .labelsHidden()
+                        .toggleStyle(.switch)
+                        .onChange(of: sendsJobNotifications) { _, enabled in
+                            if enabled {
+                                requestNotificationPermission()
+                            } else {
+                                sendsSuccessfulBackupNotifications = false
+                            }
+                        }
+                }
+
+                SettingsControlRow(
+                    title: "Success summaries",
+                    detail: "Also notify when a backup finishes successfully with its new, changed, and checked file summary."
+                ) {
+                    Toggle("", isOn: $sendsSuccessfulBackupNotifications)
+                        .labelsHidden()
+                        .toggleStyle(.switch)
+                        .disabled(!sendsJobNotifications)
+                }
+
+                SettingsFactGrid(items: [
+                    SettingsFact(title: "macOS permission", value: notificationAuthorizationState.displayName),
+                    SettingsFact(title: "Failure alerts", value: sendsJobNotifications ? "On" : "Off"),
+                    SettingsFact(title: "Success alerts", value: sendsSuccessfulBackupNotifications ? "On" : "Off")
+                ])
+
+                HStack(spacing: 8) {
+                    Button {
+                        requestNotificationPermission()
+                    } label: {
+                        Label("Request Permission", systemImage: "bell.badge")
+                    }
+                    .disabled(notificationAuthorizationState.canDeliver)
+
+                    Button {
+                        model.openNotificationSettings()
+                    } label: {
+                        Label("Open Notifications", systemImage: "gearshape")
+                    }
+
+                    Button {
+                        refreshNotificationAuthorization()
+                    } label: {
+                        Label("Refresh Status", systemImage: "arrow.clockwise")
+                    }
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
             }
 
             SettingsCard(
@@ -1180,6 +1270,52 @@ struct SettingsView: View {
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
+            }
+
+            SettingsCard(
+                symbol: "arrow.uturn.backward.circle",
+                title: "Restore Defaults",
+                subtitle: "Safety defaults used when the Restore page opens.",
+                statusText: restoreDefaultsStatusText,
+                statusColor: restoreDefaultsStatusColor
+            ) {
+                SettingsControlRow(
+                    title: "Preview first",
+                    detail: "Open restores as a dry run so Delta shows what would happen before writing files."
+                ) {
+                    Toggle("", isOn: $previewsRestoresByDefault)
+                        .labelsHidden()
+                        .toggleStyle(.switch)
+                }
+
+                SettingsControlRow(
+                    title: "Verify files",
+                    detail: "Ask the backup engine to verify restored file content after writes complete."
+                ) {
+                    Toggle("", isOn: $verifiesRestoresByDefault)
+                        .labelsHidden()
+                        .toggleStyle(.switch)
+                }
+
+                SettingsControlRow(
+                    title: "Existing files",
+                    detail: "Default overwrite policy for files that already exist at the restore destination."
+                ) {
+                    Picker("", selection: $defaultRestoreConflictPolicyRawValue) {
+                        ForEach(RestoreConflictPolicy.allCases, id: \.self) { policy in
+                            Text(policy.displayName).tag(policy.rawValue)
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(width: 210)
+                    .onChange(of: defaultRestoreConflictPolicyRawValue) { _, _ in
+                        normalizeRestorePreferences()
+                    }
+                }
+
+                SettingsDescription(
+                    text: "These defaults keep restores conservative without hiding control. Each restore can still be changed before previewing or running it."
+                )
             }
 
             SettingsCard(
@@ -1288,7 +1424,9 @@ struct SettingsView: View {
         .onAppear {
             automaticallyChecksForUpdates = softwareUpdateController.automaticallyChecksForUpdates
             activityLogDetailRawValue = activityLogDetail.rawValue
+            normalizeRestorePreferences()
             applyUpdatePreferences()
+            refreshNotificationAuthorization()
         }
     }
 
@@ -1337,6 +1475,35 @@ struct SettingsView: View {
             : "Protected locations are not readable yet. Open Privacy & Security, add Delta with the + button if needed, then recheck access."
     }
 
+    private var notificationStatusText: String {
+        guard sendsJobNotifications else {
+            return "Off"
+        }
+        return notificationAuthorizationState.canDeliver ? "On" : "Needs Permission"
+    }
+
+    private var notificationStatusColor: Color {
+        guard sendsJobNotifications else {
+            return .secondary
+        }
+        switch notificationAuthorizationState {
+        case .authorized, .provisional, .ephemeral:
+            return .green
+        case .notDetermined:
+            return .orange
+        case .denied, .unknown:
+            return .red
+        }
+    }
+
+    private var restoreDefaultsStatusText: String {
+        previewsRestoresByDefault && verifiesRestoresByDefault ? "Conservative" : "Custom"
+    }
+
+    private var restoreDefaultsStatusColor: Color {
+        previewsRestoresByDefault && verifiesRestoresByDefault ? .green : .orange
+    }
+
     private var appBundleLocation: String {
         Bundle.main.bundleURL.path
     }
@@ -1348,6 +1515,30 @@ struct SettingsView: View {
         }
         softwareUpdateController.automaticallyChecksForUpdates = automaticallyChecksForUpdates
         softwareUpdateController.updateCheckInterval = TimeInterval(interval.rawValue)
+    }
+
+    private func normalizeRestorePreferences() {
+        if RestoreConflictPolicy(rawValue: defaultRestoreConflictPolicyRawValue) == nil {
+            defaultRestoreConflictPolicyRawValue = RestoreConflictPolicy.ifChanged.rawValue
+        }
+    }
+
+    private func refreshNotificationAuthorization() {
+        Task {
+            notificationAuthorizationState = await DeltaUserNotifier.authorizationState()
+        }
+    }
+
+    private func requestNotificationPermission() {
+        Task {
+            let state = await DeltaUserNotifier.requestAuthorization()
+            notificationAuthorizationState = state
+            if !state.canDeliver {
+                sendsJobNotifications = false
+                sendsSuccessfulBackupNotifications = false
+                model.alertMessage = "Delta cannot send notifications until they are allowed in macOS Notifications settings."
+            }
+        }
     }
 
     private var launchAgentStatusColor: Color {
@@ -2627,6 +2818,8 @@ struct SettingsCard<Content: View>: View {
 
                         if let statusText {
                             StateBadge(text: statusText, color: statusColor)
+                                .lineLimit(1)
+                                .layoutPriority(1)
                         }
                     }
 
@@ -2713,6 +2906,7 @@ struct SettingsControlRow<Control: View>: View {
             .frame(maxWidth: .infinity, alignment: .leading)
 
             control
+                .frame(minWidth: 190, alignment: .trailing)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

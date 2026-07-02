@@ -124,3 +124,7 @@ public enum FullDiskAccessGuide {
 public enum LoginItemsGuide {
     public static let settingsURL = URL(string: "x-apple.systempreferences:com.apple.LoginItems-Settings.extension")!
 }
+
+public enum NotificationSettingsGuide {
+    public static let settingsURL = URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension")!
+}

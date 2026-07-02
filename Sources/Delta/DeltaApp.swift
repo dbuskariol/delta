@@ -1,3 +1,4 @@
+import DeltaCore
 import SwiftUI
 
 @main

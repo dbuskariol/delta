@@ -18,9 +18,10 @@ The product goal is simple: make serious backup practices approachable without h
 - **Retention maintenance** with scheduled forget/prune/check windows.
 - **Pause, resume, and cancel controls** for active backups from the main window and macOS menu bar, including scheduled jobs started by Background Backups. Pause stops restic safely, keeps the profile visibly paused, and Resume continues from already saved backup data.
 - **Clear backup summaries** showing new, changed, unchanged, added, and checked data for each backup run.
-- **Full or browsed selected restore** with backup browsing, file/folder selection, dry-run preview, overwrite policies, verification, original-path restore, chosen-folder restore, and optional pre-restore backup.
+- **Notification Center alerts** for failed or warning jobs, with optional successful-backup summaries. The signed background helper uses the same notification policy for scheduled runs.
+- **Full or browsed selected restore** with backup browsing, file/folder selection, configurable dry-run and verification defaults, overwrite policies, original-path restore, chosen-folder restore, and optional pre-restore backup.
 - **Streaming and saved backup logs** from restic stdout/stderr with source context, stable processed-file counters, clean change summaries, fixed-height live panes, and expandable per-job audit history.
-- **Settings and diagnostics** for updates, Full Disk Access, Background Backups, Activity log detail, app version, helper status, tool paths, profile/destination counts, recent jobs, and local support paths.
+- **Settings and diagnostics** for updates, notifications, Full Disk Access, Background Backups, restore safety defaults, menu bar visibility, Activity log detail, app version, helper status, tool paths, profile/destination counts, recent jobs, and local support paths.
 - **Sparkle automatic updates** with generated appcast/update archive support.
 
 ## How It Works
@@ -70,6 +71,7 @@ Important implementation details:
 - **Per-destination locks** prevent overlapping backup, restore, prune, and check jobs across app/agent processes.
 - **Per-job output logs** persist formatted restic progress, warnings, errors, start lines, and finish lines for troubleshooting after relaunch or scheduled agent runs.
 - **Compact backup summaries** persist structured new/changed/unchanged/add/check counts on job records without storing full restic stdout in the job message.
+- **Notification policy** is shared by the app and Background Backups helper. Failure and warning alerts are opt-in; successful backup summaries require a second opt-in to avoid alert fatigue.
 - **Durable run controls** let the app request pause/cancel for an agent-owned restic process without relying on in-memory UI state.
 - **Abandoned-job recovery** marks stale running jobs interrupted after restart only when the per-destination lock proves no restic process still owns the destination.
 - **Bundled tools** are pinned and checksum-verified through `Scripts/bootstrap-tools.sh`.
@@ -98,7 +100,7 @@ Each profile keeps Delta's default macOS-safe excludes and can add extra restic 
 
 ## Scheduling And Maintenance
 
-Background Backups let scheduled profiles run while the main Delta window is closed. The macOS implementation is `DeltaAgent`, a signed Login Item helper registered through `SMAppService` and implemented as a per-user LaunchAgent. It runs as the signed-in user, not as a privileged admin helper, and wakes periodically to evaluate:
+Background Backups let scheduled profiles run while the main Delta window is closed. The macOS implementation is `DeltaAgent`, a signed Login Item helper registered through `SMAppService` and implemented as a per-user LaunchAgent. In user-facing UI, Delta presents this as Background Backups because the LaunchAgent is the macOS mechanism, not a setting users should have to understand. It runs as the signed-in user, not as a privileged admin helper, and wakes periodically to evaluate:
 
 - backup schedule: hourly, daily, weekly, monthly, or custom interval
 - missed-run catchup policy
@@ -113,6 +115,8 @@ When an enabled scheduled profile is saved, Delta requests Background Backups re
 
 The visible menu bar dropdown is separate from Background Backups. Users can show or hide the menu bar item from Settings without changing scheduled backup execution. The menu bar item provides quick access to Back Up Now, Run Due Backups, Pause, Stop, Activity, update checks, and last-backup status.
 
+Notification Center alerts are also separate from Background Backups. When enabled in Settings and allowed by macOS, Delta alerts on failed or warning jobs from either the app or the signed helper. Successful backup summaries are available as a separate opt-in.
+
 Retention maintenance can run `forget`, `prune`, and optional `check` based on the profile maintenance schedule. Post-prune checks are returned to the agent so failed validation is visible in job status and process exit status.
 
 For local and mounted destinations, scheduled maintenance fails fast with a clear reconnect/remount message when the destination folder is absent. Delta does not launch restic for cleanup or check work against a missing drive.
@@ -124,15 +128,17 @@ Restore is intentionally explicit:
 1. Choose a Destination.
 2. Refresh and choose a Restore Point.
 3. Restore the full restore point, or browse backed-up source folders and select specific files/folders.
-4. Choose a target folder or original paths.
+4. Choose a destination folder or original paths.
 5. Choose conflict behavior:
    - Replace all
    - Replace changed
    - Replace older
    - Keep existing
-6. Run a dry-run preview by default.
+6. Preview or run the restore with the selected overwrite and verification policy.
 7. Optionally verify restored files.
 8. Confirm in-place restore when restoring to original paths. Delta enforces this confirmation before any non-preview original-path restore can run.
+
+Settings include conservative restore defaults: preview first, verify restored files, and replace only changed files. Users can change those defaults in Settings and still override them for an individual restore.
 
 The browser loads source roots from the selected restore point immediately and asks restic for one folder's contents at a time with `ls --json`, so full-volume backups do not need to be expanded into memory before selection. Selected-path restore uses restic snapshot path syntax for one selected path, and include filters for multiple selected paths.
 

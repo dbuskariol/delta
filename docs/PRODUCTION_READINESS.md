@@ -39,10 +39,12 @@ Record the app version, build number, macOS build, signing identity, date, and t
 | SFTP destination | Test a real SFTP destination with a non-root absolute path, wrong credential failure, corrected credential success, restore point refresh, and restore. |
 | S3-compatible destination | Test at least one S3-compatible provider with endpoint, bucket, optional region, missing credential failure, corrected credential success, backup, check, and restore. |
 | Restore wizard | Test full restore, selected folder restore from the browser, selected file restore, dry-run preview, chosen-folder restore, original-path preview, original-path confirmation, and every overwrite policy. |
+| Restore defaults | Change Settings > Restore Defaults, reopen Restore, and confirm preview, verification, and overwrite policy defaults apply while remaining editable per restore. |
 | Browse restore points | Confirm restore points load when the Restore tab is selected, refresh returns all current points, pruned points disappear after cleanup, and newest points are listed first. |
 | Pause, resume, cancel | Start a large backup, pause it from the main app and menu bar, confirm the profile stays paused with Resume visible, resume it, then cancel a separate run and confirm it is not resumable. |
 | Streaming logs | Confirm live logs stay in a fixed-height scrolling pane, auto-scroll to the bottom, include source context, and saved logs are grouped by expandable job. |
 | Menu bar | Confirm Back Up Now, Run Due Backups, Pause, Stop, Activity, Updates, last backup status, and status transitions work without the menu closing unexpectedly on completion. |
+| Notifications | Enable job alerts in Settings, allow macOS notification permission, trigger one warning/failed job from the app and one scheduled helper job, and confirm successful-backup summaries only appear when the separate success setting is enabled. |
 | Sparkle updates | Install an older signed build, host or publish a signed appcast and archive, check for updates, install the update, and confirm settings, Full Disk Access identity, destinations, profiles, restore points, and scheduled helper behavior remain intact. |
 | Diagnostics | Copy and export a diagnostic report and confirm it contains app/helper/tool/profile/job state but no repository password or backend credential values. |
 | Notarization | For release builds only, sign with Developer ID, submit for notarization, staple the ticket, verify Gatekeeper launch, and archive notarization logs. |
@@ -55,4 +57,3 @@ A build can move from local beta to external beta only when:
 - The manual matrix has current passing evidence for the targeted macOS release.
 - Any accepted limitations are documented in `README.md`.
 - Notarization is complete for external distribution builds.
-
