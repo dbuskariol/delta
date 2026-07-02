@@ -16,6 +16,7 @@ final class DiagnosticReportTests: XCTestCase {
             fullDiskAccessStatus: "Ready",
             backgroundBackupsStatus: "Ready",
             scheduledAutomationStatus: "Paused",
+            backgroundPasswordAccessStatus: "Ready",
             appLoginItemStatus: "Ready",
             notificationStatus: "Enabled",
             menuBarStatus: "Shown",
@@ -51,6 +52,7 @@ final class DiagnosticReportTests: XCTestCase {
         XCTAssertTrue(report.contains("- Full Disk Access: Ready"))
         XCTAssertTrue(report.contains("- Background Backups: Ready"))
         XCTAssertTrue(report.contains("- Scheduled Automation: Paused"))
+        XCTAssertTrue(report.contains("- Background Password Access: Ready"))
         XCTAssertTrue(report.contains("- Start at Login: Ready"))
         XCTAssertTrue(report.contains("- Notifications: Enabled"))
         XCTAssertTrue(report.contains("- Menu Bar: Shown"))
@@ -64,7 +66,7 @@ final class DiagnosticReportTests: XCTestCase {
         XCTAssertTrue(report.contains("- Primary: Local or mounted drive; verified 1970-01-01T00:00:10Z"))
         XCTAssertTrue(report.contains("- Mac: Custom folders; 2 source(s); scheduled; 1 extra exclude(s)"))
         XCTAssertTrue(report.contains("- 1970-01-01T00:00:20Z: Backup succeeded; exit 0; Backup summary"))
-        XCTAssertFalse(report.localizedCaseInsensitiveContains("password"))
+        XCTAssertFalse(report.localizedCaseInsensitiveContains("super-secret"))
         XCTAssertFalse(report.contains("AWS_SECRET_ACCESS_KEY"))
     }
 

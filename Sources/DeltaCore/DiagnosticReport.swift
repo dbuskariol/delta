@@ -81,6 +81,7 @@ public struct DiagnosticReportSnapshot: Equatable, Sendable {
     public var fullDiskAccessStatus: String
     public var backgroundBackupsStatus: String
     public var scheduledAutomationStatus: String
+    public var backgroundPasswordAccessStatus: String
     public var appLoginItemStatus: String
     public var notificationStatus: String
     public var menuBarStatus: String
@@ -112,6 +113,7 @@ public struct DiagnosticReportSnapshot: Equatable, Sendable {
         fullDiskAccessStatus: String,
         backgroundBackupsStatus: String,
         scheduledAutomationStatus: String = "Running",
+        backgroundPasswordAccessStatus: String = "Unchecked",
         appLoginItemStatus: String,
         notificationStatus: String,
         menuBarStatus: String,
@@ -142,6 +144,7 @@ public struct DiagnosticReportSnapshot: Equatable, Sendable {
         self.fullDiskAccessStatus = fullDiskAccessStatus
         self.backgroundBackupsStatus = backgroundBackupsStatus
         self.scheduledAutomationStatus = scheduledAutomationStatus
+        self.backgroundPasswordAccessStatus = backgroundPasswordAccessStatus
         self.appLoginItemStatus = appLoginItemStatus
         self.notificationStatus = notificationStatus
         self.menuBarStatus = menuBarStatus
@@ -186,6 +189,7 @@ public struct DiagnosticReportBuilder: Sendable {
             "- Full Disk Access: \(snapshot.fullDiskAccessStatus)",
             "- Background Backups: \(snapshot.backgroundBackupsStatus)",
             "- Scheduled Automation: \(snapshot.scheduledAutomationStatus)",
+            "- Background Password Access: \(snapshot.backgroundPasswordAccessStatus)",
             "- Start at Login: \(snapshot.appLoginItemStatus)",
             "- Notifications: \(snapshot.notificationStatus)",
             "- Menu Bar: \(snapshot.menuBarStatus)",

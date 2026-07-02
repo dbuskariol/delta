@@ -78,6 +78,66 @@ final class RepositorySecretAccessRepairerTests: XCTestCase {
         XCTAssertEqual(report.failures.map(\.account), ["missing-secret"])
     }
 
+    func testBackgroundSecretAccessSummaryUsesNoDestinationState() {
+        let summary = BackgroundSecretAccessSummary(reports: [], destinationCount: 0)
+
+        XCTAssertEqual(summary.state, .noDestinations)
+        XCTAssertEqual(summary.displayName, "Not Needed")
+        XCTAssertFalse(summary.needsRepair)
+    }
+
+    func testBackgroundSecretAccessSummaryUsesUncheckedStateWhenDestinationsHaveNotBeenVerified() {
+        let summary = BackgroundSecretAccessSummary(reports: [], destinationCount: 2)
+
+        XCTAssertEqual(summary.state, .unchecked)
+        XCTAssertEqual(summary.displayName, "Unchecked")
+        XCTAssertFalse(summary.needsRepair)
+    }
+
+    func testBackgroundSecretAccessSummaryReportsReadyState() {
+        let reports = [
+            RepositorySecretAccessReport(
+                repositoryID: UUID(),
+                repositoryName: "Primary",
+                checkedAccounts: 2
+            )
+        ]
+
+        let summary = BackgroundSecretAccessSummary(reports: reports, destinationCount: 1)
+
+        XCTAssertEqual(summary.state, .ready)
+        XCTAssertEqual(summary.displayName, "Ready")
+        XCTAssertEqual(summary.checkedSecretCount, 2)
+        XCTAssertFalse(summary.needsRepair)
+        XCTAssertTrue(summary.detail.contains("2 saved secrets"))
+    }
+
+    func testBackgroundSecretAccessSummaryReportsRepairNeededState() {
+        let reports = [
+            RepositorySecretAccessReport(
+                repositoryID: UUID(),
+                repositoryName: "Cloud",
+                checkedAccounts: 2,
+                failures: [
+                    RepositorySecretAccessFailure(
+                        account: "secret-key",
+                        purpose: "Backend credential AWS_SECRET_ACCESS_KEY",
+                        message: "interaction not allowed"
+                    )
+                ]
+            )
+        ]
+
+        let summary = BackgroundSecretAccessSummary(reports: reports, destinationCount: 1)
+
+        XCTAssertEqual(summary.state, .needsRepair)
+        XCTAssertEqual(summary.displayName, "Needs Repair")
+        XCTAssertEqual(summary.failureCount, 1)
+        XCTAssertEqual(summary.failedDestinationNames, ["Cloud"])
+        XCTAssertEqual(summary.firstFailure?.account, "secret-key")
+        XCTAssertTrue(summary.needsRepair)
+    }
+
     func testCleanerDeletesDestinationPasswordAndBackendCredentialsOnce() {
         let repository = BackupRepository(
             name: "S3",

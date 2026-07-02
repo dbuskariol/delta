@@ -132,6 +132,28 @@ struct DashboardView: View {
                 }
             }
 
+            if backgroundSecretAccessSummary.needsRepair && scheduledProfileCount > 0 {
+                Card {
+                    HStack(alignment: .top, spacing: 14) {
+                        StatusIcon(symbol: "key.horizontal", color: .orange)
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Password Access Needs Repair")
+                                .font(.headline)
+                            Text(backgroundSecretAccessSummary.detail)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Button {
+                            model.selectedSection = .settings
+                        } label: {
+                            Label("Repair", systemImage: "arrow.right")
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                    }
+                }
+            }
+
             if pausesScheduledBackups && scheduledProfileCount > 0 {
                 Card {
                     HStack(alignment: .top, spacing: 14) {
@@ -255,6 +277,13 @@ struct DashboardView: View {
 
     private var scheduledProfileCount: Int {
         model.profiles.filter { $0.schedule.isEnabled }.count
+    }
+
+    private var backgroundSecretAccessSummary: BackgroundSecretAccessSummary {
+        BackgroundSecretAccessSummary(
+            reports: model.backgroundSecretAccessReports,
+            destinationCount: model.repositories.count
+        )
     }
 
     private var dashboardRunDueTitle: String {
@@ -1404,6 +1433,7 @@ struct SettingsView: View {
                 SettingsFactGrid(items: [
                     SettingsFact(title: "Scheduled profiles", value: "\(scheduledProfileCount)"),
                     SettingsFact(title: "Automation", value: pausesScheduledBackups ? "Paused" : "Running"),
+                    SettingsFact(title: "Passwords", value: backgroundSecretAccessSummary.displayName),
                     SettingsFact(title: "Schedule checks", value: "Every 5 min"),
                     SettingsFact(title: "Runs at sign-in", value: "Yes"),
                     SettingsFact(title: "Runs as", value: "Your user"),
@@ -1418,7 +1448,18 @@ struct SettingsView: View {
                         text: backgroundSchedulingAttentionText,
                         color: .orange
                     )
-                } else if scheduledProfileCount == 0 {
+                }
+
+                if backgroundSecretAccessSummary.needsRepair {
+                    SettingsNotice(
+                        symbol: "key.horizontal",
+                        title: "Password access needs repair",
+                        text: "\(backgroundSecretAccessSummary.detail) Repair access so scheduled backups can read saved destination passwords without Keychain prompts.",
+                        color: .orange
+                    )
+                }
+
+                if scheduledProfileCount == 0 && !shouldShowBackgroundSchedulingAttention && !backgroundSecretAccessSummary.needsRepair {
                     SettingsNotice(
                         symbol: "calendar.badge.plus",
                         title: "No scheduled profiles",
@@ -1450,7 +1491,7 @@ struct SettingsView: View {
                     Button {
                         model.repairBackgroundSecretAccess()
                     } label: {
-                        Label("Repair Passwords", systemImage: "key")
+                        Label("Repair Password Access", systemImage: "key")
                     }
                     .disabled(model.repositories.isEmpty || model.isWorking || !model.isPersistentStoreAvailable)
                     .deltaTooltip("Refresh saved destination passwords so background backups can read them without interactive Keychain prompts.")
@@ -2125,6 +2166,26 @@ struct SettingsView: View {
         model.profiles.filter { $0.schedule.isEnabled }.count
     }
 
+    private var backgroundSecretAccessSummary: BackgroundSecretAccessSummary {
+        BackgroundSecretAccessSummary(
+            reports: model.backgroundSecretAccessReports,
+            destinationCount: model.repositories.count
+        )
+    }
+
+    private var backgroundSecretAccessStatusColor: Color {
+        switch backgroundSecretAccessSummary.state {
+        case .ready:
+            return .green
+        case .needsRepair:
+            return .orange
+        case .unchecked:
+            return .secondary
+        case .noDestinations:
+            return .secondary
+        }
+    }
+
     private var settingsOverviewTitle: String {
         if !model.isPersistentStoreAvailable {
             return "Local app data needs attention"
@@ -2134,6 +2195,9 @@ struct SettingsView: View {
         }
         if !model.fullDiskAccessStatus.hasLikelyFullDiskAccess {
             return "System access needs attention"
+        }
+        if backgroundSecretAccessSummary.needsRepair {
+            return "Password access needs repair"
         }
         if pausesScheduledBackups && scheduledProfileCount > 0 {
             return "Scheduled backups are paused"
@@ -2167,6 +2231,9 @@ struct SettingsView: View {
         if !model.fullDiskAccessStatus.hasLikelyFullDiskAccess {
             return fullDiskAccessDescription
         }
+        if backgroundSecretAccessSummary.needsRepair {
+            return "\(backgroundSecretAccessSummary.detail) Repair access before relying on unattended scheduled backups."
+        }
         if pausesScheduledBackups && scheduledProfileCount > 0 {
             return "Automatic scheduled runs are paused. Manual Back Up Now actions still work for individual profiles."
         }
@@ -2188,6 +2255,7 @@ struct SettingsView: View {
             return .red
         }
         if !model.fullDiskAccessStatus.hasLikelyFullDiskAccess
+            || backgroundSecretAccessSummary.needsRepair
             || (pausesScheduledBackups && scheduledProfileCount > 0)
             || shouldShowBackgroundSchedulingAttention
             || (sendsJobNotifications && !notificationAuthorizationState.canDeliver) {
@@ -2200,6 +2268,7 @@ struct SettingsView: View {
         !model.isPersistentStoreAvailable
             || backupToolStatusText != "Ready"
             || !model.fullDiskAccessStatus.hasLikelyFullDiskAccess
+            || backgroundSecretAccessSummary.needsRepair
             || (pausesScheduledBackups && scheduledProfileCount > 0)
             || shouldShowBackgroundSchedulingAttention
             || (sendsJobNotifications && !notificationAuthorizationState.canDeliver)
@@ -2220,6 +2289,13 @@ struct SettingsView: View {
                 symbol: "clock.badge.checkmark",
                 color: backgroundBackupsStatusColor,
                 detail: backgroundBackupsSummaryDetail
+            ),
+            SettingsStatusItem(
+                title: "Passwords",
+                value: backgroundSecretAccessSummary.displayName,
+                symbol: "key.horizontal",
+                color: backgroundSecretAccessStatusColor,
+                detail: backgroundSecretAccessSummary.detail
             ),
             SettingsStatusItem(
                 title: "Updates",

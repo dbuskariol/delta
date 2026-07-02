@@ -18,6 +18,10 @@ public struct DiagnosticSnapshotCollector {
         let resticURL = ResticExecutableLocator().locate(in: bundle)
         let rcloneURL = resticURL.deletingLastPathComponent().appendingPathComponent("rclone")
         let fullDiskAccessStatus = FullDiskAccessProbe().check(fileManager: fileManager)
+        let backgroundPasswordSummary = BackgroundSecretAccessSummary(
+            reports: repositories.map { RepositorySecretAccessRepairer().verify(repository: $0) },
+            destinationCount: repositories.count
+        )
         let recentJobs = jobs
             .sorted { $0.startedAt > $1.startedAt }
             .prefix(10)
@@ -44,6 +48,7 @@ public struct DiagnosticSnapshotCollector {
             fullDiskAccessStatus: fullDiskAccessStatus.hasLikelyFullDiskAccess ? "Ready" : "Needs Access",
             backgroundBackupsStatus: LaunchAgentController.status().displayName,
             scheduledAutomationStatus: DeltaAppPreferences.bool(for: DeltaAppPreferenceKeys.pausesScheduledBackups, default: false) ? "Paused" : "Running",
+            backgroundPasswordAccessStatus: backgroundPasswordSummary.displayName,
             appLoginItemStatus: AppLoginItemController.status().displayName,
             notificationStatus: DeltaAppPreferences.bool(for: DeltaAppPreferenceKeys.sendsJobNotifications, default: false) ? "Enabled" : "Disabled",
             menuBarStatus: DeltaAppPreferences.bool(for: DeltaAppPreferenceKeys.showsMenuBarExtra, default: true) ? "Shown" : "Hidden",

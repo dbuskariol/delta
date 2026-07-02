@@ -120,13 +120,15 @@ struct DeltaApp: App {
             let repositoryID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
             let profileID = UUID(uuidString: "22222222-2222-2222-2222-222222222222")!
             let jobID = UUID(uuidString: "33333333-3333-3333-3333-333333333333")!
+            let destinationSecretAccount = "diagnostics-repository-secret"
+            let backendSecretAccount = "diagnostics-aws-secret"
             let repository = BackupRepository(
                 id: repositoryID,
                 name: "Diagnostics rest:https://user:\(secret)@example.com/repo",
                 backend: .s3(endpoint: "https://s3.example.com", bucket: "delta-diagnostics", path: "acceptance", region: "us-east-1"),
-                keychainAccount: "diagnostics-repository-secret",
+                keychainAccount: destinationSecretAccount,
                 credentialReferences: [
-                    RepositoryCredentialReference(environmentKey: "AWS_SECRET_ACCESS_KEY", keychainAccount: "diagnostics-aws-secret")
+                    RepositoryCredentialReference(environmentKey: "AWS_SECRET_ACCESS_KEY", keychainAccount: backendSecretAccount)
                 ],
                 createdAt: Date(timeIntervalSince1970: 10),
                 lastVerifiedAt: Date(timeIntervalSince1970: 20)
@@ -160,11 +162,24 @@ struct DeltaApp: App {
                 paths: ["/tmp/delta-diagnostics"],
                 tags: ["delta", "profile:\(profileID.uuidString)"]
             )
+            let secretStore = KeychainSecretStore()
+            try? secretStore.delete(account: destinationSecretAccount)
+            try? secretStore.delete(account: backendSecretAccount)
+            try secretStore.save(
+                secret: "diagnostic-destination-password",
+                account: destinationSecretAccount,
+                authenticationPolicy: .failIfInteractionNeeded
+            )
+            try secretStore.save(
+                secret: secret,
+                account: backendSecretAccount,
+                authenticationPolicy: .failIfInteractionNeeded
+            )
             try database.saveRepository(repository)
             try database.saveProfile(profile)
             try database.saveJobRun(job)
             try database.saveSnapshot(snapshot, repositoryID: repositoryID)
-            print("Seeded diagnostic acceptance state.")
+            print("Seeded diagnostic acceptance state and throwaway Keychain items.")
             exit(0)
         } catch {
             fputs("Delta diagnostic acceptance error: \(error.localizedDescription)\n", stderr)

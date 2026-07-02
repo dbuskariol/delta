@@ -49,6 +49,7 @@ final class DeltaAppModel: ObservableObject {
     @Published private(set) var snapshotEntryLoadingKey: String?
     @Published var events: [EventLog] = []
     @Published private(set) var sourceHealthWarnings: [DashboardHealthWarning] = []
+    @Published private(set) var backgroundSecretAccessReports: [RepositorySecretAccessReport] = []
     @Published var fullDiskAccessStatus = FullDiskAccessProbe().check()
     @Published var isWorking = false
     @Published var alertMessage: String?
@@ -83,6 +84,8 @@ final class DeltaAppModel: ObservableObject {
     private var databaseRefreshTask: Task<Void, Never>?
     private var lastLiveLogWasStatus = false
     private var lastOperationalHistoryPruneAt: Date?
+    private var lastBackgroundSecretAccessCheckAt: Date?
+    private var lastBackgroundSecretAccessSignature = ""
 
     init() {
         let result = Self.openDatabase()
@@ -102,6 +105,7 @@ final class DeltaAppModel: ObservableObject {
     func reload() {
         guard reopenPersistentStoreIfNeeded() else {
             sourceHealthWarnings = []
+            backgroundSecretAccessReports = []
             fullDiskAccessStatus = FullDiskAccessProbe().check()
             launchAgentStatus = LaunchAgentController.status()
             appLoginItemStatus = AppLoginItemController.status()
@@ -124,6 +128,7 @@ final class DeltaAppModel: ObservableObject {
             snapshotsByRepository = try database.fetchSnapshotsByRepository()
             events = try database.fetchEvents(limit: 200)
             sourceHealthWarnings = DashboardHealthEvaluator().sourceWarnings(profiles: storedProfiles)
+            refreshBackgroundSecretAccessStatusIfNeeded(repositories: storedRepositories)
             fullDiskAccessStatus = FullDiskAccessProbe().check()
             launchAgentStatus = LaunchAgentController.status()
             appLoginItemStatus = AppLoginItemController.status()
@@ -728,6 +733,7 @@ final class DeltaAppModel: ObservableObject {
                 try database.appendEvent(EventLog(level: .warning, message: message))
                 alertMessage = "\(message) The first failure was \(failures[0].purpose): \(failures[0].message)"
             }
+            lastBackgroundSecretAccessCheckAt = nil
             reload()
         } catch {
             alertMessage = error.localizedDescription
@@ -913,6 +919,40 @@ final class DeltaAppModel: ObservableObject {
         } catch {
             try? database.appendEvent(EventLog(level: .warning, message: "Could not clean up old activity history: \(error.localizedDescription)"))
         }
+    }
+
+    private func refreshBackgroundSecretAccessStatusIfNeeded(
+        repositories: [BackupRepository],
+        now: Date = Date()
+    ) {
+        guard !repositories.isEmpty else {
+            backgroundSecretAccessReports = []
+            lastBackgroundSecretAccessCheckAt = nil
+            lastBackgroundSecretAccessSignature = ""
+            return
+        }
+
+        let signature: String = repositories
+            .sorted { $0.id.uuidString < $1.id.uuidString }
+            .map { repository in
+                let credentialSignature: String = repository.credentialReferences
+                    .map { "\($0.environmentKey):\($0.keychainAccount)" }
+                    .sorted()
+                    .joined(separator: String(","))
+                return "\(repository.id.uuidString):\(repository.keychainAccount):\(credentialSignature)"
+            }
+            .joined(separator: String("|"))
+
+        if let lastBackgroundSecretAccessCheckAt,
+           signature == lastBackgroundSecretAccessSignature,
+           now.timeIntervalSince(lastBackgroundSecretAccessCheckAt) < 60 {
+            return
+        }
+
+        let repairer = RepositorySecretAccessRepairer(secretStore: secretStore)
+        backgroundSecretAccessReports = repositories.map { repairer.verify(repository: $0) }
+        lastBackgroundSecretAccessCheckAt = now
+        lastBackgroundSecretAccessSignature = signature
     }
 
     private func operationalHistoryPruneMessage(_ result: OperationalHistoryPruneResult) -> String {
