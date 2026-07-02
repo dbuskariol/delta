@@ -83,14 +83,14 @@ struct DeltaMenuBarView: View {
                     } label: {
                         Label("Pause", systemImage: "pause.fill")
                     }
-                    .disabled(model.activeStopRequest != nil)
+                    .disabled(!actionAvailability.canPauseActiveBackup)
                 }
                 Button(role: .destructive) {
                     model.cancelActiveJob()
                 } label: {
                     Label("Stop", systemImage: "xmark")
                 }
-                .disabled(model.activeStopRequest != nil)
+                .disabled(!actionAvailability.canStopActiveJob)
             }
             .controlSize(.small)
             .buttonStyle(.bordered)
@@ -152,7 +152,7 @@ struct DeltaMenuBarView: View {
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(model.profiles.isEmpty || model.isWorking || !model.isPersistentStoreAvailable)
+                .disabled(!actionAvailability.canBackUpNow)
             } else {
                 Menu {
                     ForEach(model.profiles) { profile in
@@ -165,18 +165,18 @@ struct DeltaMenuBarView: View {
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(model.isWorking || !model.isPersistentStoreAvailable)
+                .disabled(!actionAvailability.canBackUpNow)
             }
 
             Button {
                 model.runDueBackups()
             } label: {
-                Label(pausesScheduledBackups ? "Scheduled Paused" : "Run Due Backups", systemImage: pausesScheduledBackups ? "pause.circle" : "calendar.badge.clock")
+                Label(actionAvailability.runDueTitle, systemImage: actionAvailability.runDueSymbolName)
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.bordered)
-            .disabled(model.profiles.isEmpty || model.isWorking || pausesScheduledBackups || !model.isPersistentStoreAvailable)
-            .deltaTooltip(pausesScheduledBackups ? "Scheduled backups are paused in Settings. Manual Back Up Now is still available." : "Run every backup profile that is currently due.")
+            .disabled(!actionAvailability.canRunDueBackups)
+            .deltaTooltip(actionAvailability.runDueTooltip)
         }
         .controlSize(.regular)
     }
@@ -267,6 +267,17 @@ struct DeltaMenuBarView: View {
             isWorking: model.isWorking,
             activeJobKind: model.activeOperation?.kind,
             latestBackupStatus: lastBackupRun?.status
+        )
+    }
+
+    private var actionAvailability: MenuBarActionAvailability {
+        MenuBarActionAvailability.make(
+            profileCount: model.profiles.count,
+            isPersistentStoreAvailable: model.isPersistentStoreAvailable,
+            isWorking: model.isWorking,
+            pausesScheduledBackups: pausesScheduledBackups,
+            activeJobKind: model.activeOperation?.kind,
+            activeStopRequest: model.activeStopRequest
         )
     }
 

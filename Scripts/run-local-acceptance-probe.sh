@@ -368,7 +368,14 @@ else
   else
     append_row "remote_first_backup_preparation" "$(item_area remote_first_backup_preparation)" "Manual Required" "Remote destination preparation needs a real unprepared remote and an existing remote to avoid false confidence. Configure SFTP or S3 external acceptance to automate the backend lifecycle." "Start backup on new unprepared remote and existing remote; confirm init happens only when needed."
   fi
-  append_row "menu_bar" "$(item_area menu_bar)" "Manual Required" "Native status item presentation and persistent popover behavior require visual macOS interaction." "Enable/disable the menu bar item and verify ready/running/attention states plus all popover actions."
+  if [[ "$automated_gate_status" == "Passed" && "$automated_gate_commit" == "$git_commit" ]] \
+    && grep -Fq "MenuBarStatusPresentationTests" "$ROOT_DIR/Tests/DeltaCoreTests/MenuBarStatusPresentationTests.swift" \
+    && grep -Fq "MenuBarActionAvailabilityTests" "$ROOT_DIR/Tests/DeltaCoreTests/MenuBarActionAvailabilityTests.swift"
+  then
+    append_row "menu_bar" "$(item_area menu_bar)" "Partial" "Automated release gate passed menu bar status presentation and action-availability policy coverage for commit $git_commit. Native status item visibility and persistent popover behavior still require visual macOS interaction." "Enable/disable the menu bar item and verify ready/running/attention states plus all popover actions."
+  else
+    append_row "menu_bar" "$(item_area menu_bar)" "Manual Required" "Native status item presentation and persistent popover behavior require visual macOS interaction." "Enable/disable the menu bar item and verify ready/running/attention states plus all popover actions."
+  fi
   if [[ "$automated_gate_status" == "Passed" && "$automated_gate_commit" == "$git_commit" ]] \
     && grep -Fq "Send Test Alert" "$ROOT_DIR/Sources/Delta/ContentView.swift" \
     && grep -Fq "testTestAlertRequiresEnabledNotificationsAndDeliverableAuthorization" "$ROOT_DIR/Tests/DeltaCoreTests/JobNotificationPolicyTests.swift"
