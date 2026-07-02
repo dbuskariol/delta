@@ -78,6 +78,35 @@ final class BackupCoordinatorPolicyTests: XCTestCase {
         XCTAssertNil(storedRepository.lastVerifiedAt)
     }
 
+    func testRunBackupPreparesMissingLocalDestinationBeforeFirstBackup() throws {
+        let fixture = try Fixture(repositoryPrepared: false)
+        let runner = MockResticRunner(results: [.success, .success])
+        let coordinator = fixture.makeCoordinator(runner: runner)
+        let profile = fixture.profile()
+
+        let job = try coordinator.runBackup(profile: profile, repository: fixture.repository)
+        let jobs = try fixture.database.fetchJobRuns(limit: 10)
+
+        XCTAssertEqual(job.status, .succeeded)
+        XCTAssertEqual(runner.commands.map(\.resticSubcommand), ["init", "backup"])
+        XCTAssertEqual(jobs.filter { $0.kind == .initializeRepository && $0.status == .succeeded }.count, 1)
+        XCTAssertEqual(jobs.filter { $0.kind == .backup && $0.status == .succeeded }.count, 1)
+    }
+
+    func testRefreshSnapshotsUsesFriendlyRepositoryMissingMessage() throws {
+        let fixture = try Fixture()
+        let rawError = """
+        {"message_type":"exit_error","code":10,"message":"Fatal: repository does not exist: unable to open config file"}
+        """
+        let runner = MockResticRunner(results: [ResticRunResult(exitCode: 10, standardOutput: "", standardError: rawError)])
+        let coordinator = fixture.makeCoordinator(runner: runner)
+
+        XCTAssertThrowsError(try coordinator.refreshSnapshots(repository: fixture.repository)) { error in
+            XCTAssertTrue(error.localizedDescription.contains("destination has not been prepared"), error.localizedDescription)
+            XCTAssertFalse(error.localizedDescription.contains("message_type"), error.localizedDescription)
+        }
+    }
+
     func testScheduledMaintenanceRunsCleanupAndCheckWhenDue() throws {
         let fixture = try Fixture()
         let runner = MockResticRunner(results: [.success, .success, .success])
@@ -366,11 +395,12 @@ final class BackupCoordinatorPolicyTests: XCTestCase {
         let messages = logs.map(\.message)
 
         XCTAssertEqual(job.status, .succeeded)
+        XCTAssertTrue(messages.contains("Source: \(fixture.source.path)"))
         XCTAssertTrue(messages.contains { $0.hasPrefix("Starting Backup:") && $0.contains("<redacted>") })
-        XCTAssertTrue(messages.contains("Progress 42% · 21/50 files · 1 MB"))
+        XCTAssertTrue(messages.contains("Estimated 42% · 21/50 files · 1 MB"))
         XCTAssertTrue(messages.contains("Finished Backup with status succeeded."))
-        XCTAssertEqual(recorder.events.first?.jobID, job.id)
-        XCTAssertEqual(recorder.events.first?.event, event)
+        XCTAssertTrue(recorder.events.contains { $0.jobID == job.id && $0.event.message == "Source: \(fixture.source.path)" })
+        XCTAssertTrue(recorder.events.contains { $0.jobID == job.id && $0.event == event })
     }
 
     func testRunnerThrowMarksJobFailedAndPersistsFailureLog() throws {
@@ -558,7 +588,7 @@ private struct Fixture {
     let database: DeltaDatabase
     let repository: BackupRepository
 
-    init() throws {
+    init(repositoryPrepared: Bool = true) throws {
         root = FileManager.default.temporaryDirectory
             .appendingPathComponent("delta-tests-\(UUID().uuidString)", isDirectory: true)
         source = root.appendingPathComponent("source", isDirectory: true)
@@ -568,6 +598,9 @@ private struct Fixture {
         lockManager = RepositoryJobLockManager(lockDirectoryProvider: { lockDirectoryURL })
         try FileManager.default.createDirectory(at: source, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
+        if repositoryPrepared {
+            try Data("prepared".utf8).write(to: destination.appendingPathComponent("config"))
+        }
         database = try DeltaDatabase(url: root.appendingPathComponent("Delta.sqlite"))
         repository = BackupRepository(name: "Destination", backend: .local(path: destination.path))
     }

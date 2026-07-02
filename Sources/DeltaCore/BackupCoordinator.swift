@@ -101,7 +101,37 @@ public final class BackupCoordinator: @unchecked Sendable {
             BackupSource(id: original.id, path: resolved.url.path, bookmarkData: original.bookmarkData, includeSubvolumes: original.includeSubvolumes)
         }
 
-        return try run(repositoryID: repository.id, profileID: profile.id, kind: .backup) {
+        if localRepositoryNeedsPreparation(repository) {
+            let preparationRun = try initializeRepository(repository)
+            guard preparationRun.status == .succeeded || preparationRun.status == .warning else {
+                let message = "Backup was not started because the destination could not be prepared."
+                let run = JobRun(
+                    profileID: profile.id,
+                    repositoryID: repository.id,
+                    kind: .backup,
+                    status: .failed,
+                    finishedAt: Date(),
+                    message: message
+                )
+                try database.saveJobRun(run)
+                try database.appendEvent(EventLog(level: .error, message: message))
+                recordJobLog(
+                    jobID: run.id,
+                    profileID: profile.id,
+                    repositoryID: repository.id,
+                    stream: .standardError,
+                    message: message
+                )
+                return run
+            }
+        }
+
+        return try run(
+            repositoryID: repository.id,
+            profileID: profile.id,
+            kind: .backup,
+            initialLogMessages: sourceSummaryMessages(for: resolvedProfile)
+        ) {
             try commandBuilder.backup(profile: resolvedProfile, repository: repository)
         }
     }
@@ -115,7 +145,7 @@ public final class BackupCoordinator: @unchecked Sendable {
 
         let result = try runner.run(try commandBuilder.snapshots(repository: repository))
         guard result.status == .succeeded || result.status == .warning else {
-            throw BackupCoordinatorError.resticFailed(result.standardError)
+            throw BackupCoordinatorError.resticFailed(result.userFacingMessage)
         }
         let snapshots = try parser.parseSnapshots(from: result.standardOutput)
         try database.saveSnapshots(snapshots, repositoryID: repository.id)
@@ -243,6 +273,34 @@ public final class BackupCoordinator: @unchecked Sendable {
         ).isDue
     }
 
+    private func localRepositoryNeedsPreparation(_ repository: BackupRepository) -> Bool {
+        guard case let .local(path) = repository.backend else {
+            return false
+        }
+        let expandedPath = (path.trimmingCharacters(in: .whitespacesAndNewlines) as NSString).expandingTildeInPath
+        let configPath = URL(fileURLWithPath: expandedPath).appendingPathComponent("config").path
+        return !FileManager.default.fileExists(atPath: configPath)
+    }
+
+    private func sourceSummaryMessages(for profile: BackupProfile) -> [String] {
+        let paths = profile.sources.map(\.path)
+        guard !paths.isEmpty else {
+            return []
+        }
+
+        let sourceLabel = profile.sourceMode == .fullVolume ? "Volume source" : "Source"
+        if paths.count == 1, let path = paths.first {
+            return ["\(sourceLabel): \(path)"]
+        }
+
+        var messages = ["Sources: \(paths.count) selected"]
+        messages += paths.prefix(8).map { "\(sourceLabel): \($0)" }
+        if paths.count > 8 {
+            messages.append("Sources: \(paths.count - 8) more not shown")
+        }
+        return messages
+    }
+
     private func failedRestoreRun(repositoryID: UUID, message: String) throws -> JobRun {
         let run = JobRun(
             profileID: nil,
@@ -272,6 +330,7 @@ public final class BackupCoordinator: @unchecked Sendable {
         repositoryID: UUID,
         profileID: UUID?,
         kind: JobKind,
+        initialLogMessages: [String] = [],
         makeCommand: () throws -> ResticCommand
     ) throws -> JobRun {
         guard let lock = try lockManager.acquire(repositoryID: repositoryID) else {
@@ -291,6 +350,19 @@ public final class BackupCoordinator: @unchecked Sendable {
 
         var job = JobRun(profileID: profileID, repositoryID: repositoryID, kind: kind, status: .running)
         try database.saveJobRun(job)
+        for message in initialLogMessages {
+            recordJobLog(
+                jobID: job.id,
+                profileID: profileID,
+                repositoryID: repositoryID,
+                stream: .standardOutput,
+                message: message
+            )
+            outputHandler?(
+                job.id,
+                ResticOutputEvent(stream: .standardOutput, message: message)
+            )
+        }
 
         let command: ResticCommand
         do {

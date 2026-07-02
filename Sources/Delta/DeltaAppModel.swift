@@ -68,6 +68,15 @@ final class DeltaAppModel: ObservableObject {
         }
     }
 
+    func savedLogs(for jobID: UUID, limit: Int = 10_000) -> [JobLogEntry] {
+        do {
+            return try database.fetchJobLogs(jobID: jobID, limit: limit)
+        } catch {
+            alertMessage = error.localizedDescription
+            return []
+        }
+    }
+
     @discardableResult
     func createRepository(
         name: String,

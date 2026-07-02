@@ -33,7 +33,7 @@ public enum ResticLogFormatter {
     private static func statusMessage(from object: [String: Any]) -> String {
         var parts: [String] = []
         if let percentDone = number(object["percent_done"]) {
-            parts.append("Progress \(Int((percentDone * 100).rounded()))%")
+            parts.append("Estimated \(Int((percentDone * 100).rounded()))%")
         }
         if let filesDone = integer(object["files_done"]) {
             if let totalFiles = integer(object["total_files"]), totalFiles > 0 {
@@ -45,7 +45,10 @@ public enum ResticLogFormatter {
         if let bytesDone = integer(object["bytes_done"]), bytesDone > 0 {
             parts.append(ByteCountFormatter.string(fromByteCount: Int64(bytesDone), countStyle: .file))
         }
-        return parts.isEmpty ? "Backup is running" : parts.joined(separator: " · ")
+        if let currentPath = currentPath(from: object) {
+            parts.append("Current \(compactPath(currentPath))")
+        }
+        return parts.isEmpty ? "Backup is scanning sources" : parts.joined(separator: " · ")
     }
 
     private static func summaryMessage(from object: [String: Any]) -> String {
@@ -91,5 +94,27 @@ public enum ResticLogFormatter {
         default:
             return nil
         }
+    }
+
+    private static func currentPath(from object: [String: Any]) -> String? {
+        if let currentFile = object["current_file"] as? String, !currentFile.isEmpty {
+            return currentFile
+        }
+        if let currentFiles = object["current_files"] as? [String] {
+            return currentFiles.first { !$0.isEmpty }
+        }
+        if let item = object["item"] as? String, !item.isEmpty {
+            return item
+        }
+        return nil
+    }
+
+    private static func compactPath(_ path: String) -> String {
+        let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
+        let components = trimmed.split(separator: "/").map(String.init)
+        guard components.count > 3 else {
+            return trimmed
+        }
+        return ".../" + components.suffix(3).joined(separator: "/")
     }
 }

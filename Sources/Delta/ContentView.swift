@@ -394,34 +394,17 @@ struct ActivityView: View {
     var body: some View {
         PageScaffold(title: "Activity", subtitle: "Jobs, destination checks, and system events") {
             SurfaceSection(title: "Live Backup Logs", symbol: "terminal") {
-                if model.liveLogLines.isEmpty {
-                    CompactEmptyRow(text: model.isWorking ? "Waiting for backup output..." : "No backup output is streaming right now.")
-                } else {
-                    VStack(alignment: .leading, spacing: 6) {
-                        ForEach(model.liveLogLines.suffix(120)) { line in
-                            LiveLogRow(line: line)
-                        }
-                    }
-                    .font(.system(.caption, design: .monospaced))
-                    .textSelection(.enabled)
-                }
+                LiveLogViewport(
+                    lines: Array(model.liveLogLines.suffix(300)),
+                    isWorking: model.isWorking
+                )
             }
 
             SurfaceSection(title: "Saved Job Logs", symbol: "doc.text.magnifyingglass") {
-                if model.jobLogs.isEmpty {
-                    CompactEmptyRow(text: "No saved job output yet.")
-                } else {
-                    VStack(alignment: .leading, spacing: 6) {
-                        ForEach(model.jobLogs.suffix(160)) { entry in
-                            PersistentLogRow(
-                                entry: entry,
-                                job: model.jobs.first(where: { $0.id == entry.jobID })
-                            )
-                        }
-                    }
-                    .font(.system(.caption, design: .monospaced))
-                    .textSelection(.enabled)
-                }
+                PersistentLogViewport(
+                    entries: Array(model.jobLogs.suffix(240)),
+                    jobs: model.jobs
+                )
             }
 
             SurfaceSection(title: "Recent Jobs", symbol: "waveform.path.ecg") {
@@ -1827,6 +1810,194 @@ struct EventRow: View {
     }
 }
 
+struct LiveLogViewport: View {
+    var lines: [ResticOutputEvent]
+    var isWorking: Bool
+
+    var body: some View {
+        LogViewport(
+            height: DeltaTheme.liveLogPaneHeight,
+            itemCount: lines.count,
+            bottomID: lines.last?.id
+        ) {
+            if lines.isEmpty {
+                CompactEmptyRow(text: isWorking ? "Waiting for backup output..." : "No backup output is streaming right now.")
+            } else {
+                ForEach(lines) { line in
+                    LiveLogRow(line: line)
+                        .id(line.id)
+                }
+            }
+        }
+        .font(.system(.caption, design: .monospaced))
+        .textSelection(.enabled)
+    }
+}
+
+struct PersistentLogViewport: View {
+    var entries: [JobLogEntry]
+    var jobs: [JobRun]
+
+    var body: some View {
+        PlainLogViewport(height: DeltaTheme.savedLogPaneHeight) {
+            if entries.isEmpty {
+                CompactEmptyRow(text: "No saved job output yet.")
+            } else {
+                ForEach(jobLogGroups) { group in
+                    SavedJobLogGroupView(group: group)
+                }
+            }
+        }
+        .font(.system(.caption, design: .monospaced))
+        .textSelection(.enabled)
+    }
+
+    private var jobLogGroups: [SavedJobLogGroup] {
+        let jobByID = Dictionary(uniqueKeysWithValues: jobs.map { ($0.id, $0) })
+        return Dictionary(grouping: entries, by: \.jobID)
+            .map { jobID, entries in
+                SavedJobLogGroup(
+                    id: jobID,
+                    job: jobByID[jobID],
+                    entries: entries.sorted { $0.date < $1.date }
+                )
+            }
+            .sorted { $0.latestDate > $1.latestDate }
+    }
+}
+
+struct SavedJobLogGroup: Identifiable {
+    var id: UUID
+    var job: JobRun?
+    var entries: [JobLogEntry]
+
+    var latestDate: Date {
+        entries.map(\.date).max() ?? .distantPast
+    }
+}
+
+struct SavedJobLogGroupView: View {
+    @EnvironmentObject private var model: DeltaAppModel
+    var group: SavedJobLogGroup
+    @State private var isExpanded = false
+    @State private var loadedEntries: [JobLogEntry] = []
+
+    var body: some View {
+        DisclosureGroup(isExpanded: $isExpanded) {
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(displayEntries) { entry in
+                    PersistentLogRow(entry: entry, job: group.job)
+                        .id(entry.id)
+                }
+            }
+            .padding(.top, 6)
+            .padding(.leading, 14)
+        } label: {
+            HStack(spacing: 10) {
+                Text(jobTitle)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                Text(group.latestDate.formatted(date: .omitted, time: .standard))
+                    .foregroundStyle(.tertiary)
+                Spacer()
+                Text(lineCountLabel)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .onChange(of: isExpanded) { _, expanded in
+            if expanded && loadedEntries.isEmpty {
+                loadedEntries = model.savedLogs(for: group.id)
+            }
+        }
+    }
+
+    private var displayEntries: [JobLogEntry] {
+        isExpanded && !loadedEntries.isEmpty ? loadedEntries : group.entries
+    }
+
+    private var lineCountLabel: String {
+        if isExpanded && !loadedEntries.isEmpty {
+            return "\(loadedEntries.count) \(loadedEntries.count == 1 ? "line" : "lines")"
+        }
+        return "\(group.entries.count) preview \(group.entries.count == 1 ? "line" : "lines")"
+    }
+
+    private var jobTitle: String {
+        guard let job = group.job else {
+            return "Job \(group.id.uuidString.prefix(8))"
+        }
+        return "\(job.kind.displayName) \(group.id.uuidString.prefix(6))"
+    }
+}
+
+struct LogViewport<BottomID: Hashable, Content: View>: View {
+    var height: CGFloat
+    var itemCount: Int
+    var bottomID: BottomID?
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 6) {
+                    content
+                }
+                .padding(.vertical, 8)
+                .padding(.horizontal, 10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(height: height)
+            .background(DeltaTheme.logPaneBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .overlay(
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(DeltaTheme.border, lineWidth: 1)
+            )
+            .onAppear {
+                scrollToBottom(with: proxy)
+            }
+            .onChange(of: itemCount) { _, _ in
+                scrollToBottom(with: proxy)
+            }
+        }
+    }
+
+    private func scrollToBottom(with proxy: ScrollViewProxy) {
+        guard let bottomID else {
+            return
+        }
+        DispatchQueue.main.async {
+            withAnimation(.easeOut(duration: 0.12)) {
+                proxy.scrollTo(bottomID, anchor: .bottom)
+            }
+        }
+    }
+}
+
+struct PlainLogViewport<Content: View>: View {
+    var height: CGFloat
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 8) {
+                content
+            }
+            .padding(.vertical, 8)
+            .padding(.horizontal, 10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(height: height)
+        .background(DeltaTheme.logPaneBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(DeltaTheme.border, lineWidth: 1)
+        )
+    }
+}
+
 struct LiveLogRow: View {
     var line: ResticOutputEvent
 
@@ -1894,6 +2065,9 @@ enum DeltaTheme {
     static let panel = Color(nsColor: .controlBackgroundColor)
     static let border = Color(nsColor: .separatorColor).opacity(0.45)
     static let badge = Color(nsColor: .tertiarySystemFill)
+    static let logPaneBackground = Color(nsColor: .textBackgroundColor).opacity(0.16)
+    static let liveLogPaneHeight: CGFloat = 300
+    static let savedLogPaneHeight: CGFloat = 220
     static let statColumns = [
         GridItem(.adaptive(minimum: 190), spacing: 12)
     ]

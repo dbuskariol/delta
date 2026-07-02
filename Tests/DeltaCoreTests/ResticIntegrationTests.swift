@@ -14,6 +14,7 @@ final class ResticIntegrationTests: XCTestCase {
         let repo = root.appendingPathComponent("repo", isDirectory: true)
         let fullRestore = root.appendingPathComponent("restore-full", isDirectory: true)
         let selectedRestore = root.appendingPathComponent("restore-selected", isDirectory: true)
+        let multiSelectedRestore = root.appendingPathComponent("restore-multi-selected", isDirectory: true)
         try FileManager.default.createDirectory(at: source, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: nested, withIntermediateDirectories: true)
         try "hello".write(to: source.appendingPathComponent("file.txt"), atomically: true, encoding: .utf8)
@@ -88,6 +89,22 @@ final class ResticIntegrationTests: XCTestCase {
         XCTAssertEqual(selectedRestoreResult.status, .succeeded)
         XCTAssertEqual(try contentsOfFirstFile(named: "selected.txt", under: selectedRestore), "selected-updated")
         XCTAssertNil(try firstFile(named: "other.txt", under: selectedRestore))
+
+        let multiSelectedRestoreRequest = RestoreRequest(
+            repositoryID: repository.id,
+            snapshotID: latestSnapshot.id,
+            scope: .selectedPaths([
+                source.appendingPathComponent("file.txt").path,
+                nested.path
+            ]),
+            destination: .chosenFolder(multiSelectedRestore.path),
+            dryRun: false
+        )
+        let multiSelectedRestoreResult = try runner.run(try builder.restore(request: multiSelectedRestoreRequest, repository: repository))
+        XCTAssertEqual(multiSelectedRestoreResult.status, .succeeded)
+        XCTAssertEqual(try contentsOfFirstFile(named: "file.txt", under: multiSelectedRestore), "hello-updated")
+        XCTAssertEqual(try contentsOfFirstFile(named: "selected.txt", under: multiSelectedRestore), "selected-updated")
+        XCTAssertNil(try firstFile(named: "other.txt", under: multiSelectedRestore))
 
         let checkResult = try runner.run(try builder.check(repository: repository, readDataSubset: "1/100"))
         XCTAssertEqual(checkResult.status, .succeeded)

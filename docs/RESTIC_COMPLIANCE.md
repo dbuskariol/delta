@@ -49,6 +49,8 @@ URL construction is covered by `ResticCommandTests`.
 
 Delta validates destination inputs before saving them. The validator trims persisted fields, requires writable new or changed local destinations or writable parents, rejects relative local paths in the native destination form, requires absolute SFTP paths and valid ports, validates REST URLs as `http` or `https`, and rejects rclone remote names that already include a colon. Advanced raw restic URLs remain available through the custom destination type.
 
+For local and mounted destinations, Delta automatically runs `restic init` before the first backup when the destination is writable but has no restic `config` file yet.
+
 ## Backend Credentials
 
 Backend credentials are stored in Keychain and injected into a curated restic process environment only for the job run. Delta forwards operational values such as `PATH`, `HOME`, `TMPDIR`, locale, and `SSH_AUTH_SOCK`, but does not pass arbitrary ambient environment variables to restic.
@@ -106,6 +108,8 @@ Expected restic backup exit handling:
 | `11` | Destination locked |
 | `12` | Wrong password |
 | other non-zero | Failed or cancelled when interruption text is present |
+
+Restic progress totals can change while it scans sources, so Delta labels live percentages as estimated progress. Backup jobs record source paths at job start, and saved logs are grouped by job with expandable full-log loading from SQLite.
 
 ## Snapshots / Restore Points
 
