@@ -1085,7 +1085,7 @@ struct SettingsView: View {
     var body: some View {
         PageScaffold(
             title: "Settings",
-            subtitle: "Backups, permissions, updates, and support",
+            subtitle: "Background backups, permissions, notifications, and safe defaults",
             actions: {
                 Button {
                     model.reload()
@@ -1118,14 +1118,14 @@ struct SettingsView: View {
             SettingsStatusGrid(items: settingsStatusItems)
 
             SettingsSectionLabel(
-                title: "Background Backups",
-                subtitle: "Let scheduled profiles run without keeping the main Delta window open."
+                title: "Required Setup",
+                subtitle: "Permissions and approvals needed for reliable unattended backups."
             )
 
             SettingsCard(
                 symbol: "clock.badge.checkmark",
                 title: "Background Backups",
-                subtitle: "A signed macOS Login Item checks schedules, starts due backups, then exits.",
+                subtitle: "Run scheduled backups while Delta's main window is closed.",
                 statusText: backgroundBackupsStatusText,
                 statusColor: backgroundBackupsStatusColor
             ) {
@@ -1140,16 +1140,15 @@ struct SettingsView: View {
 
                 SettingsNotice(
                     symbol: "clock.arrow.circlepath",
-                    title: "How it works",
-                    text: "macOS runs Delta's signed per-user helper for short schedule checks. It runs as you, never as an admin service, and scheduled backups continue even after the main window is closed.",
+                    title: "Why this exists",
+                    text: "macOS can wake Delta's signed background item for short schedule checks. It runs as your user account, uses the same saved destinations, and exits when no work is due.",
                     color: .blue
                 )
 
                 SettingsFactGrid(items: [
                     SettingsFact(title: "Scheduled profiles", value: "\(scheduledProfileCount)"),
-                    SettingsFact(title: "Schedule checks", value: "Automatic"),
                     SettingsFact(title: "Runs as", value: "Current user"),
-                    SettingsFact(title: "Window required", value: "No"),
+                    SettingsFact(title: "Window", value: "Not required"),
                     SettingsFact(title: "macOS approval", value: backgroundApprovalText)
                 ])
 
@@ -1169,7 +1168,7 @@ struct SettingsView: View {
                     )
                 }
 
-                HStack(spacing: 8) {
+                SettingsActionBar {
                     Button {
                         model.openLoginItemsSettings()
                     } label: {
@@ -1190,14 +1189,7 @@ struct SettingsView: View {
                     .disabled(model.repositories.isEmpty || model.isWorking || !model.isPersistentStoreAvailable)
                     .deltaTooltip("Refresh saved destination passwords so background backups can read them without interactive Keychain prompts.")
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
             }
-
-            SettingsSectionLabel(
-                title: "System Access",
-                subtitle: "macOS privacy permissions Delta needs to read protected folders."
-            )
 
             SettingsCard(
                 symbol: "lock.shield",
@@ -1220,7 +1212,7 @@ struct SettingsView: View {
                     text: "For development builds, keep Delta installed in /Applications with the same signing identity. macOS ties privacy approval to the signed app identity, so changing that identity can require approval again."
                 )
 
-                HStack(spacing: 8) {
+                SettingsActionBar {
                     Button {
                         model.openFullDiskAccessSettings()
                     } label: {
@@ -1240,13 +1232,11 @@ struct SettingsView: View {
                     }
                     .deltaTooltip("Recheck whether protected folders are readable.")
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
             }
 
             SettingsSectionLabel(
-                title: "Preferences",
-                subtitle: "App-level preferences that apply across destinations and backup profiles."
+                title: "App Behavior",
+                subtitle: "Controls for Delta's menu bar, sign-in behavior, and macOS alerts."
             )
 
             SettingsCard(
@@ -1293,7 +1283,7 @@ struct SettingsView: View {
                     )
                 }
 
-                HStack(spacing: 8) {
+                SettingsActionBar {
                     Button {
                         model.openLoginItemsSettings()
                     } label: {
@@ -1307,8 +1297,6 @@ struct SettingsView: View {
                     }
                     .deltaTooltip("Recheck Delta's menu bar and login status.")
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
             }
 
             SettingsCard(
@@ -1350,7 +1338,7 @@ struct SettingsView: View {
                     SettingsFact(title: "Success alerts", value: sendsSuccessfulBackupNotifications ? "On" : "Off")
                 ])
 
-                HStack(spacing: 8) {
+                SettingsActionBar {
                     Button {
                         requestNotificationPermission()
                     } label: {
@@ -1370,9 +1358,12 @@ struct SettingsView: View {
                         Label("Refresh Status", systemImage: "arrow.clockwise")
                     }
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
             }
+
+            SettingsSectionLabel(
+                title: "Backup & Restore Defaults",
+                subtitle: "Recommended defaults for newly created profiles and restore jobs."
+            )
 
             SettingsCard(
                 symbol: "slider.horizontal.3",
@@ -1471,7 +1462,7 @@ struct SettingsView: View {
                     SettingsFact(title: "Existing profiles", value: "Unchanged")
                 ])
 
-                HStack(spacing: 8) {
+                SettingsActionBar {
                     Button {
                         resetBackupDefaults()
                     } label: {
@@ -1488,8 +1479,6 @@ struct SettingsView: View {
                         Label("Manage Destinations", systemImage: "externaldrive.connected.to.line.below")
                     }
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
             }
 
             SettingsCard(
@@ -1537,14 +1526,19 @@ struct SettingsView: View {
                     text: "These defaults keep restores conservative without hiding control. Each restore can still be changed before previewing or running it."
                 )
 
-                Button {
-                    resetRestoreDefaults()
-                } label: {
-                    Label("Restore Recommended", systemImage: "arrow.counterclockwise")
+                SettingsActionBar {
+                    Button {
+                        resetRestoreDefaults()
+                    } label: {
+                        Label("Restore Recommended", systemImage: "arrow.counterclockwise")
+                    }
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
             }
+
+            SettingsSectionLabel(
+                title: "Updates",
+                subtitle: "Signed update checks and install behavior."
+            )
 
             SettingsCard(
                 symbol: "arrow.down.circle",
@@ -1583,13 +1577,13 @@ struct SettingsView: View {
                     }
                 }
 
-                Button {
-                    softwareUpdateController.checkForUpdates()
-                } label: {
-                    Label("Check Now", systemImage: "arrow.clockwise")
+                SettingsActionBar {
+                    Button {
+                        softwareUpdateController.checkForUpdates()
+                    } label: {
+                        Label("Check Now", systemImage: "arrow.clockwise")
+                    }
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
             }
 
             SettingsSectionLabel(
@@ -1635,14 +1629,14 @@ struct SettingsView: View {
                     text: "Delta uses its bundled, signed backup tools so scheduled jobs and restores run with the same tested binaries as the app."
                 )
 
-                Button {
-                    model.revealBackupToolsFolder()
-                } label: {
-                    Label("Show Tools", systemImage: "folder")
+                SettingsActionBar {
+                    Button {
+                        model.revealBackupToolsFolder()
+                    } label: {
+                        Label("Show Tools", systemImage: "folder")
+                    }
+                    .deltaTooltip("Show Delta's bundled backup engine and cloud helper in Finder.")
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .deltaTooltip("Show Delta's bundled backup engine and cloud helper in Finder.")
             }
 
             SettingsCard(
@@ -3599,21 +3593,62 @@ struct SettingsControlRow<Control: View>: View {
     @ViewBuilder var control: Control
 
     var body: some View {
+        ViewThatFits(in: .horizontal) {
+            horizontalLayout
+            verticalLayout
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var horizontalLayout: some View {
         HStack(alignment: .center, spacing: 16) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text(title)
-                    .font(.subheadline.weight(.semibold))
-                Text(detail)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+            label
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            control
+                .frame(width: 270, alignment: .trailing)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var verticalLayout: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            label
+            control
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var label: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+            Text(detail)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
+struct SettingsActionBar<Content: View>: View {
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 8) {
+                content
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            control
-                .frame(minWidth: 190, alignment: .trailing)
+            VStack(alignment: .leading, spacing: 8) {
+                content
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .buttonStyle(.bordered)
+        .controlSize(.small)
     }
 }
 

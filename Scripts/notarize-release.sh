@@ -15,7 +15,7 @@ fi
 
 /usr/bin/codesign --verify --strict --deep --verbose=2 "$APP"
 
-SIGNING_DETAILS="$(/usr/bin/codesign -dv "$APP" 2>&1)"
+SIGNING_DETAILS="$(/usr/bin/codesign -dvv "$APP" 2>&1)"
 if ! /usr/bin/grep -q '^Authority=Developer ID Application:' <<<"$SIGNING_DETAILS"; then
   printf "Notarization requires a Developer ID Application signature.\n" >&2
   printf "Current signing details:\n%s\n" "$SIGNING_DETAILS" >&2

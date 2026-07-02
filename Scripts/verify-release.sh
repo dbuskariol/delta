@@ -10,8 +10,11 @@ cd "$ROOT_DIR"
 /bin/bash -n \
   "$ROOT_DIR/Scripts/package-update.sh" \
   "$ROOT_DIR/Scripts/notarize-release.sh" \
+  "$ROOT_DIR/Scripts/manual-acceptance-items.sh" \
   "$ROOT_DIR/Scripts/collect-release-evidence.sh" \
-  "$ROOT_DIR/Scripts/verify-installed-app.sh"
+  "$ROOT_DIR/Scripts/create-manual-acceptance-report.sh" \
+  "$ROOT_DIR/Scripts/verify-installed-app.sh" \
+  "$ROOT_DIR/Scripts/verify-manual-acceptance.sh"
 if [[ ! -x "$ROOT_DIR/Scripts/notarize-release.sh" ]]; then
   printf "Scripts/notarize-release.sh must be executable.\n" >&2
   exit 1
@@ -22,6 +25,14 @@ if [[ ! -x "$ROOT_DIR/Scripts/collect-release-evidence.sh" ]]; then
 fi
 if [[ ! -x "$ROOT_DIR/Scripts/verify-installed-app.sh" ]]; then
   printf "Scripts/verify-installed-app.sh must be executable.\n" >&2
+  exit 1
+fi
+if [[ ! -x "$ROOT_DIR/Scripts/create-manual-acceptance-report.sh" ]]; then
+  printf "Scripts/create-manual-acceptance-report.sh must be executable.\n" >&2
+  exit 1
+fi
+if [[ ! -x "$ROOT_DIR/Scripts/verify-manual-acceptance.sh" ]]; then
+  printf "Scripts/verify-manual-acceptance.sh must be executable.\n" >&2
   exit 1
 fi
 "$ROOT_DIR/Scripts/bootstrap-tools.sh"
@@ -46,7 +57,7 @@ fi
 /bin/rm -f "$BUILD_LOG"
 /usr/bin/codesign --verify --strict --deep --verbose=2 "$ROOT_DIR/dist/Delta.app"
 
-SIGNING_DETAILS="$(/usr/bin/codesign -dv "$ROOT_DIR/dist/Delta.app" 2>&1)"
+SIGNING_DETAILS="$(/usr/bin/codesign -dvv "$ROOT_DIR/dist/Delta.app" 2>&1)"
 if ! /usr/bin/grep -q '^TeamIdentifier=' <<<"$SIGNING_DETAILS"; then
   printf "Delta.app is ad-hoc signed. Install an Apple Development or Developer ID certificate, or set DELTA_CODESIGN_IDENTITY, before release verification.\n" >&2
   exit 1
@@ -225,5 +236,14 @@ if ! /usr/bin/grep -Eq 'sparkle:edSignature="[A-Za-z0-9+/=]{40,}"' "$APPCAST"; t
   printf "Sparkle appcast does not contain an EdDSA signature for the update archive.\n" >&2
   exit 1
 fi
+
+GATE_STATUS_DIR="$ROOT_DIR/dist/release-evidence"
+/bin/mkdir -p "$GATE_STATUS_DIR"
+cat >"$GATE_STATUS_DIR/automated-gate-status" <<EOF
+status=Passed
+git_commit=$(/usr/bin/git -C "$ROOT_DIR" rev-parse --short HEAD 2>/dev/null || printf "unknown")
+generated_at=$(/bin/date -u +%Y%m%dT%H%M%SZ)
+app_path=$ROOT_DIR/dist/Delta.app
+EOF
 
 printf "Release verification passed for %s\n" "$ROOT_DIR/dist/Delta.app"

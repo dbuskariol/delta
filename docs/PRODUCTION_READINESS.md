@@ -35,7 +35,7 @@ After the automated gate, collect a release evidence report:
 Scripts/collect-release-evidence.sh
 ```
 
-The report is written under `dist/release-evidence/` and records the exact app path, version, git commit, signature details, helper/tool smoke output, Sparkle update artifacts, Gatekeeper/notarization status, and manual acceptance matrix placeholders.
+The automated gate writes `dist/release-evidence/automated-gate-status` when it passes. The release evidence report is written under `dist/release-evidence/` and records the exact app path, version, git commit, signature details, helper/tool smoke output, Sparkle update artifacts, installed app smoke output, Gatekeeper/notarization status, automated gate status, and manual acceptance verification.
 
 ## Notarization Gate
 
@@ -52,10 +52,22 @@ DELTA_NOTARY_KEYCHAIN_PROFILE="Delta Notary" Scripts/notarize-release.sh
 
 Record the app version, build number, macOS build, signing identity, date, and tester for each run.
 
+Create an editable report from the canonical matrix:
+
+```sh
+Scripts/create-manual-acceptance-report.sh
+```
+
+Fill in `dist/manual-acceptance/latest.md` as each check is performed. Use exactly `Passed`, `Failed`, `Blocked`, or `Not run` in the Result column. Verify the report before external beta distribution:
+
+```sh
+Scripts/verify-manual-acceptance.sh
+```
+
 | Area | Required evidence |
 | --- | --- |
 | Install identity | Install `/Applications/Delta.app`, launch it, quit, relaunch, and confirm macOS privacy prompts remain stable across rebuilds signed by the same identity. |
-| Settings surface | Confirm Settings shows plain-language Background Backups, not raw LaunchAgent status; the compact status summary matches Full Disk Access, schedules, updates, notifications, and bundled backup-tool state; Start at Login uses macOS Login Items separately from scheduled backups; reset buttons restore recommended backup and restore defaults. |
+| Settings surface | Confirm Settings shows plain-language Background Backups, not raw helper status; the compact status summary matches Full Disk Access, schedules, updates, notifications, and bundled backup-tool state; Start at Login uses macOS Login Items separately from scheduled backups; reset buttons restore recommended backup and restore defaults. |
 | Full Disk Access | From Settings, open Privacy & Security, add Delta manually when required, recheck access, and confirm the dashboard only shows Readiness when action is needed. |
 | Background Backups | Create an enabled scheduled profile, approve Delta in Login Items if macOS asks, quit the main window, wait for the helper interval, and confirm the scheduled run appears in Dashboard, Activity, and menu bar state after relaunch. |
 | Keychain background access | Use an app-managed destination and a destination with backend credentials. Confirm a scheduled backup does not show interactive Keychain prompts after Repair Password Access has been run when needed. |

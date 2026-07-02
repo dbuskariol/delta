@@ -10,7 +10,7 @@ fi
 
 /usr/bin/codesign --verify --strict --deep --verbose=2 "$APP"
 
-SIGNING_DETAILS="$(/usr/bin/codesign -dv "$APP" 2>&1)"
+SIGNING_DETAILS="$(/usr/bin/codesign -dvv "$APP" 2>&1)"
 if ! /usr/bin/grep -q '^TeamIdentifier=' <<<"$SIGNING_DETAILS"; then
   printf "Installed Delta app has no signing TeamIdentifier.\n" >&2
   exit 1

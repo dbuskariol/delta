@@ -241,7 +241,15 @@ Collect a release evidence report for the verified app:
 Scripts/collect-release-evidence.sh
 ```
 
-The report is written under `dist/release-evidence/` and records the app version, git commit, signing details, helper/tool smoke output, Sparkle artifacts, notarization ticket status, and manual acceptance matrix placeholders.
+Create and verify the manual macOS acceptance report:
+
+```sh
+Scripts/create-manual-acceptance-report.sh
+# Edit dist/manual-acceptance/latest.md after testing each required item.
+Scripts/verify-manual-acceptance.sh
+```
+
+The release evidence report is written under `dist/release-evidence/` and records the app version, git commit, signing details, helper/tool smoke output, Sparkle artifacts, automated gate status, installed app smoke output, notarization ticket status, and manual acceptance report verification.
 
 Production readiness and manual macOS acceptance:
 
