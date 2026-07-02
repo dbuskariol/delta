@@ -173,8 +173,14 @@ else
 
   language_output="$(run_capture product_language "$ROOT_DIR/Scripts/verify-product-language.sh")"
   language_status="$(command_status product_language)"
-  installed_diagnostics_output="$(run_capture installed_diagnostics "$ROOT_DIR/Scripts/run-installed-diagnostics-acceptance.sh" "$APP_PATH")"
+  installed_diagnostics_output="$(run_capture installed_diagnostics /usr/bin/env DELTA_DIAGNOSTICS_ACCEPTANCE_DIR="$OUTPUT_DIR" "$ROOT_DIR/Scripts/run-installed-diagnostics-acceptance.sh" "$APP_PATH")"
   installed_diagnostics_status="$(command_status installed_diagnostics)"
+  installed_diagnostics_report="$OUTPUT_DIR/installed-diagnostics-latest.md"
+  installed_full_disk_access_status="Unknown"
+  if [[ -e "$installed_diagnostics_report" || -L "$installed_diagnostics_report" ]]; then
+    installed_full_disk_access_status="$(/usr/bin/awk -F': ' '/^- Full Disk Access:/ { print $2; exit }' "$installed_diagnostics_report")"
+    installed_full_disk_access_status="${installed_full_disk_access_status:-Unknown}"
+  fi
   if [[ "$installed_diagnostics_status" -eq 0 ]]; then
     installed_diagnostics_evidence="Installed diagnostics acceptance passed: isolated installed-app diagnostic export generated a redacted report, proved Background Password Access was Ready, and proved seeded destination/backend credential values were absent. $installed_diagnostics_output"
   else
@@ -182,14 +188,20 @@ else
   fi
 
   if [[ "$language_status" -eq 0 && "$installed_diagnostics_status" -eq 0 ]]; then
-    append_row "settings_surface" "$(item_area settings_surface)" "Partial" "Product-language verifier passed; raw Repository/LaunchAgent terminology is blocked from user-facing strings. Installed diagnostics reported Background Password Access as Ready." "Open Settings and confirm visual grouping, status summary, Run Due Now scheduler action, Sparkle automatic check/download controls, idle-sleep protection, reset controls, backup freshness warnings, source-access warnings, destination-check warning controls, and activity history retention in the running app."
+    append_row "settings_surface" "$(item_area settings_surface)" "Partial" "Product-language verifier passed; raw Repository/LaunchAgent terminology is blocked from user-facing strings. Installed diagnostics reported Background Password Access as Ready and Full Disk Access as $installed_full_disk_access_status." "Open Settings and confirm visual grouping, status summary, Run Due Now scheduler action, Sparkle automatic check/download controls, idle-sleep protection, reset controls, backup freshness warnings, source-access warnings, destination-check warning controls, and activity history retention in the running app."
   elif [[ "$language_status" -eq 0 ]]; then
     append_row "settings_surface" "$(item_area settings_surface)" "Failed" "Product-language verifier passed, but installed diagnostics did not prove Background Password Access: $installed_diagnostics_evidence" "Fix installed diagnostics and background password-access health before manual Settings acceptance."
   else
     append_row "settings_surface" "$(item_area settings_surface)" "Failed" "Product-language verifier failed: $language_output" "Fix user-facing terminology and rerun."
   fi
 
-  append_row "full_disk_access" "$(item_area full_disk_access)" "Manual Required" "macOS Full Disk Access is tied to the app identity and cannot be safely proven by this shell process." "Use Settings > Full Disk Access, add Delta manually if needed, recheck access, and confirm dashboard readiness behavior."
+  if [[ "$installed_diagnostics_status" -eq 0 && "$installed_full_disk_access_status" == "Ready" ]]; then
+    append_row "full_disk_access" "$(item_area full_disk_access)" "Partial" "Installed Delta diagnostic report from the signed app process reported Full Disk Access as Ready." "Open Settings, recheck access, and confirm the dashboard only shows Readiness when action is needed."
+  elif [[ "$installed_diagnostics_status" -eq 0 ]]; then
+    append_row "full_disk_access" "$(item_area full_disk_access)" "Manual Required" "Installed Delta diagnostic report from the signed app process reported Full Disk Access as $installed_full_disk_access_status." "Use Settings > Full Disk Access, add Delta manually if needed, recheck access, and confirm dashboard readiness behavior."
+  else
+    append_row "full_disk_access" "$(item_area full_disk_access)" "Failed" "Installed Delta diagnostics could not verify Full Disk Access: $installed_diagnostics_evidence" "Fix installed diagnostics, then use Settings > Full Disk Access and rerun."
+  fi
 
   agent="$APP_PATH/Contents/MacOS/DeltaAgent"
   if [[ -x "$agent" ]]; then
