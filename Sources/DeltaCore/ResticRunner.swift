@@ -116,6 +116,8 @@ public enum ResticFailureClassifier {
             return .lockedRepository
         case 12:
             return .wrongPassword
+        case 3:
+            return .unreadableSourceFiles
         default:
             break
         }

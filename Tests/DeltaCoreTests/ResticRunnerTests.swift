@@ -185,6 +185,17 @@ final class ResticRunnerTests: XCTestCase {
 
         XCTAssertEqual(message, "permission denied: /Users/me/Library/Mail")
     }
+
+    func testExitCodeThreeMapsToUnreadableSourceWarningWithoutOutputText() {
+        let result = ResticRunResult(exitCode: 3, standardOutput: "", standardError: "")
+
+        XCTAssertEqual(result.status, .warning)
+        XCTAssertEqual(result.failureKind, .unreadableSourceFiles)
+        XCTAssertEqual(
+            result.userFacingMessage,
+            "Backup completed, but some files could not be read. Check Full Disk Access and source permissions."
+        )
+    }
 }
 
 private final class OutputRecorder: @unchecked Sendable {

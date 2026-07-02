@@ -111,7 +111,7 @@ Expected restic backup exit handling:
 | Exit code | Delta state |
 | --- | --- |
 | `0` | Succeeded |
-| `3` | Warning, incomplete snapshot due to unreadable source data |
+| `3` | Warning, incomplete snapshot due to unreadable source data, even if restic output does not include a matching permission phrase |
 | `10` | Destination not prepared/found |
 | `11` | Destination locked |
 | `12` | Wrong password |
