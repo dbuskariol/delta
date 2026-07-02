@@ -24,4 +24,11 @@ final class KeychainSecretStoreTests: XCTestCase {
         XCTAssertNil(query[kSecUseAuthenticationContext as String])
         XCTAssertNil(query[kSecUseAuthenticationUI as String])
     }
+
+    func testMissingDestinationSecretHasRepairableMessage() {
+        XCTAssertEqual(
+            KeychainSecretError.itemNotFound.localizedDescription,
+            "The saved destination secret is missing. Re-save the destination or repair password access in Settings."
+        )
+    }
 }

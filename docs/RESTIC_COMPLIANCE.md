@@ -19,6 +19,10 @@ Delta uses restic `--password-command`.
 
 The command points at `DeltaSecretBridge`, which reads the destination password from Keychain and writes it to stdout for restic. Delta does not pass repository passwords through long-lived environment variables or command-line literals.
 
+`DeltaSecretBridge` accepts exactly one keychain account argument and exits with usage status for missing or extra arguments. This keeps the password bridge fail-closed if restic or a caller invokes it with an unexpected command line.
+
+If restic reports that password resolution failed through the bridge, Delta maps the failure to a destination-password access message that points users to Repair Password Access or re-saving the destination, instead of showing raw Keychain status output.
+
 App-managed destinations use a generated Keychain password. User-managed passphrase destinations require confirmation before the password is stored.
 
 Relevant files:

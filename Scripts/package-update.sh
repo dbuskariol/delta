@@ -25,7 +25,7 @@ cat > "${ARCHIVE%.zip}.md" <<EOF
 # Delta $SHORT_VERSION Beta
 
 - Encrypted backup destinations
-- Scheduled LaunchAgent backups
+- Background Scheduling for scheduled backups
 - Local drives, mounted network drives, and cloud destinations
 - Full and selected-path restore
 - Saved per-job backup and restore logs

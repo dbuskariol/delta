@@ -78,6 +78,7 @@ public enum ResticFailureKind: String, Codable, CaseIterable, Sendable {
     case repositoryMissing
     case lockedRepository
     case wrongPassword
+    case destinationSecretUnavailable
     case missingBackendCredentials
     case networkUnavailable
     case unreadableSourceFiles
@@ -129,6 +130,15 @@ public enum ResticFailureClassifier {
         if containsAny(text, ["wrong password", "password is incorrect", "invalid password", "mac: authentication failed"]) {
             return .wrongPassword
         }
+        if containsAny(text, [
+            "deltasecretbridge error",
+            "resolving password failed",
+            "saved destination secret",
+            "could not read this saved destination secret",
+            "keychain operation failed"
+        ]) {
+            return .destinationSecretUnavailable
+        }
         if containsAny(text, ["nocredentialproviders", "no credentials", "missing credentials", "access key", "secret access key", "environment variable"]) {
             return .missingBackendCredentials
         }
@@ -157,6 +167,8 @@ public enum ResticFailureClassifier {
             return "The destination is already in use by another backup or maintenance job. Try again after the current job finishes."
         case .wrongPassword:
             return "The encryption password for this destination is incorrect or unavailable."
+        case .destinationSecretUnavailable:
+            return "Delta could not read the saved destination password. Use Repair Password Access in Settings or re-save the destination."
         case .missingBackendCredentials:
             return "This destination is missing required sign-in credentials."
         case .networkUnavailable:

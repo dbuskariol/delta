@@ -936,6 +936,17 @@ final class BackupCoordinatorPolicyTests: XCTestCase {
                 "encryption password"
             ),
             (
+                "destination secret unavailable",
+                ResticRunResult(
+                    exitCode: 1,
+                    standardOutput: "",
+                    standardError: "DeltaSecretBridge error: The saved destination secret is missing.\nFatal: Resolving password failed: exit status 1"
+                ),
+                .failed,
+                .destinationSecretUnavailable,
+                "Repair Password Access"
+            ),
+            (
                 "missing credentials",
                 ResticRunResult(exitCode: 1, standardOutput: "", standardError: "NoCredentialProviders: no valid providers in chain"),
                 .failed,

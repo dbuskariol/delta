@@ -3,12 +3,15 @@ import LocalAuthentication
 import Security
 
 public enum KeychainSecretError: Error, Equatable, LocalizedError {
+    case itemNotFound
     case unexpectedStatus(OSStatus)
     case interactionNotAllowed
     case invalidData
 
     public var errorDescription: String? {
         switch self {
+        case .itemNotFound:
+            "The saved destination secret is missing. Re-save the destination or repair password access in Settings."
         case let .unexpectedStatus(status):
             "Keychain operation failed with status \(status)."
         case .interactionNotAllowed:
@@ -165,6 +168,9 @@ public struct KeychainSecretStore: Sendable {
     }
 
     private func keychainError(for status: OSStatus) -> KeychainSecretError {
+        if status == errSecItemNotFound {
+            return .itemNotFound
+        }
         if status == errSecInteractionNotAllowed {
             return .interactionNotAllowed
         }

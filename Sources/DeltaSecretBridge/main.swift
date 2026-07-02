@@ -1,15 +1,21 @@
 import DeltaCore
 import Foundation
 
-let arguments = CommandLine.arguments.dropFirst()
-guard let account = arguments.first, !account.isEmpty else {
+let command: DeltaSecretBridgeCommand
+do {
+    command = try DeltaSecretBridgeInvocation.command(arguments: Array(CommandLine.arguments.dropFirst()))
+} catch let error as DeltaSecretBridgeArgumentError {
+    fputs("DeltaSecretBridge error: \(error.localizedDescription)\n", stderr)
     fputs("usage: DeltaSecretBridge <keychain-account>\n", stderr)
     exit(64)
+} catch {
+    fputs("DeltaSecretBridge error: \(error.localizedDescription)\n", stderr)
+    exit(1)
 }
 
 do {
     let secret = try KeychainSecretStore().load(
-        account: String(account),
+        account: command.keychainAccount,
         authenticationPolicy: .failIfInteractionNeeded
     )
     print(secret)

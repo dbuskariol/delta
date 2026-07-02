@@ -674,7 +674,7 @@ private final class InMemorySecretStore: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         guard let value = values[account] else {
-            throw KeychainSecretError.unexpectedStatus(errSecItemNotFound)
+            throw KeychainSecretError.itemNotFound
         }
         return value
     }

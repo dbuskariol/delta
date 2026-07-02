@@ -113,6 +113,22 @@ fi
 "$ROOT_DIR/dist/Delta.app/Contents/MacOS/restic" version
 "$ROOT_DIR/dist/Delta.app/Contents/MacOS/rclone" version | /usr/bin/head -n 1
 
+SECRET_BRIDGE="$ROOT_DIR/dist/Delta.app/Contents/MacOS/DeltaSecretBridge"
+set +e
+SECRET_BRIDGE_MISSING_OUTPUT="$("$SECRET_BRIDGE" 2>&1)"
+SECRET_BRIDGE_MISSING_STATUS=$?
+SECRET_BRIDGE_EXTRA_OUTPUT="$("$SECRET_BRIDGE" account extra 2>&1)"
+SECRET_BRIDGE_EXTRA_STATUS=$?
+set -e
+if [[ "$SECRET_BRIDGE_MISSING_STATUS" -ne 64 || "$SECRET_BRIDGE_MISSING_OUTPUT" != *"expected exactly one keychain account"* ]]; then
+  printf "DeltaSecretBridge did not fail closed for a missing account. status=%s output=%s\n" "$SECRET_BRIDGE_MISSING_STATUS" "$SECRET_BRIDGE_MISSING_OUTPUT" >&2
+  exit 1
+fi
+if [[ "$SECRET_BRIDGE_EXTRA_STATUS" -ne 64 || "$SECRET_BRIDGE_EXTRA_OUTPUT" != *"expected exactly one keychain account"* ]]; then
+  printf "DeltaSecretBridge did not fail closed for extra arguments. status=%s output=%s\n" "$SECRET_BRIDGE_EXTRA_STATUS" "$SECRET_BRIDGE_EXTRA_OUTPUT" >&2
+  exit 1
+fi
+
 "$ROOT_DIR/Scripts/package-update.sh"
 "$ROOT_DIR/Scripts/generate-appcast.sh"
 

@@ -196,6 +196,24 @@ final class ResticRunnerTests: XCTestCase {
             "Backup completed, but some files could not be read. Check Full Disk Access and source permissions."
         )
     }
+
+    func testPasswordCommandFailureMapsToRepairableDestinationSecretMessage() {
+        let result = ResticRunResult(
+            exitCode: 1,
+            standardOutput: "",
+            standardError: """
+            DeltaSecretBridge error: The saved destination secret is missing.
+            Fatal: Resolving password failed: exit status 1
+            """
+        )
+
+        XCTAssertEqual(result.status, .failed)
+        XCTAssertEqual(result.failureKind, .destinationSecretUnavailable)
+        XCTAssertEqual(
+            result.userFacingMessage,
+            "Delta could not read the saved destination password. Use Repair Password Access in Settings or re-save the destination."
+        )
+    }
 }
 
 private final class OutputRecorder: @unchecked Sendable {
