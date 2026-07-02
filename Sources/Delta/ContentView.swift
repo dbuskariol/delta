@@ -1115,7 +1115,13 @@ struct SettingsView: View {
                 }
             }
 
-            SettingsStatusGrid(items: settingsStatusItems)
+            SettingsOverviewCard(
+                title: settingsOverviewTitle,
+                detail: settingsOverviewDetail,
+                statusText: settingsOverviewStatusText,
+                statusColor: settingsOverviewStatusColor,
+                items: settingsStatusItems
+            )
 
             SettingsSectionLabel(
                 title: "Required Setup",
@@ -1125,12 +1131,12 @@ struct SettingsView: View {
             SettingsCard(
                 symbol: "clock.badge.checkmark",
                 title: "Background Backups",
-                subtitle: "Run scheduled backups while Delta's main window is closed.",
+                subtitle: "Let scheduled profiles run when Delta's main window is closed.",
                 statusText: backgroundBackupsStatusText,
                 statusColor: backgroundBackupsStatusColor
             ) {
                 SettingsControlRow(
-                    title: "Run scheduled backups in background",
+                    title: "Scheduled background runs",
                     detail: backgroundBackupsControlDetail
                 ) {
                     Toggle("", isOn: backgroundBackupsBinding)
@@ -1140,15 +1146,15 @@ struct SettingsView: View {
 
                 SettingsNotice(
                     symbol: "clock.arrow.circlepath",
-                    title: "Why this exists",
-                    text: "macOS can wake Delta's signed background item for short schedule checks. It runs as your user account, uses the same saved destinations, and exits when no work is due.",
+                    title: "How it works",
+                    text: "macOS can wake Delta for short schedule checks. It runs as your user account, uses the same saved destinations, starts due backups, then exits when there is no work.",
                     color: .blue
                 )
 
                 SettingsFactGrid(items: [
                     SettingsFact(title: "Scheduled profiles", value: "\(scheduledProfileCount)"),
                     SettingsFact(title: "Runs as", value: "Current user"),
-                    SettingsFact(title: "Window", value: "Not required"),
+                    SettingsFact(title: "Admin access", value: "Not required"),
                     SettingsFact(title: "macOS approval", value: backgroundApprovalText)
                 ])
 
@@ -1172,19 +1178,19 @@ struct SettingsView: View {
                     Button {
                         model.openLoginItemsSettings()
                     } label: {
-                        Label("Open Login Items", systemImage: "gearshape")
+                        Label("Review Login Items", systemImage: "gearshape")
                     }
                     .deltaTooltip("Open macOS Login Items to approve or inspect Delta's background backups.")
                     Button {
                         model.reload()
                     } label: {
-                        Label("Refresh Status", systemImage: "arrow.clockwise")
+                        Label("Refresh", systemImage: "arrow.clockwise")
                     }
                     .deltaTooltip("Recheck background backup and system access status.")
                     Button {
                         model.repairBackgroundSecretAccess()
                     } label: {
-                        Label("Repair Password Access", systemImage: "key")
+                        Label("Repair Passwords", systemImage: "key")
                     }
                     .disabled(model.repositories.isEmpty || model.isWorking || !model.isPersistentStoreAvailable)
                     .deltaTooltip("Refresh saved destination passwords so background backups can read them without interactive Keychain prompts.")
@@ -1705,6 +1711,68 @@ struct SettingsView: View {
         model.profiles.filter { $0.schedule.isEnabled }.count
     }
 
+    private var settingsOverviewTitle: String {
+        if !model.isPersistentStoreAvailable {
+            return "Local app data needs attention"
+        }
+        if backupToolStatusText != "Ready" {
+            return "Backup tools need attention"
+        }
+        if !model.fullDiskAccessStatus.hasLikelyFullDiskAccess {
+            return "System access needs attention"
+        }
+        if shouldShowBackgroundSchedulingAttention {
+            return "Scheduled backups need attention"
+        }
+        if sendsJobNotifications && !notificationAuthorizationState.canDeliver {
+            return "Notifications need permission"
+        }
+        return "Delta is ready"
+    }
+
+    private var settingsOverviewDetail: String {
+        if !model.isPersistentStoreAvailable {
+            return "Delta cannot use its local database until app data opens successfully."
+        }
+        if backupToolStatusText != "Ready" {
+            return backupToolStatusDetail
+        }
+        if !model.fullDiskAccessStatus.hasLikelyFullDiskAccess {
+            return fullDiskAccessDescription
+        }
+        if shouldShowBackgroundSchedulingAttention {
+            return backgroundSchedulingAttentionText
+        }
+        if sendsJobNotifications && !notificationAuthorizationState.canDeliver {
+            return "macOS notification permission is required before Delta can send backup alerts."
+        }
+        return "Background scheduling, protected-folder access, update checks, notifications, and bundled backup tools are summarized here."
+    }
+
+    private var settingsOverviewStatusText: String {
+        settingsOverviewNeedsReview ? "Review" : "Ready"
+    }
+
+    private var settingsOverviewStatusColor: Color {
+        if !model.isPersistentStoreAvailable || backupToolStatusText != "Ready" {
+            return .red
+        }
+        if !model.fullDiskAccessStatus.hasLikelyFullDiskAccess
+            || shouldShowBackgroundSchedulingAttention
+            || (sendsJobNotifications && !notificationAuthorizationState.canDeliver) {
+            return .orange
+        }
+        return .green
+    }
+
+    private var settingsOverviewNeedsReview: Bool {
+        !model.isPersistentStoreAvailable
+            || backupToolStatusText != "Ready"
+            || !model.fullDiskAccessStatus.hasLikelyFullDiskAccess
+            || shouldShowBackgroundSchedulingAttention
+            || (sendsJobNotifications && !notificationAuthorizationState.canDeliver)
+    }
+
     private var settingsStatusItems: [SettingsStatusItem] {
         [
             SettingsStatusItem(
@@ -1736,6 +1804,13 @@ struct SettingsView: View {
                 detail: sendsJobNotifications ? "Job alerts configured" : "Alerts disabled"
             ),
             SettingsStatusItem(
+                title: "Status Menu",
+                value: showsMenuBarExtra ? "Shown" : "Hidden",
+                symbol: "menubar.rectangle",
+                color: showsMenuBarExtra ? .green : .secondary,
+                detail: model.appLoginItemStatus == .enabled ? "Starts at login" : "Login optional"
+            ),
+            SettingsStatusItem(
                 title: "Backup Tools",
                 value: backupToolStatusText,
                 symbol: "externaldrive.badge.checkmark",
@@ -1756,7 +1831,7 @@ struct SettingsView: View {
 
         switch model.launchAgentStatus {
         case .enabled:
-            return "On"
+            return "Ready"
         case .requiresApproval:
             return "Needs Approval"
         case .notRegistered:
@@ -3414,37 +3489,64 @@ struct SettingsStatusItem: Identifiable {
     var detail: String
 }
 
-struct SettingsStatusGrid: View {
+struct SettingsOverviewCard: View {
+    var title: String
+    var detail: String
+    var statusText: String
+    var statusColor: Color
     var items: [SettingsStatusItem]
 
     var body: some View {
-        LazyVGrid(columns: columns, spacing: 12) {
-            ForEach(items) { item in
-                SettingsStatusTile(item: item)
+        Card {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(alignment: .top, spacing: 14) {
+                    StatusIcon(symbol: "checkmark.seal", color: statusColor)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(title)
+                            .font(.headline)
+                        Text(detail)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                    StateBadge(text: statusText, color: statusColor)
+                        .lineLimit(1)
+                }
+
+                Divider()
+
+                LazyVGrid(columns: columns, spacing: 12) {
+                    ForEach(items) { item in
+                        SettingsOverviewItem(item: item)
+                    }
+                }
             }
         }
     }
 
     private var columns: [GridItem] {
         [
-            GridItem(.adaptive(minimum: 150), spacing: 10)
+            GridItem(.adaptive(minimum: 210), spacing: 12)
         ]
     }
 }
 
-struct SettingsStatusTile: View {
+struct SettingsOverviewItem: View {
     var item: SettingsStatusItem
 
     var body: some View {
-        HStack(alignment: .center, spacing: 10) {
+        HStack(alignment: .top, spacing: 10) {
             Image(systemName: item.symbol)
                 .font(.system(size: 13, weight: .semibold))
-                .frame(width: 26, height: 26)
+                .frame(width: 24, height: 24)
                 .foregroundStyle(item.color)
                 .background(item.color.opacity(0.14))
                 .clipShape(RoundedRectangle(cornerRadius: 7))
+                .padding(.top, 1)
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(item.title)
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
@@ -3455,21 +3557,12 @@ struct SettingsStatusTile: View {
                 Text(item.detail)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(.vertical, 10)
-        .padding(.horizontal, 12)
-        .frame(maxWidth: .infinity, minHeight: 70, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(DeltaTheme.panel)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(DeltaTheme.border, lineWidth: 1)
-        )
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
