@@ -249,7 +249,13 @@ Scripts/create-manual-acceptance-report.sh
 Scripts/verify-manual-acceptance.sh
 ```
 
-The release evidence report is written under `dist/release-evidence/` and records the app version, git commit, signing details, helper/tool smoke output, Sparkle artifacts, automated gate status, installed app smoke output, notarization ticket status, and manual acceptance report verification.
+After Developer ID notarization and installing the exact release candidate, run the hard external-distribution gate:
+
+```sh
+Scripts/verify-production-readiness.sh
+```
+
+The release evidence report is written under `dist/release-evidence/` and records the app version, git commit, signing details, helper/tool smoke output, Sparkle artifacts, automated gate status, installed app smoke output, notarization ticket status, and manual acceptance report verification. `Scripts/verify-production-readiness.sh` fails unless that evidence, the current manual acceptance report, notarization, Gatekeeper, and the installed app all prove the same current git commit is ready for external distribution.
 
 Production readiness and manual macOS acceptance:
 
@@ -287,6 +293,13 @@ DELTA_NOTARY_KEYCHAIN_PROFILE="Delta Notary" Scripts/notarize-release.sh
 ```
 
 `Scripts/notarize-release.sh` submits `dist/Delta.app`, waits for Apple notarization, staples the ticket, validates Gatekeeper assessment, archives the notarization log under `dist/notarization`, and regenerates Sparkle update assets from the stapled app. It also supports `DELTA_NOTARY_PREPARE_ONLY=1` for local archive validation without submitting to Apple.
+
+Final external release check:
+
+```sh
+Scripts/install-app.sh
+Scripts/verify-production-readiness.sh
+```
 
 ## Current Scope
 

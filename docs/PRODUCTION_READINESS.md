@@ -37,6 +37,14 @@ Scripts/collect-release-evidence.sh
 
 The automated gate writes `dist/release-evidence/automated-gate-status` when it passes. The release evidence report is written under `dist/release-evidence/` and records the exact app path, version, git commit, signature details, helper/tool smoke output, Sparkle update artifacts, installed app smoke output, Gatekeeper/notarization status, automated gate status, and manual acceptance verification.
 
+After manual acceptance, Developer ID notarization, and local installation of the exact release candidate, run the external distribution gate:
+
+```sh
+Scripts/verify-production-readiness.sh
+```
+
+This gate fails unless the automated gate passed for the current git commit, the manual acceptance report passes for the same commit, the app is signed with Developer ID, the notarization ticket is stapled and accepted by Gatekeeper, notarization logs are archived, `/Applications/Delta.app` matches the verified app, installed-app smoke verification passes, and the regenerated release evidence says the build is ready for external distribution.
+
 ## Notarization Gate
 
 External distribution builds must be notarized after the automated gate passes:
@@ -96,3 +104,4 @@ A build can move from local beta to external beta only when:
 - The manual matrix has current passing evidence for the targeted macOS release.
 - Any accepted limitations are documented in `README.md`.
 - Notarization is complete for external distribution builds.
+- `Scripts/verify-production-readiness.sh` passes.
