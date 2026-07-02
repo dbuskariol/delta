@@ -176,6 +176,12 @@ Build the app:
 Scripts/build-app.sh
 ```
 
+Install the verified app bundle locally:
+
+```sh
+Scripts/install-app.sh
+```
+
 Full release verification:
 
 ```sh
