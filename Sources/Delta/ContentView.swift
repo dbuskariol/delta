@@ -859,19 +859,20 @@ private extension Array where Element == ResticSnapshotEntry {
 
 struct ActivityView: View {
     @EnvironmentObject private var model: DeltaAppModel
+    @AppStorage("Delta.activityLogDetail") private var activityLogDetailRawValue = ActivityLogDetail.standard.rawValue
 
     var body: some View {
         PageScaffold(title: "Activity", subtitle: "Jobs, destination checks, and system events") {
             SurfaceSection(title: "Live Backup Logs", symbol: "terminal") {
                 LiveLogViewport(
-                    lines: Array(model.liveLogLines.suffix(300)),
+                    lines: Array(model.liveLogLines.suffix(activityLogDetail.liveLineLimit)),
                     isWorking: model.isWorking
                 )
             }
 
             SurfaceSection(title: "Saved Job Logs", symbol: "doc.text.magnifyingglass") {
                 PersistentLogViewport(
-                    entries: Array(model.jobLogs.suffix(240)),
+                    entries: Array(model.jobLogs.suffix(activityLogDetail.savedPreviewLineLimit)),
                     jobs: model.jobs
                 )
             }
@@ -897,6 +898,10 @@ struct ActivityView: View {
             }
         }
     }
+
+    private var activityLogDetail: ActivityLogDetail {
+        ActivityLogDetail.normalized(activityLogDetailRawValue)
+    }
 }
 
 private enum UpdateCheckInterval: Int, CaseIterable, Identifiable {
@@ -919,10 +924,58 @@ private enum UpdateCheckInterval: Int, CaseIterable, Identifiable {
     }
 }
 
+private enum ActivityLogDetail: String, CaseIterable, Identifiable {
+    case compact
+    case standard
+    case detailed
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .compact: "Compact"
+        case .standard: "Standard"
+        case .detailed: "Detailed"
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .compact:
+            return "Show fewer lines for quieter troubleshooting."
+        case .standard:
+            return "Balanced live output and saved job previews."
+        case .detailed:
+            return "Show more output when diagnosing long-running jobs."
+        }
+    }
+
+    var liveLineLimit: Int {
+        switch self {
+        case .compact: 120
+        case .standard: 300
+        case .detailed: 500
+        }
+    }
+
+    var savedPreviewLineLimit: Int {
+        switch self {
+        case .compact: 120
+        case .standard: 240
+        case .detailed: 500
+        }
+    }
+
+    static func normalized(_ rawValue: String) -> ActivityLogDetail {
+        ActivityLogDetail(rawValue: rawValue) ?? .standard
+    }
+}
+
 struct SettingsView: View {
     @EnvironmentObject private var model: DeltaAppModel
     @EnvironmentObject private var softwareUpdateController: SoftwareUpdateController
     @AppStorage("Delta.updateCheckIntervalSeconds") private var updateCheckIntervalSeconds = UpdateCheckInterval.daily.rawValue
+    @AppStorage("Delta.activityLogDetail") private var activityLogDetailRawValue = ActivityLogDetail.standard.rawValue
     @State private var automaticallyChecksForUpdates = true
 
     var body: some View {
@@ -958,41 +1011,10 @@ struct SettingsView: View {
                 }
             }
 
-            LazyVGrid(columns: DeltaTheme.statColumns, spacing: 12) {
-                SettingsStatusTile(
-                    symbol: "clock.badge.checkmark",
-                    title: "Automation",
-                    value: backgroundBackupsStatusText,
-                    detail: backgroundBackupsSummary,
-                    color: launchAgentStatusColor
-                )
-                SettingsStatusTile(
-                    symbol: "lock.shield",
-                    title: "System Access",
-                    value: fullDiskAccessStatusText,
-                    detail: fullDiskAccessSummary,
-                    color: model.fullDiskAccessStatus.hasLikelyFullDiskAccess ? .green : .orange
-                )
-                SettingsStatusTile(
-                    symbol: "arrow.down.circle",
-                    title: "Updates",
-                    value: automaticallyChecksForUpdates ? "Automatic" : "Manual",
-                    detail: updateSummary,
-                    color: automaticallyChecksForUpdates ? .green : .secondary
-                )
-                SettingsStatusTile(
-                    symbol: "slider.horizontal.3",
-                    title: "Configuration",
-                    value: "\(model.profiles.count) \(model.profiles.count == 1 ? "profile" : "profiles")",
-                    detail: "\(model.repositories.count) \(model.repositories.count == 1 ? "destination" : "destinations") · \(model.snapshots.count) restore \(model.snapshots.count == 1 ? "point" : "points")",
-                    color: .blue
-                )
-            }
-
             SettingsCard(
                 symbol: "clock.badge.checkmark",
                 title: "Background Backups",
-                subtitle: "Run scheduled backups when the main Delta window is closed.",
+                subtitle: "Run scheduled profiles when the main Delta window is closed.",
                 statusText: backgroundBackupsStatusText,
                 statusColor: launchAgentStatusColor
             ) {
@@ -1006,17 +1028,17 @@ struct SettingsView: View {
                 }
 
                 SettingsDescription(
-                    text: "Background Backups is Delta's signed macOS Login Item helper. It runs as your user account, wakes periodically, checks due profiles, destination availability, battery and Low Power policies, and retention maintenance, then exits."
+                    text: "Delta uses a signed macOS Login Item helper for this. It runs as your user account, wakes briefly, starts due backups, enforces destination and power policies, runs cleanup when scheduled, then exits. It is not an admin service."
                 )
 
                 SettingsFactGrid(items: [
                     SettingsFact(title: "Scheduled profiles", value: "\(scheduledProfileCount)"),
-                    SettingsFact(title: "Check cadence", value: "Every 5 min"),
+                    SettingsFact(title: "Wake cadence", value: "Every 5 min"),
                     SettingsFact(title: "Privileges", value: "Current user")
                 ])
 
                 SettingsDescription(
-                    text: "macOS may require approval in Login Items before background backups can run. Delta can open that pane, but macOS does not allow apps to approve themselves."
+                    text: "macOS may require approval in Login Items before this helper can run. Delta can open the correct pane, but macOS does not allow apps to approve their own background items."
                 )
 
                 SettingsDescription(
@@ -1090,8 +1112,8 @@ struct SettingsView: View {
 
             SettingsCard(
                 symbol: "slider.horizontal.3",
-                title: "Backup Controls",
-                subtitle: "Global safety controls live here; schedule, retention, power, bandwidth, and exclusions are configured per backup profile."
+                title: "Profiles and Destinations",
+                subtitle: "Operational backup behavior is configured where it applies."
             ) {
                 SettingsFactGrid(items: [
                     SettingsFact(title: "Schedule", value: "Per profile"),
@@ -1186,8 +1208,22 @@ struct SettingsView: View {
             SettingsCard(
                 symbol: "stethoscope",
                 title: "Diagnostics",
-                subtitle: "Generate support information without secrets."
+                subtitle: "Control troubleshooting output and generate support information without secrets."
             ) {
+                SettingsControlRow(
+                    title: "Activity log detail",
+                    detail: activityLogDetail.description
+                ) {
+                    Picker("", selection: $activityLogDetailRawValue) {
+                        ForEach(ActivityLogDetail.allCases) { detail in
+                            Text(detail.title).tag(detail.rawValue)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.segmented)
+                    .frame(width: 260)
+                }
+
                 ActionLine(
                     description: "Copy a sanitized report with app, helper, destination, profile, and recent job state.",
                     buttonTitle: "Copy Report",
@@ -1204,12 +1240,17 @@ struct SettingsView: View {
         }
         .onAppear {
             automaticallyChecksForUpdates = softwareUpdateController.automaticallyChecksForUpdates
+            activityLogDetailRawValue = activityLogDetail.rawValue
             applyUpdatePreferences()
         }
     }
 
     private var scheduledProfileCount: Int {
         model.profiles.filter { $0.schedule.isEnabled }.count
+    }
+
+    private var activityLogDetail: ActivityLogDetail {
+        ActivityLogDetail.normalized(activityLogDetailRawValue)
     }
 
     private var backgroundBackupsStatusText: String {
@@ -1229,16 +1270,6 @@ struct SettingsView: View {
         }
     }
 
-    private var backgroundBackupsSummary: String {
-        if scheduledProfileCount == 0 {
-            return model.launchAgentStatus == .enabled ? "Ready for schedules" : "No scheduled profiles"
-        }
-        if model.launchAgentStatus == .enabled {
-            return "\(scheduledProfileCount) scheduled \(scheduledProfileCount == 1 ? "profile" : "profiles") ready"
-        }
-        return model.launchAgentStatus.detail
-    }
-
     private var backgroundBackupsControlDetail: String {
         if scheduledProfileCount == 0 {
             return "Keep background automation ready for profiles that use hourly, daily, weekly, monthly, or custom schedules."
@@ -1253,22 +1284,10 @@ struct SettingsView: View {
         model.fullDiskAccessStatus.hasLikelyFullDiskAccess ? "Ready" : "Needs Access"
     }
 
-    private var fullDiskAccessSummary: String {
-        model.fullDiskAccessStatus.hasLikelyFullDiskAccess ? "Protected folders readable" : "Manual approval needed"
-    }
-
     private var fullDiskAccessDescription: String {
         model.fullDiskAccessStatus.hasLikelyFullDiskAccess
             ? "Protected locations look readable for full-volume and selected-folder backups."
             : "Protected locations are not readable yet. Open Privacy & Security, add Delta with the + button if needed, then recheck access."
-    }
-
-    private var updateSummary: String {
-        guard automaticallyChecksForUpdates else {
-            return "Manual checks only"
-        }
-        let interval = UpdateCheckInterval.normalized(updateCheckIntervalSeconds)
-        return "Checks \(interval.title.lowercased())"
     }
 
     private func applyUpdatePreferences() {
@@ -2504,37 +2523,6 @@ struct SurfaceSection<Content: View>: View {
                 Divider()
                 content
             }
-        }
-    }
-}
-
-struct SettingsStatusTile: View {
-    var symbol: String
-    var title: String
-    var value: String
-    var detail: String
-    var color: Color
-
-    var body: some View {
-        Card {
-            VStack(alignment: .leading, spacing: 10) {
-                StatusIcon(symbol: symbol, color: color)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(value)
-                        .font(.system(size: 20, weight: .semibold, design: .rounded))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.82)
-                    Text(title)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                    Text(detail)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            .frame(minHeight: 104, alignment: .topLeading)
         }
     }
 }

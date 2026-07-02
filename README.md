@@ -20,7 +20,7 @@ The product goal is simple: make serious backup practices approachable without h
 - **Clear backup summaries** showing new, changed, unchanged, added, and checked data for each backup run.
 - **Full or browsed selected restore** with backup browsing, file/folder selection, dry-run preview, overwrite policies, verification, original-path restore, chosen-folder restore, and optional pre-restore backup.
 - **Streaming and saved backup logs** from restic stdout/stderr with source context, stable processed-file counters, clean change summaries, fixed-height live panes, and expandable per-job audit history.
-- **Sanitized diagnostics** from Settings for app version, helper status, tool paths, profile/destination counts, recent jobs, and local support paths.
+- **Settings and diagnostics** for updates, Full Disk Access, Background Backups, Activity log detail, app version, helper status, tool paths, profile/destination counts, recent jobs, and local support paths.
 - **Sparkle automatic updates** with generated appcast/update archive support.
 
 ## How It Works
@@ -53,7 +53,7 @@ Delta intentionally uses user-facing language instead of restic internals:
 The app is split into signed targets:
 
 - `Delta`: SwiftUI macOS app, menu bar item, settings, backup/restore UI, Sparkle update controller.
-- `DeltaAgent`: LaunchAgent helper for scheduled runs.
+- `DeltaAgent`: signed Background Backups Login Item helper for scheduled runs.
 - `DeltaSecretBridge`: CLI password bridge used by restic `--password-command`.
 - `DeltaCore`: shared models, database, command builder, scheduling, restic runner, parser, Keychain, bookmarks, locks, job logs, and policy code.
 
@@ -72,7 +72,7 @@ Important implementation details:
 - **Durable run controls** let the app request pause/cancel for an agent-owned restic process without relying on in-memory UI state.
 - **Abandoned-job recovery** marks stale running jobs interrupted after restart only when the per-destination lock proves no restic process still owns the destination.
 - **Bundled tools** are pinned and checksum-verified through `Scripts/bootstrap-tools.sh`.
-- **Packaged app verification** checks signatures, minimal hardened-runtime entitlements, Sparkle embedding, LaunchAgent plist integrity, helper smoke tests, signed Sparkle update metadata, and bundled restic/rclone versions.
+- **Packaged app verification** checks signatures, minimal hardened-runtime entitlements, Sparkle embedding, background helper plist integrity, helper smoke tests, signed Sparkle update metadata, and bundled restic/rclone versions.
 - **Sanitized diagnostic reports** can be copied or exported from Settings without including repository passwords or backend credential values.
 
 ## Backup Behavior
