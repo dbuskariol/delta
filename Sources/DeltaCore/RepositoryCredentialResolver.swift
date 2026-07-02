@@ -1,10 +1,33 @@
 import Foundation
 
 public struct RepositoryCredentialResolver: Sendable {
-    public var secretStore: KeychainSecretStore
+    public var loadSecret: @Sendable (String) throws -> String
+    public var saveSecret: @Sendable (String, String) throws -> Void
+    public var deleteSecret: @Sendable (String) throws -> Void
 
-    public init(secretStore: KeychainSecretStore = KeychainSecretStore()) {
-        self.secretStore = secretStore
+    public init(
+        secretStore: KeychainSecretStore = KeychainSecretStore(),
+        authenticationPolicy: KeychainAuthenticationPolicy = .allowUserInteraction
+    ) {
+        self.loadSecret = { account in
+            try secretStore.load(account: account, authenticationPolicy: authenticationPolicy)
+        }
+        self.saveSecret = { secret, account in
+            try secretStore.save(secret: secret, account: account, authenticationPolicy: authenticationPolicy)
+        }
+        self.deleteSecret = { account in
+            try secretStore.delete(account: account)
+        }
+    }
+
+    public init(
+        loadSecret: @escaping @Sendable (String) throws -> String,
+        saveSecret: @escaping @Sendable (String, String) throws -> Void,
+        deleteSecret: @escaping @Sendable (String) throws -> Void
+    ) {
+        self.loadSecret = loadSecret
+        self.saveSecret = saveSecret
+        self.deleteSecret = deleteSecret
     }
 
     public func environment(for repository: BackupRepository) throws -> [String: String] {
@@ -12,7 +35,7 @@ public struct RepositoryCredentialResolver: Sendable {
         for reference in repository.credentialReferences {
             let key = reference.environmentKey.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !key.isEmpty else { continue }
-            values[key] = try secretStore.load(account: reference.keychainAccount)
+            values[key] = try loadSecret(reference.keychainAccount)
         }
         return values
     }
@@ -21,7 +44,7 @@ public struct RepositoryCredentialResolver: Sendable {
         var references: [RepositoryCredentialReference] = []
         for (environmentKey, value) in credentials where !environmentKey.isEmpty && !value.isEmpty {
             let account = "repository-\(repositoryID.uuidString)-env-\(environmentKey)"
-            try secretStore.save(secret: value, account: account)
+            try saveSecret(value, account)
             references.append(RepositoryCredentialReference(environmentKey: environmentKey, keychainAccount: account))
         }
         return references.sorted { $0.environmentKey < $1.environmentKey }
@@ -49,7 +72,7 @@ public struct RepositoryCredentialResolver: Sendable {
             }
 
             let account = existingByKey[key]?.keychainAccount ?? "repository-\(repositoryID.uuidString)-env-\(key)"
-            try secretStore.save(secret: value, account: account)
+            try saveSecret(value, account)
             updatedReferences.append(
                 RepositoryCredentialReference(
                     id: existingByKey[key]?.id ?? UUID(),
@@ -61,7 +84,7 @@ public struct RepositoryCredentialResolver: Sendable {
 
         let keptAccounts = Set(updatedReferences.map(\.keychainAccount))
         for oldReference in existingReferences where !keptAccounts.contains(oldReference.keychainAccount) {
-            try secretStore.delete(account: oldReference.keychainAccount)
+            try deleteSecret(oldReference.keychainAccount)
         }
         return updatedReferences.sorted { $0.environmentKey < $1.environmentKey }
     }

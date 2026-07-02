@@ -397,7 +397,7 @@ final class BackupCoordinatorPolicyTests: XCTestCase {
         XCTAssertEqual(job.status, .succeeded)
         XCTAssertTrue(messages.contains("Source: \(fixture.source.path)"))
         XCTAssertTrue(messages.contains { $0.hasPrefix("Starting Backup:") && $0.contains("<redacted>") })
-        XCTAssertTrue(messages.contains("Estimated 42% · 21/50 files · 1 MB"))
+        XCTAssertTrue(messages.contains("Processed 21 files · 1 MB"))
         XCTAssertTrue(messages.contains("Finished Backup with status succeeded."))
         XCTAssertTrue(recorder.events.contains { $0.jobID == job.id && $0.event.message == "Source: \(fixture.source.path)" })
         XCTAssertTrue(recorder.events.contains { $0.jobID == job.id && $0.event == event })

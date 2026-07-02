@@ -71,7 +71,7 @@ struct DashboardView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(model.profiles.isEmpty || model.isWorking)
-                .help(model.isWorking ? "A Delta job is already running." : "Run every backup profile that is currently due.")
+                .deltaTooltip(model.isWorking ? "A Delta job is already running." : "Run every backup profile that is currently due.")
             }
         ) {
             LazyVGrid(columns: DeltaTheme.statColumns, spacing: 12) {
@@ -100,8 +100,8 @@ struct DashboardView: View {
                     }
                     Spacer()
                     StateBadge(
-                        text: model.isWorking ? "Running" : (model.fullDiskAccessStatus.hasLikelyFullDiskAccess ? "Ready" : "Needs Access"),
-                        color: model.isWorking ? .blue : (model.fullDiskAccessStatus.hasLikelyFullDiskAccess ? .green : .orange)
+                        text: model.fullDiskAccessStatus.hasLikelyFullDiskAccess ? "Ready" : "Needs Access",
+                        color: model.fullDiskAccessStatus.hasLikelyFullDiskAccess ? .green : .orange
                     )
                 }
             }
@@ -116,7 +116,7 @@ struct DashboardView: View {
             } else {
                 VStack(spacing: 10) {
                     ForEach(model.profiles) { profile in
-                        ProfileRow(profile: profile)
+                        ProfileRow(profile: profile, showsInlineProgress: false)
                     }
                 }
             }
@@ -155,13 +155,6 @@ struct BackupsView: View {
                     message: "Create a profile for a full volume or selected folders."
                 )
             } else {
-                if let operation = model.activeOperation {
-                    ActiveOperationBanner(
-                        operation: operation,
-                        progress: model.activeProgress,
-                        latestMessage: model.liveLogLines.last?.message
-                    )
-                }
                 VStack(spacing: 10) {
                     ForEach(model.profiles) { profile in
                         ProfileRow(profile: profile)
@@ -316,8 +309,8 @@ struct RestoreView: View {
                             } label: {
                                 Image(systemName: "folder")
                             }
-                            .help("Choose destination folder")
                             .disabled(restoreOriginalPaths)
+                            .deltaTooltip("Choose destination folder")
                         }
                     }
 
@@ -477,10 +470,16 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
                 ActionLine(
-                    description: "Grant Delta and DeltaAgent access before full-volume backups.",
-                    buttonTitle: "Open Settings",
+                    description: "macOS requires you to add Delta manually if it is not already listed.",
+                    buttonTitle: "Open Privacy Settings",
                     symbol: "arrow.up.forward.app",
                     action: model.openFullDiskAccessSettings
+                )
+                ActionLine(
+                    description: "Use this when Privacy & Security asks you to choose the app with the + button.",
+                    buttonTitle: "Show Delta",
+                    symbol: "folder",
+                    action: model.revealInstalledAppInFinder
                 )
                 Button {
                     model.reload()
@@ -516,60 +515,75 @@ struct SettingsView: View {
 struct ProfileRow: View {
     @EnvironmentObject private var model: DeltaAppModel
     var profile: BackupProfile
+    var showsInlineProgress = true
     @State private var isPresentingEditor = false
     @State private var isConfirmingDelete = false
 
     var body: some View {
         Card {
             VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 14) {
+                HStack(alignment: .top, spacing: 14) {
                     StatusIcon(symbol: profile.sourceMode == .fullVolume ? "internaldrive" : "folder", color: isActiveBackup ? .blue : .gray)
-                    VStack(alignment: .leading, spacing: 5) {
+                    VStack(alignment: .leading, spacing: 8) {
                         HStack(spacing: 8) {
                             Text(profile.name)
                                 .font(.headline)
+                                .lineLimit(1)
                             if isActiveBackup {
                                 StateBadge(text: "Running", color: .blue)
                             }
                         }
-                        Text(sourceSummary)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                        Text(repositorySummary)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(sourceSummary)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                            Text(repositorySummary)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                        }
+                        HStack(spacing: 8) {
+                            MetadataBadge(text: profile.sourceMode.displayName)
+                            MetadataBadge(text: scheduleSummary)
+                            MetadataBadge(text: retentionSummary)
+                        }
                     }
-                    Spacer()
-                    MetadataBadge(text: profile.sourceMode.displayName)
-                    MetadataBadge(text: scheduleSummary)
-                    MetadataBadge(text: retentionSummary)
-                    Button {
-                        model.runNow(profile: profile)
-                    } label: {
-                        Label(isActiveBackup ? "Running" : "Back Up Now", systemImage: isActiveBackup ? "arrow.triangle.2.circlepath" : "play.fill")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                    VStack(alignment: .trailing, spacing: 8) {
+                        Button {
+                            model.runNow(profile: profile)
+                        } label: {
+                            Label(isActiveBackup ? "Running" : "Back Up Now", systemImage: isActiveBackup ? "arrow.triangle.2.circlepath" : "play.fill")
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
+                        .disabled(model.isWorking)
+                        .fixedSize()
+                        .deltaTooltip(isActiveBackup ? "This backup is running. Progress is shown below." : "Start this backup profile immediately.")
+                        .accessibilityLabel(isActiveBackup ? "Backup running" : "Back up now")
+
+                        HStack(spacing: 8) {
+                            IconButton(symbol: "pencil", help: "Edit sources, destination, schedule, and retention") {
+                                isPresentingEditor = true
+                            }
+                            .disabled(model.isWorking)
+                            IconButton(symbol: "scissors", help: "Run retention cleanup for this profile") {
+                                model.prune(profile: profile)
+                            }
+                            .disabled(model.isWorking)
+                            IconButton(symbol: "trash", help: "Delete this backup profile") {
+                                isConfirmingDelete = true
+                            }
+                            .disabled(model.isWorking)
+                        }
                     }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
-                    .disabled(model.isWorking)
-                    .help(isActiveBackup ? "This backup is running. Progress is shown below." : "Start this backup profile immediately.")
-                    .accessibilityLabel(isActiveBackup ? "Backup running" : "Back up now")
-                    IconButton(symbol: "pencil", help: "Edit sources, destination, schedule, and retention") {
-                        isPresentingEditor = true
-                    }
-                    .disabled(model.isWorking)
-                    IconButton(symbol: "scissors", help: "Run retention cleanup for this profile") {
-                        model.prune(profile: profile)
-                    }
-                    .disabled(model.isWorking)
-                    IconButton(symbol: "trash", help: "Delete this backup profile") {
-                        isConfirmingDelete = true
-                    }
-                    .disabled(model.isWorking)
                 }
 
-                if isActiveBackup {
+                if isActiveBackup && showsInlineProgress {
                     InlineBackupProgress(
                         progress: model.activeProgress,
                         latestMessage: model.liveLogLines.last?.message
@@ -640,42 +654,51 @@ struct RepositoryRow: View {
 
     var body: some View {
         Card {
-            HStack(spacing: 14) {
+            HStack(alignment: .top, spacing: 14) {
                 StatusIcon(symbol: repository.backend.kind == .local ? "externaldrive" : "network", color: .teal)
-                VStack(alignment: .leading, spacing: 5) {
+                VStack(alignment: .leading, spacing: 8) {
                     Text(repository.name)
                         .font(.headline)
-                    Text(repository.backend.kind.displayName)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Text(backendSummary)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
                         .lineLimit(1)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(repository.backend.kind.displayName)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text(backendSummary)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
+                    HStack(spacing: 8) {
+                        MetadataBadge(text: repository.secretStorageMode.displayName)
+                        MetadataBadge(text: verificationSummary)
+                    }
                 }
-                Spacer()
-                MetadataBadge(text: repository.secretStorageMode.displayName)
-                MetadataBadge(text: verificationSummary)
-                IconButton(symbol: "pencil", help: "Edit destination") {
-                    isPresentingEditor = true
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                HStack(spacing: 8) {
+                    IconButton(symbol: "pencil", help: "Edit destination settings and credentials") {
+                        isPresentingEditor = true
+                    }
+                    .disabled(model.isWorking)
+                    IconButton(symbol: "shippingbox.and.arrow.backward", help: "Prepare this destination for encrypted backups") {
+                        model.initializeRepository(repository)
+                    }
+                    .disabled(model.isWorking)
+                    IconButton(symbol: "checkmark.shield", help: "Check destination integrity") {
+                        model.checkRepository(repository)
+                    }
+                    .disabled(model.isWorking)
+                    IconButton(symbol: "arrow.clockwise", help: "Refresh restore points from this destination") {
+                        model.refreshSnapshots(repository: repository)
+                    }
+                    .disabled(model.isWorking)
+                    IconButton(symbol: "trash", help: "Remove this destination from Delta") {
+                        isConfirmingDelete = true
+                    }
+                    .disabled(model.isWorking)
                 }
-                .disabled(model.isWorking)
-                IconButton(symbol: "shippingbox.and.arrow.backward", help: "Prepare destination") {
-                    model.initializeRepository(repository)
-                }
-                .disabled(model.isWorking)
-                IconButton(symbol: "checkmark.shield", help: "Check destination") {
-                    model.checkRepository(repository)
-                }
-                .disabled(model.isWorking)
-                IconButton(symbol: "arrow.clockwise", help: "Refresh restore points") {
-                    model.refreshSnapshots(repository: repository)
-                }
-                .disabled(model.isWorking)
-                IconButton(symbol: "trash", help: "Remove destination") {
-                    isConfirmingDelete = true
-                }
-                .disabled(model.isWorking)
             }
         }
         .sheet(isPresented: $isPresentingEditor) {
@@ -1473,8 +1496,10 @@ struct Card<Content: View>: View {
         content
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(DeltaTheme.panel)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(DeltaTheme.panel)
+            )
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
                     .stroke(DeltaTheme.border, lineWidth: 1)
@@ -1688,26 +1713,11 @@ struct InlineBackupProgress: View {
     var latestMessage: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 10) {
-                if let percentDone = progress?.percentDone {
-                    ProgressView(value: percentDone)
-                        .progressViewStyle(.linear)
-                        .frame(maxWidth: .infinity)
-                    Text(percentLabel(percentDone))
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                        .monospacedDigit()
-                        .frame(width: 96, alignment: .trailing)
-                } else {
-                    ProgressView()
-                        .controlSize(.small)
-                    Text("Scanning sources")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                }
-            }
+        VStack(alignment: .leading, spacing: 8) {
+            ProgressView()
+                .progressViewStyle(.linear)
+                .controlSize(.small)
+                .frame(maxWidth: .infinity)
             Text(statusText)
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -1717,7 +1727,7 @@ struct InlineBackupProgress: View {
         .padding(10)
         .background(DeltaTheme.badge.opacity(0.65))
         .clipShape(RoundedRectangle(cornerRadius: 8))
-        .help("Progress is estimated while Delta scans sources because file and byte totals can change during discovery.")
+        .deltaTooltip("Delta shows stable processed-file counters because backup totals can change while sources are being discovered.")
     }
 
     private var statusText: String {
@@ -1727,11 +1737,7 @@ struct InlineBackupProgress: View {
         if let latestMessage, !latestMessage.isEmpty {
             return latestMessage
         }
-        return "Starting backup engine..."
-    }
-
-    private func percentLabel(_ value: Double) -> String {
-        "Estimated \(Int((value * 100).rounded()))%"
+        return "Scanning sources and preparing backup data..."
     }
 }
 
@@ -1792,6 +1798,8 @@ struct MetadataBadge: View {
     var body: some View {
         Text(text)
             .font(.caption.weight(.medium))
+            .lineLimit(1)
+            .minimumScaleFactor(0.85)
             .padding(.horizontal, 9)
             .padding(.vertical, 5)
             .background(DeltaTheme.badge)
@@ -1810,8 +1818,63 @@ struct IconButton: View {
                 .frame(width: 18, height: 18)
         }
         .buttonStyle(.bordered)
-        .help(help)
         .accessibilityLabel(help)
+        .deltaTooltip(help)
+    }
+}
+
+extension View {
+    func deltaTooltip(_ text: String) -> some View {
+        modifier(DeltaTooltipModifier(text: text))
+    }
+}
+
+private struct DeltaTooltipModifier: ViewModifier {
+    let text: String
+    @State private var isHovering = false
+
+    func body(content: Content) -> some View {
+        content
+            .overlay(alignment: .bottom) {
+                if isHovering {
+                    TooltipBubble(text: text)
+                        .offset(y: 34)
+                        .transition(.opacity.combined(with: .scale(scale: 0.98, anchor: .top)))
+                        .allowsHitTesting(false)
+                        .zIndex(100)
+                }
+            }
+            .onHover { hovering in
+                withAnimation(.easeOut(duration: 0.08)) {
+                    isHovering = hovering
+                }
+            }
+            .zIndex(isHovering ? 100 : 0)
+    }
+}
+
+struct TooltipBubble: View {
+    var text: String
+
+    var body: some View {
+        Text(text)
+            .font(.caption.weight(.medium))
+            .lineLimit(2)
+            .multilineTextAlignment(.center)
+            .foregroundStyle(.primary)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(DeltaTheme.tooltipBackground)
+                    .shadow(color: .black.opacity(0.22), radius: 10, y: 4)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(DeltaTheme.border, lineWidth: 1)
+            )
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(width: 220)
     }
 }
 
@@ -2184,6 +2247,7 @@ enum DeltaTheme {
     static let panel = Color(nsColor: .controlBackgroundColor)
     static let border = Color(nsColor: .separatorColor).opacity(0.45)
     static let badge = Color(nsColor: .tertiarySystemFill)
+    static let tooltipBackground = Color(nsColor: .windowBackgroundColor).opacity(0.98)
     static let logPaneBackground = Color(nsColor: .textBackgroundColor).opacity(0.16)
     static let liveLogPaneHeight: CGFloat = 300
     static let savedLogPaneHeight: CGFloat = 220

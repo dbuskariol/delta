@@ -53,7 +53,7 @@ For local and mounted destinations, Delta automatically runs `restic init` befor
 
 ## Backend Credentials
 
-Backend credentials are stored in Keychain and injected into a curated restic process environment only for the job run. Delta forwards operational values such as `PATH`, `HOME`, `TMPDIR`, locale, and `SSH_AUTH_SOCK`, but does not pass arbitrary ambient environment variables to restic.
+Backend credentials are stored in Keychain and injected into a curated restic process environment only for the job run. Keychain items are created with a trusted-application access list for the signed Delta app, DeltaAgent, and DeltaSecretBridge so scheduled jobs do not require interactive Keychain approval. Delta forwards operational values such as `PATH`, `HOME`, `TMPDIR`, locale, and `SSH_AUTH_SOCK`, but does not pass arbitrary ambient environment variables to restic.
 
 Supported credential templates include:
 
@@ -62,7 +62,7 @@ Supported credential templates include:
 - Backblaze B2: `B2_ACCOUNT_ID`, `B2_ACCOUNT_KEY`
 - Azure Blob: `AZURE_ACCOUNT_NAME`, `AZURE_ACCOUNT_KEY`, `AZURE_ACCOUNT_SAS`, `AZURE_ENDPOINT_SUFFIX`
 - Google Cloud Storage: `GOOGLE_PROJECT_ID`, `GOOGLE_APPLICATION_CREDENTIALS`, `GOOGLE_ACCESS_TOKEN`
-- OpenStack Swift: Keystone, token, and legacy Swift variables
+- OpenStack Swift: Keystone, token, and Swift object storage variables
 - rclone: `RCLONE_CONFIG`, `RCLONE_BWLIMIT`, `RCLONE_VERBOSE`
 
 S3 region is passed as an explicit restic backend option:
@@ -109,7 +109,7 @@ Expected restic backup exit handling:
 | `12` | Wrong password |
 | other non-zero | Failed or cancelled when interruption text is present |
 
-Restic progress totals can change while it scans sources, so Delta labels live percentages as estimated progress. Backup jobs record source paths at job start, and saved logs are grouped by job with expandable full-log loading from SQLite.
+Restic progress totals can change while it scans sources, so Delta does not render volatile live percentages as stable completion. The UI uses an indeterminate active-job bar with stable processed-file and processed-byte counters, backup jobs record source paths at job start, and saved logs are grouped by job with expandable full-log loading from SQLite.
 
 ## Snapshots / Restore Points
 

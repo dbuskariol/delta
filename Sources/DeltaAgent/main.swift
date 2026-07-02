@@ -9,7 +9,10 @@ enum DeltaAgentMain {
                 database: database,
                 commandBuilder: ResticCommandBuilder(
                     resticExecutableURL: ResticExecutableLocator().locate(),
-                    secretBridgeURL: secretBridgeURL()
+                    secretBridgeURL: secretBridgeURL(),
+                    credentialResolver: RepositoryCredentialResolver(
+                        authenticationPolicy: .failIfInteractionNeeded
+                    )
                 )
             )
 

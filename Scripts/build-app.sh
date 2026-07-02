@@ -12,6 +12,13 @@ FRAMEWORKS="$CONTENTS/Frameworks"
 LAUNCH_AGENTS="$CONTENTS/Library/LaunchAgents"
 TOOLS_DIR="$ROOT_DIR/Resources/Tools/bin"
 SIGN_IDENTITY="${DELTA_CODESIGN_IDENTITY:-}"
+APP_ENTITLEMENTS="$ROOT_DIR/dist/Delta.app.entitlements"
+TOOL_ENTITLEMENTS="$ROOT_DIR/dist/Delta.tool.entitlements"
+
+if [[ -z "$SIGN_IDENTITY" ]]; then
+  SIGN_IDENTITY="$(/usr/bin/security find-identity -v -p codesigning 2>/dev/null \
+    | /usr/bin/awk -F\" '/Developer ID Application|Apple Development/ { print $2; exit }')"
+fi
 
 if [[ ! -x "$TOOLS_DIR/restic" || ! -x "$TOOLS_DIR/rclone" ]]; then
   "$ROOT_DIR/Scripts/bootstrap-tools.sh"
@@ -55,35 +62,61 @@ fi
 
 sign_sparkle_framework() {
   local identity="$1"
-  local timestamp_flag="$2"
+  local timestamp_flag="${2:-}"
   local sparkle="$FRAMEWORKS/Sparkle.framework"
   local version_dir="$sparkle/Versions/B"
 
   if [[ -d "$version_dir/XPCServices/Installer.xpc" ]]; then
-    /usr/bin/codesign --force --options runtime $timestamp_flag --sign "$identity" "$version_dir/XPCServices/Installer.xpc"
+    /usr/bin/codesign --force --options runtime ${timestamp_flag:+$timestamp_flag} --sign "$identity" "$version_dir/XPCServices/Installer.xpc"
   fi
   if [[ -d "$version_dir/XPCServices/Downloader.xpc" ]]; then
-    /usr/bin/codesign --force --options runtime $timestamp_flag --preserve-metadata=entitlements --sign "$identity" "$version_dir/XPCServices/Downloader.xpc"
+    /usr/bin/codesign --force --options runtime ${timestamp_flag:+$timestamp_flag} --preserve-metadata=entitlements --sign "$identity" "$version_dir/XPCServices/Downloader.xpc"
   fi
   if [[ -x "$version_dir/Autoupdate" ]]; then
-    /usr/bin/codesign --force --options runtime $timestamp_flag --sign "$identity" "$version_dir/Autoupdate"
+    /usr/bin/codesign --force --options runtime ${timestamp_flag:+$timestamp_flag} --sign "$identity" "$version_dir/Autoupdate"
   fi
   if [[ -d "$version_dir/Updater.app" ]]; then
-    /usr/bin/codesign --force --options runtime $timestamp_flag --sign "$identity" "$version_dir/Updater.app"
+    /usr/bin/codesign --force --options runtime ${timestamp_flag:+$timestamp_flag} --sign "$identity" "$version_dir/Updater.app"
   fi
-  /usr/bin/codesign --force --options runtime $timestamp_flag --sign "$identity" "$sparkle"
+  /usr/bin/codesign --force --options runtime ${timestamp_flag:+$timestamp_flag} --sign "$identity" "$sparkle"
+}
+
+write_entitlements() {
+  local path="$1"
+  {
+    printf '%s\n' '<?xml version="1.0" encoding="UTF-8"?>'
+    printf '%s\n' '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">'
+    printf '%s\n' '<plist version="1.0">'
+    printf '%s\n' '<dict>'
+    printf '    <key>com.apple.security.cs.allow-jit</key>\n'
+    printf '    <false/>\n'
+    printf '    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>\n'
+    printf '    <false/>\n'
+    printf '    <key>com.apple.security.cs.disable-library-validation</key>\n'
+    printf '    <false/>\n'
+    printf '%s\n' '</dict>'
+    printf '%s\n' '</plist>'
+  } > "$path"
 }
 
 if [[ -n "$SIGN_IDENTITY" ]]; then
-  sign_sparkle_framework "$SIGN_IDENTITY" "--timestamp"
-  /usr/bin/codesign --force --options runtime --timestamp --entitlements "$ROOT_DIR/Packaging/Delta.entitlements" --sign "$SIGN_IDENTITY" "$MACOS/restic"
-  /usr/bin/codesign --force --options runtime --timestamp --entitlements "$ROOT_DIR/Packaging/Delta.entitlements" --sign "$SIGN_IDENTITY" "$MACOS/rclone"
-  /usr/bin/codesign --force --options runtime --timestamp --entitlements "$ROOT_DIR/Packaging/Delta.entitlements" --sign "$SIGN_IDENTITY" "$MACOS/DeltaSecretBridge"
-  /usr/bin/codesign --force --options runtime --timestamp --entitlements "$ROOT_DIR/Packaging/Delta.entitlements" --sign "$SIGN_IDENTITY" "$MACOS/DeltaAgent"
-  /usr/bin/codesign --force --options runtime --timestamp --entitlements "$ROOT_DIR/Packaging/Delta.entitlements" --sign "$SIGN_IDENTITY" "$APP_BUNDLE"
+  timestamp_flag=""
+  if [[ "$SIGN_IDENTITY" == Developer\ ID\ Application:* ]]; then
+    timestamp_flag="--timestamp"
+  fi
+  printf "Signing with %s\n" "$SIGN_IDENTITY"
+  write_entitlements "$APP_ENTITLEMENTS"
+  write_entitlements "$TOOL_ENTITLEMENTS"
+  sign_sparkle_framework "$SIGN_IDENTITY" "$timestamp_flag"
+  /usr/bin/codesign --force --options runtime ${timestamp_flag:+$timestamp_flag} --entitlements "$TOOL_ENTITLEMENTS" --sign "$SIGN_IDENTITY" "$MACOS/restic"
+  /usr/bin/codesign --force --options runtime ${timestamp_flag:+$timestamp_flag} --entitlements "$TOOL_ENTITLEMENTS" --sign "$SIGN_IDENTITY" "$MACOS/rclone"
+  /usr/bin/codesign --force --options runtime ${timestamp_flag:+$timestamp_flag} --entitlements "$APP_ENTITLEMENTS" --sign "$SIGN_IDENTITY" "$MACOS/DeltaSecretBridge"
+  /usr/bin/codesign --force --options runtime ${timestamp_flag:+$timestamp_flag} --entitlements "$APP_ENTITLEMENTS" --sign "$SIGN_IDENTITY" "$MACOS/DeltaAgent"
+  /usr/bin/codesign --force --options runtime ${timestamp_flag:+$timestamp_flag} --entitlements "$APP_ENTITLEMENTS" --sign "$SIGN_IDENTITY" "$APP_BUNDLE"
   /usr/bin/codesign --verify --strict --deep --verbose=2 "$APP_BUNDLE"
 else
-  sign_sparkle_framework "-" ""
+  printf "Signing ad-hoc. Set DELTA_CODESIGN_IDENTITY or install an Apple Development/Developer ID certificate for stable macOS privacy permissions.\n" >&2
+  sign_sparkle_framework "-"
   /usr/bin/codesign --force --sign - "$MACOS/restic"
   /usr/bin/codesign --force --sign - "$MACOS/rclone"
   /usr/bin/codesign --force --sign - "$MACOS/DeltaSecretBridge"

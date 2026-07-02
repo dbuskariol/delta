@@ -16,7 +16,7 @@ The product goal is simple: make serious backup practices approachable without h
 - **Power-aware scheduling** with battery and Low Power Mode controls.
 - **Retention maintenance** with scheduled forget/prune/check windows.
 - **Full or selected restore** with dry-run preview, overwrite policies, verification, original-path restore, chosen-folder restore, and optional pre-restore backup.
-- **Streaming and saved backup logs** from restic stdout/stderr with source context, estimated progress formatting, fixed-height live panes, and expandable per-job audit history.
+- **Streaming and saved backup logs** from restic stdout/stderr with source context, stable processed-file counters, fixed-height live panes, and expandable per-job audit history.
 - **Sparkle automatic updates** with generated appcast/update archive support.
 
 ## How It Works
@@ -56,7 +56,7 @@ The app is split into signed targets:
 Important implementation details:
 
 - **SQLite persistence** lives under Application Support through `AppDirectories.databaseURL()`.
-- **Keychain secrets** use `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`.
+- **Keychain secrets** use `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly` and a trusted-application access list for the signed Delta app, agent, and secret bridge. Background secret reads fail closed instead of showing system prompts.
 - **Security-scoped bookmarks** preserve access to selected source folders where macOS requires it.
 - **Per-destination locks** prevent overlapping backup, restore, prune, and check jobs across app/agent processes.
 - **Per-job output logs** persist formatted restic progress, warnings, errors, start lines, and finish lines for troubleshooting after relaunch or scheduled agent runs.
@@ -198,7 +198,7 @@ Scripts/generate-appcast.sh
 
 ## Release And Signing
 
-Local development builds use ad-hoc signing when `DELTA_CODESIGN_IDENTITY` is not set.
+Local development builds prefer `DELTA_CODESIGN_IDENTITY` when set. If it is unset, the build script automatically uses the first available `Developer ID Application` or `Apple Development` signing identity before falling back to ad-hoc signing. Stable signing matters for macOS privacy permissions such as Full Disk Access; changing the signing identity changes the app identity macOS trusts.
 
 Developer ID distribution should use:
 

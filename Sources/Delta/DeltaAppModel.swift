@@ -57,6 +57,7 @@ final class DeltaAppModel: ObservableObject {
     private let credentialResolver = RepositoryCredentialResolver()
     private let bookmarkStore = SecurityScopedBookmarkStore()
     private let repositoryValidator = BackupRepositoryValidator()
+    private var lastLiveLogWasStatus = false
 
     init() {
         let result = Self.openDatabase()
@@ -67,7 +68,8 @@ final class DeltaAppModel: ObservableObject {
 
     func reload() {
         do {
-            repositories = try database.fetchRepositories()
+            let storedRepositories = try database.fetchRepositories()
+            repositories = storedRepositories
             profiles = try database.fetchProfiles()
             jobs = try database.fetchJobRuns(limit: 100)
             jobLogs = try database.fetchJobLogs(limit: 300)
@@ -363,6 +365,11 @@ final class DeltaAppModel: ObservableObject {
         NSWorkspace.shared.open(FullDiskAccessGuide.settingsURL)
     }
 
+    func revealInstalledAppInFinder() {
+        let installedApp = URL(fileURLWithPath: "/Applications/Delta.app")
+        NSWorkspace.shared.activateFileViewerSelecting([installedApp])
+    }
+
     func chooseFolder(allowsMultipleSelection: Bool = false) -> [String] {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
@@ -395,6 +402,7 @@ final class DeltaAppModel: ObservableObject {
         self.activeOperation = activeOperation
         activeProgress = nil
         liveLogLines.removeAll()
+        lastLiveLogWasStatus = false
         Task.detached(priority: .userInitiated) {
             do {
                 try operation()
@@ -438,7 +446,14 @@ final class DeltaAppModel: ObservableObject {
             return
         }
         let displayMessage = ResticLogFormatter.displayMessage(for: trimmed)
-        liveLogLines.append(ResticOutputEvent(date: event.date, stream: event.stream, message: String(displayMessage.prefix(2_000))))
+        let isStatusMessage = ResticLogFormatter.isStatusMessage(trimmed)
+        let liveEvent = ResticOutputEvent(date: event.date, stream: event.stream, message: String(displayMessage.prefix(2_000)))
+        if isStatusMessage, lastLiveLogWasStatus, !liveLogLines.isEmpty {
+            liveLogLines[liveLogLines.count - 1] = liveEvent
+        } else {
+            liveLogLines.append(liveEvent)
+        }
+        lastLiveLogWasStatus = isStatusMessage
         if let progress = ResticLogFormatter.progressSnapshot(for: trimmed) {
             activeProgress = progress
         }

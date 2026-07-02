@@ -169,11 +169,9 @@ final class ResticCommandTests: XCTestCase {
     }
 
     func testCredentialEnvironmentIsLoadedFromKeychainReferences() throws {
-        let service = "com.delta.backup.tests.\(UUID().uuidString)"
-        let store = KeychainSecretStore(service: service)
+        let secrets = InMemorySecretStore()
         let account = "aws-secret-\(UUID().uuidString)"
-        try store.save(secret: "secret-value", account: account)
-        defer { try? store.delete(account: account) }
+        try secrets.save(secret: "secret-value", account: account)
 
         let repository = BackupRepository(
             name: "S3",
@@ -185,7 +183,7 @@ final class ResticCommandTests: XCTestCase {
         let builder = ResticCommandBuilder(
             resticExecutableURL: URL(fileURLWithPath: "/usr/bin/restic"),
             secretBridgeURL: URL(fileURLWithPath: "/Applications/Delta.app/Contents/MacOS/DeltaSecretBridge"),
-            credentialResolver: RepositoryCredentialResolver(secretStore: store)
+            credentialResolver: secrets.resolver
         )
 
         let command = try builder.snapshots(repository: repository)
@@ -223,10 +221,9 @@ final class ResticCommandTests: XCTestCase {
     }
 
     func testCredentialUpdatePreservesBlankExistingValuesAndReplacesProvidedValues() throws {
-        let service = "com.delta.backup.tests.\(UUID().uuidString)"
-        let store = KeychainSecretStore(service: service)
+        let secrets = InMemorySecretStore()
         let repositoryID = UUID()
-        let resolver = RepositoryCredentialResolver(secretStore: store)
+        let resolver = secrets.resolver
         let existing = try resolver.saveCredentials(
             [
                 "AWS_ACCESS_KEY_ID": "old-key",
@@ -234,11 +231,6 @@ final class ResticCommandTests: XCTestCase {
             ],
             repositoryID: repositoryID
         )
-        defer {
-            for reference in existing {
-                try? store.delete(account: reference.keychainAccount)
-            }
-        }
 
         let updated = try resolver.updateCredentials(
             [
@@ -263,10 +255,9 @@ final class ResticCommandTests: XCTestCase {
     }
 
     func testCredentialUpdateDeletesReferencesNoLongerAllowedByBackend() throws {
-        let service = "com.delta.backup.tests.\(UUID().uuidString)"
-        let store = KeychainSecretStore(service: service)
+        let secrets = InMemorySecretStore()
         let repositoryID = UUID()
-        let resolver = RepositoryCredentialResolver(secretStore: store)
+        let resolver = secrets.resolver
         let existing = try resolver.saveCredentials(
             ["AWS_SECRET_ACCESS_KEY": "old-secret"],
             repositoryID: repositoryID
@@ -281,7 +272,7 @@ final class ResticCommandTests: XCTestCase {
         )
 
         XCTAssertTrue(updated.isEmpty)
-        XCTAssertThrowsError(try store.load(account: oldReference.keychainAccount))
+        XCTAssertThrowsError(try secrets.load(account: oldReference.keychainAccount))
     }
 
     func testCredentialTemplatesExposeDocumentedResticEnvironmentKeys() {
@@ -299,5 +290,45 @@ final class ResticCommandTests: XCTestCase {
             resticExecutableURL: URL(fileURLWithPath: "/usr/bin/restic"),
             secretBridgeURL: URL(fileURLWithPath: "/Applications/Delta.app/Contents/MacOS/DeltaSecretBridge")
         )
+    }
+}
+
+private final class InMemorySecretStore: @unchecked Sendable {
+    private var values: [String: String] = [:]
+    private let lock = NSLock()
+
+    var resolver: RepositoryCredentialResolver {
+        RepositoryCredentialResolver(
+            loadSecret: { account in
+                try self.load(account: account)
+            },
+            saveSecret: { secret, account in
+                try self.save(secret: secret, account: account)
+            },
+            deleteSecret: { account in
+                try self.delete(account: account)
+            }
+        )
+    }
+
+    func save(secret: String, account: String) throws {
+        lock.lock()
+        defer { lock.unlock() }
+        values[account] = secret
+    }
+
+    func load(account: String) throws -> String {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let value = values[account] else {
+            throw KeychainSecretError.unexpectedStatus(errSecItemNotFound)
+        }
+        return value
+    }
+
+    func delete(account: String) throws {
+        lock.lock()
+        defer { lock.unlock() }
+        values.removeValue(forKey: account)
     }
 }

@@ -53,6 +53,13 @@ public enum ResticLogFormatter {
         )
     }
 
+    public static func isStatusMessage(_ rawMessage: String) -> Bool {
+        guard let object = jsonObject(from: rawMessage) else {
+            return false
+        }
+        return object["message_type"] as? String == "status"
+    }
+
     private static func jsonObject(from rawMessage: String) -> [String: Any]? {
         let trimmed = rawMessage.trimmingCharacters(in: .whitespacesAndNewlines)
         guard
@@ -87,15 +94,8 @@ public enum ResticLogFormatter {
 
     private static func statusMessage(from object: [String: Any]) -> String {
         var parts: [String] = []
-        if let percentDone = number(object["percent_done"]) {
-            parts.append("Estimated \(Int((percentDone * 100).rounded()))%")
-        }
         if let filesDone = integer(object["files_done"]) {
-            if let totalFiles = integer(object["total_files"]), totalFiles > 0 {
-                parts.append("\(filesDone)/\(totalFiles) files")
-            } else {
-                parts.append("\(filesDone) files")
-            }
+            parts.append("Processed \(filesDone.formatted()) files")
         }
         if let bytesDone = integer(object["bytes_done"]), bytesDone > 0 {
             parts.append(ByteCountFormatter.string(fromByteCount: Int64(bytesDone), countStyle: .file))

@@ -8,7 +8,10 @@ guard let account = arguments.first, !account.isEmpty else {
 }
 
 do {
-    let secret = try KeychainSecretStore().load(account: String(account))
+    let secret = try KeychainSecretStore().load(
+        account: String(account),
+        authenticationPolicy: .failIfInteractionNeeded
+    )
     print(secret)
     exit(0)
 } catch {
