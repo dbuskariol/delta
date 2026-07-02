@@ -244,10 +244,19 @@ final class DeltaAppModel: ObservableObject {
     ) -> Bool {
         guardPersistentStoreAvailable()
         guard isPersistentStoreAvailable else { return false }
+        var rollbackSecretAccounts = Set<String>()
+        var didPersistRepository = false
+        let userManagedPassphrase = passphrase ?? ""
         do {
             let validated = try repositoryValidator.validate(name: name, backend: backend)
             let repositoryID = UUID()
+            if storageMode == .userManagedPassphrase {
+                guard !userManagedPassphrase.isEmpty else {
+                    throw DeltaUIError.message("An encryption passphrase is required for user-managed destinations.")
+                }
+            }
             let credentialReferences = try credentialResolver.saveCredentials(backendCredentials, repositoryID: repositoryID)
+            rollbackSecretAccounts.formUnion(credentialReferences.map(\.keychainAccount))
             let repository = BackupRepository(
                 id: repositoryID,
                 name: validated.name,
@@ -258,18 +267,21 @@ final class DeltaAppModel: ObservableObject {
             switch storageMode {
             case .appManagedKeychain:
                 _ = try secretStore.generateAndSave(account: repository.keychainAccount)
+                rollbackSecretAccounts.insert(repository.keychainAccount)
             case .userManagedPassphrase:
-                guard let passphrase, !passphrase.isEmpty else {
-                    throw DeltaUIError.message("An encryption passphrase is required for user-managed destinations.")
-                }
-                try secretStore.save(secret: passphrase, account: repository.keychainAccount)
+                try secretStore.save(secret: userManagedPassphrase, account: repository.keychainAccount)
+                rollbackSecretAccounts.insert(repository.keychainAccount)
             }
             try database.saveRepository(repository)
-            try database.appendEvent(EventLog(level: .info, message: "Destination '\(repository.name)' was created."))
+            didPersistRepository = true
+            try? database.appendEvent(EventLog(level: .info, message: "Destination '\(repository.name)' was created."))
             reload()
             initializeRepository(repository)
             return true
         } catch {
+            if !didPersistRepository {
+                rollbackSecrets(accounts: rollbackSecretAccounts)
+            }
             alertMessage = error.localizedDescription
             return false
         }
@@ -309,6 +321,12 @@ final class DeltaAppModel: ObservableObject {
         } catch {
             alertMessage = error.localizedDescription
             return false
+        }
+    }
+
+    private func rollbackSecrets(accounts: Set<String>) {
+        for account in accounts {
+            try? secretStore.delete(account: account)
         }
     }
 

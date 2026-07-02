@@ -342,6 +342,37 @@ final class ResticCommandTests: XCTestCase {
         XCTAssertEqual(command.environment["AWS_SECRET_ACCESS_KEY"], "secret-value")
     }
 
+    func testCredentialSaveRollsBackEarlierSecretsWhenLaterSaveFails() throws {
+        enum TestError: Error {
+            case saveFailed
+        }
+
+        let repositoryID = UUID()
+        let firstAccount = "repository-\(repositoryID.uuidString)-env-A_KEY"
+        let recorder = CredentialRollbackRecorder(failingSuffix: "B_FAIL")
+        let resolver = RepositoryCredentialResolver(
+            loadSecret: { _ in "" },
+            saveSecret: { _, account in
+                try recorder.save(account: account, error: TestError.saveFailed)
+            },
+            deleteSecret: { account in
+                recorder.delete(account: account)
+            }
+        )
+
+        XCTAssertThrowsError(
+            try resolver.saveCredentials(
+                [
+                    "A_KEY": "first",
+                    "B_FAIL": "second"
+                ],
+                repositoryID: repositoryID
+            )
+        )
+        XCTAssertTrue(recorder.savedAccounts.isEmpty)
+        XCTAssertEqual(recorder.deletedAccounts, [firstAccount])
+    }
+
     func testCommandEnvironmentDoesNotInheritAmbientSecrets() throws {
         let repository = BackupRepository(name: "Local", backend: .local(path: "/repo"))
         let builder = ResticCommandBuilder(
@@ -491,5 +522,44 @@ private final class InMemorySecretStore: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         values.removeValue(forKey: account)
+    }
+}
+
+private final class CredentialRollbackRecorder: @unchecked Sendable {
+    private let failingSuffix: String
+    private var saved: Set<String> = []
+    private var deleted: Set<String> = []
+    private let lock = NSLock()
+
+    init(failingSuffix: String) {
+        self.failingSuffix = failingSuffix
+    }
+
+    var savedAccounts: Set<String> {
+        lock.lock()
+        defer { lock.unlock() }
+        return saved
+    }
+
+    var deletedAccounts: Set<String> {
+        lock.lock()
+        defer { lock.unlock() }
+        return deleted
+    }
+
+    func save(account: String, error: Error) throws {
+        lock.lock()
+        defer { lock.unlock() }
+        if account.hasSuffix(failingSuffix) {
+            throw error
+        }
+        saved.insert(account)
+    }
+
+    func delete(account: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        deleted.insert(account)
+        saved.remove(account)
     }
 }

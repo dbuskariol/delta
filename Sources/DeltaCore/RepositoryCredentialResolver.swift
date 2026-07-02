@@ -42,12 +42,26 @@ public struct RepositoryCredentialResolver: Sendable {
 
     public func saveCredentials(_ credentials: [String: String], repositoryID: UUID) throws -> [RepositoryCredentialReference] {
         var references: [RepositoryCredentialReference] = []
-        for (environmentKey, value) in credentials where !environmentKey.isEmpty && !value.isEmpty {
-            let account = "repository-\(repositoryID.uuidString)-env-\(environmentKey)"
-            try saveSecret(value, account)
-            references.append(RepositoryCredentialReference(environmentKey: environmentKey, keychainAccount: account))
+        do {
+            for environmentKey in credentials.keys.sorted() {
+                guard
+                    !environmentKey.isEmpty,
+                    let value = credentials[environmentKey],
+                    !value.isEmpty
+                else {
+                    continue
+                }
+                let account = "repository-\(repositoryID.uuidString)-env-\(environmentKey)"
+                try saveSecret(value, account)
+                references.append(RepositoryCredentialReference(environmentKey: environmentKey, keychainAccount: account))
+            }
+        } catch {
+            for reference in references {
+                try? deleteSecret(reference.keychainAccount)
+            }
+            throw error
         }
-        return references.sorted { $0.environmentKey < $1.environmentKey }
+        return references
     }
 
     public func updateCredentials(
