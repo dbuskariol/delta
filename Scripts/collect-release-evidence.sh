@@ -94,6 +94,7 @@ append_command "Background Backups Helper Dry Run" "$APP_PATH/Contents/MacOS/Del
 ISOLATED_AGENT_SUPPORT="$(/usr/bin/mktemp -d -t delta-agent-support.XXXXXX)"
 append_command "Background Backups Isolated Due-Run" /bin/sh -c "DELTA_APP_SUPPORT_DIR='$ISOLATED_AGENT_SUPPORT' '$APP_PATH/Contents/MacOS/DeltaAgent' && test -f '$ISOLATED_AGENT_SUPPORT/Delta.sqlite'"
 /bin/rm -rf "$ISOLATED_AGENT_SUPPORT"
+append_command "Background Backups Scheduled Acceptance" "$ROOT_DIR/Scripts/run-installed-scheduled-agent-acceptance.sh" "$APP_PATH"
 if [[ -d "/Applications/Delta.app" ]]; then
   append_command "Installed App Smoke Verification" "$ROOT_DIR/Scripts/verify-installed-app.sh" "/Applications/Delta.app"
 fi
@@ -120,6 +121,9 @@ if [[ -x "$ROOT_DIR/Scripts/run-local-acceptance-probe.sh" ]]; then
   fi
   if [[ -f "$ROOT_DIR/dist/local-acceptance/installed-keychain-access-latest.md" ]]; then
     append_command "Installed Keychain Access Acceptance Report" /bin/cat "$ROOT_DIR/dist/local-acceptance/installed-keychain-access-latest.md"
+  fi
+  if [[ -f "$ROOT_DIR/dist/local-acceptance/installed-scheduled-agent-latest.md" ]]; then
+    append_command "Installed Scheduled Helper Acceptance Report" /bin/cat "$ROOT_DIR/dist/local-acceptance/installed-scheduled-agent-latest.md"
   fi
   if [[ -f "$ROOT_DIR/dist/local-acceptance/installed-diagnostics-latest.md" ]]; then
     append_command "Installed Diagnostics Acceptance Report" /bin/cat "$ROOT_DIR/dist/local-acceptance/installed-diagnostics-latest.md"

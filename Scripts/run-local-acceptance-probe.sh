@@ -190,10 +190,12 @@ else
     isolated_support="$TMP_DIR/agent-support"
     agent_due_output="$(run_capture agent_due /bin/sh -c "DELTA_APP_SUPPORT_DIR='$isolated_support' '$agent' && test -f '$isolated_support/Delta.sqlite'")"
     agent_due_status="$(command_status agent_due)"
-    if [[ "$agent_status_status" -eq 0 && "$agent_dry_status" -eq 0 && "$agent_due_status" -eq 0 ]]; then
-      append_row "background_backups" "$(item_area background_backups)" "Partial" "Helper status, dry-run, and isolated due-run passed: $agent_status_output $agent_dry_output $agent_due_output" "Approve Login Items if macOS asks, quit Delta, wait for a real scheduled interval, and confirm the run appears after relaunch."
+    scheduled_agent_output="$(run_capture scheduled_agent "$ROOT_DIR/Scripts/run-installed-scheduled-agent-acceptance.sh" "$APP_PATH")"
+    scheduled_agent_status="$(command_status scheduled_agent)"
+    if [[ "$agent_status_status" -eq 0 && "$agent_dry_status" -eq 0 && "$agent_due_status" -eq 0 && "$scheduled_agent_status" -eq 0 ]]; then
+      append_row "background_backups" "$(item_area background_backups)" "Partial" "Helper status, dry-run, no-profile isolated due-run, and seeded scheduled-helper backup acceptance passed: $agent_status_output $agent_dry_output $agent_due_output $scheduled_agent_output" "Approve Login Items if macOS asks, quit Delta, wait for a real scheduled interval, and confirm the run appears after relaunch."
     else
-      append_row "background_backups" "$(item_area background_backups)" "Failed" "Helper checks failed. status=$agent_status_status dry=$agent_dry_status due=$agent_due_status output: $agent_status_output $agent_dry_output $agent_due_output" "Fix bundled Background Backups helper before manual schedule testing."
+      append_row "background_backups" "$(item_area background_backups)" "Failed" "Helper checks failed. status=$agent_status_status dry=$agent_dry_status due=$agent_due_status scheduled=$scheduled_agent_status output: $agent_status_output $agent_dry_output $agent_due_output $scheduled_agent_output" "Fix bundled Background Backups helper before manual schedule testing."
     fi
   else
     append_row "background_backups" "$(item_area background_backups)" "Failed" "DeltaAgent was not executable at $agent." "Rebuild and reinstall the app bundle."

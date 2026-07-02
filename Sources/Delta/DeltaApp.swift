@@ -47,6 +47,10 @@ struct DeltaApp: App {
             runAcceptanceSeedDiagnostics()
         case "--acceptance-local-lifecycle":
             runAcceptanceLocalLifecycle()
+        case "--acceptance-seed-scheduled-agent":
+            runAcceptanceSeedScheduledAgent(arguments: Array(arguments.dropFirst()))
+        case "--acceptance-verify-scheduled-agent":
+            runAcceptanceVerifyScheduledAgent(arguments: Array(arguments.dropFirst()))
         case "--acceptance-save-secret":
             runAcceptanceSave(arguments: Array(arguments.dropFirst()))
         case "--acceptance-delete-secret":
@@ -178,6 +182,52 @@ struct DeltaApp: App {
             exit(0)
         } catch {
             fputs("Delta local lifecycle acceptance error: \(error.localizedDescription)\n", stderr)
+            exit(1)
+        }
+    }
+
+    private static func runAcceptanceSeedScheduledAgent(arguments: [String]) -> Never {
+        guard ProcessInfo.processInfo.environment["DELTA_ENABLE_SCHEDULED_AGENT_ACCEPTANCE"] == "1" else {
+            fputs("Delta scheduled agent acceptance command is disabled.\n", stderr)
+            exit(64)
+        }
+        guard arguments.count == 2 else {
+            fputs("usage: Delta --acceptance-seed-scheduled-agent <work-directory> <keychain-account>\n", stderr)
+            exit(64)
+        }
+
+        do {
+            let output = try AcceptanceScheduledAgentCommand.seed(
+                workDirectory: URL(fileURLWithPath: arguments[0]),
+                keychainAccount: arguments[1]
+            )
+            print(output, terminator: output.hasSuffix("\n") ? "" : "\n")
+            exit(0)
+        } catch {
+            fputs("Delta scheduled agent acceptance seed error: \(error.localizedDescription)\n", stderr)
+            exit(1)
+        }
+    }
+
+    private static func runAcceptanceVerifyScheduledAgent(arguments: [String]) -> Never {
+        guard ProcessInfo.processInfo.environment["DELTA_ENABLE_SCHEDULED_AGENT_ACCEPTANCE"] == "1" else {
+            fputs("Delta scheduled agent acceptance command is disabled.\n", stderr)
+            exit(64)
+        }
+        guard arguments.count == 2 else {
+            fputs("usage: Delta --acceptance-verify-scheduled-agent <work-directory> <keychain-account>\n", stderr)
+            exit(64)
+        }
+
+        do {
+            let report = try AcceptanceScheduledAgentCommand.verify(
+                workDirectory: URL(fileURLWithPath: arguments[0]),
+                keychainAccount: arguments[1]
+            )
+            print(report, terminator: report.hasSuffix("\n") ? "" : "\n")
+            exit(0)
+        } catch {
+            fputs("Delta scheduled agent acceptance verify error: \(error.localizedDescription)\n", stderr)
             exit(1)
         }
     }
