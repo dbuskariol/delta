@@ -276,7 +276,7 @@ This runs:
 
 - unit tests
 - restic/rclone bootstrap and checksum verification
-- bundled restic command and flag surface verification
+- bundled restic command, flag, and backend option surface verification for SFTP, REST, S3, Backblaze B2, Azure Blob, Google Cloud Storage, OpenStack Swift, and rclone
 - local restic integration test with real init/backup/restore, dry-run restore without writes, check, prune, and post-prune check
 - backup source preflight coverage for moved, invalid, and unreadable source selections
 - packaged app build

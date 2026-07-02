@@ -62,11 +62,23 @@ DELTA_ACCEPTANCE_SFTP_BAD_REPOSITORY='sftp:user@example.com:/srv/backups/delta-a
 DELTA_ACCEPTANCE_S3_REPOSITORY='s3:https://s3.example.com/bucket/delta-acceptance'
 AWS_ACCESS_KEY_ID=...
 AWS_SECRET_ACCESS_KEY=...
+DELTA_ACCEPTANCE_B2_REPOSITORY='b2:bucket:delta-acceptance'
+B2_ACCOUNT_ID=...
+B2_ACCOUNT_KEY=...
+DELTA_ACCEPTANCE_AZURE_REPOSITORY='azure:container:/delta-acceptance'
+AZURE_ACCOUNT_NAME=...
+AZURE_ACCOUNT_KEY=... # or AZURE_ACCOUNT_SAS
+DELTA_ACCEPTANCE_GCS_REPOSITORY='gs:bucket:/delta-acceptance'
+GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json # or GOOGLE_ACCESS_TOKEN
+DELTA_ACCEPTANCE_SWIFT_REPOSITORY='swift:container:/delta-acceptance'
+DELTA_ACCEPTANCE_RCLONE_REPOSITORY='rclone:remote:delta-acceptance'
+RCLONE_CONFIG=/path/to/rclone.conf
+DELTA_ACCEPTANCE_REST_REPOSITORY='rest:https://rest.example.com/delta-acceptance'
 ```
 
 `DELTA_ACCEPTANCE_MOUNTED_PATH` must be a mounted network filesystem under `/Volumes`, such as SMB or NFS. Local external disks are covered by installed local lifecycle acceptance and do not satisfy the mounted-network acceptance row.
 
-The external harness requires remote URLs to include `delta-acceptance` unless `DELTA_ACCEPTANCE_ALLOW_EXISTING_REMOTE=1` is set after a human confirms the target is safe. It launches the installed Delta app in external lifecycle acceptance mode, then proves the coordinator, isolated SQLite store, Keychain password command, bundled restic, automatic destination preparation, existing-destination reuse, first backup, deduplicated no-change backup, restore-point cache, restore browser listing, full restore, selected-folder restore, check, prune, and post-prune check against the configured mounted, SFTP, or S3-compatible backend. S3 acceptance stores throwaway backend credentials as Delta Keychain credential references and proves missing-credential failure; SFTP can prove wrong-target or wrong-credential failure when `DELTA_ACCEPTANCE_SFTP_BAD_REPOSITORY` is configured.
+The external harness requires remote URLs to include `delta-acceptance` unless `DELTA_ACCEPTANCE_ALLOW_EXISTING_REMOTE=1` is set after a human confirms the target is safe. It launches the installed Delta app in external lifecycle acceptance mode, then proves the coordinator, isolated SQLite store, Keychain password command, bundled restic, automatic destination preparation, existing-destination reuse, first backup, deduplicated no-change backup, restore-point cache, restore browser listing, full restore, selected-folder restore, check, prune, and post-prune check against the configured mounted, SFTP, REST, S3-compatible, Backblaze B2, Azure Blob, Google Cloud Storage, OpenStack Swift, rclone, or custom restic backend. Credentialed backend acceptance stores provider environment values as Delta Keychain credential references; S3 acceptance also proves missing-credential failure, and SFTP can prove wrong-target or wrong-credential failure when `DELTA_ACCEPTANCE_SFTP_BAD_REPOSITORY` is configured.
 
 The probe only marks machine-verifiable evidence as automated or partial evidence. It can record the installed app's own Full Disk Access diagnostic result, but it intentionally keeps Full Disk Access approval, macOS Login Items approval, closed-window schedule visibility, UI disconnect/reconnect behavior, menu bar visual interaction, Notification Center delivery, Sparkle install flow, and notarization as explicit manual follow-up where a shell process would give weak or misleading evidence.
 
@@ -118,6 +130,7 @@ Use the local acceptance probe report as supporting evidence while filling this 
 | Mounted SMB or NFS destination | Test at least one SMB or NFS mounted path under /Volumes, disconnect it, confirm Delta reports destination unavailable without invoking restic, reconnect it, and confirm backup resumes. Also test an unwritable mounted destination and confirm Delta fails the write probe before invoking restic. |
 | SFTP destination | Test a real SFTP destination with a non-root absolute path and non-interactive SSH authentication through a configured key file or ssh-agent; confirm wrong credential/key failure, corrected credential success, restore point refresh, and restore. |
 | S3-compatible destination | Test at least one S3-compatible provider with endpoint, bucket, optional region, missing credential failure, corrected credential success, backup, check, and restore. |
+| Additional restic remote backends | Test REST server, Backblaze B2, Azure Blob, Google Cloud Storage, OpenStack Swift, rclone, and custom restic URL destinations with provider-specific credentials/configuration; confirm backup, check, restore point refresh, selected restore, cleanup, and post-cleanup check. |
 | Remote first-backup preparation | Add a new unprepared remote destination, start a backup without pressing Prepare first, and confirm Delta probes, prepares when missing, then runs the backup. Repeat with an existing remote destination and confirm Delta reuses it without reinitializing. |
 | Restore wizard | Test full restore, selected folder restore from the browser, selected file restore, dry-run preview, chosen-folder restore, original-path preview, original-path confirmation, and every overwrite policy. |
 | Restore defaults | Change Settings > Restore Defaults, reopen Restore, and confirm preview, verification, and overwrite policy defaults apply while remaining editable per restore. |

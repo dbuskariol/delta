@@ -8,7 +8,7 @@ OUTPUT_DIR="${DELTA_EXTERNAL_ACCEPTANCE_DIR:-$ROOT_DIR/dist/local-acceptance}"
 
 usage() {
   cat >&2 <<'EOF'
-usage: Scripts/run-external-backend-acceptance.sh <mounted|sftp|s3> [Delta.app]
+usage: Scripts/run-external-backend-acceptance.sh <mounted|sftp|rest|s3|b2|azure|gcs|swift|rclone|custom> [Delta.app]
 
 Environment:
   mounted:
@@ -19,12 +19,48 @@ Environment:
     DELTA_ACCEPTANCE_SFTP_PRIVATE_KEY=/path/to/key   optional; ssh-agent/config also works
     DELTA_ACCEPTANCE_SFTP_BAD_REPOSITORY=...         optional; must fail before success
 
+  rest:
+    DELTA_ACCEPTANCE_REST_REPOSITORY=rest:https://rest.example.com/delta-acceptance
+    RESTIC_REST_USERNAME=...                         optional
+    RESTIC_REST_PASSWORD=...                         optional
+
   s3:
     DELTA_ACCEPTANCE_S3_REPOSITORY=s3:https://endpoint/bucket/delta-acceptance-path
     AWS_ACCESS_KEY_ID=...
     AWS_SECRET_ACCESS_KEY=...
     AWS_SESSION_TOKEN=...                            optional
     AWS_DEFAULT_REGION=...                           optional
+
+  b2:
+    DELTA_ACCEPTANCE_B2_REPOSITORY=b2:bucket:delta-acceptance-path
+    B2_ACCOUNT_ID=...
+    B2_ACCOUNT_KEY=...
+
+  azure:
+    DELTA_ACCEPTANCE_AZURE_REPOSITORY=azure:container:/delta-acceptance-path
+    AZURE_ACCOUNT_NAME=...
+    AZURE_ACCOUNT_KEY=...                            either key or SAS is required
+    AZURE_ACCOUNT_SAS=...
+    AZURE_ENDPOINT_SUFFIX=...                        optional
+
+  gcs:
+    DELTA_ACCEPTANCE_GCS_REPOSITORY=gs:bucket:/delta-acceptance-path
+    GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
+    GOOGLE_ACCESS_TOKEN=...                          alternatively use an access token
+    GOOGLE_PROJECT_ID=...                            optional
+
+  swift:
+    DELTA_ACCEPTANCE_SWIFT_REPOSITORY=swift:container:/delta-acceptance-path
+    Provide ST_AUTH/ST_USER/ST_KEY, OS_STORAGE_URL/OS_AUTH_TOKEN,
+    Keystone password auth, or Keystone application credential auth.
+
+  rclone:
+    DELTA_ACCEPTANCE_RCLONE_REPOSITORY=rclone:remote:delta-acceptance-path
+    RCLONE_CONFIG=/path/to/rclone.conf
+
+  custom:
+    DELTA_ACCEPTANCE_CUSTOM_REPOSITORY=<raw restic repository URL containing delta-acceptance>
+    DELTA_ACCEPTANCE_CUSTOM_CREDENTIAL_KEYS=ENV_KEY,ANOTHER_ENV_KEY optional
 
 Remote repository URLs must include "delta-acceptance" unless DELTA_ACCEPTANCE_ALLOW_EXISTING_REMOTE=1 is set.
 EOF
@@ -88,8 +124,54 @@ require_acceptance_remote() {
   esac
 }
 
+require_env() {
+  local key="$1"
+  [[ -n "${!key:-}" ]] || fail "$key is required for $KIND acceptance." 64
+}
+
+require_any_env() {
+  local key
+  for key in "$@"; do
+    if [[ -n "${!key:-}" ]]; then
+      return
+    fi
+  done
+  fail "One of $* is required for $KIND acceptance." 64
+}
+
+require_readable_file_env() {
+  local key="$1"
+  require_env "$key"
+  [[ -r "${!key}" ]] || fail "$key is not readable: ${!key}"
+}
+
+require_custom_credentials() {
+  local raw_keys="${DELTA_ACCEPTANCE_CUSTOM_CREDENTIAL_KEYS:-}"
+  local key
+  raw_keys="${raw_keys//,/ }"
+  for key in $raw_keys; do
+    [[ -n "$key" ]] || continue
+    [[ -n "${!key:-}" ]] || fail "$key is listed in DELTA_ACCEPTANCE_CUSTOM_CREDENTIAL_KEYS but is not set." 64
+  done
+}
+
+has_all_env() {
+  local key
+  for key in "$@"; do
+    [[ -n "${!key:-}" ]] || return 1
+  done
+}
+
+has_any_env() {
+  local key
+  for key in "$@"; do
+    [[ -n "${!key:-}" ]] && return 0
+  done
+  return 1
+}
+
 case "$KIND" in
-  mounted|sftp|s3)
+  mounted|sftp|rest|s3|b2|azure|gcs|swift|rclone|custom)
     ;;
   "")
     usage
@@ -176,6 +258,10 @@ case "$KIND" in
       require_acceptance_remote "$DELTA_ACCEPTANCE_SFTP_BAD_REPOSITORY"
     fi
     ;;
+  rest)
+    require_env DELTA_ACCEPTANCE_REST_REPOSITORY
+    require_acceptance_remote "$DELTA_ACCEPTANCE_REST_REPOSITORY"
+    ;;
   s3)
     repository_url="${DELTA_ACCEPTANCE_S3_REPOSITORY:-}"
     [[ -n "$repository_url" ]] || fail "DELTA_ACCEPTANCE_S3_REPOSITORY is required for S3 acceptance." 64
@@ -183,6 +269,49 @@ case "$KIND" in
     [[ -n "${AWS_ACCESS_KEY_ID:-}" ]] || fail "AWS_ACCESS_KEY_ID is required for S3 acceptance." 64
     [[ -n "${AWS_SECRET_ACCESS_KEY:-}" ]] || fail "AWS_SECRET_ACCESS_KEY is required for S3 acceptance." 64
     COMMAND_ENV+=("DELTA_EXTERNAL_ACCEPTANCE_REQUIRE_MISSING_CREDENTIAL_PROBE=1")
+    ;;
+  b2)
+    require_env DELTA_ACCEPTANCE_B2_REPOSITORY
+    require_acceptance_remote "$DELTA_ACCEPTANCE_B2_REPOSITORY"
+    require_env B2_ACCOUNT_ID
+    require_env B2_ACCOUNT_KEY
+    ;;
+  azure)
+    require_env DELTA_ACCEPTANCE_AZURE_REPOSITORY
+    require_acceptance_remote "$DELTA_ACCEPTANCE_AZURE_REPOSITORY"
+    require_env AZURE_ACCOUNT_NAME
+    require_any_env AZURE_ACCOUNT_KEY AZURE_ACCOUNT_SAS
+    ;;
+  gcs)
+    require_env DELTA_ACCEPTANCE_GCS_REPOSITORY
+    require_acceptance_remote "$DELTA_ACCEPTANCE_GCS_REPOSITORY"
+    require_any_env GOOGLE_APPLICATION_CREDENTIALS GOOGLE_ACCESS_TOKEN
+    if [[ -n "${GOOGLE_APPLICATION_CREDENTIALS:-}" ]]; then
+      [[ -r "$GOOGLE_APPLICATION_CREDENTIALS" ]] || fail "GOOGLE_APPLICATION_CREDENTIALS is not readable: $GOOGLE_APPLICATION_CREDENTIALS"
+    fi
+    ;;
+  swift)
+    require_env DELTA_ACCEPTANCE_SWIFT_REPOSITORY
+    require_acceptance_remote "$DELTA_ACCEPTANCE_SWIFT_REPOSITORY"
+    if has_all_env ST_AUTH ST_USER ST_KEY \
+      || has_all_env OS_STORAGE_URL OS_AUTH_TOKEN \
+      || { has_any_env OS_USERNAME OS_USER_ID && has_all_env OS_AUTH_URL OS_PASSWORD; } \
+      || { has_any_env OS_APPLICATION_CREDENTIAL_ID OS_APPLICATION_CREDENTIAL_NAME && has_all_env OS_AUTH_URL OS_APPLICATION_CREDENTIAL_SECRET; }
+    then
+      :
+    else
+      fail "Swift acceptance requires ST_AUTH/ST_USER/ST_KEY, OS_STORAGE_URL/OS_AUTH_TOKEN, Keystone password auth, or Keystone application credential auth." 64
+    fi
+    ;;
+  rclone)
+    require_env DELTA_ACCEPTANCE_RCLONE_REPOSITORY
+    require_acceptance_remote "$DELTA_ACCEPTANCE_RCLONE_REPOSITORY"
+    require_readable_file_env RCLONE_CONFIG
+    ;;
+  custom)
+    require_env DELTA_ACCEPTANCE_CUSTOM_REPOSITORY
+    require_acceptance_remote "$DELTA_ACCEPTANCE_CUSTOM_REPOSITORY"
+    require_custom_credentials
     ;;
 esac
 

@@ -292,6 +292,31 @@ DELTA_ACCEPTANCE_S3_REPOSITORY='s3:https://s3.example.com/bucket/delta-acceptanc
 AWS_ACCESS_KEY_ID=... \
 AWS_SECRET_ACCESS_KEY=... \
 Scripts/run-external-backend-acceptance.sh s3
+
+DELTA_ACCEPTANCE_B2_REPOSITORY='b2:bucket:delta-acceptance' \
+B2_ACCOUNT_ID=... \
+B2_ACCOUNT_KEY=... \
+Scripts/run-external-backend-acceptance.sh b2
+
+DELTA_ACCEPTANCE_AZURE_REPOSITORY='azure:container:/delta-acceptance' \
+AZURE_ACCOUNT_NAME=... \
+AZURE_ACCOUNT_KEY=... \
+Scripts/run-external-backend-acceptance.sh azure
+
+DELTA_ACCEPTANCE_GCS_REPOSITORY='gs:bucket:/delta-acceptance' \
+GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json \
+Scripts/run-external-backend-acceptance.sh gcs
+
+DELTA_ACCEPTANCE_SWIFT_REPOSITORY='swift:container:/delta-acceptance' \
+OS_AUTH_URL=... OS_USERNAME=... OS_PASSWORD=... \
+Scripts/run-external-backend-acceptance.sh swift
+
+DELTA_ACCEPTANCE_RCLONE_REPOSITORY='rclone:remote:delta-acceptance' \
+RCLONE_CONFIG=/path/to/rclone.conf \
+Scripts/run-external-backend-acceptance.sh rclone
+
+DELTA_ACCEPTANCE_REST_REPOSITORY='rest:https://rest.example.com/delta-acceptance' \
+Scripts/run-external-backend-acceptance.sh rest
 ```
 
 `DELTA_ACCEPTANCE_MOUNTED_PATH` must point to a mounted network filesystem under `/Volumes`, such as SMB or NFS. Local external disks are covered by the installed local lifecycle acceptance instead.
@@ -310,7 +335,7 @@ After Developer ID notarization and installing the exact release candidate, run 
 Scripts/verify-production-readiness.sh
 ```
 
-The local acceptance probe writes `dist/local-acceptance/latest.md` and separates automated evidence from human-only checks. It also runs `Scripts/run-installed-keychain-access-acceptance.sh`, which creates a throwaway destination-secret item through the installed Delta app, proves the installed password bridge mode can read it without interaction, then deletes it. It runs `Scripts/run-installed-scheduled-agent-acceptance.sh`, which seeds an isolated due scheduled profile and proves the installed Background Backups helper runs one real backup through the installed Delta executable without interactive Keychain prompts. It runs `Scripts/run-installed-diagnostics-acceptance.sh`, which seeds isolated installed-app state, exports diagnostics through the installed app, proves seeded destination/backend credential values are redacted, and records the installed app's own Full Disk Access status. It also runs `Scripts/run-installed-local-backup-acceptance.sh`, which launches the installed Delta app in local lifecycle acceptance mode and verifies Delta's coordinator, SQLite store, Keychain password command, bundled restic, automatic destination preparation, first backup, no-change backup, incremental backup, restore-point cache, backup browser listing, full restore, selected folder restore, selected file restore, destination check, cleanup, and post-cleanup check against a temporary encrypted local destination. When configured with `DELTA_ACCEPTANCE_MOUNTED_PATH`, `DELTA_ACCEPTANCE_SFTP_REPOSITORY`, or `DELTA_ACCEPTANCE_S3_REPOSITORY`, it also runs `Scripts/run-external-backend-acceptance.sh`, which launches the installed Delta app in external lifecycle acceptance mode against the configured mounted, SFTP, or S3-compatible destination. That external mode verifies Delta's coordinator, isolated SQLite store, Keychain password command, bundled restic, automatic destination preparation, no-change dedupe behavior, restore-point cache, restore browser listing, full restore, selected folder restore, destination check, cleanup, and post-cleanup check against the real backend. S3 acceptance stores throwaway backend credentials as Delta Keychain credential references, then proves they are usable without inheriting ambient AWS secrets. Remote acceptance URLs must point at dedicated paths containing `delta-acceptance` unless `DELTA_ACCEPTANCE_ALLOW_EXISTING_REMOTE=1` is set after a human confirms the target is safe. New manual reports copy that local evidence into the Evidence / Notes column while keeping every Result as `Not run`. It is useful release evidence, but it does not replace the manual macOS acceptance matrix for Full Disk Access approval, macOS Login Items approval, closed-window scheduling UI, disconnect/reconnect behavior, menu bar visual interaction, Notification Center delivery, Sparkle update installation, or notarization.
+The local acceptance probe writes `dist/local-acceptance/latest.md` and separates automated evidence from human-only checks. It also runs `Scripts/run-installed-keychain-access-acceptance.sh`, which creates a throwaway destination-secret item through the installed Delta app, proves the installed password bridge mode can read it without interaction, then deletes it. It runs `Scripts/run-installed-scheduled-agent-acceptance.sh`, which seeds an isolated due scheduled profile and proves the installed Background Backups helper runs one real backup through the installed Delta executable without interactive Keychain prompts. It runs `Scripts/run-installed-diagnostics-acceptance.sh`, which seeds isolated installed-app state, exports diagnostics through the installed app, proves seeded destination/backend credential values are redacted, and records the installed app's own Full Disk Access status. It also runs `Scripts/run-installed-local-backup-acceptance.sh`, which launches the installed Delta app in local lifecycle acceptance mode and verifies Delta's coordinator, SQLite store, Keychain password command, bundled restic, automatic destination preparation, first backup, no-change backup, incremental backup, restore-point cache, backup browser listing, full restore, selected folder restore, selected file restore, destination check, cleanup, and post-cleanup check against a temporary encrypted local destination. When configured with external backend environment variables, it also runs `Scripts/run-external-backend-acceptance.sh`, which launches the installed Delta app in external lifecycle acceptance mode against mounted, SFTP, REST, S3-compatible, Backblaze B2, Azure Blob, Google Cloud Storage, OpenStack Swift, rclone, and custom restic destinations. That external mode verifies Delta's coordinator, isolated SQLite store, Keychain password command, bundled restic, automatic destination preparation, no-change dedupe behavior, restore-point cache, restore browser listing, full restore, selected folder restore, destination check, cleanup, and post-cleanup check against the real backend. Credentialed backend acceptance stores provider environment values as Delta Keychain credential references, then proves they are usable without inheriting ambient shell secrets. Remote acceptance URLs must point at dedicated paths containing `delta-acceptance` unless `DELTA_ACCEPTANCE_ALLOW_EXISTING_REMOTE=1` is set after a human confirms the target is safe. New manual reports copy that local evidence into the Evidence / Notes column while keeping every Result as `Not run`. It is useful release evidence, but it does not replace the manual macOS acceptance matrix for Full Disk Access approval, macOS Login Items approval, closed-window scheduling UI, disconnect/reconnect behavior, menu bar visual interaction, Notification Center delivery, Sparkle update installation, or notarization.
 
 The release evidence report is written under `dist/release-evidence/` and records the app version, git commit, signing details, helper/tool smoke output, Sparkle artifacts, automated gate status, local acceptance probe output, installed app smoke output, notarization ticket status, and manual acceptance report verification. `Scripts/verify-production-readiness.sh` fails unless that evidence, the current manual acceptance report, notarization, Gatekeeper, and the installed app all prove the same current git commit is ready for external distribution.
 

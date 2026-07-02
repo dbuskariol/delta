@@ -292,6 +292,47 @@ else
     fi
   fi
 
+  additional_remote_kinds=(rest b2 azure gcs swift rclone custom)
+  additional_remote_envs=(
+    DELTA_ACCEPTANCE_REST_REPOSITORY
+    DELTA_ACCEPTANCE_B2_REPOSITORY
+    DELTA_ACCEPTANCE_AZURE_REPOSITORY
+    DELTA_ACCEPTANCE_GCS_REPOSITORY
+    DELTA_ACCEPTANCE_SWIFT_REPOSITORY
+    DELTA_ACCEPTANCE_RCLONE_REPOSITORY
+    DELTA_ACCEPTANCE_CUSTOM_REPOSITORY
+  )
+  additional_remote_names=(
+    "REST server"
+    "Backblaze B2"
+    "Azure Blob"
+    "Google Cloud Storage"
+    "OpenStack Swift"
+    "rclone"
+    "custom restic URL"
+  )
+  additional_remote_statuses=()
+  additional_remote_evidence=()
+  for index in "${!additional_remote_kinds[@]}"; do
+    kind="${additional_remote_kinds[$index]}"
+    env_key="${additional_remote_envs[$index]}"
+    name="${additional_remote_names[$index]}"
+    if [[ -n "${!env_key:-}" ]]; then
+      output="$(run_capture "external_$kind" "$ROOT_DIR/Scripts/run-external-backend-acceptance.sh" "$kind" "$APP_PATH")"
+      status="$(command_status "external_$kind")"
+      if [[ "$status" -eq 0 ]]; then
+        additional_remote_statuses+=("passed")
+        additional_remote_evidence+=("Installed Delta external $name lifecycle acceptance passed through the coordinator with Keychain-backed backend configuration where applicable: $output")
+      else
+        additional_remote_statuses+=("failed")
+        additional_remote_evidence+=("External $name acceptance failed: $output")
+      fi
+    else
+      additional_remote_statuses+=("not_configured")
+      additional_remote_evidence+=("$name acceptance was not configured. Set $env_key and provider credentials/configuration to run it.")
+    fi
+  done
+
   automated_gate_status="$(gate_status_value status)"
   automated_gate_commit="$(gate_status_value git_commit)"
   if [[ "$automated_gate_status" == "Passed" && "$automated_gate_commit" == "$git_commit" ]]; then
@@ -360,6 +401,31 @@ else
       ;;
   esac
 
+  additional_remote_passed=()
+  additional_remote_failed=()
+  additional_remote_missing=()
+  for index in "${!additional_remote_kinds[@]}"; do
+    name="${additional_remote_names[$index]}"
+    case "${additional_remote_statuses[$index]}" in
+      passed)
+        additional_remote_passed+=("${additional_remote_evidence[$index]}")
+        ;;
+      failed)
+        additional_remote_failed+=("${additional_remote_evidence[$index]}")
+        ;;
+      *)
+        additional_remote_missing+=("$name")
+        ;;
+    esac
+  done
+  if [[ "${#additional_remote_failed[@]}" -gt 0 ]]; then
+    append_row "remote_backend_matrix" "$(item_area remote_backend_matrix)" "Failed" "${additional_remote_failed[*]}" "Fix the configured remote backend acceptance targets and rerun."
+  elif [[ "${#additional_remote_passed[@]}" -gt 0 ]]; then
+    append_row "remote_backend_matrix" "$(item_area remote_backend_matrix)" "Partial" "${additional_remote_passed[*]} Missing non-interactive acceptance for: ${additional_remote_missing[*]:-none}." "Run configured external lifecycle acceptance for every remote destination family you intend to ship: REST, B2, Azure, GCS, Swift, rclone, and custom restic URLs."
+  else
+    append_row "remote_backend_matrix" "$(item_area remote_backend_matrix)" "Manual Required" "No additional restic backend families are configured for non-interactive verification. Set one or more of DELTA_ACCEPTANCE_REST_REPOSITORY, DELTA_ACCEPTANCE_B2_REPOSITORY, DELTA_ACCEPTANCE_AZURE_REPOSITORY, DELTA_ACCEPTANCE_GCS_REPOSITORY, DELTA_ACCEPTANCE_SWIFT_REPOSITORY, DELTA_ACCEPTANCE_RCLONE_REPOSITORY, or DELTA_ACCEPTANCE_CUSTOM_REPOSITORY to run installed-app external lifecycle acceptance." "Test REST, B2, Azure Blob, Google Cloud Storage, OpenStack Swift, rclone, and custom restic URL destinations with provider credentials/configuration, backup, check, restore-point refresh, and restore."
+  fi
+
   remote_evidence_parts=()
   remote_failed_parts=()
   if [[ "$sftp_acceptance_status" == "passed" ]]; then
@@ -372,13 +438,20 @@ else
   elif [[ "$s3_acceptance_status" == "failed" ]]; then
     remote_failed_parts+=("$s3_acceptance_evidence")
   fi
+  for index in "${!additional_remote_kinds[@]}"; do
+    if [[ "${additional_remote_statuses[$index]}" == "passed" ]]; then
+      remote_evidence_parts+=("Installed Delta ${additional_remote_names[$index]} external lifecycle acceptance proved Keychain-backed backend configuration where applicable, unprepared-destination probe, prepare, reuse probe, backup, restore, check, and prune.")
+    elif [[ "${additional_remote_statuses[$index]}" == "failed" ]]; then
+      remote_failed_parts+=("${additional_remote_evidence[$index]}")
+    fi
+  done
 
   if [[ "${#remote_failed_parts[@]}" -gt 0 ]]; then
     append_row "remote_first_backup_preparation" "$(item_area remote_first_backup_preparation)" "Failed" "${remote_failed_parts[*]}" "Fix configured external remote acceptance targets and rerun."
   elif [[ "${#remote_evidence_parts[@]}" -gt 0 ]]; then
     append_row "remote_first_backup_preparation" "$(item_area remote_first_backup_preparation)" "Partial" "${remote_evidence_parts[*]}" "Repeat through the installed app UI with a new unprepared remote and an existing remote; confirm init happens only when needed."
   else
-    append_row "remote_first_backup_preparation" "$(item_area remote_first_backup_preparation)" "Manual Required" "Remote destination preparation needs a real unprepared remote and an existing remote to avoid false confidence. Configure SFTP or S3 external acceptance to automate the backend lifecycle." "Start backup on new unprepared remote and existing remote; confirm init happens only when needed."
+    append_row "remote_first_backup_preparation" "$(item_area remote_first_backup_preparation)" "Manual Required" "Remote destination preparation needs a real unprepared remote and an existing remote to avoid false confidence. Configure external backend acceptance to automate the backend lifecycle." "Start backup on new unprepared remote and existing remote; confirm init happens only when needed."
   fi
   if [[ "$automated_gate_status" == "Passed" && "$automated_gate_commit" == "$git_commit" ]] \
     && grep -Fq "MenuBarStatusPresentationTests" "$ROOT_DIR/Tests/DeltaCoreTests/MenuBarStatusPresentationTests.swift" \
