@@ -49,8 +49,8 @@ public enum SettingsSurfaceContract {
     ]
 
     public static let controlTitles = [
-        "Scheduled backups",
-        "Pause scheduled automation",
+        "Allow scheduled backups",
+        "Pause automatic runs",
         "Keep Mac awake during backup work",
         "Status menu",
         "Start Delta at login",
@@ -145,7 +145,7 @@ public enum SettingsSurfaceContract {
         require(cardTitles, contains: "Power & Reliability", in: "cards", failures: &failures)
         require(cardTitles, contains: "Automatic Updates", in: "cards", failures: &failures)
         require(cardTitles, contains: "Diagnostics", in: "cards", failures: &failures)
-        require(controlTitles, contains: "Pause scheduled automation", in: "controls", failures: &failures)
+        require(controlTitles, contains: "Pause automatic runs", in: "controls", failures: &failures)
         require(controlTitles, contains: "Backup freshness", in: "controls", failures: &failures)
         require(controlTitles, contains: "Destination checks", in: "controls", failures: &failures)
         require(controlTitles, contains: "Destination free space", in: "controls", failures: &failures)

@@ -20,7 +20,7 @@ public struct BackgroundBackupServicePresentation: Equatable, Sendable {
         attentionTitle != nil && attentionText != nil
     }
 
-    public static let purposeText = "Delta can run due scheduled backups after you sign in, even when the main window is closed. macOS manages this as a Login Item helper. It runs as your user account, checks each profile's power and destination rules, starts eligible backups, then exits when there is no work."
+    public static let purposeText = "Delta can run due scheduled backups after you sign in, even when the main window is closed. macOS manages this through Login Items, and Delta presents it as a scheduler instead of exposing the operating-system mechanism. It runs as your user account, checks each profile's power and destination rules, starts eligible backups, then exits when there is no work."
 
     public static func make(
         status: LaunchAgentRegistrationStatus,
@@ -90,7 +90,7 @@ public struct BackgroundBackupServicePresentation: Equatable, Sendable {
         if !hasScheduledProfiles {
             return status == .enabled ? "Ready for future schedules" : "No scheduled profiles"
         }
-        return status == .enabled ? "Schedules can run closed" : "Scheduled runs need attention"
+        return status == .enabled ? "Schedules can run when closed" : "Scheduled runs need attention"
     }
 
     private static func controlDetail(
@@ -99,7 +99,7 @@ public struct BackgroundBackupServicePresentation: Equatable, Sendable {
         isPaused: Bool
     ) -> String {
         if isPaused {
-            return "Keep the scheduled-backup helper approved, but skip automatic due runs until automation is resumed."
+            return "Keep macOS approval in place, but skip automatic due runs until they are resumed."
         }
         if scheduledProfileCount == 0 {
             return "Optional until at least one backup profile has an hourly, daily, weekly, monthly, or custom schedule."
@@ -147,11 +147,11 @@ public struct BackgroundBackupServicePresentation: Equatable, Sendable {
         case .notRegistered:
             return "Scheduled backups are off"
         case .notFound:
-            return "Scheduled-backup helper missing"
+            return "Scheduler missing"
         case .unavailable:
             return "Scheduled backups unavailable"
         case .unknown:
-            return "Unknown scheduled-backup status"
+            return "Unknown schedule status"
         }
     }
 
@@ -164,7 +164,7 @@ public struct BackgroundBackupServicePresentation: Equatable, Sendable {
             return nil
         }
         if isPaused {
-            return "Automatic scheduled runs are paused. Resume scheduled automation here when you want due backups to run again."
+            return "Automatic scheduled runs are paused. Resume them here when you want due backups to run again."
         }
         switch status {
         case .enabled:
@@ -174,11 +174,11 @@ public struct BackgroundBackupServicePresentation: Equatable, Sendable {
         case .notRegistered:
             return "Turn on Scheduled Backups before scheduled profiles can run while the main window is closed."
         case .notFound:
-            return "The signed scheduled-backup helper is missing from the installed app bundle. Reinstall Delta from the latest build."
+            return "Delta's signed scheduler is missing from the installed app bundle. Reinstall Delta from the latest build."
         case .unavailable:
-            return "This macOS version cannot run Delta's scheduled-backup helper."
+            return "This macOS version cannot run Delta's scheduler."
         case .unknown:
-            return "macOS returned an unknown scheduled-backup status. Refresh status, then review Login Items if scheduled backups do not run."
+            return "macOS returned an unknown schedule status. Refresh status, then review Login Items if scheduled backups do not run."
         }
     }
 

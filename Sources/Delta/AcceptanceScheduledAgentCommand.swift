@@ -17,7 +17,7 @@ enum AcceptanceScheduledAgentCommand {
         try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
         try fileManager.createDirectory(at: documentsURL, withIntermediateDirectories: true)
         try fileManager.createDirectory(at: destinationURL, withIntermediateDirectories: true)
-        try "Scheduled helper acceptance \(timestamp)\n".write(to: reportURL, atomically: true, encoding: .utf8)
+        try "Scheduled Backups acceptance \(timestamp)\n".write(to: reportURL, atomically: true, encoding: .utf8)
 
         let repositoryID = UUID()
         let profileID = UUID()
@@ -77,7 +77,7 @@ enum AcceptanceScheduledAgentCommand {
         try writeManifest(manifest, to: root)
 
         return """
-        Seeded scheduled helper acceptance state.
+        Seeded Scheduled Backups acceptance state.
         - Application Support: \(supportURL.path)
         - Source: \(sourceURL.path)
         - Destination: \(destinationURL.path)
@@ -134,7 +134,7 @@ enum AcceptanceScheduledAgentCommand {
         }
 
         return """
-        # Delta Installed Scheduled Helper Acceptance
+        # Delta Installed Scheduled Backups Acceptance
 
         - Generated: \(ISO8601DateFormatter().string(from: Date()))
         - App: \(bundle.bundleURL.path)
@@ -142,13 +142,13 @@ enum AcceptanceScheduledAgentCommand {
         - Source: \(manifest.sourcePath)
         - Destination: \(manifest.destinationPath)
 
-        This verifies the installed Scheduled Backups helper against isolated Delta state. The helper runs the installed Delta executable, reads the saved destination password non-interactively, prepares a missing encrypted local destination, runs one due scheduled backup, persists job logs and a structured backup summary, and refreshes cached restore points.
+        This verifies the installed Scheduled Backups scheduler against isolated Delta state. The scheduler runs the installed Delta executable, reads the saved destination password non-interactively, prepares a missing encrypted local destination, runs one due scheduled backup, persists job logs and a structured backup summary, and refreshes cached restore points.
 
         ## Result
 
-        Installed scheduled helper acceptance passed.
+        Installed Scheduled Backups acceptance passed.
 
-        - Helper-started backup status: \(backup.status.displayName)
+        - Scheduler-started backup status: \(backup.status.displayName)
         - Backup summary: \(summary.detailedText)
         - Automatic destination preparation jobs: \(initJobs.count)
         - Cached restore points: \(snapshots.count)

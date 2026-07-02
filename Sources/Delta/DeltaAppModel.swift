@@ -690,7 +690,7 @@ final class DeltaAppModel: ObservableObject {
     func repairBackgroundSecretAccess() {
         guard let database = requirePersistentDatabase() else { return }
         guard !isWorking else {
-            alertMessage = "Wait for the current Delta job to finish before repairing background secret access."
+            alertMessage = "Wait for the current Delta job to finish before repairing password access."
             return
         }
         guard !repositories.isEmpty else {
@@ -707,11 +707,11 @@ final class DeltaAppModel: ObservableObject {
 
         do {
             if failures.isEmpty {
-                let message = "Background secret access was repaired for \(repairedAccounts) saved \(repairedAccounts == 1 ? "secret" : "secrets") across \(reports.count) \(reports.count == 1 ? "destination" : "destinations")."
+                let message = "Password access was repaired for \(repairedAccounts) saved \(repairedAccounts == 1 ? "secret" : "secrets") across \(reports.count) \(reports.count == 1 ? "destination" : "destinations")."
                 try database.appendEvent(EventLog(level: .info, message: message))
                 alertMessage = "\(message) Scheduled backups can read these secrets without interactive Keychain prompts."
             } else {
-                let message = "Background secret access repaired \(repairedAccounts) of \(checkedAccounts) saved secrets. Review \(failedRepositories.joined(separator: ", "))."
+                let message = "Password access repaired \(repairedAccounts) of \(checkedAccounts) saved secrets. Review \(failedRepositories.joined(separator: ", "))."
                 try database.appendEvent(EventLog(level: .warning, message: message))
                 alertMessage = "\(message) The first failure was \(failures[0].purpose): \(failures[0].message)"
             }
@@ -735,7 +735,7 @@ final class DeltaAppModel: ObservableObject {
                 try? database?.appendEvent(EventLog(level: .info, message: "Scheduled Backups registration was requested for scheduled profile '\(profile.name)'."))
             } catch {
                 launchAgentStatus = LaunchAgentController.status()
-                alertMessage = "Scheduled backups were saved, but the scheduled-backup helper could not be turned on: \(error.localizedDescription)"
+                alertMessage = "Scheduled backups were saved, but the scheduler could not be turned on: \(error.localizedDescription)"
                 return
             }
         }
@@ -754,7 +754,7 @@ final class DeltaAppModel: ObservableObject {
         case .notRegistered:
             return "Scheduled Backups are not on yet. Turn them on again or approve Delta in Login Items if macOS is waiting for approval."
         case .notFound:
-            return "Scheduled Backups could not start because the helper is missing from the app bundle."
+            return "Scheduled Backups could not start because the scheduler is missing from the app bundle."
         case .unavailable:
             return "Scheduled Backups are unavailable on this macOS version."
         case .unknown:

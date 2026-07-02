@@ -46,7 +46,7 @@ write_failure_report() {
   local title="$1"
   local status="$2"
   {
-    printf "# Delta Installed Scheduled Helper Acceptance\n\n"
+    printf "# Delta Installed Scheduled Backups Acceptance\n\n"
     printf "%s\n\n" "$title"
     printf -- "- App: %s\n" "$APP_PATH"
     printf -- "- Exit status: %s\n" "$status"
@@ -86,8 +86,8 @@ DELTA_APP_SUPPORT_DIR="$SUPPORT_DIR" \
 SEED_STATUS=$?
 set -e
 if [[ "$SEED_STATUS" -ne 0 ]]; then
-  write_failure_report "Installed scheduled helper acceptance failed while seeding isolated state." "$SEED_STATUS"
-  printf "Installed scheduled helper acceptance failed. See %s\n" "$OUTPUT" >&2
+  write_failure_report "Installed Scheduled Backups acceptance failed while seeding isolated state." "$SEED_STATUS"
+  printf "Installed Scheduled Backups acceptance failed. See %s\n" "$OUTPUT" >&2
   exit "$SEED_STATUS"
 fi
 
@@ -96,13 +96,13 @@ DELTA_APP_SUPPORT_DIR="$SUPPORT_DIR" "$AGENT" >"$AGENT_STDOUT" 2>"$AGENT_STDERR"
 AGENT_STATUS=$?
 set -e
 if [[ "$AGENT_STATUS" -ne 0 ]]; then
-  write_failure_report "Installed scheduled helper acceptance failed while running DeltaAgent." "$AGENT_STATUS"
-  printf "Installed scheduled helper acceptance failed. See %s\n" "$OUTPUT" >&2
+  write_failure_report "Installed Scheduled Backups acceptance failed while running DeltaAgent." "$AGENT_STATUS"
+  printf "Installed Scheduled Backups acceptance failed. See %s\n" "$OUTPUT" >&2
   exit "$AGENT_STATUS"
 fi
 if ! /usr/bin/grep -Fq "completed 1 due backup run(s)" "$AGENT_STDOUT"; then
-  write_failure_report "Installed scheduled helper acceptance failed because DeltaAgent did not report one due backup." "$AGENT_STATUS"
-  printf "Installed scheduled helper acceptance failed. See %s\n" "$OUTPUT" >&2
+  write_failure_report "Installed Scheduled Backups acceptance failed because DeltaAgent did not report one due backup." "$AGENT_STATUS"
+  printf "Installed Scheduled Backups acceptance failed. See %s\n" "$OUTPUT" >&2
   exit 1
 fi
 
@@ -113,14 +113,14 @@ DELTA_APP_SUPPORT_DIR="$SUPPORT_DIR" \
 VERIFY_STATUS=$?
 set -e
 if [[ "$VERIFY_STATUS" -ne 0 ]]; then
-  write_failure_report "Installed scheduled helper acceptance failed while verifying the scheduled backup." "$VERIFY_STATUS"
-  printf "Installed scheduled helper acceptance failed. See %s\n" "$OUTPUT" >&2
+  write_failure_report "Installed Scheduled Backups acceptance failed while verifying the scheduled backup." "$VERIFY_STATUS"
+  printf "Installed Scheduled Backups acceptance failed. See %s\n" "$OUTPUT" >&2
   exit "$VERIFY_STATUS"
 fi
 
 if [[ -s "$VERIFY_STDERR" ]]; then
-  write_failure_report "Installed scheduled helper acceptance failed because verify stderr was not empty." 1
-  printf "Installed scheduled helper acceptance failed. See %s\n" "$OUTPUT" >&2
+  write_failure_report "Installed Scheduled Backups acceptance failed because verify stderr was not empty." 1
+  printf "Installed Scheduled Backups acceptance failed. See %s\n" "$OUTPUT" >&2
   exit 1
 fi
 
@@ -137,14 +137,14 @@ fi
 } >>"$OUTPUT"
 
 for expected in \
-  "Installed scheduled helper acceptance passed." \
-  "Helper-started backup status:" \
+  "Installed Scheduled Backups acceptance passed." \
+  "Scheduler-started backup status:" \
   "Automatic destination preparation jobs:" \
   "Cached restore points:" \
   "Source context logged: Yes"
 do
   if ! /usr/bin/grep -Fq "$expected" "$OUTPUT"; then
-    printf "Installed scheduled helper acceptance output was missing: %s\n" "$expected" >&2
+    printf "Installed Scheduled Backups acceptance output was missing: %s\n" "$expected" >&2
     exit 1
   fi
 done
@@ -153,6 +153,6 @@ LATEST_TMP="$OUTPUT_DIR/.installed-scheduled-agent-latest.$$"
 /bin/ln -s "$(basename "$OUTPUT")" "$LATEST_TMP"
 /bin/mv -f "$LATEST_TMP" "$LATEST"
 
-printf "Wrote installed scheduled helper acceptance to %s\n" "$OUTPUT"
+printf "Wrote installed Scheduled Backups acceptance to %s\n" "$OUTPUT"
 printf "Updated %s\n" "$LATEST"
-printf "Installed scheduled helper acceptance passed for %s\n" "$APP_PATH"
+printf "Installed Scheduled Backups acceptance passed for %s\n" "$APP_PATH"

@@ -1443,7 +1443,7 @@ struct SettingsView: View {
                     statusColor: backgroundBackupsStatusColor
                 ) {
                 SettingsControlRow(
-                    title: "Scheduled backups",
+                    title: "Allow scheduled backups",
                     detail: backgroundBackupsPresentation.controlDetail
                 ) {
                     Toggle("", isOn: backgroundBackupsBinding)
@@ -1452,7 +1452,7 @@ struct SettingsView: View {
                 }
 
                 SettingsControlRow(
-                    title: "Pause scheduled automation",
+                    title: "Pause automatic runs",
                     detail: "Temporarily stop hourly, daily, weekly, monthly, and custom due runs without editing profiles or removing macOS approval."
                 ) {
                     Toggle("", isOn: $pausesScheduledBackups)
@@ -1469,7 +1469,7 @@ struct SettingsView: View {
 
                 SettingsCapabilityList(items: [
                     SettingsCapability(symbol: "moon.zzz", title: "Runs while Delta is closed", detail: "Scheduled profiles can run after sign-in without keeping the main window open."),
-                    SettingsCapability(symbol: "person.crop.circle", title: "No admin privileges", detail: "The helper runs as your user account with the same file permissions granted to Delta."),
+                    SettingsCapability(symbol: "person.crop.circle", title: "No admin privileges", detail: "The scheduler runs as your user account with the same file permissions granted to Delta."),
                     SettingsCapability(symbol: "bolt.badge.checkmark", title: "Checks policy first", detail: "Battery, Low Power Mode, speed limits, destination availability, and locking are checked before work starts.")
                 ])
 
@@ -1506,7 +1506,7 @@ struct SettingsView: View {
                     SettingsNotice(
                         symbol: "calendar.badge.plus",
                         title: "No scheduled profiles",
-                        text: "Create an hourly, daily, weekly, monthly, or custom scheduled backup profile before scheduled automation is needed.",
+                        text: "Create an hourly, daily, weekly, monthly, or custom scheduled backup profile before automatic scheduled backups are needed.",
                         color: .secondary
                     )
                 }
@@ -1518,19 +1518,19 @@ struct SettingsView: View {
                         Label("Run Due Now", systemImage: "play.fill")
                     }
                     .disabled(model.profiles.isEmpty || model.isWorking || pausesScheduledBackups || !model.isPersistentStoreAvailable)
-                    .deltaTooltip(pausesScheduledBackups ? "Scheduled automation is paused. Resume it here or run a manual profile backup." : "Run every backup profile that is currently due using the same scheduler path.")
+                    .deltaTooltip(pausesScheduledBackups ? "Automatic scheduled runs are paused. Resume them here or run a manual profile backup." : "Run every backup profile that is currently due using the same rules as automatic scheduled runs.")
                     Button {
                         model.openLoginItemsSettings()
                     } label: {
                         Label("Review Login Items", systemImage: "gearshape")
                     }
-                    .deltaTooltip("Open macOS Login Items to approve or inspect Delta's scheduled-backup helper.")
+                    .deltaTooltip("Open macOS Login Items to approve or inspect Delta scheduled backups.")
                     Button {
                         model.reload()
                     } label: {
                         Label("Refresh", systemImage: "arrow.clockwise")
                     }
-                    .deltaTooltip("Recheck scheduled-backup and system access status.")
+                    .deltaTooltip("Recheck scheduled backup and system access status.")
                     Button {
                         model.repairBackgroundSecretAccess()
                     } label: {
@@ -1549,7 +1549,7 @@ struct SettingsView: View {
                     statusColor: backgroundSecretAccessStatusColor
                 ) {
                     SettingsDescription(
-                        text: "Scheduled backups need non-interactive access to saved destination passwords and backend credentials. Delta checks that access here so unattended work fails closed instead of stopping at a Keychain prompt."
+                        text: "Scheduled backups must be able to read saved destination passwords and backend credentials without showing a Keychain prompt. Delta checks that access here so unattended work fails closed before backup data is scanned."
                     )
 
                     SettingsFactGrid(items: [
@@ -2190,7 +2190,7 @@ struct SettingsView: View {
             ) {
                 SettingsFactGrid(items: [
                     SettingsFact(title: "Backup engine", value: isResticExecutableAvailable ? "Ready" : "Missing"),
-                    SettingsFact(title: "Cloud helper", value: isRcloneExecutableAvailable ? "Ready" : "Missing"),
+                    SettingsFact(title: "Remote tool", value: isRcloneExecutableAvailable ? "Ready" : "Missing"),
                     SettingsFact(title: "Install mode", value: "Bundled")
                 ])
 
@@ -2204,7 +2204,7 @@ struct SettingsView: View {
                     } label: {
                         Label("Show Tools", systemImage: "folder")
                     }
-                    .deltaTooltip("Show Delta's bundled backup engine and cloud helper in Finder.")
+                    .deltaTooltip("Show Delta's bundled backup engine and remote-destination tool in Finder.")
                 }
             }
 
@@ -2270,7 +2270,7 @@ struct SettingsView: View {
                 ])
 
                 ActionLine(
-                    description: "Copy a sanitized report with app, helper, destination, profile, and recent job state.",
+                    description: "Copy a sanitized report with app, scheduler, destination, profile, and recent job state.",
                     buttonTitle: "Copy Report",
                     symbol: "doc.on.doc",
                     action: model.copyDiagnosticReport
@@ -2397,7 +2397,7 @@ struct SettingsView: View {
         if sendsJobNotifications && !notificationAuthorizationState.canDeliver {
             return "macOS notification permission is required before Delta can send backup alerts."
         }
-        return "Background scheduling, protected-folder access, update checks, notifications, and bundled backup tools are summarized here."
+        return "System access, scheduled backups, update checks, notifications, and bundled backup tools are summarized here."
     }
 
     private var settingsOverviewStatusText: String {
@@ -2704,7 +2704,7 @@ struct SettingsView: View {
             return "Bundled engines available"
         }
         if isResticExecutableAvailable {
-            return "Cloud helper missing"
+            return "Remote destination tool missing"
         }
         if isRcloneExecutableAvailable {
             return "Backup engine missing"

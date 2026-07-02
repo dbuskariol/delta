@@ -150,7 +150,7 @@ final class ScheduleAndParserTests: XCTestCase {
         let status = LaunchAgentRegistrationStatus.parse("SMAppServiceStatus(rawValue: 99)")
 
         XCTAssertEqual(status.displayName, "Unknown")
-        XCTAssertEqual(status.detail, "macOS returned an unknown scheduled-backup status.")
+        XCTAssertEqual(status.detail, "macOS returned an unknown schedule status.")
     }
 
     func testBackgroundBackupPresentationTreatsUnscheduledUnregisteredServiceAsNotNeeded() {
@@ -175,7 +175,7 @@ final class ScheduleAndParserTests: XCTestCase {
         )
 
         XCTAssertEqual(presentation.statusText, "Ready")
-        XCTAssertEqual(presentation.statusDetail, "Schedules can run closed")
+        XCTAssertEqual(presentation.statusDetail, "Schedules can run when closed")
         XCTAssertEqual(presentation.approvalText, "Approved")
         XCTAssertEqual(presentation.severity, .ready)
         XCTAssertFalse(presentation.needsAttention)
@@ -211,7 +211,7 @@ final class ScheduleAndParserTests: XCTestCase {
         XCTAssertEqual(presentation.approvalText, "Approved")
         XCTAssertEqual(presentation.attentionTitle, "Scheduled backups paused")
         XCTAssertEqual(presentation.severity, .attention)
-        XCTAssertTrue(presentation.controlDetail.contains("Keep the scheduled-backup helper approved"))
+        XCTAssertTrue(presentation.controlDetail.contains("Keep macOS approval in place"))
     }
 
     func testBackgroundBackupPresentationUsesProductLanguageForMissingService() {
@@ -222,10 +222,10 @@ final class ScheduleAndParserTests: XCTestCase {
         )
 
         XCTAssertEqual(presentation.statusText, "Missing Scheduler")
-        XCTAssertEqual(presentation.attentionTitle, "Scheduled-backup helper missing")
+        XCTAssertEqual(presentation.attentionTitle, "Scheduler missing")
         XCTAssertEqual(
             presentation.attentionText,
-            "The signed scheduled-backup helper is missing from the installed app bundle. Reinstall Delta from the latest build."
+            "Delta's signed scheduler is missing from the installed app bundle. Reinstall Delta from the latest build."
         )
         XCTAssertEqual(presentation.severity, .blocked)
     }

@@ -35,7 +35,7 @@ enum AcceptancePreferencesCommand {
         - Preference suite: \(DeltaAppPreferences.sharedSuiteName)
         - Isolated app support: \(try AppDirectories.applicationSupportDirectory(fileManager: fileManager).path)
 
-        This verifies the installed Delta app reads Settings values from the shared preferences suite used by the UI and helper processes, exposes the required Settings categories and status summary contract, normalizes unsafe values, applies backup defaults to newly created profiles, applies restore defaults, and restores any existing user preferences after the probe.
+        This verifies the installed Delta app reads Settings values from the shared preferences suite used by the UI and scheduler processes, exposes the required Settings categories and status summary contract, normalizes unsafe values, applies backup defaults to newly created profiles, applies restore defaults, and restores any existing user preferences after the probe.
 
         ## Result
 
@@ -204,7 +204,7 @@ enum AcceptancePreferencesCommand {
         try requireCustomRetention(storedProfile.retention)
 
         let diagnostic = DiagnosticSnapshotCollector(database: database, bundle: bundle).snapshot(fileManager: FileManager.default)
-        try require(diagnostic.scheduledAutomationStatus == "Paused", "Diagnostics did not reflect paused scheduled automation.")
+        try require(diagnostic.scheduledAutomationStatus == "Paused", "Diagnostics did not reflect paused automatic scheduled runs.")
         try require(diagnostic.notificationStatus == "Enabled", "Diagnostics did not reflect notification preference.")
         try require(diagnostic.menuBarStatus == "Hidden", "Diagnostics did not reflect status menu preference.")
         try require(diagnostic.idleSleepProtectionStatus == "Disabled", "Diagnostics did not reflect idle sleep preference.")

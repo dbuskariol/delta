@@ -195,7 +195,7 @@ else
   fi
 
   if [[ "$language_status" -eq 0 && "$installed_diagnostics_status" -eq 0 && "$installed_preferences_status" -eq 0 ]]; then
-    append_row "settings_surface" "$(item_area settings_surface)" "Partial" "Product-language verifier passed; raw Repository/LaunchAgent terminology is blocked from user-facing strings. Installed diagnostics reported Password Access as Ready and Full Disk Access as $installed_full_disk_access_status. Installed preferences acceptance proved the shared Settings surface contract, required categories, compact status summary, scheduler/update/power/defaults/diagnostics controls, and preference behavior. $installed_preferences_evidence" "Open Settings and confirm visual grouping, status summary, Password Access status/refresh/repair controls, Run Due Now scheduler action, Sparkle automatic check/download controls, idle-sleep protection, reset controls, backup freshness warnings, source-access warnings, destination-check warning controls, local/mounted destination free-space warnings, and activity history retention in the running app."
+    append_row "settings_surface" "$(item_area settings_surface)" "Partial" "Product-language verifier passed; raw restic repository and LaunchAgent terminology is blocked from user-facing strings. Installed diagnostics reported Password Access as Ready and Full Disk Access as $installed_full_disk_access_status. Installed preferences acceptance proved the shared Settings surface contract, required categories, compact status summary, scheduler/update/power/defaults/diagnostics controls, and preference behavior. $installed_preferences_evidence" "Open Settings and confirm visual grouping, status summary, Password Access status/refresh/repair controls, Run Due Now behavior, Sparkle automatic check/download controls, idle-sleep protection, reset controls, backup freshness warnings, source-access warnings, destination-check warning controls, local/mounted destination free-space warnings, and activity history retention in the running app."
   elif [[ "$language_status" -eq 0 && "$installed_diagnostics_status" -eq 0 ]]; then
     append_row "settings_surface" "$(item_area settings_surface)" "Failed" "Product-language verifier and installed diagnostics passed, but installed preferences did not: $installed_preferences_evidence" "Fix installed preferences/defaults behavior before manual Settings acceptance."
   elif [[ "$language_status" -eq 0 ]]; then
@@ -224,9 +224,9 @@ else
     scheduled_agent_output="$(run_capture scheduled_agent "$ROOT_DIR/Scripts/run-installed-scheduled-agent-acceptance.sh" "$APP_PATH")"
     scheduled_agent_status="$(command_status scheduled_agent)"
     if [[ "$agent_status_status" -eq 0 && "$agent_dry_status" -eq 0 && "$agent_due_status" -eq 0 && "$scheduled_agent_status" -eq 0 ]]; then
-      append_row "scheduled_backups" "$(item_area scheduled_backups)" "Partial" "Helper status, dry-run, no-profile isolated due-run, and seeded scheduled-helper backup acceptance passed: $agent_status_output $agent_dry_output $agent_due_output $scheduled_agent_output" "Approve Login Items if macOS asks, quit Delta, wait for a real scheduled interval, and confirm the run appears after relaunch."
+      append_row "scheduled_backups" "$(item_area scheduled_backups)" "Partial" "Scheduler status, dry-run, no-profile isolated due-run, and seeded scheduler backup acceptance passed: $agent_status_output $agent_dry_output $agent_due_output $scheduled_agent_output" "Approve Login Items if macOS asks, quit Delta, wait for a real scheduled interval, and confirm the run appears after relaunch."
     else
-      append_row "scheduled_backups" "$(item_area scheduled_backups)" "Failed" "Helper checks failed. status=$agent_status_status dry=$agent_dry_status due=$agent_due_status scheduled=$scheduled_agent_status output: $agent_status_output $agent_dry_output $agent_due_output $scheduled_agent_output" "Fix bundled Scheduled Backups helper before manual schedule testing."
+      append_row "scheduled_backups" "$(item_area scheduled_backups)" "Failed" "Scheduler checks failed. status=$agent_status_status dry=$agent_dry_status due=$agent_due_status scheduled=$scheduled_agent_status output: $agent_status_output $agent_dry_output $agent_due_output $scheduled_agent_output" "Fix bundled Scheduled Backups scheduler before manual schedule testing."
     fi
   else
     append_row "scheduled_backups" "$(item_area scheduled_backups)" "Failed" "DeltaAgent was not executable at $agent." "Rebuild and reinstall the app bundle."
@@ -498,9 +498,9 @@ else
     && grep -Fq "Send Test Alert" "$ROOT_DIR/Sources/Delta/ContentView.swift" \
     && grep -Fq "testTestAlertRequiresEnabledNotificationsAndDeliverableAuthorization" "$ROOT_DIR/Tests/DeltaCoreTests/JobNotificationPolicyTests.swift"
   then
-    append_row "notifications" "$(item_area notifications)" "Partial" "Automated release gate passed notification policy coverage for commit $git_commit, and Settings exposes a Send Test Alert control for user-verifiable macOS delivery." "Enable alerts, grant macOS permission, use Send Test Alert, trigger warning/failed helper jobs, and verify success summaries only when opted in."
+    append_row "notifications" "$(item_area notifications)" "Partial" "Automated release gate passed notification policy coverage for commit $git_commit, and Settings exposes a Send Test Alert control for user-verifiable macOS delivery." "Enable alerts, grant macOS permission, use Send Test Alert, trigger warning/failed scheduled jobs, and verify success summaries only when opted in."
   else
-    append_row "notifications" "$(item_area notifications)" "Manual Required" "Notification Center authorization and delivery require user approval and real macOS delivery." "Enable alerts, grant macOS permission, trigger warning/failed helper jobs, and verify success summaries only when opted in."
+    append_row "notifications" "$(item_area notifications)" "Manual Required" "Notification Center authorization and delivery require user approval and real macOS delivery." "Enable alerts, grant macOS permission, trigger warning/failed scheduled jobs, and verify success summaries only when opted in."
   fi
 
   sparkle_output="$(run_capture sparkle_artifacts "$ROOT_DIR/Scripts/verify-sparkle-update-artifacts.sh" "$ROOT_DIR/dist/Delta.app" "$ROOT_DIR/dist/updates")"
