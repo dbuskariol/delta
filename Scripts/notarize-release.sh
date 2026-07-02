@@ -75,24 +75,17 @@ fi
 NOTARY_ARGS=()
 if [[ -n "${DELTA_NOTARY_KEYCHAIN_PROFILE:-}" ]]; then
   NOTARY_ARGS=(--keychain-profile "$DELTA_NOTARY_KEYCHAIN_PROFILE")
-elif [[ -n "${DELTA_NOTARY_APPLE_ID:-}" && -n "${DELTA_NOTARY_TEAM_ID:-}" && -n "${DELTA_NOTARY_PASSWORD:-}" ]]; then
-  NOTARY_ARGS=(
-    --apple-id "$DELTA_NOTARY_APPLE_ID"
-    --team-id "$DELTA_NOTARY_TEAM_ID"
-    --password "$DELTA_NOTARY_PASSWORD"
-  )
 else
   cat >&2 <<'EOF'
 Notarization credentials are not configured.
 
-Preferred:
-  xcrun notarytool store-credentials "Delta Notary" --apple-id "you@example.com" --team-id "TEAMID" --password "app-specific-password"
+Create a stored notarytool keychain profile, then pass its profile name:
+
   DELTA_NOTARY_KEYCHAIN_PROFILE="Delta Notary" Scripts/notarize-release.sh
 
-Alternative environment variables:
-  DELTA_NOTARY_APPLE_ID
-  DELTA_NOTARY_TEAM_ID
-  DELTA_NOTARY_PASSWORD
+Delta intentionally does not accept Apple ID credentials through environment
+variables. Keep notarization credentials in Keychain so they are not exposed as
+long-lived shell state or process arguments during release automation.
 EOF
   exit 1
 fi

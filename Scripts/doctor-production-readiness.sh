@@ -147,6 +147,11 @@ elif [[ ! -d "$INSTALLED_APP_PATH" ]]; then
 fi
 
 printf "\n## Notarization\n\n"
+if "$ROOT_DIR/Scripts/verify-notarization-policy.sh" >/dev/null 2>&1; then
+  pass "Notarization credential policy requires a stored notarytool keychain profile."
+else
+  block "Notarization credential policy check failed. Run Scripts/verify-notarization-policy.sh."
+fi
 if [[ -d "$APP_PATH" ]] && /usr/bin/xcrun stapler validate "$APP_PATH" >/dev/null 2>&1; then
   pass "Stapled notarization ticket validates."
 else

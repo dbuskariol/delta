@@ -110,6 +110,8 @@ DELTA_NOTARY_KEYCHAIN_PROFILE="Delta Notary" Scripts/notarize-release.sh
 
 `Scripts/notarize-release.sh` requires a Developer ID Application signature, submits the app archive with `xcrun notarytool`, waits for the result, saves the submission and notary logs under `dist/notarization`, staples the ticket, validates the stapled app with `xcrun stapler` and `spctl`, then regenerates the Sparkle archive and appcast from the stapled app.
 
+Notarization credentials must be supplied through a stored `notarytool` keychain profile. Raw Apple ID, team ID, or app-specific password environment-variable fallbacks are intentionally unsupported so release automation does not keep notarization secrets in shell state or pass them as long-lived process arguments.
+
 ## Manual macOS Acceptance Matrix
 
 Record the app version, build number, macOS build, signing identity, date, and tester for each run.

@@ -390,6 +390,8 @@ DELTA_NOTARY_KEYCHAIN_PROFILE="Delta Notary" Scripts/notarize-release.sh
 
 `Scripts/notarize-release.sh` submits `dist/Delta.app`, waits for Apple notarization, staples the ticket, validates Gatekeeper assessment, archives the notarization log under `dist/notarization`, and regenerates Sparkle update assets from the stapled app. It also supports `DELTA_NOTARY_PREPARE_ONLY=1` for local archive validation without submitting to Apple.
 
+Notarization credentials must be stored in a `notarytool` keychain profile. Delta intentionally does not support Apple ID, team ID, or app-specific password environment-variable fallbacks for release notarization because those credentials can persist in shell state or be exposed as process arguments.
+
 Final external release check:
 
 ```sh
