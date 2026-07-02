@@ -12,8 +12,13 @@ cd "$ROOT_DIR"
 "$ROOT_DIR/Scripts/verify-manual-acceptance-matrix.sh"
 "$ROOT_DIR/Scripts/verify-manual-acceptance-self-test.sh"
 "$ROOT_DIR/Scripts/verify-ci-workflows.sh"
+/bin/bash -n "$ROOT_DIR/Scripts/run-installed-local-s3-acceptance.sh"
 /bin/bash -n "$ROOT_DIR/Scripts/run-installed-local-sftp-acceptance.sh"
 /bin/bash -n "$ROOT_DIR/Scripts/run-installed-rclone-local-acceptance.sh"
+if [[ ! -x "$ROOT_DIR/Scripts/run-installed-local-s3-acceptance.sh" ]]; then
+  printf "Scripts/run-installed-local-s3-acceptance.sh must be executable.\n" >&2
+  exit 1
+fi
 if [[ ! -x "$ROOT_DIR/Scripts/run-installed-local-sftp-acceptance.sh" ]]; then
   printf "Scripts/run-installed-local-sftp-acceptance.sh must be executable.\n" >&2
   exit 1

@@ -272,6 +272,13 @@ else
   else
     installed_sftp_local_evidence="Installed app localhost SFTP lifecycle acceptance failed: $installed_sftp_local_output"
   fi
+  installed_s3_local_output="$(run_capture installed_s3_local "$ROOT_DIR/Scripts/run-installed-local-s3-acceptance.sh" "$APP_PATH")"
+  installed_s3_local_status="$(command_status installed_s3_local)"
+  if [[ "$installed_s3_local_status" -eq 0 ]]; then
+    installed_s3_local_evidence="Installed app local S3-compatible lifecycle acceptance passed through Delta coordinator using bundled rclone serve s3 with Keychain-backed AWS credentials: missing-credential failure, automatic destination preparation, existing-destination reuse, no-change backup, incremental backup, restore-point cache, backup browser listing, full restore, selected folder restore, destination check, cleanup, and post-cleanup check. $installed_s3_local_output"
+  else
+    installed_s3_local_evidence="Installed app local S3-compatible lifecycle acceptance failed: $installed_s3_local_output"
+  fi
   installed_rclone_local_output="$(run_capture installed_rclone_local "$ROOT_DIR/Scripts/run-installed-rclone-local-acceptance.sh" "$APP_PATH")"
   installed_rclone_local_status="$(command_status installed_rclone_local)"
   if [[ "$installed_rclone_local_status" -eq 0 ]]; then
@@ -326,6 +333,12 @@ else
       s3_acceptance_status="failed"
       s3_acceptance_evidence="External S3-compatible acceptance failed: $s3_output"
     fi
+  elif [[ "$installed_s3_local_status" -eq 0 ]]; then
+    s3_acceptance_status="passed"
+    s3_acceptance_evidence="$installed_s3_local_evidence"
+  else
+    s3_acceptance_status="failed"
+    s3_acceptance_evidence="$installed_s3_local_evidence"
   fi
 
   additional_remote_kinds=(rest b2 azure gcs swift rclone custom)
