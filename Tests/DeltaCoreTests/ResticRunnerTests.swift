@@ -99,6 +99,7 @@ final class ResticRunnerTests: XCTestCase {
         XCTAssertEqual(box.result?.status, .cancelled)
         XCTAssertEqual(box.result?.failureKind, .interrupted)
         XCTAssertTrue(box.result?.userFacingMessage.localizedCaseInsensitiveContains("cancelled") == true)
+        XCTAssertFalse(box.result?.userFacingMessage.localizedCaseInsensitiveContains("restic") == true)
     }
 
     func testLogFormatterTurnsResticStatusJSONIntoReadableProgress() {

@@ -3856,7 +3856,7 @@ struct RepositoryEditorView: View {
                 )
             }
         case .rest:
-            FieldRow(title: "URL") { TextField("https://backup.example.com/repo", text: $primary).textFieldStyle(.roundedBorder) }
+            FieldRow(title: "URL") { TextField("https://backup.example.com/delta", text: $primary).textFieldStyle(.roundedBorder) }
         case .s3:
             FieldRow(title: "Bucket") { TextField("bucket", text: $primary).textFieldStyle(.roundedBorder) }
             FieldRow(title: "Path") { TextField("Optional", text: $secondary).textFieldStyle(.roundedBorder) }

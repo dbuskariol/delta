@@ -15,7 +15,7 @@ public enum ResticRunStopReason: String, Codable, Equatable, Sendable {
     public var userFacingMessage: String {
         switch self {
         case .pause: "Backup paused. Run it again to continue from already saved backup data."
-        case .cancel: "Job cancelled. Any incomplete restic work is safe to retry on the next run."
+        case .cancel: "Job cancelled. Any incomplete backup work is safe to retry on the next run."
         }
     }
 }

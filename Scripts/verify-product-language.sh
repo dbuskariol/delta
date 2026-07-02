@@ -12,6 +12,7 @@ APP_STRING_FILES=(
   "Sources/DeltaCore/DiagnosticReport.swift"
   "Sources/DeltaCore/KeychainSecretStore.swift"
   "Sources/DeltaCore/LaunchAgentController.swift"
+  "Sources/DeltaCore/ResticRunner.swift"
   "Sources/DeltaCore/SettingsSurfaceContract.swift"
 )
 
@@ -20,7 +21,7 @@ UI_STRING_VIOLATIONS="$(
     /usr/bin/perl -ne '
       my $visible = $_;
       $visible =~ s/\\\([^)]*\)//g;
-      if ($visible =~ /"(?:[^"\\]|\\.)*(?:\b(?:Repositories|Repository|LaunchAgent)\b|repository passwords?|repository secrets?|repository-secrets|\bLaunch Agent\b|\blaunch agent\b)(?:[^"\\]|\\.)*"/) {
+      if ($visible =~ /"(?:[^"\\]|\\.)*(?:\b(?:Repositories|Repository|LaunchAgent)\b|repository passwords?|repository secrets?|repository-secrets|\bLaunch Agent\b|\blaunch agent\b|\brestic work\b|backup\.example\.com\/repo|\/repo\b)(?:[^"\\]|\\.)*"/) {
         print "$ARGV:$.:$_";
       }
     ' "$file"
