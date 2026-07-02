@@ -581,6 +581,7 @@ struct ProfileRow: View {
 struct RepositoryRow: View {
     @EnvironmentObject private var model: DeltaAppModel
     var repository: BackupRepository
+    @State private var isPresentingEditor = false
 
     var body: some View {
         Card {
@@ -600,6 +601,10 @@ struct RepositoryRow: View {
                 Spacer()
                 MetadataBadge(text: repository.secretStorageMode.displayName)
                 MetadataBadge(text: verificationSummary)
+                IconButton(symbol: "pencil", help: "Edit destination") {
+                    isPresentingEditor = true
+                }
+                .disabled(model.isWorking)
                 IconButton(symbol: "shippingbox.and.arrow.backward", help: "Prepare destination") {
                     model.initializeRepository(repository)
                 }
@@ -613,6 +618,11 @@ struct RepositoryRow: View {
                 }
                 .disabled(model.isWorking)
             }
+        }
+        .sheet(isPresented: $isPresentingEditor) {
+            RepositoryEditorView(repository: repository)
+                .environmentObject(model)
+                .frame(width: ModalMetrics.sheetWidth)
         }
     }
 
@@ -1039,6 +1049,7 @@ struct TimeControls: View {
 struct RepositoryEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var model: DeltaAppModel
+    private let existingRepository: BackupRepository?
     @State private var name = "Primary Destination"
     @State private var kind: RepositoryBackendKind = .local
     @State private var primary = ""
@@ -1049,8 +1060,21 @@ struct RepositoryEditorView: View {
     @State private var passphrase = ""
     @State private var credentialValues: [String: String] = [:]
 
+    init(repository: BackupRepository? = nil) {
+        existingRepository = repository
+        let backendState = Self.editorState(for: repository?.backend ?? .local(path: ""))
+        _name = State(initialValue: repository?.name ?? "Primary Destination")
+        _kind = State(initialValue: backendState.kind)
+        _primary = State(initialValue: backendState.primary)
+        _secondary = State(initialValue: backendState.secondary)
+        _tertiary = State(initialValue: backendState.tertiary)
+        _quaternary = State(initialValue: backendState.quaternary)
+        _storageMode = State(initialValue: repository?.secretStorageMode ?? .appManagedKeychain)
+        _credentialValues = State(initialValue: Dictionary(uniqueKeysWithValues: ResticBackendCredentialTemplates.keys(for: backendState.kind).map { ($0, "") }))
+    }
+
     var body: some View {
-        SheetScaffold(title: "New Destination", subtitle: "Choose where encrypted restore points are stored.") {
+        SheetScaffold(title: sheetTitle, subtitle: sheetSubtitle) {
             FieldRow(title: "Name") {
                 TextField("Destination name", text: $name)
                     .textFieldStyle(.roundedBorder)
@@ -1069,34 +1093,35 @@ struct RepositoryEditorView: View {
             backendFields
             credentialFields
 
-            FieldRow(title: "Encryption password") {
-                Picker("Password", selection: $storageMode) {
-                    ForEach(SecretStorageMode.allCases, id: \.self) { mode in
-                        Text(mode.displayName).tag(mode)
+            if existingRepository == nil {
+                FieldRow(title: "Encryption password") {
+                    Picker("Password", selection: $storageMode) {
+                        ForEach(SecretStorageMode.allCases, id: \.self) { mode in
+                            Text(mode.displayName).tag(mode)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.segmented)
+                    .frame(width: 360, alignment: .leading)
+                }
+
+                if storageMode == .userManagedPassphrase {
+                    FieldRow(title: "Passphrase") {
+                        SecureField("Encryption passphrase", text: $passphrase)
+                            .textFieldStyle(.roundedBorder)
                     }
                 }
-                .labelsHidden()
-                .pickerStyle(.segmented)
-                .frame(width: 360, alignment: .leading)
-            }
-
-            if storageMode == .userManagedPassphrase {
-                FieldRow(title: "Passphrase") {
-                    SecureField("Encryption passphrase", text: $passphrase)
-                        .textFieldStyle(.roundedBorder)
+            } else if let existingRepository {
+                FieldRow(title: "Encryption password") {
+                    Text(existingRepository.secretStorageMode.displayName)
+                        .foregroundStyle(.secondary)
                 }
             }
 
             SheetActions {
                 Button("Cancel") { dismiss() }
-                Button("Create") {
-                    model.createRepository(
-                        name: name,
-                        backend: backend,
-                        storageMode: storageMode,
-                        passphrase: passphrase,
-                        backendCredentials: sanitizedCredentialValues
-                    )
+                Button(existingRepository == nil ? "Create" : "Save") {
+                    saveDestination()
                     dismiss()
                 }
                 .buttonStyle(.borderedProminent)
@@ -1107,6 +1132,14 @@ struct RepositoryEditorView: View {
             let keys = ResticBackendCredentialTemplates.keys(for: newKind)
             credentialValues = Dictionary(uniqueKeysWithValues: keys.map { ($0, credentialValues[$0] ?? "") })
         }
+    }
+
+    private var sheetTitle: String {
+        existingRepository == nil ? "New Destination" : "Edit Destination"
+    }
+
+    private var sheetSubtitle: String {
+        existingRepository == nil ? "Choose where encrypted restore points are stored." : "Update where encrypted restore points are stored."
     }
 
     @ViewBuilder
@@ -1210,11 +1243,63 @@ struct RepositoryEditorView: View {
         return Int(value)
     }
 
+    private func saveDestination() {
+        if let existingRepository {
+            model.saveRepository(
+                existingRepository,
+                name: name,
+                backend: backend,
+                backendCredentials: sanitizedCredentialValues
+            )
+        } else {
+            model.createRepository(
+                name: name,
+                backend: backend,
+                storageMode: storageMode,
+                passphrase: passphrase,
+                backendCredentials: sanitizedCredentialValues
+            )
+        }
+    }
+
     private func credentialBinding(for key: String) -> Binding<String> {
         Binding(
             get: { credentialValues[key, default: ""] },
             set: { credentialValues[key] = $0 }
         )
+    }
+
+    private static func editorState(for backend: RepositoryBackend) -> RepositoryEditorState {
+        switch backend {
+        case let .local(path):
+            RepositoryEditorState(kind: .local, primary: path)
+        case let .sftp(host, path, username, port):
+            RepositoryEditorState(kind: .sftp, primary: host, secondary: path, tertiary: username ?? "", quaternary: port.map(String.init) ?? "")
+        case let .rest(url):
+            RepositoryEditorState(kind: .rest, primary: url)
+        case let .s3(endpoint, bucket, path, region):
+            RepositoryEditorState(kind: .s3, primary: bucket, secondary: path ?? "", tertiary: endpoint ?? "", quaternary: region ?? "")
+        case let .backblazeB2(bucket, path):
+            RepositoryEditorState(kind: .backblazeB2, primary: bucket, secondary: path ?? "")
+        case let .azureBlob(container, path):
+            RepositoryEditorState(kind: .azureBlob, primary: container, secondary: path ?? "")
+        case let .googleCloudStorage(bucket, path):
+            RepositoryEditorState(kind: .googleCloudStorage, primary: bucket, secondary: path ?? "")
+        case let .swiftObjectStorage(container, path):
+            RepositoryEditorState(kind: .swiftObjectStorage, primary: container, secondary: path ?? "")
+        case let .rclone(remote, path):
+            RepositoryEditorState(kind: .rclone, primary: remote, secondary: path)
+        case let .custom(repository):
+            RepositoryEditorState(kind: .custom, primary: repository)
+        }
+    }
+
+    private struct RepositoryEditorState {
+        var kind: RepositoryBackendKind
+        var primary = ""
+        var secondary = ""
+        var tertiary = ""
+        var quaternary = ""
     }
 }
 

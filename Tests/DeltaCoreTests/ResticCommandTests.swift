@@ -175,6 +175,68 @@ final class ResticCommandTests: XCTestCase {
         XCTAssertEqual(command.environment["AWS_SECRET_ACCESS_KEY"], "secret-value")
     }
 
+    func testCredentialUpdatePreservesBlankExistingValuesAndReplacesProvidedValues() throws {
+        let service = "com.delta.backup.tests.\(UUID().uuidString)"
+        let store = KeychainSecretStore(service: service)
+        let repositoryID = UUID()
+        let resolver = RepositoryCredentialResolver(secretStore: store)
+        let existing = try resolver.saveCredentials(
+            [
+                "AWS_ACCESS_KEY_ID": "old-key",
+                "AWS_SECRET_ACCESS_KEY": "old-secret"
+            ],
+            repositoryID: repositoryID
+        )
+        defer {
+            for reference in existing {
+                try? store.delete(account: reference.keychainAccount)
+            }
+        }
+
+        let updated = try resolver.updateCredentials(
+            [
+                "AWS_ACCESS_KEY_ID": "",
+                "AWS_SECRET_ACCESS_KEY": " new-secret "
+            ],
+            existingReferences: existing,
+            repositoryID: repositoryID,
+            allowedKeys: ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"]
+        )
+        let repository = BackupRepository(
+            id: repositoryID,
+            name: "S3",
+            backend: .s3(endpoint: nil, bucket: "bucket", path: nil, region: nil),
+            credentialReferences: updated
+        )
+
+        let environment = try resolver.environment(for: repository)
+        XCTAssertEqual(environment["AWS_ACCESS_KEY_ID"], "old-key")
+        XCTAssertEqual(environment["AWS_SECRET_ACCESS_KEY"], " new-secret ")
+        XCTAssertEqual(updated.count, 2)
+    }
+
+    func testCredentialUpdateDeletesReferencesNoLongerAllowedByBackend() throws {
+        let service = "com.delta.backup.tests.\(UUID().uuidString)"
+        let store = KeychainSecretStore(service: service)
+        let repositoryID = UUID()
+        let resolver = RepositoryCredentialResolver(secretStore: store)
+        let existing = try resolver.saveCredentials(
+            ["AWS_SECRET_ACCESS_KEY": "old-secret"],
+            repositoryID: repositoryID
+        )
+        let oldReference = try XCTUnwrap(existing.first)
+
+        let updated = try resolver.updateCredentials(
+            [:],
+            existingReferences: existing,
+            repositoryID: repositoryID,
+            allowedKeys: []
+        )
+
+        XCTAssertTrue(updated.isEmpty)
+        XCTAssertThrowsError(try store.load(account: oldReference.keychainAccount))
+    }
+
     func testCredentialTemplatesExposeDocumentedResticEnvironmentKeys() {
         XCTAssertTrue(ResticBackendCredentialTemplates.keys(for: .rest).contains("RESTIC_REST_USERNAME"))
         XCTAssertTrue(ResticBackendCredentialTemplates.keys(for: .rest).contains("RESTIC_REST_PASSWORD"))

@@ -99,6 +99,33 @@ final class DeltaAppModel: ObservableObject {
         }
     }
 
+    func saveRepository(
+        _ repository: BackupRepository,
+        name: String,
+        backend: RepositoryBackend,
+        backendCredentials: [String: String] = [:]
+    ) {
+        do {
+            var updatedRepository = repository
+            updatedRepository.name = name
+            updatedRepository.backend = backend
+            updatedRepository.credentialReferences = try credentialResolver.updateCredentials(
+                backendCredentials,
+                existingReferences: repository.credentialReferences,
+                repositoryID: repository.id,
+                allowedKeys: ResticBackendCredentialTemplates.keys(for: backend.kind)
+            )
+            if updatedRepository.backend != repository.backend || updatedRepository.credentialReferences != repository.credentialReferences {
+                updatedRepository.lastVerifiedAt = nil
+            }
+            try database.saveRepository(updatedRepository)
+            try database.appendEvent(EventLog(level: .info, message: "Destination '\(updatedRepository.name)' was updated."))
+            reload()
+        } catch {
+            alertMessage = error.localizedDescription
+        }
+    }
+
     func createProfile(
         name: String,
         mode: BackupSourceMode,

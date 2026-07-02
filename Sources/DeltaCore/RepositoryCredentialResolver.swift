@@ -26,6 +26,45 @@ public struct RepositoryCredentialResolver: Sendable {
         }
         return references.sorted { $0.environmentKey < $1.environmentKey }
     }
+
+    public func updateCredentials(
+        _ credentials: [String: String],
+        existingReferences: [RepositoryCredentialReference],
+        repositoryID: UUID,
+        allowedKeys: [String]
+    ) throws -> [RepositoryCredentialReference] {
+        let existingByKey = Dictionary(uniqueKeysWithValues: existingReferences.map { ($0.environmentKey, $0) })
+        let allowedKeys = allowedKeys.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+        var updatedReferences: [RepositoryCredentialReference] = []
+
+        for key in allowedKeys {
+            let value = credentials[key] ?? ""
+            let isBlank = value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            if isBlank, let existing = existingByKey[key] {
+                updatedReferences.append(existing)
+                continue
+            }
+            guard !isBlank else {
+                continue
+            }
+
+            let account = existingByKey[key]?.keychainAccount ?? "repository-\(repositoryID.uuidString)-env-\(key)"
+            try secretStore.save(secret: value, account: account)
+            updatedReferences.append(
+                RepositoryCredentialReference(
+                    id: existingByKey[key]?.id ?? UUID(),
+                    environmentKey: key,
+                    keychainAccount: account
+                )
+            )
+        }
+
+        let keptAccounts = Set(updatedReferences.map(\.keychainAccount))
+        for oldReference in existingReferences where !keptAccounts.contains(oldReference.keychainAccount) {
+            try secretStore.delete(account: oldReference.keychainAccount)
+        }
+        return updatedReferences.sorted { $0.environmentKey < $1.environmentKey }
+    }
 }
 
 public enum ResticBackendCredentialTemplates {
