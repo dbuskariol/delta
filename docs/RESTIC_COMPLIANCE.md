@@ -239,6 +239,7 @@ This runs:
 - local restic integration test with real init/backup/restore
 - packaged app build
 - codesign verification
+- minimal hardened-runtime entitlement checks for Delta, DeltaAgent, DeltaSecretBridge, restic, and rclone
 - Sparkle framework checks
 - helper smoke checks
 - bundled restic/rclone version checks

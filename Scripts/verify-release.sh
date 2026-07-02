@@ -16,6 +16,28 @@ RESTIC_BINARY="$ROOT_DIR/Resources/Tools/bin/restic" \
 "$ROOT_DIR/Scripts/build-app.sh"
 /usr/bin/codesign --verify --strict --deep --verbose=2 "$ROOT_DIR/dist/Delta.app"
 
+assert_no_runtime_exception_entitlements() {
+  local target="$1"
+  local entitlements
+  entitlements="$(/usr/bin/codesign -d --entitlements :- "$target" 2>/dev/null || true)"
+  for key in \
+    "com.apple.security.cs.allow-jit" \
+    "com.apple.security.cs.allow-unsigned-executable-memory" \
+    "com.apple.security.cs.disable-library-validation"
+  do
+    if /usr/bin/grep -q "<key>$key</key>" <<<"$entitlements"; then
+      printf "%s contains unnecessary hardened-runtime exception entitlement: %s\n" "$target" "$key" >&2
+      exit 1
+    fi
+  done
+}
+
+assert_no_runtime_exception_entitlements "$ROOT_DIR/dist/Delta.app"
+assert_no_runtime_exception_entitlements "$ROOT_DIR/dist/Delta.app/Contents/MacOS/DeltaAgent"
+assert_no_runtime_exception_entitlements "$ROOT_DIR/dist/Delta.app/Contents/MacOS/DeltaSecretBridge"
+assert_no_runtime_exception_entitlements "$ROOT_DIR/dist/Delta.app/Contents/MacOS/restic"
+assert_no_runtime_exception_entitlements "$ROOT_DIR/dist/Delta.app/Contents/MacOS/rclone"
+
 if ! /usr/bin/otool -l "$ROOT_DIR/dist/Delta.app/Contents/MacOS/Delta" | /usr/bin/grep -q "@executable_path/../Frameworks"; then
   printf "Delta.app is missing the Frameworks runtime search path.\n" >&2
   exit 1

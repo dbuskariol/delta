@@ -69,7 +69,7 @@ Important implementation details:
 - **Durable run controls** let the app request pause/cancel for an agent-owned restic process without relying on in-memory UI state.
 - **Abandoned-job recovery** marks stale running jobs interrupted after restart only when the per-destination lock proves no restic process still owns the destination.
 - **Bundled tools** are pinned and checksum-verified through `Scripts/bootstrap-tools.sh`.
-- **Packaged app verification** checks signatures, Sparkle embedding, LaunchAgent plist integrity, helper smoke tests, Sparkle update metadata, and bundled restic/rclone versions.
+- **Packaged app verification** checks signatures, minimal hardened-runtime entitlements, Sparkle embedding, LaunchAgent plist integrity, helper smoke tests, Sparkle update metadata, and bundled restic/rclone versions.
 - **Sanitized diagnostic reports** can be copied or exported from Settings without including repository passwords or backend credential values.
 
 ## Backup Behavior
@@ -94,7 +94,7 @@ Each profile keeps Delta's default macOS-safe excludes and can add extra restic 
 
 ## Scheduling And Maintenance
 
-`DeltaAgent` is Delta's background backup service. It is packaged as a macOS LaunchAgent registered through `SMAppService` and Login Items so scheduled profiles can run while the main Delta window is closed. It runs as the signed-in user, not as a privileged admin helper, and wakes periodically to evaluate:
+Background Backups let scheduled profiles run while the main Delta window is closed. The macOS implementation is `DeltaAgent`, a signed LaunchAgent registered through `SMAppService` and Login Items. It runs as the signed-in user, not as a privileged admin helper, and wakes periodically to evaluate:
 
 - backup schedule: hourly, daily, weekly, monthly, or custom interval
 - missed-run catchup policy
@@ -105,7 +105,7 @@ Each profile keeps Delta's default macOS-safe excludes and can add extra restic 
 - per-destination lock state
 - scheduled retention maintenance
 
-If any enabled backup profile needs background scheduling and macOS reports that `DeltaAgent` is not enabled, Delta shows an action-needed Background Backups card on the dashboard and a detailed status in Settings.
+If any enabled backup profile needs background scheduling and macOS reports that the helper is not enabled, Delta shows an action-needed Background Backups card on the dashboard and a detailed status in Settings. macOS may require manual approval in Login Items; apps cannot approve their own background items.
 
 Retention maintenance can run `forget`, `prune`, and optional `check` based on the profile maintenance schedule. Post-prune checks are returned to the agent so failed validation is visible in job status and process exit status.
 

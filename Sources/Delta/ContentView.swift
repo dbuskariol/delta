@@ -886,7 +886,19 @@ struct SettingsView: View {
     @State private var automaticallyChecksForUpdates = true
 
     var body: some View {
-        PageScaffold(title: "Settings", subtitle: "System access, background backups, updates, and diagnostics") {
+        PageScaffold(
+            title: "Settings",
+            subtitle: "System access, background automation, updates, and support",
+            actions: {
+                Button {
+                    model.reload()
+                } label: {
+                    Label("Refresh", systemImage: "arrow.clockwise")
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
+        ) {
             if let persistentStoreErrorMessage = model.persistentStoreErrorMessage {
                 SettingsCard(
                     symbol: "externaldrive.badge.exclamationmark",
@@ -906,16 +918,47 @@ struct SettingsView: View {
                 }
             }
 
+            LazyVGrid(columns: DeltaTheme.statColumns, spacing: 12) {
+                SettingsStatusTile(
+                    symbol: "clock.badge.checkmark",
+                    title: "Background",
+                    value: backgroundBackupsStatusText,
+                    detail: backgroundBackupsSummary,
+                    color: launchAgentStatusColor
+                )
+                SettingsStatusTile(
+                    symbol: "lock.shield",
+                    title: "System Access",
+                    value: fullDiskAccessStatusText,
+                    detail: fullDiskAccessSummary,
+                    color: model.fullDiskAccessStatus.hasLikelyFullDiskAccess ? .green : .orange
+                )
+                SettingsStatusTile(
+                    symbol: "arrow.down.circle",
+                    title: "Updates",
+                    value: automaticallyChecksForUpdates ? "Automatic" : "Manual",
+                    detail: updateSummary,
+                    color: automaticallyChecksForUpdates ? .green : .secondary
+                )
+                SettingsStatusTile(
+                    symbol: "slider.horizontal.3",
+                    title: "Configuration",
+                    value: "\(model.profiles.count) \(model.profiles.count == 1 ? "profile" : "profiles")",
+                    detail: "\(model.repositories.count) \(model.repositories.count == 1 ? "destination" : "destinations") · \(model.snapshots.count) restore \(model.snapshots.count == 1 ? "point" : "points")",
+                    color: .blue
+                )
+            }
+
             SettingsCard(
                 symbol: "clock.badge.checkmark",
                 title: "Background Backups",
-                subtitle: "Run scheduled backups even when the main Delta window is closed.",
+                subtitle: "Run scheduled backups when the main Delta window is closed.",
                 statusText: backgroundBackupsStatusText,
                 statusColor: launchAgentStatusColor
             ) {
                 SettingsControlRow(
-                    title: "Scheduled runs",
-                    detail: "Allow Delta's background service to evaluate schedules and start due backups."
+                    title: "Scheduled automation",
+                    detail: backgroundBackupsControlDetail
                 ) {
                     Toggle("", isOn: backgroundBackupsBinding)
                         .labelsHidden()
@@ -923,7 +966,17 @@ struct SettingsView: View {
                 }
 
                 SettingsDescription(
-                    text: "This uses the macOS Login Items service. The helper wakes every five minutes, checks due profiles, destination availability, battery and Low Power policies, and retention maintenance, then exits."
+                    text: "Under the hood this is Delta's signed macOS LaunchAgent: a lightweight Login Item helper that wakes periodically, checks due profiles, destination availability, battery and Low Power policies, retention maintenance, then exits."
+                )
+
+                SettingsFactGrid(items: [
+                    SettingsFact(title: "Scheduled profiles", value: "\(scheduledProfileCount)"),
+                    SettingsFact(title: "Check cadence", value: "Every 5 min"),
+                    SettingsFact(title: "Runs as", value: "Current user")
+                ])
+
+                SettingsDescription(
+                    text: "macOS may require approval in Login Items before background backups can run. Delta can open that pane, but macOS does not allow apps to approve themselves."
                 )
 
                 HStack(spacing: 8) {
@@ -950,9 +1003,17 @@ struct SettingsView: View {
                 statusColor: model.fullDiskAccessStatus.hasLikelyFullDiskAccess ? .green : .orange
             ) {
                 SettingsDescription(
-                    text: model.fullDiskAccessStatus.hasLikelyFullDiskAccess
-                        ? "Protected locations look readable."
-                        : "Protected locations are not readable yet. macOS requires adding Delta manually in Privacy & Security."
+                    text: fullDiskAccessDescription
+                )
+
+                SettingsFactGrid(items: [
+                    SettingsFact(title: "Protected folders", value: model.fullDiskAccessStatus.hasLikelyFullDiskAccess ? "Readable" : "Blocked"),
+                    SettingsFact(title: "Install location", value: "/Applications"),
+                    SettingsFact(title: "Approval", value: "Manual in macOS")
+                ])
+
+                SettingsDescription(
+                    text: "For development builds, keep Delta installed in /Applications with the same signing identity. macOS ties privacy approval to the signed app identity, so changing that identity can require approval again."
                 )
 
                 HStack(spacing: 8) {
@@ -1024,8 +1085,8 @@ struct SettingsView: View {
 
             SettingsCard(
                 symbol: "folder.badge.gearshape",
-                title: "Local Data",
-                subtitle: "Open Delta's local support folders for troubleshooting."
+                title: "Support Files",
+                subtitle: "Open local data and logs used for troubleshooting."
             ) {
                 ActionLine(
                     description: "Database, locks, background control state, and support files.",
@@ -1044,7 +1105,7 @@ struct SettingsView: View {
             SettingsCard(
                 symbol: "stethoscope",
                 title: "Diagnostics",
-                subtitle: "Generate sanitized support information without secrets."
+                subtitle: "Generate support information without secrets."
             ) {
                 ActionLine(
                     description: "Copy a sanitized report with app, helper, destination, profile, and recent job state.",
@@ -1066,6 +1127,10 @@ struct SettingsView: View {
         }
     }
 
+    private var scheduledProfileCount: Int {
+        model.profiles.filter { $0.schedule.isEnabled }.count
+    }
+
     private var backgroundBackupsStatusText: String {
         switch model.launchAgentStatus {
         case .enabled:
@@ -1075,8 +1140,46 @@ struct SettingsView: View {
         }
     }
 
+    private var backgroundBackupsSummary: String {
+        if scheduledProfileCount == 0 {
+            return "No scheduled profiles"
+        }
+        if model.launchAgentStatus == .enabled {
+            return "\(scheduledProfileCount) scheduled \(scheduledProfileCount == 1 ? "profile" : "profiles") ready"
+        }
+        return "Action needed for schedules"
+    }
+
+    private var backgroundBackupsControlDetail: String {
+        if scheduledProfileCount == 0 {
+            return "Keep the background helper ready for profiles that use hourly, daily, weekly, monthly, or custom schedules."
+        }
+        if model.launchAgentStatus == .enabled {
+            return "Allow \(scheduledProfileCount) scheduled \(scheduledProfileCount == 1 ? "profile" : "profiles") to run while Delta's window is closed."
+        }
+        return "Enable and approve Delta in Login Items so scheduled backups can run automatically."
+    }
+
     private var fullDiskAccessStatusText: String {
         model.fullDiskAccessStatus.hasLikelyFullDiskAccess ? "Ready" : "Needs Access"
+    }
+
+    private var fullDiskAccessSummary: String {
+        model.fullDiskAccessStatus.hasLikelyFullDiskAccess ? "Protected folders readable" : "Manual approval needed"
+    }
+
+    private var fullDiskAccessDescription: String {
+        model.fullDiskAccessStatus.hasLikelyFullDiskAccess
+            ? "Protected locations look readable for full-volume and selected-folder backups."
+            : "Protected locations are not readable yet. Open Privacy & Security, add Delta with the + button if needed, then recheck access."
+    }
+
+    private var updateSummary: String {
+        guard automaticallyChecksForUpdates else {
+            return "Manual checks only"
+        }
+        let interval = UpdateCheckInterval.normalized(updateCheckIntervalSeconds)
+        return "Checks \(interval.title.lowercased())"
     }
 
     private func applyUpdatePreferences() {
@@ -2317,6 +2420,37 @@ struct SurfaceSection<Content: View>: View {
     }
 }
 
+struct SettingsStatusTile: View {
+    var symbol: String
+    var title: String
+    var value: String
+    var detail: String
+    var color: Color
+
+    var body: some View {
+        Card {
+            VStack(alignment: .leading, spacing: 10) {
+                StatusIcon(symbol: symbol, color: color)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(value)
+                        .font(.system(size: 20, weight: .semibold, design: .rounded))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.82)
+                    Text(title)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    Text(detail)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .frame(minHeight: 104, alignment: .topLeading)
+        }
+    }
+}
+
 struct SettingsCard<Content: View>: View {
     var symbol: String
     var title: String
@@ -2372,6 +2506,45 @@ struct SettingsCard<Content: View>: View {
     }
 }
 
+struct SettingsFact: Identifiable {
+    var id: String { title }
+    var title: String
+    var value: String
+}
+
+struct SettingsFactGrid: View {
+    var items: [SettingsFact]
+
+    var body: some View {
+        LazyVGrid(columns: columns, spacing: 8) {
+            ForEach(items) { item in
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(item.title)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(item.value)
+                        .font(.caption.weight(.semibold))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+                .padding(.vertical, 8)
+                .padding(.horizontal, 10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(DeltaTheme.badge.opacity(0.65))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
+        }
+    }
+
+    private var columns: [GridItem] {
+        [
+            GridItem(.flexible(minimum: 120), spacing: 8),
+            GridItem(.flexible(minimum: 120), spacing: 8),
+            GridItem(.flexible(minimum: 120), spacing: 8)
+        ]
+    }
+}
+
 struct SettingsControlRow<Control: View>: View {
     var title: String
     var detail: String
@@ -2402,7 +2575,6 @@ struct SettingsDescription: View {
         Text(text)
             .font(.callout)
             .foregroundStyle(.secondary)
-            .lineLimit(3)
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
     }

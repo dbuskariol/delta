@@ -88,12 +88,6 @@ write_entitlements() {
     printf '%s\n' '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">'
     printf '%s\n' '<plist version="1.0">'
     printf '%s\n' '<dict>'
-    printf '    <key>com.apple.security.cs.allow-jit</key>\n'
-    printf '    <false/>\n'
-    printf '    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>\n'
-    printf '    <false/>\n'
-    printf '    <key>com.apple.security.cs.disable-library-validation</key>\n'
-    printf '    <false/>\n'
     printf '%s\n' '</dict>'
     printf '%s\n' '</plist>'
   } > "$path"
