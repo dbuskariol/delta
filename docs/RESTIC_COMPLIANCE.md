@@ -244,6 +244,6 @@ This runs:
 - packaged app build
 - codesign verification
 - minimal hardened-runtime entitlement checks for Delta, DeltaAgent, DeltaSecretBridge, restic, and rclone
-- Sparkle framework checks
+- Sparkle framework checks and signed appcast/update metadata
 - helper smoke checks
 - bundled restic/rclone version checks

@@ -88,10 +88,20 @@ wait "$DELTA_PID" >/dev/null 2>&1 || true
 
 SHORT_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$ROOT_DIR/dist/Delta.app/Contents/Info.plist")"
 BUILD_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$ROOT_DIR/dist/Delta.app/Contents/Info.plist")"
+SPARKLE_PUBLIC_KEY="$(/usr/libexec/PlistBuddy -c 'Print :SUPublicEDKey' "$ROOT_DIR/dist/Delta.app/Contents/Info.plist")"
 ARCHIVE_NAME="Delta-$SHORT_VERSION-$BUILD_VERSION.zip"
+RELEASE_NOTES_NAME="Delta-$SHORT_VERSION-$BUILD_VERSION.md"
 APPCAST="$ROOT_DIR/dist/updates/appcast.xml"
+if [[ -z "$SPARKLE_PUBLIC_KEY" || "$SPARKLE_PUBLIC_KEY" == *"TODO"* ]]; then
+  printf "Sparkle public EdDSA key is missing from Info.plist.\n" >&2
+  exit 1
+fi
 if [[ ! -f "$ROOT_DIR/dist/updates/$ARCHIVE_NAME" ]]; then
   printf "Sparkle update archive %s was not generated.\n" "$ARCHIVE_NAME" >&2
+  exit 1
+fi
+if [[ ! -f "$ROOT_DIR/dist/updates/$RELEASE_NOTES_NAME" ]]; then
+  printf "Sparkle release notes %s were not generated.\n" "$RELEASE_NOTES_NAME" >&2
   exit 1
 fi
 if ! /usr/bin/grep -q "<sparkle:shortVersionString>$SHORT_VERSION</sparkle:shortVersionString>" "$APPCAST"; then
@@ -104,6 +114,14 @@ if ! /usr/bin/grep -q "<sparkle:version>$BUILD_VERSION</sparkle:version>" "$APPC
 fi
 if ! /usr/bin/grep -q "$ARCHIVE_NAME" "$APPCAST"; then
   printf "Sparkle appcast does not reference %s.\n" "$ARCHIVE_NAME" >&2
+  exit 1
+fi
+if ! /usr/bin/grep -q "$RELEASE_NOTES_NAME" "$APPCAST"; then
+  printf "Sparkle appcast does not reference release notes %s.\n" "$RELEASE_NOTES_NAME" >&2
+  exit 1
+fi
+if ! /usr/bin/grep -Eq 'sparkle:edSignature="[A-Za-z0-9+/=]{40,}"' "$APPCAST"; then
+  printf "Sparkle appcast does not contain an EdDSA signature for the update archive.\n" >&2
   exit 1
 fi
 

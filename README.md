@@ -72,7 +72,7 @@ Important implementation details:
 - **Durable run controls** let the app request pause/cancel for an agent-owned restic process without relying on in-memory UI state.
 - **Abandoned-job recovery** marks stale running jobs interrupted after restart only when the per-destination lock proves no restic process still owns the destination.
 - **Bundled tools** are pinned and checksum-verified through `Scripts/bootstrap-tools.sh`.
-- **Packaged app verification** checks signatures, minimal hardened-runtime entitlements, Sparkle embedding, LaunchAgent plist integrity, helper smoke tests, Sparkle update metadata, and bundled restic/rclone versions.
+- **Packaged app verification** checks signatures, minimal hardened-runtime entitlements, Sparkle embedding, LaunchAgent plist integrity, helper smoke tests, signed Sparkle update metadata, and bundled restic/rclone versions.
 - **Sanitized diagnostic reports** can be copied or exported from Settings without including repository passwords or backend credential values.
 
 ## Backup Behavior
