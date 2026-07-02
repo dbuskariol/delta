@@ -241,7 +241,7 @@ else
     mounted_status="$(command_status external_mounted)"
     if [[ "$mounted_status" -eq 0 ]]; then
       mounted_acceptance_status="passed"
-      mounted_acceptance_evidence="External mounted-destination acceptance passed using configured /Volumes target: $mounted_output"
+      mounted_acceptance_evidence="Installed Delta external mounted-destination lifecycle acceptance passed through the coordinator using configured /Volumes target: $mounted_output"
     else
       mounted_acceptance_status="failed"
       mounted_acceptance_evidence="External mounted-destination acceptance failed: $mounted_output"
@@ -255,7 +255,7 @@ else
     sftp_status="$(command_status external_sftp)"
     if [[ "$sftp_status" -eq 0 ]]; then
       sftp_acceptance_status="passed"
-      sftp_acceptance_evidence="External SFTP acceptance passed with non-interactive authentication: $sftp_output"
+      sftp_acceptance_evidence="Installed Delta external SFTP lifecycle acceptance passed through the coordinator with non-interactive authentication: $sftp_output"
     else
       sftp_acceptance_status="failed"
       sftp_acceptance_evidence="External SFTP acceptance failed: $sftp_output"
@@ -269,7 +269,7 @@ else
     s3_status="$(command_status external_s3)"
     if [[ "$s3_status" -eq 0 ]]; then
       s3_acceptance_status="passed"
-      s3_acceptance_evidence="External S3-compatible acceptance passed with missing-credential failure and corrected-credential success: $s3_output"
+      s3_acceptance_evidence="Installed Delta external S3-compatible lifecycle acceptance passed through the coordinator with Keychain-backed backend credentials, missing-credential failure, and corrected-credential success: $s3_output"
     else
       s3_acceptance_status="failed"
       s3_acceptance_evidence="External S3-compatible acceptance failed: $s3_output"
@@ -347,12 +347,12 @@ else
   remote_evidence_parts=()
   remote_failed_parts=()
   if [[ "$sftp_acceptance_status" == "passed" ]]; then
-    remote_evidence_parts+=("SFTP external acceptance proved unprepared-destination probe, prepare, reuse probe, backup, restore, check, and prune.")
+    remote_evidence_parts+=("Installed Delta SFTP external lifecycle acceptance proved unprepared-destination probe, prepare, reuse probe, backup, restore, check, and prune.")
   elif [[ "$sftp_acceptance_status" == "failed" ]]; then
     remote_failed_parts+=("$sftp_acceptance_evidence")
   fi
   if [[ "$s3_acceptance_status" == "passed" ]]; then
-    remote_evidence_parts+=("S3-compatible external acceptance proved unprepared-destination probe, prepare, reuse probe, backup, restore, check, and prune.")
+    remote_evidence_parts+=("Installed Delta S3-compatible external lifecycle acceptance proved Keychain-backed credentials, unprepared-destination probe, prepare, reuse probe, backup, restore, check, and prune.")
   elif [[ "$s3_acceptance_status" == "failed" ]]; then
     remote_failed_parts+=("$s3_acceptance_evidence")
   fi

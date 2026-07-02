@@ -47,6 +47,8 @@ struct DeltaApp: App {
             runAcceptanceSeedDiagnostics()
         case "--acceptance-local-lifecycle":
             runAcceptanceLocalLifecycle()
+        case "--acceptance-external-lifecycle":
+            runAcceptanceExternalLifecycle()
         case "--acceptance-seed-scheduled-agent":
             runAcceptanceSeedScheduledAgent(arguments: Array(arguments.dropFirst()))
         case "--acceptance-verify-scheduled-agent":
@@ -182,6 +184,22 @@ struct DeltaApp: App {
             exit(0)
         } catch {
             fputs("Delta local lifecycle acceptance error: \(error.localizedDescription)\n", stderr)
+            exit(1)
+        }
+    }
+
+    private static func runAcceptanceExternalLifecycle() -> Never {
+        guard ProcessInfo.processInfo.environment["DELTA_ENABLE_EXTERNAL_LIFECYCLE_ACCEPTANCE"] == "1" else {
+            fputs("Delta external lifecycle acceptance command is disabled.\n", stderr)
+            exit(64)
+        }
+
+        do {
+            let report = try AcceptanceExternalLifecycleCommand.run(executableURL: selfExecutableURL())
+            print(report, terminator: report.hasSuffix("\n") ? "" : "\n")
+            exit(0)
+        } catch {
+            fputs("Delta external lifecycle acceptance error: \(error.localizedDescription)\n", stderr)
             exit(1)
         }
     }
