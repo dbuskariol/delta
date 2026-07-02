@@ -52,6 +52,7 @@ public enum ResticCommandValidationError: Error, Equatable, LocalizedError {
     case missingSnapshotID
     case missingRestoreTarget
     case invalidRestorePath(String)
+    case invalidSnapshotBrowsePath(String)
 
     public var errorDescription: String? {
         switch self {
@@ -61,6 +62,8 @@ public enum ResticCommandValidationError: Error, Equatable, LocalizedError {
             return "Choose a destination folder or restore to original paths before starting restore."
         case let .invalidRestorePath(path):
             return "Restore path must be an absolute path inside the restore point: \(path)"
+        case let .invalidSnapshotBrowsePath(path):
+            return "Folder browser path must be an absolute path inside the restore point: \(path)"
         }
     }
 }
@@ -162,8 +165,13 @@ public struct ResticCommandBuilder: Sendable {
     }
 
     public func listSnapshotEntries(repository: BackupRepository, snapshotID: String, directoryPath: String? = nil) throws -> ResticCommand {
+        let snapshotID = snapshotID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !snapshotID.isEmpty else {
+            throw ResticCommandValidationError.missingSnapshotID
+        }
+
         var subcommand = ["ls", "--json", "--sort", "name", snapshotID]
-        if let directoryPath = directoryPath?.trimmingCharacters(in: .whitespacesAndNewlines), !directoryPath.isEmpty {
+        if let directoryPath = try Self.normalizedSnapshotBrowsePath(directoryPath) {
             subcommand.append(directoryPath)
         }
         return try command(repository: repository, subcommand: subcommand)
@@ -322,6 +330,23 @@ public struct ResticCommandBuilder: Sendable {
         }
         while trimmed.count > 1 && trimmed.hasSuffix("/") {
             trimmed.removeLast()
+        }
+        return trimmed
+    }
+
+    private static func normalizedSnapshotBrowsePath(_ path: String?) throws -> String? {
+        guard let path else {
+            return nil
+        }
+        var trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return nil
+        }
+        while trimmed.count > 1 && trimmed.hasSuffix("/") {
+            trimmed.removeLast()
+        }
+        guard trimmed.hasPrefix("/") else {
+            throw ResticCommandValidationError.invalidSnapshotBrowsePath(path)
         }
         return trimmed
     }

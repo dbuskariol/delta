@@ -246,14 +246,42 @@ final class ResticCommandTests: XCTestCase {
 
         let command = try makeBuilder().listSnapshotEntries(
             repository: repository,
-            snapshotID: "abc123",
-            directoryPath: "/Users/me/Documents"
+            snapshotID: " abc123 ",
+            directoryPath: " /Users/me/Documents/ "
         )
 
         XCTAssertEqual(
             Array(command.arguments.suffix(6)),
             ["ls", "--json", "--sort", "name", "abc123", "/Users/me/Documents"]
         )
+    }
+
+    func testListSnapshotEntriesRejectsBlankSnapshotID() {
+        let repository = BackupRepository(name: "Local", backend: .local(path: "/repo"))
+
+        XCTAssertThrowsError(
+            try makeBuilder().listSnapshotEntries(
+                repository: repository,
+                snapshotID: " ",
+                directoryPath: "/Users/me/Documents"
+            )
+        ) { error in
+            XCTAssertEqual(error as? ResticCommandValidationError, .missingSnapshotID)
+        }
+    }
+
+    func testListSnapshotEntriesRejectsRelativeDirectoryFilter() {
+        let repository = BackupRepository(name: "Local", backend: .local(path: "/repo"))
+
+        XCTAssertThrowsError(
+            try makeBuilder().listSnapshotEntries(
+                repository: repository,
+                snapshotID: "abc123",
+                directoryPath: "Users/me/Documents"
+            )
+        ) { error in
+            XCTAssertEqual(error as? ResticCommandValidationError, .invalidSnapshotBrowsePath("Users/me/Documents"))
+        }
     }
 
     func testS3RegionIsPassedAsResticBackendOption() throws {

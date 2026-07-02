@@ -135,7 +135,7 @@ Delta browses files and folders inside a selected restore point with:
 ls --json --sort name <snapshot-id> <absolute-directory-path>
 ```
 
-The UI starts from the restore point's backed-up source roots and loads one directory at a time. Delta does not recursively dump a full-volume backup into app memory just to render the browser. `ls --json` output is parsed as newline-delimited restic node records; non-node records are ignored.
+The UI starts from the restore point's backed-up source roots and loads one directory at a time. Delta does not recursively dump a full-volume backup into app memory just to render the browser. Before invoking restic, Delta trims and validates the restore point ID and rejects relative folder filters because restic `ls` directory arguments must be absolute paths inside the restore point. `ls --json` output is parsed as newline-delimited restic node records; non-node records are ignored.
 
 ## Restore
 

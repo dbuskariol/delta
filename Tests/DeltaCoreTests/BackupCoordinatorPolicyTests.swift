@@ -564,6 +564,23 @@ final class BackupCoordinatorPolicyTests: XCTestCase {
         XCTAssertTrue(runner.commands.isEmpty)
     }
 
+    func testBrowseRestorePointDoesNotRunResticForInvalidBrowserPath() throws {
+        let fixture = try Fixture()
+        let runner = MockResticRunner(results: [.success])
+        let coordinator = fixture.makeCoordinator(runner: runner)
+
+        XCTAssertThrowsError(
+            try coordinator.listSnapshotEntries(
+                repository: fixture.repository,
+                snapshotID: "snapshot",
+                directoryPath: "relative/path"
+            )
+        ) { error in
+            XCTAssertTrue(error.localizedDescription.contains("absolute path"), error.localizedDescription)
+        }
+        XCTAssertTrue(runner.commands.isEmpty)
+    }
+
     func testRestoreRecordsFailureWhenDestinationIsUnavailable() throws {
         let fixture = try Fixture()
         let runner = MockResticRunner(results: [.success])
