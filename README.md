@@ -119,7 +119,7 @@ On each check, Background Scheduling evaluates:
 
 When an enabled scheduled profile is saved, Delta requests Background Scheduling registration automatically. If macOS still requires approval, Delta shows an action-needed scheduled-backup card on the dashboard and a detailed status in Settings. macOS may require manual approval in Login Items; apps cannot approve their own background items.
 
-The visible menu bar dropdown and Start at Login setting are separate from Background Scheduling. Users can show or hide the menu bar item and choose whether Delta opens after sign-in without changing scheduled backup execution. The menu bar item provides quick access to Back Up Now, Run Due Backups, Pause, Stop, Activity, update checks, and last-backup status.
+The visible menu bar dropdown and Start at Login setting are separate from Background Scheduling. Users can show or hide the menu bar item and choose whether Delta opens after sign-in without changing scheduled backup execution. The menu bar item changes symbol for ready, running, and attention states, and provides quick access to Back Up Now, Run Due Backups, Pause, Stop, Activity, update checks, and last-backup status.
 
 Notification Center alerts are also separate from Background Scheduling. When enabled in Settings and allowed by macOS, Delta alerts on failed or warning jobs from either the app or the signed helper. Successful backup summaries are available as a separate opt-in.
 
