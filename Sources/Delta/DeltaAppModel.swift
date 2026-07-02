@@ -127,6 +127,16 @@ final class DeltaAppModel: ObservableObject {
         }
     }
 
+    func saveProfile(_ profile: BackupProfile) {
+        do {
+            try database.saveProfile(profile)
+            try database.appendEvent(EventLog(level: .info, message: "Backup profile '\(profile.name)' was updated."))
+            reload()
+        } catch {
+            alertMessage = error.localizedDescription
+        }
+    }
+
     func runNow(profile: BackupProfile) {
         guard let repository = repositories.first(where: { $0.id == profile.repositoryID }) else {
             alertMessage = "Destination for this profile no longer exists."

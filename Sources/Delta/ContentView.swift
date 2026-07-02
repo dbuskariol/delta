@@ -499,6 +499,7 @@ struct SettingsView: View {
 struct ProfileRow: View {
     @EnvironmentObject private var model: DeltaAppModel
     var profile: BackupProfile
+    @State private var isPresentingEditor = false
 
     var body: some View {
         Card {
@@ -520,6 +521,10 @@ struct ProfileRow: View {
                 MetadataBadge(text: profile.sourceMode.displayName)
                 MetadataBadge(text: scheduleSummary)
                 MetadataBadge(text: retentionSummary)
+                IconButton(symbol: "pencil", help: "Edit profile") {
+                    isPresentingEditor = true
+                }
+                .disabled(model.isWorking)
                 IconButton(symbol: "play.fill", help: "Run backup now") {
                     model.runNow(profile: profile)
                 }
@@ -529,6 +534,11 @@ struct ProfileRow: View {
                 }
                 .disabled(model.isWorking)
             }
+        }
+        .sheet(isPresented: $isPresentingEditor) {
+            ProfileEditorView(profile: profile)
+                .environmentObject(model)
+                .frame(width: ModalMetrics.sheetWidth, height: 680)
         }
     }
 
@@ -641,6 +651,7 @@ struct RepositoryRow: View {
 struct ProfileEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var model: DeltaAppModel
+    private let existingProfile: BackupProfile?
     @State private var name = "Mac Backup"
     @State private var mode: BackupSourceMode = .customFolders
     @State private var sources: [BackupSource] = []
@@ -669,8 +680,43 @@ struct ProfileEditorView: View {
     @State private var maintenanceHour = 2
     @State private var maintenanceMinute = 0
 
+    init(profile: BackupProfile? = nil) {
+        existingProfile = profile
+        let schedule = profile?.schedule ?? BackupSchedule()
+        let scheduleState = Self.scheduleEditorState(for: schedule.kind)
+        let retention = profile?.retention ?? RetentionPolicy()
+
+        _name = State(initialValue: profile?.name ?? "Mac Backup")
+        _mode = State(initialValue: profile?.sourceMode ?? .customFolders)
+        _sources = State(initialValue: profile?.sources ?? [])
+        _repositoryID = State(initialValue: profile?.repositoryID)
+        _scheduleKind = State(initialValue: scheduleState.kind)
+        _hour = State(initialValue: scheduleState.hour)
+        _minute = State(initialValue: scheduleState.minute)
+        _weekday = State(initialValue: scheduleState.weekday)
+        _day = State(initialValue: scheduleState.day)
+        _intervalMinutes = State(initialValue: scheduleState.intervalMinutes)
+        _scheduleEnabled = State(initialValue: schedule.isEnabled)
+        _catchUpMissedRuns = State(initialValue: schedule.catchUpMissedRuns)
+        _runOnBattery = State(initialValue: schedule.runOnBattery)
+        _runInLowPowerMode = State(initialValue: schedule.runInLowPowerMode)
+        _uploadLimit = State(initialValue: schedule.uploadLimitKiB.map(String.init) ?? "")
+        _downloadLimit = State(initialValue: schedule.downloadLimitKiB.map(String.init) ?? "")
+        _keepHourly = State(initialValue: retention.keepHourly)
+        _keepDaily = State(initialValue: retention.keepDaily)
+        _keepWeekly = State(initialValue: retention.keepWeekly)
+        _keepMonthly = State(initialValue: retention.keepMonthly)
+        _keepYearly = State(initialValue: retention.keepYearly)
+        _pruneAfterForget = State(initialValue: retention.pruneAfterForget)
+        _checkAfterPrune = State(initialValue: retention.checkAfterPrune)
+        _maintenanceEnabled = State(initialValue: retention.maintenanceSchedule.isEnabled)
+        _maintenanceIntervalDays = State(initialValue: retention.maintenanceSchedule.intervalDays)
+        _maintenanceHour = State(initialValue: retention.maintenanceSchedule.hour)
+        _maintenanceMinute = State(initialValue: retention.maintenanceSchedule.minute)
+    }
+
     var body: some View {
-        SheetScaffold(title: "New Backup Profile", subtitle: "Define what to protect and when to run.") {
+        SheetScaffold(title: sheetTitle, subtitle: sheetSubtitle) {
             FieldRow(title: "Name") {
                 TextField("Profile name", text: $name)
                     .textFieldStyle(.roundedBorder)
@@ -804,16 +850,9 @@ struct ProfileEditorView: View {
 
             SheetActions {
                 Button("Cancel") { dismiss() }
-                Button("Create") {
+                Button(existingProfile == nil ? "Create" : "Save") {
                     if let repositoryID {
-                        model.createProfile(
-                            name: name,
-                            mode: mode,
-                            sources: sources,
-                            repositoryID: repositoryID,
-                            schedule: selectedSchedule,
-                            retention: selectedRetention
-                        )
+                        saveProfile(repositoryID: repositoryID)
                         dismiss()
                     }
                 }
@@ -824,6 +863,14 @@ struct ProfileEditorView: View {
         .onAppear {
             repositoryID = repositoryID ?? model.repositories.first?.id
         }
+    }
+
+    private var sheetTitle: String {
+        existingProfile == nil ? "New Backup Profile" : "Edit Backup Profile"
+    }
+
+    private var sheetSubtitle: String {
+        existingProfile == nil ? "Define what to protect and when to run." : "Update what to protect and when to run."
     }
 
     @ViewBuilder
@@ -901,11 +948,57 @@ struct ProfileEditorView: View {
         )
     }
 
+    private func saveProfile(repositoryID: UUID) {
+        if var profile = existingProfile {
+            profile.name = name
+            profile.sourceMode = mode
+            profile.sources = sources
+            profile.repositoryID = repositoryID
+            profile.schedule = selectedSchedule
+            profile.retention = selectedRetention
+            profile.updatedAt = Date()
+            model.saveProfile(profile)
+        } else {
+            model.createProfile(
+                name: name,
+                mode: mode,
+                sources: sources,
+                repositoryID: repositoryID,
+                schedule: selectedSchedule,
+                retention: selectedRetention
+            )
+        }
+    }
+
     private func positiveInteger(_ value: String) -> Int? {
         guard let integer = Int(value.trimmingCharacters(in: .whitespacesAndNewlines)), integer > 0 else {
             return nil
         }
         return integer
+    }
+
+    private static func scheduleEditorState(for kind: ScheduleKind) -> ScheduleEditorState {
+        switch kind {
+        case let .hourly(minute):
+            return ScheduleEditorState(kind: .hourly, minute: minute)
+        case let .daily(hour, minute):
+            return ScheduleEditorState(kind: .daily, hour: hour, minute: minute)
+        case let .weekly(weekday, hour, minute):
+            return ScheduleEditorState(kind: .weekly, hour: hour, minute: minute, weekday: weekday)
+        case let .monthly(day, hour, minute):
+            return ScheduleEditorState(kind: .monthly, hour: hour, minute: minute, day: day)
+        case let .customInterval(seconds):
+            return ScheduleEditorState(kind: .custom, intervalMinutes: max(1, Int(seconds / 60)))
+        }
+    }
+
+    private struct ScheduleEditorState {
+        var kind: ScheduleEditorKind
+        var hour = 20
+        var minute = 0
+        var weekday = 2
+        var day = 1
+        var intervalMinutes = 120
     }
 }
 

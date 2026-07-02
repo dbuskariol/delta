@@ -59,4 +59,37 @@ final class DatabaseTests: XCTestCase {
         let snapshotsByRepository = try database.fetchSnapshotsByRepository()
         XCTAssertEqual(snapshotsByRepository[repository.id]?.first?.id, "snapshot")
     }
+
+    func testSavingExistingProfileUpdatesEditableFields() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let database = try DeltaDatabase(url: directory.appendingPathComponent("Delta.sqlite"))
+        let repository = BackupRepository(name: "Local", backend: .local(path: "/repo"))
+        var profile = BackupProfile(
+            name: "Documents",
+            sourceMode: .customFolders,
+            sources: [BackupSource(path: "/Users/me/Documents")],
+            repositoryID: repository.id
+        )
+        try database.saveRepository(repository)
+        try database.saveProfile(profile)
+
+        profile.name = "Edited Documents"
+        profile.schedule = BackupSchedule(kind: .weekly(weekday: 3, hour: 9, minute: 30), isEnabled: false)
+        profile.retention = RetentionPolicy(keepHourly: 2, keepDaily: 7, keepWeekly: 4, keepMonthly: 3, keepYearly: 1)
+        profile.sources = [BackupSource(path: "/Users/me/Desktop")]
+        profile.updatedAt = Date()
+        try database.saveProfile(profile)
+
+        let profiles = try database.fetchProfiles()
+        let fetchedProfile = try XCTUnwrap(profiles.first)
+        XCTAssertEqual(profiles.count, 1)
+        XCTAssertEqual(fetchedProfile.id, profile.id)
+        XCTAssertEqual(fetchedProfile.name, "Edited Documents")
+        XCTAssertEqual(fetchedProfile.schedule, profile.schedule)
+        XCTAssertEqual(fetchedProfile.retention, profile.retention)
+        XCTAssertEqual(fetchedProfile.sources, profile.sources)
+    }
 }
