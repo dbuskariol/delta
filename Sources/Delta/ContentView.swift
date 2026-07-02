@@ -1234,6 +1234,7 @@ struct SettingsView: View {
         store: DeltaAppPreferences.sharedStore()
     ) private var showsMenuBarExtra = true
     @State private var automaticallyChecksForUpdates = true
+    @State private var automaticallyDownloadsUpdates = false
     @State private var notificationAuthorizationState: DeltaNotificationAuthorizationState = .notDetermined
 
     var body: some View {
@@ -1270,6 +1271,7 @@ struct SettingsView: View {
             }
 
             SettingsOverviewCard(
+                symbol: settingsOverviewSymbol,
                 title: settingsOverviewTitle,
                 detail: settingsOverviewDetail,
                 statusText: settingsOverviewStatusText,
@@ -1304,6 +1306,12 @@ struct SettingsView: View {
                     text: "macOS starts Delta's signed background helper at sign-in and during short schedule checks. It runs as your user account, uses the same saved destinations, starts due backups when policy allows, then exits when there is no work.",
                     color: .blue
                 )
+
+                SettingsCapabilityList(items: [
+                    SettingsCapability(symbol: "moon.zzz", title: "Works with the window closed", detail: "Scheduled profiles can run after sign-in without keeping the main app open."),
+                    SettingsCapability(symbol: "person.crop.circle", title: "Runs as your user", detail: "No admin helper, no elevated privileges, and the same file permissions you granted to Delta."),
+                    SettingsCapability(symbol: "bolt.badge.checkmark", title: "Honors backup policy", detail: "Battery, Low Power Mode, speed limits, destination availability, and locking are checked before work starts.")
+                ])
 
                 SettingsFactGrid(items: [
                     SettingsFact(title: "Scheduled profiles", value: "\(scheduledProfileCount)"),
@@ -1775,8 +1783,8 @@ struct SettingsView: View {
                 symbol: "arrow.down.circle",
                 title: "Automatic Updates",
                 subtitle: "Check for signed Delta releases using Sparkle.",
-                statusText: automaticallyChecksForUpdates ? "On" : "Off",
-                statusColor: automaticallyChecksForUpdates ? .green : .secondary
+                statusText: automaticUpdatesStatusText,
+                statusColor: automaticUpdatesStatusColor
             ) {
                 SettingsControlRow(
                     title: "Automatic checks",
@@ -1808,12 +1816,33 @@ struct SettingsView: View {
                     }
                 }
 
+                SettingsControlRow(
+                    title: "Download in background",
+                    detail: "Let Sparkle download signed updates after it finds them, then prompt before replacing Delta."
+                ) {
+                    Toggle("", isOn: $automaticallyDownloadsUpdates)
+                        .labelsHidden()
+                        .toggleStyle(.switch)
+                        .disabled(!automaticallyChecksForUpdates || !softwareUpdateController.allowsAutomaticUpdates)
+                        .onChange(of: automaticallyDownloadsUpdates) { _, _ in
+                            applyUpdatePreferences()
+                        }
+                }
+
+                SettingsFactGrid(items: [
+                    SettingsFact(title: "Checks", value: automaticallyChecksForUpdates ? AppUpdateCheckInterval.normalized(updateCheckIntervalSeconds).title : "Off"),
+                    SettingsFact(title: "Downloads", value: automaticallyDownloadsUpdates && automaticallyChecksForUpdates ? "Background" : "Manual"),
+                    SettingsFact(title: "Packages", value: "Signed"),
+                    SettingsFact(title: "Install", value: "Prompted")
+                ])
+
                 SettingsActionBar {
                     Button {
                         softwareUpdateController.checkForUpdates()
                     } label: {
                         Label("Check Now", systemImage: "arrow.clockwise")
                     }
+                    .disabled(!softwareUpdateController.canCheckForUpdates)
                 }
             }
 
@@ -1958,6 +1987,7 @@ struct SettingsView: View {
         }
         .onAppear {
             automaticallyChecksForUpdates = softwareUpdateController.automaticallyChecksForUpdates
+            automaticallyDownloadsUpdates = softwareUpdateController.automaticallyDownloadsUpdates
             activityLogDetailRawValue = activityLogDetail.rawValue
             normalizeOperationalHistoryRetention()
             normalizeHealthMonitoring()
@@ -1989,6 +2019,16 @@ struct SettingsView: View {
             return "Notifications need permission"
         }
         return "Delta is ready"
+    }
+
+    private var settingsOverviewSymbol: String {
+        if !model.isPersistentStoreAvailable || backupToolStatusText != "Ready" {
+            return "xmark.octagon"
+        }
+        if settingsOverviewNeedsReview {
+            return "exclamationmark.triangle"
+        }
+        return "checkmark.seal"
     }
 
     private var settingsOverviewDetail: String {
@@ -2052,10 +2092,10 @@ struct SettingsView: View {
             ),
             SettingsStatusItem(
                 title: "Updates",
-                value: automaticallyChecksForUpdates ? "On" : "Off",
+                value: automaticUpdatesStatusText,
                 symbol: "arrow.down.circle",
-                color: automaticallyChecksForUpdates ? .green : .secondary,
-                detail: AppUpdateCheckInterval.normalized(updateCheckIntervalSeconds).summaryText
+                color: automaticUpdatesStatusColor,
+                detail: automaticUpdatesSummaryDetail
             ),
             SettingsStatusItem(
                 title: "Notifications",
@@ -2263,6 +2303,25 @@ struct SettingsView: View {
         }
     }
 
+    private var automaticUpdatesStatusText: String {
+        guard automaticallyChecksForUpdates else {
+            return "Off"
+        }
+        return automaticallyDownloadsUpdates ? "Auto Download" : "Checks On"
+    }
+
+    private var automaticUpdatesStatusColor: Color {
+        automaticallyChecksForUpdates ? .green : .secondary
+    }
+
+    private var automaticUpdatesSummaryDetail: String {
+        guard automaticallyChecksForUpdates else {
+            return "Manual checks only"
+        }
+        let interval = AppUpdateCheckInterval.normalized(updateCheckIntervalSeconds).summaryText
+        return automaticallyDownloadsUpdates ? "\(interval), downloads ready" : interval
+    }
+
     private var restoreDefaultsStatusText: String {
         previewsRestoresByDefault && verifiesRestoresByDefault ? "Conservative" : "Custom"
     }
@@ -2403,6 +2462,7 @@ struct SettingsView: View {
         }
         softwareUpdateController.automaticallyChecksForUpdates = automaticallyChecksForUpdates
         softwareUpdateController.updateCheckInterval = TimeInterval(interval.rawValue)
+        softwareUpdateController.automaticallyDownloadsUpdates = automaticallyChecksForUpdates && automaticallyDownloadsUpdates
     }
 
     private func normalizeRestorePreferences() {
@@ -3796,6 +3856,7 @@ struct SettingsStatusItem: Identifiable {
 }
 
 struct SettingsOverviewCard: View {
+    var symbol: String
     var title: String
     var detail: String
     var statusText: String
@@ -3806,7 +3867,7 @@ struct SettingsOverviewCard: View {
         Card {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(alignment: .top, spacing: 14) {
-                    StatusIcon(symbol: "checkmark.seal", color: statusColor)
+                    StatusIcon(symbol: symbol, color: statusColor)
                     VStack(alignment: .leading, spacing: 4) {
                         Text(title)
                             .font(.headline)
@@ -3935,6 +3996,13 @@ struct SettingsFact: Identifiable {
     var value: String
 }
 
+struct SettingsCapability: Identifiable {
+    var id: String { title }
+    var symbol: String
+    var title: String
+    var detail: String
+}
+
 struct SettingsSectionLabel: View {
     var title: String
     var subtitle: String
@@ -3950,6 +4018,39 @@ struct SettingsSectionLabel: View {
         }
         .padding(.top, 4)
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+struct SettingsCapabilityList: View {
+    var items: [SettingsCapability]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ForEach(items) { item in
+                HStack(alignment: .top, spacing: 10) {
+                    Image(systemName: item.symbol)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 18, height: 18)
+                        .padding(.top, 1)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(item.title)
+                            .font(.caption.weight(.semibold))
+                        Text(item.detail)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+        }
+        .padding(.vertical, 10)
+        .padding(.horizontal, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(DeltaTheme.badge.opacity(0.45))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 }
 

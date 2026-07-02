@@ -174,7 +174,7 @@ else
   language_output="$(run_capture product_language "$ROOT_DIR/Scripts/verify-product-language.sh")"
   language_status="$(command_status product_language)"
   if [[ "$language_status" -eq 0 ]]; then
-    append_row "settings_surface" "$(item_area settings_surface)" "Partial" "Product-language verifier passed; raw Repository/LaunchAgent terminology is blocked from user-facing strings." "Open Settings and confirm visual grouping, status summary, Run Due Now scheduler action, reset controls, backup freshness warnings, source-access warnings, destination-check warning controls, and activity history retention in the running app."
+    append_row "settings_surface" "$(item_area settings_surface)" "Partial" "Product-language verifier passed; raw Repository/LaunchAgent terminology is blocked from user-facing strings." "Open Settings and confirm visual grouping, status summary, Run Due Now scheduler action, Sparkle automatic check/download controls, reset controls, backup freshness warnings, source-access warnings, destination-check warning controls, and activity history retention in the running app."
   else
     append_row "settings_surface" "$(item_area settings_surface)" "Failed" "Product-language verifier failed: $language_output" "Fix user-facing terminology and rerun."
   fi

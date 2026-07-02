@@ -14,8 +14,8 @@ final class DiagnosticReportTests: XCTestCase {
             databasePath: "/Users/me/Library/Application Support/Delta/Delta.sqlite",
             logPath: "/Users/me/Library/Application Support/Delta/Logs",
             fullDiskAccessStatus: "Ready",
-            backgroundBackupsStatus: "Enabled",
-            appLoginItemStatus: "Enabled",
+            backgroundBackupsStatus: "Ready",
+            appLoginItemStatus: "Ready",
             notificationStatus: "Enabled",
             menuBarStatus: "Shown",
             operationalHistoryRetentionStatus: "Keep 90 days",
@@ -47,8 +47,8 @@ final class DiagnosticReportTests: XCTestCase {
         XCTAssertTrue(report.contains("# Delta Diagnostic Report"))
         XCTAssertTrue(report.contains("- Version: 0.1 (1)"))
         XCTAssertTrue(report.contains("- Full Disk Access: Ready"))
-        XCTAssertTrue(report.contains("- Background Backups: Enabled"))
-        XCTAssertTrue(report.contains("- Start at Login: Enabled"))
+        XCTAssertTrue(report.contains("- Background Backups: Ready"))
+        XCTAssertTrue(report.contains("- Start at Login: Ready"))
         XCTAssertTrue(report.contains("- Notifications: Enabled"))
         XCTAssertTrue(report.contains("- Menu Bar: Shown"))
         XCTAssertTrue(report.contains("- Activity History Retention: Keep 90 days"))
@@ -76,8 +76,8 @@ final class DiagnosticReportTests: XCTestCase {
             databasePath: "/support/Delta.sqlite",
             logPath: "/support/Logs",
             fullDiskAccessStatus: "Needs Access",
-            backgroundBackupsStatus: "Not Registered",
-            appLoginItemStatus: "Not Registered",
+            backgroundBackupsStatus: "Off",
+            appLoginItemStatus: "Off",
             notificationStatus: "Disabled",
             menuBarStatus: "Hidden",
             operationalHistoryRetentionStatus: "Keep 90 days",
@@ -113,8 +113,8 @@ final class DiagnosticReportTests: XCTestCase {
             databasePath: "/support/Delta.sqlite",
             logPath: "/support/Logs",
             fullDiskAccessStatus: "Ready",
-            backgroundBackupsStatus: "Enabled",
-            appLoginItemStatus: "Enabled",
+            backgroundBackupsStatus: "Ready",
+            appLoginItemStatus: "Ready",
             notificationStatus: "Disabled",
             menuBarStatus: "Shown",
             operationalHistoryRetentionStatus: "Keep 90 days",
@@ -173,8 +173,8 @@ final class DiagnosticReportTests: XCTestCase {
             databasePath: "/support/Delta.sqlite",
             logPath: "/support/Logs",
             fullDiskAccessStatus: "Ready",
-            backgroundBackupsStatus: "Enabled",
-            appLoginItemStatus: "Enabled",
+            backgroundBackupsStatus: "Ready",
+            appLoginItemStatus: "Ready",
             notificationStatus: "Disabled",
             menuBarStatus: "Shown",
             operationalHistoryRetentionStatus: "Keep 90 days",
@@ -219,8 +219,8 @@ final class DiagnosticReportTests: XCTestCase {
             databasePath: "/support/Delta.sqlite",
             logPath: "/support/Logs",
             fullDiskAccessStatus: "Ready",
-            backgroundBackupsStatus: "Enabled",
-            appLoginItemStatus: "Enabled",
+            backgroundBackupsStatus: "Ready",
+            appLoginItemStatus: "Ready",
             notificationStatus: "Disabled",
             menuBarStatus: "Shown",
             operationalHistoryRetentionStatus: "Keep 90 days",

@@ -132,6 +132,13 @@ final class ScheduleAndParserTests: XCTestCase {
         XCTAssertEqual(LaunchAgentRegistrationStatus.parse("futureState"), .unknown("futureState"))
     }
 
+    func testLaunchAgentStatusDisplayNamesUseProductLanguage() {
+        XCTAssertEqual(LaunchAgentRegistrationStatus.enabled.displayName, "Ready")
+        XCTAssertEqual(LaunchAgentRegistrationStatus.requiresApproval.displayName, "Needs Approval")
+        XCTAssertEqual(LaunchAgentRegistrationStatus.notRegistered.displayName, "Off")
+        XCTAssertEqual(LaunchAgentRegistrationStatus.notFound.displayName, "Missing Helper")
+    }
+
     func testLaunchAgentStatusParserHandlesRawServiceManagementStates() {
         XCTAssertEqual(LaunchAgentRegistrationStatus.parse("SMAppServiceStatus(rawValue: 0)"), .notRegistered)
         XCTAssertEqual(LaunchAgentRegistrationStatus.parse("SMAppServiceStatus(rawValue: 1)"), .enabled)

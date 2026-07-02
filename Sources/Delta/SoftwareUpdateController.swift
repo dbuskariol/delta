@@ -34,6 +34,23 @@ final class SoftwareUpdateController: ObservableObject {
         }
     }
 
+    var automaticallyDownloadsUpdates: Bool {
+        get {
+            updaterController.updater.automaticallyDownloadsUpdates
+        }
+        set {
+            updaterController.updater.automaticallyDownloadsUpdates = newValue
+        }
+    }
+
+    var allowsAutomaticUpdates: Bool {
+        updaterController.updater.allowsAutomaticUpdates
+    }
+
+    var canCheckForUpdates: Bool {
+        updaterController.updater.canCheckForUpdates
+    }
+
     func checkForUpdates() {
         updaterController.checkForUpdates(nil)
     }

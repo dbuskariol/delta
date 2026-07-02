@@ -14,10 +14,10 @@ public enum LaunchAgentRegistrationStatus: Equatable, Sendable {
 
     public var displayName: String {
         switch self {
-        case .enabled: "Enabled"
+        case .enabled: "Ready"
         case .requiresApproval: "Needs Approval"
-        case .notRegistered: "Not Registered"
-        case .notFound: "Not Found"
+        case .notRegistered: "Off"
+        case .notFound: "Missing Helper"
         case .unavailable: "Unavailable"
         case .unknown: "Unknown"
         }

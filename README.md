@@ -24,7 +24,7 @@ The product goal is simple: make serious backup practices approachable without h
 - **Notification Center alerts** for failed or warning jobs, with optional successful-backup summaries. The signed background helper uses the same notification policy for scheduled runs.
 - **Full or browsed selected restore** with backup browsing, file/folder selection, configurable dry-run and verification defaults, overwrite policies, original-path restore, chosen-folder restore, and optional pre-restore backup.
 - **Streaming and saved backup logs** from restic stdout/stderr with source context, stable processed-file counters, clean change summaries, fixed-height live panes, and expandable per-job audit history.
-- **Settings and diagnostics** with a compact health summary for system access, schedules, updates, notifications, and bundled backup tools, plus controls for health monitoring thresholds, new-backup defaults, restore safety defaults, menu bar visibility, start-at-login, Activity log detail, scheduled-backup test runs, app version, helper status, tool paths, profile/destination counts, recent jobs, and local support paths.
+- **Settings and diagnostics** with a compact health summary for system access, schedules, updates, notifications, and bundled backup tools, plus controls for health monitoring thresholds, new-backup defaults, restore safety defaults, menu bar visibility, start-at-login, Activity log detail, scheduled-backup test runs, signed update checks/downloads, app version, background-backup status, tool paths, profile/destination counts, recent jobs, and local support paths.
 - **Sparkle automatic updates** with generated appcast/update archive support.
 
 ## How It Works
@@ -175,6 +175,8 @@ Losing the destination password means losing access to the encrypted backup data
 ## Automatic Updates
 
 Delta uses [Sparkle](https://sparkle-project.org/) for automatic updates.
+
+Settings expose Sparkle's automatic check interval and optional background download behavior. Delta still relies on Sparkle signature verification and prompts before replacing the app.
 
 Relevant files:
 
