@@ -30,13 +30,13 @@ public enum LaunchAgentRegistrationStatus: Equatable, Sendable {
         case .requiresApproval:
             return "Approve Delta in Login Items to allow scheduled backups."
         case .notRegistered:
-            return "Turn on background backups to run scheduled backups while Delta is closed."
+            return "Turn on Scheduled Backups to run scheduled profiles while Delta is closed."
         case .notFound:
-            return "The background scheduler could not be found in the app bundle."
+            return "The scheduled-backup helper could not be found in the app bundle."
         case .unavailable:
-            return "Background backups are unavailable on this macOS version."
+            return "Scheduled Backups are unavailable on this macOS version."
         case .unknown:
-            return "macOS returned an unknown background backup status."
+            return "macOS returned an unknown scheduled-backup status."
         }
     }
 

@@ -150,7 +150,7 @@ final class ScheduleAndParserTests: XCTestCase {
         let status = LaunchAgentRegistrationStatus.parse("SMAppServiceStatus(rawValue: 99)")
 
         XCTAssertEqual(status.displayName, "Unknown")
-        XCTAssertEqual(status.detail, "macOS returned an unknown background backup status.")
+        XCTAssertEqual(status.detail, "macOS returned an unknown scheduled-backup status.")
     }
 
     func testBackgroundBackupPresentationTreatsUnscheduledUnregisteredServiceAsNotNeeded() {
@@ -211,7 +211,7 @@ final class ScheduleAndParserTests: XCTestCase {
         XCTAssertEqual(presentation.approvalText, "Approved")
         XCTAssertEqual(presentation.attentionTitle, "Scheduled backups paused")
         XCTAssertEqual(presentation.severity, .attention)
-        XCTAssertTrue(presentation.controlDetail.contains("Keep background backups approved"))
+        XCTAssertTrue(presentation.controlDetail.contains("Keep the scheduled-backup helper approved"))
     }
 
     func testBackgroundBackupPresentationUsesProductLanguageForMissingService() {
@@ -222,10 +222,10 @@ final class ScheduleAndParserTests: XCTestCase {
         )
 
         XCTAssertEqual(presentation.statusText, "Missing Scheduler")
-        XCTAssertEqual(presentation.attentionTitle, "Background scheduler missing")
+        XCTAssertEqual(presentation.attentionTitle, "Scheduled-backup helper missing")
         XCTAssertEqual(
             presentation.attentionText,
-            "The signed background scheduler is missing from the installed app bundle. Reinstall Delta from the latest build."
+            "The signed scheduled-backup helper is missing from the installed app bundle. Reinstall Delta from the latest build."
         )
         XCTAssertEqual(presentation.severity, .blocked)
     }

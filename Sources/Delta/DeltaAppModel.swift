@@ -658,7 +658,7 @@ final class DeltaAppModel: ObservableObject {
         do {
             try LaunchAgentController.unregister()
             launchAgentStatus = LaunchAgentController.status()
-            alertMessage = "Background Backups were turned off."
+            alertMessage = "Scheduled Backups were turned off."
         } catch {
             launchAgentStatus = LaunchAgentController.status()
             alertMessage = error.localizedDescription
@@ -732,10 +732,10 @@ final class DeltaAppModel: ObservableObject {
             do {
                 try LaunchAgentController.register()
                 launchAgentStatus = LaunchAgentController.status()
-                try? database?.appendEvent(EventLog(level: .info, message: "Background Backups registration was requested for scheduled profile '\(profile.name)'."))
+                try? database?.appendEvent(EventLog(level: .info, message: "Scheduled Backups registration was requested for scheduled profile '\(profile.name)'."))
             } catch {
                 launchAgentStatus = LaunchAgentController.status()
-                alertMessage = "Scheduled backups were saved, but Background Backups could not be turned on: \(error.localizedDescription)"
+                alertMessage = "Scheduled backups were saved, but the scheduled-backup helper could not be turned on: \(error.localizedDescription)"
                 return
             }
         }
@@ -748,17 +748,17 @@ final class DeltaAppModel: ObservableObject {
     private func backgroundBackupsRegistrationMessage(for status: LaunchAgentRegistrationStatus) -> String {
         switch status {
         case .enabled:
-            return "Background Backups are on."
+            return "Scheduled Backups are on."
         case .requiresApproval:
-            return "Background Backups were added. Approve Delta in Login Items so scheduled backups can run while the main window is closed."
+            return "Scheduled Backups were added. Approve Delta in Login Items so scheduled backups can run while the main window is closed."
         case .notRegistered:
-            return "Background Backups are not on yet. Turn them on again or approve Delta in Login Items if macOS is waiting for approval."
+            return "Scheduled Backups are not on yet. Turn them on again or approve Delta in Login Items if macOS is waiting for approval."
         case .notFound:
-            return "Background Backups could not start because the helper is missing from the app bundle."
+            return "Scheduled Backups could not start because the helper is missing from the app bundle."
         case .unavailable:
-            return "Background Backups are unavailable on this macOS version."
+            return "Scheduled Backups are unavailable on this macOS version."
         case .unknown:
-            return "Background Backups returned an unknown macOS status. Refresh status or review Login Items if scheduled backups do not run."
+            return "Scheduled Backups returned an unknown macOS status. Refresh status or review Login Items if scheduled backups do not run."
         }
     }
 

@@ -88,13 +88,13 @@ EOF
 append_command "Code Signature Verification" /usr/bin/codesign --verify --strict --deep --verbose=2 "$APP_PATH"
 append_command "Code Signature Details" /usr/bin/codesign -dvv "$APP_PATH"
 append_command "Gatekeeper Assessment" /usr/sbin/spctl --assess --type execute --verbose=4 "$APP_PATH"
-append_command "Stapled Notarization Ticket" /usr/bin/stapler validate "$APP_PATH"
-append_command "Background Backups Helper Status" "$APP_PATH/Contents/MacOS/DeltaAgent" --status
-append_command "Background Backups Helper Dry Run" "$APP_PATH/Contents/MacOS/DeltaAgent" --dry-run
+append_command "Stapled Notarization Ticket" /usr/bin/xcrun stapler validate "$APP_PATH"
+append_command "Scheduled Backups Helper Status" "$APP_PATH/Contents/MacOS/DeltaAgent" --status
+append_command "Scheduled Backups Helper Dry Run" "$APP_PATH/Contents/MacOS/DeltaAgent" --dry-run
 ISOLATED_AGENT_SUPPORT="$(/usr/bin/mktemp -d -t delta-agent-support.XXXXXX)"
-append_command "Background Backups Isolated Due-Run" /bin/sh -c "DELTA_APP_SUPPORT_DIR='$ISOLATED_AGENT_SUPPORT' '$APP_PATH/Contents/MacOS/DeltaAgent' && test -f '$ISOLATED_AGENT_SUPPORT/Delta.sqlite'"
+append_command "Scheduled Backups Isolated Due-Run" /bin/sh -c "DELTA_APP_SUPPORT_DIR='$ISOLATED_AGENT_SUPPORT' '$APP_PATH/Contents/MacOS/DeltaAgent' && test -f '$ISOLATED_AGENT_SUPPORT/Delta.sqlite'"
 /bin/rm -rf "$ISOLATED_AGENT_SUPPORT"
-append_command "Background Backups Scheduled Acceptance" "$ROOT_DIR/Scripts/run-installed-scheduled-agent-acceptance.sh" "$APP_PATH"
+append_command "Scheduled Backups Acceptance" "$ROOT_DIR/Scripts/run-installed-scheduled-agent-acceptance.sh" "$APP_PATH"
 append_command "Installed Preferences Acceptance" "$ROOT_DIR/Scripts/run-installed-preferences-acceptance.sh" "$APP_PATH"
 if [[ -d "/Applications/Delta.app" ]]; then
   append_command "Installed App Smoke Verification" "$ROOT_DIR/Scripts/verify-installed-app.sh" "/Applications/Delta.app"

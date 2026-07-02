@@ -1380,7 +1380,7 @@ struct SettingsView: View {
     var body: some View {
         PageScaffold(
             title: "Settings",
-            subtitle: "System access, background backups, updates, and safe defaults",
+            subtitle: "System access, scheduled backups, updates, and safe defaults",
             actions: {
                 Button {
                     model.reload()
@@ -1431,7 +1431,7 @@ struct SettingsView: View {
 
             if settingsCategory == .essentials {
                 SettingsSectionLabel(
-                    title: "Background Backups",
+                    title: "Scheduled Backups",
                     subtitle: "Unattended scheduling, macOS approval, and reliability controls."
                 )
 
@@ -1443,7 +1443,7 @@ struct SettingsView: View {
                     statusColor: backgroundBackupsStatusColor
                 ) {
                 SettingsControlRow(
-                    title: "Background backups",
+                    title: "Scheduled backups",
                     detail: backgroundBackupsPresentation.controlDetail
                 ) {
                     Toggle("", isOn: backgroundBackupsBinding)
@@ -1462,15 +1462,15 @@ struct SettingsView: View {
 
                 SettingsNotice(
                     symbol: "clock.arrow.circlepath",
-                    title: "What runs in the background",
+                    title: "How scheduled backups run",
                     text: BackgroundBackupServicePresentation.purposeText,
                     color: .blue
                 )
 
                 SettingsCapabilityList(items: [
-                    SettingsCapability(symbol: "moon.zzz", title: "Works with the window closed", detail: "Scheduled profiles can run after sign-in without keeping the main app open."),
-                    SettingsCapability(symbol: "person.crop.circle", title: "Runs as your user", detail: "No admin helper, no elevated privileges, and the same file permissions you granted to Delta."),
-                    SettingsCapability(symbol: "bolt.badge.checkmark", title: "Honors backup policy", detail: "Battery, Low Power Mode, speed limits, destination availability, and locking are checked before work starts.")
+                    SettingsCapability(symbol: "moon.zzz", title: "Runs while Delta is closed", detail: "Scheduled profiles can run after sign-in without keeping the main window open."),
+                    SettingsCapability(symbol: "person.crop.circle", title: "No admin privileges", detail: "The helper runs as your user account with the same file permissions granted to Delta."),
+                    SettingsCapability(symbol: "bolt.badge.checkmark", title: "Checks policy first", detail: "Battery, Low Power Mode, speed limits, destination availability, and locking are checked before work starts.")
                 ])
 
                 SettingsFactGrid(items: [
@@ -1481,14 +1481,14 @@ struct SettingsView: View {
                     SettingsFact(title: "Sign-in check", value: "Enabled"),
                     SettingsFact(title: "Runs as", value: "Your user"),
                     SettingsFact(title: "Admin access", value: "No"),
-                    SettingsFact(title: "Login Items approval", value: backgroundBackupsPresentation.approvalText)
+                    SettingsFact(title: "macOS approval", value: backgroundBackupsPresentation.approvalText)
                 ])
 
                 if backgroundBackupsPresentation.needsAttention {
                     SettingsNotice(
                         symbol: "person.crop.circle.badge.exclamationmark",
-                        title: backgroundBackupsPresentation.attentionTitle ?? "Background backups need attention",
-                        text: backgroundBackupsPresentation.attentionText ?? "Review Background Backups before relying on scheduled runs.",
+                        title: backgroundBackupsPresentation.attentionTitle ?? "Scheduled backups need attention",
+                        text: backgroundBackupsPresentation.attentionText ?? "Review Scheduled Backups before relying on scheduled runs.",
                         color: .orange
                     )
                 }
@@ -1506,7 +1506,7 @@ struct SettingsView: View {
                     SettingsNotice(
                         symbol: "calendar.badge.plus",
                         title: "No scheduled profiles",
-                        text: "Create an hourly, daily, weekly, monthly, or custom scheduled backup profile before background backups are needed.",
+                        text: "Create an hourly, daily, weekly, monthly, or custom scheduled backup profile before scheduled automation is needed.",
                         color: .secondary
                     )
                 }
@@ -1524,26 +1524,26 @@ struct SettingsView: View {
                     } label: {
                         Label("Review Login Items", systemImage: "gearshape")
                     }
-                    .deltaTooltip("Open macOS Login Items to approve or inspect Delta's background scheduler.")
+                    .deltaTooltip("Open macOS Login Items to approve or inspect Delta's scheduled-backup helper.")
                     Button {
                         model.reload()
                     } label: {
                         Label("Refresh", systemImage: "arrow.clockwise")
                     }
-                    .deltaTooltip("Recheck background backup and system access status.")
+                    .deltaTooltip("Recheck scheduled-backup and system access status.")
                     Button {
                         model.repairBackgroundSecretAccess()
                     } label: {
                         Label("Repair Password Access", systemImage: "key")
                     }
                     .disabled(model.repositories.isEmpty || model.isWorking || !model.isPersistentStoreAvailable)
-                    .deltaTooltip("Refresh saved destination passwords so background backups can read them without interactive Keychain prompts.")
+                    .deltaTooltip("Refresh saved destination passwords so scheduled backups can read them without interactive Keychain prompts.")
                 }
             }
 
                 SettingsCard(
                     symbol: "key.horizontal",
-                    title: "Background Password Access",
+                    title: "Password Access",
                     subtitle: "Verify scheduled backups can read saved destination passwords without prompts.",
                     statusText: backgroundSecretAccessSummary.displayName,
                     statusColor: backgroundSecretAccessStatusColor
@@ -1699,7 +1699,7 @@ struct SettingsView: View {
                 ])
 
                 SettingsDescription(
-                    text: "Start at login opens Delta for convenience. Background Backups above are what actually run scheduled backups when the window is closed."
+                    text: "Start at login opens Delta for convenience. Scheduled Backups above are what actually run due profiles when the main window is closed."
                 )
 
                 if model.appLoginItemStatus == .requiresApproval {
@@ -3851,7 +3851,7 @@ struct RepositoryEditorView: View {
                 SettingsNotice(
                     symbol: "key.horizontal",
                     title: "Scheduled SFTP requires non-interactive SSH",
-                    text: "Delta runs SFTP with SSH batch mode so background backups fail clearly instead of waiting for a password prompt. Use a key file, ssh-agent, or your SSH config.",
+                    text: "Delta runs SFTP with SSH batch mode so scheduled backups fail clearly instead of waiting for a password prompt. Use a key file, ssh-agent, or your SSH config.",
                     color: .blue
                 )
             }

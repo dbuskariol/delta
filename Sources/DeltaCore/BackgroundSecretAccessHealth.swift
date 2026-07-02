@@ -55,7 +55,7 @@ public struct BackgroundSecretAccessSummary: Equatable, Sendable {
         case .noDestinations:
             return "No saved destinations need password access yet."
         case .unchecked:
-            return "Saved destination passwords have not been checked for background use yet."
+            return "Saved destination passwords have not been checked for scheduled backups yet."
         case .ready:
             return checkedSecretCount == 1
                 ? "One saved secret can be read without interactive Keychain prompts."

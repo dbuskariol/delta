@@ -76,7 +76,7 @@ fi
 
 required_patterns=(
   "# Delta Diagnostic Report"
-  "- Background Password Access: Ready"
+  "- Password Access: Ready"
   "- Profiles: 1"
   "- Destinations: 1"
   "- Restore Points: 1"

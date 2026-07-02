@@ -9,6 +9,8 @@ APP_STRING_FILES=(
   "Sources/Delta/DeltaAppModel.swift"
   "Sources/Delta/MenuBarStatusView.swift"
   "Sources/Delta/SoftwareUpdateController.swift"
+  "Sources/DeltaCore/BackgroundBackupServicePresentation.swift"
+  "Sources/DeltaCore/BackgroundSecretAccessHealth.swift"
   "Sources/DeltaCore/DiagnosticReport.swift"
   "Sources/DeltaCore/KeychainSecretStore.swift"
   "Sources/DeltaCore/LaunchAgentController.swift"
@@ -21,7 +23,7 @@ UI_STRING_VIOLATIONS="$(
     /usr/bin/perl -ne '
       my $visible = $_;
       $visible =~ s/\\\([^)]*\)//g;
-      if ($visible =~ /"(?:[^"\\]|\\.)*(?:\b(?:Repositories|Repository|LaunchAgent)\b|repository passwords?|repository secrets?|repository-secrets|\bLaunch Agent\b|\blaunch agent\b|\brestic work\b|backup\.example\.com\/repo|\/repo\b)(?:[^"\\]|\\.)*"/) {
+      if ($visible =~ /"(?:[^"\\]|\\.)*(?:\b(?:Repositories|Repository|LaunchAgent)\b|repository passwords?|repository secrets?|repository-secrets|\bLaunch Agent\b|\blaunch agent\b|\bBackground Backups\b|\bbackground backups\b|\brestic work\b|backup\.example\.com\/repo|\/repo\b)(?:[^"\\]|\\.)*"/) {
         print "$ARGV:$.:$_";
       }
     ' "$file"
@@ -30,7 +32,7 @@ UI_STRING_VIOLATIONS="$(
 
 if [[ -n "$UI_STRING_VIOLATIONS" ]]; then
   printf "%s" "$UI_STRING_VIOLATIONS"
-  printf "User-facing app strings must use Delta product language: Destinations, Restore Points, and Background Backups.\n" >&2
+  printf "User-facing app strings must use Delta product language: Destinations, Restore Points, Scheduled Backups, and Password Access.\n" >&2
   exit 1
 fi
 

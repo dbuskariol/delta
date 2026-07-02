@@ -142,7 +142,7 @@ enum AcceptanceScheduledAgentCommand {
         - Source: \(manifest.sourcePath)
         - Destination: \(manifest.destinationPath)
 
-        This verifies the installed Background Backups helper against isolated Delta state. The helper runs the installed Delta executable, reads the saved destination password non-interactively, prepares a missing encrypted local destination, runs one due scheduled backup, persists job logs and a structured backup summary, and refreshes cached restore points.
+        This verifies the installed Scheduled Backups helper against isolated Delta state. The helper runs the installed Delta executable, reads the saved destination password non-interactively, prepares a missing encrypted local destination, runs one due scheduled backup, persists job logs and a structured backup summary, and refreshes cached restore points.
 
         ## Result
 

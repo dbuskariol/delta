@@ -182,7 +182,7 @@ else
     installed_full_disk_access_status="${installed_full_disk_access_status:-Unknown}"
   fi
   if [[ "$installed_diagnostics_status" -eq 0 ]]; then
-    installed_diagnostics_evidence="Installed diagnostics acceptance passed: isolated installed-app diagnostic export generated a redacted report, proved Background Password Access was Ready, and proved seeded destination/backend credential values were absent. $installed_diagnostics_output"
+    installed_diagnostics_evidence="Installed diagnostics acceptance passed: isolated installed-app diagnostic export generated a redacted report, proved Password Access was Ready, and proved seeded destination/backend credential values were absent. $installed_diagnostics_output"
   else
     installed_diagnostics_evidence="Installed diagnostics acceptance failed: $installed_diagnostics_output"
   fi
@@ -195,11 +195,11 @@ else
   fi
 
   if [[ "$language_status" -eq 0 && "$installed_diagnostics_status" -eq 0 && "$installed_preferences_status" -eq 0 ]]; then
-    append_row "settings_surface" "$(item_area settings_surface)" "Partial" "Product-language verifier passed; raw Repository/LaunchAgent terminology is blocked from user-facing strings. Installed diagnostics reported Background Password Access as Ready and Full Disk Access as $installed_full_disk_access_status. Installed preferences acceptance proved the shared Settings surface contract, required categories, compact status summary, scheduler/update/power/defaults/diagnostics controls, and preference behavior. $installed_preferences_evidence" "Open Settings and confirm visual grouping, status summary, Background Password Access status/refresh/repair controls, Run Due Now scheduler action, Sparkle automatic check/download controls, idle-sleep protection, reset controls, backup freshness warnings, source-access warnings, destination-check warning controls, local/mounted destination free-space warnings, and activity history retention in the running app."
+    append_row "settings_surface" "$(item_area settings_surface)" "Partial" "Product-language verifier passed; raw Repository/LaunchAgent terminology is blocked from user-facing strings. Installed diagnostics reported Password Access as Ready and Full Disk Access as $installed_full_disk_access_status. Installed preferences acceptance proved the shared Settings surface contract, required categories, compact status summary, scheduler/update/power/defaults/diagnostics controls, and preference behavior. $installed_preferences_evidence" "Open Settings and confirm visual grouping, status summary, Password Access status/refresh/repair controls, Run Due Now scheduler action, Sparkle automatic check/download controls, idle-sleep protection, reset controls, backup freshness warnings, source-access warnings, destination-check warning controls, local/mounted destination free-space warnings, and activity history retention in the running app."
   elif [[ "$language_status" -eq 0 && "$installed_diagnostics_status" -eq 0 ]]; then
     append_row "settings_surface" "$(item_area settings_surface)" "Failed" "Product-language verifier and installed diagnostics passed, but installed preferences did not: $installed_preferences_evidence" "Fix installed preferences/defaults behavior before manual Settings acceptance."
   elif [[ "$language_status" -eq 0 ]]; then
-    append_row "settings_surface" "$(item_area settings_surface)" "Failed" "Product-language verifier passed, but installed diagnostics did not prove Background Password Access: $installed_diagnostics_evidence" "Fix installed diagnostics and background password-access health before manual Settings acceptance."
+    append_row "settings_surface" "$(item_area settings_surface)" "Failed" "Product-language verifier passed, but installed diagnostics did not prove Password Access: $installed_diagnostics_evidence" "Fix installed diagnostics and password-access health before manual Settings acceptance."
   else
     append_row "settings_surface" "$(item_area settings_surface)" "Failed" "Product-language verifier failed: $language_output" "Fix user-facing terminology and rerun."
   fi
@@ -226,7 +226,7 @@ else
     if [[ "$agent_status_status" -eq 0 && "$agent_dry_status" -eq 0 && "$agent_due_status" -eq 0 && "$scheduled_agent_status" -eq 0 ]]; then
       append_row "background_backups" "$(item_area background_backups)" "Partial" "Helper status, dry-run, no-profile isolated due-run, and seeded scheduled-helper backup acceptance passed: $agent_status_output $agent_dry_output $agent_due_output $scheduled_agent_output" "Approve Login Items if macOS asks, quit Delta, wait for a real scheduled interval, and confirm the run appears after relaunch."
     else
-      append_row "background_backups" "$(item_area background_backups)" "Failed" "Helper checks failed. status=$agent_status_status dry=$agent_dry_status due=$agent_due_status scheduled=$scheduled_agent_status output: $agent_status_output $agent_dry_output $agent_due_output $scheduled_agent_output" "Fix bundled Background Backups helper before manual schedule testing."
+      append_row "background_backups" "$(item_area background_backups)" "Failed" "Helper checks failed. status=$agent_status_status dry=$agent_dry_status due=$agent_due_status scheduled=$scheduled_agent_status output: $agent_status_output $agent_dry_output $agent_due_output $scheduled_agent_output" "Fix bundled Scheduled Backups helper before manual schedule testing."
     fi
   else
     append_row "background_backups" "$(item_area background_backups)" "Failed" "DeltaAgent was not executable at $agent." "Rebuild and reinstall the app bundle."
@@ -239,9 +239,9 @@ else
     installed_keychain_output="$(run_capture installed_keychain_access "$ROOT_DIR/Scripts/run-installed-keychain-access-acceptance.sh" "$APP_PATH")"
     installed_keychain_status="$(command_status installed_keychain_access)"
     if [[ "$bridge_status" -eq 0 && "$installed_keychain_status" -eq 0 && "$installed_diagnostics_status" -eq 0 ]]; then
-      append_row "keychain_background_access" "$(item_area keychain_background_access)" "Partial" "Secret bridge fail-closed argument behavior passed, installed Keychain access acceptance proved a throwaway destination password can be read by Delta --secret-bridge without interaction, and installed diagnostics proved Background Password Access as Ready for a destination with backend credentials: $bridge_output $installed_keychain_output $installed_diagnostics_output" "Run scheduled backups against saved app-managed and credentialed destinations and confirm Keychain does not prompt."
+      append_row "keychain_background_access" "$(item_area keychain_background_access)" "Partial" "Secret bridge fail-closed argument behavior passed, installed Keychain access acceptance proved a throwaway destination password can be read by Delta --secret-bridge without interaction, and installed diagnostics proved Password Access as Ready for a destination with backend credentials: $bridge_output $installed_keychain_output $installed_diagnostics_output" "Run scheduled backups against saved app-managed and credentialed destinations and confirm Keychain does not prompt."
     elif [[ "$bridge_status" -eq 0 && "$installed_keychain_status" -eq 0 ]]; then
-      append_row "keychain_background_access" "$(item_area keychain_background_access)" "Failed" "Secret bridge and installed Keychain access acceptance passed, but installed diagnostics did not prove Background Password Access readiness: $installed_diagnostics_evidence" "Fix background password-access diagnostics before scheduled-secret testing."
+      append_row "keychain_background_access" "$(item_area keychain_background_access)" "Failed" "Secret bridge and installed Keychain access acceptance passed, but installed diagnostics did not prove Password Access readiness: $installed_diagnostics_evidence" "Fix password-access diagnostics before scheduled-secret testing."
     elif [[ "$bridge_status" -eq 0 ]]; then
       append_row "keychain_background_access" "$(item_area keychain_background_access)" "Failed" "Secret bridge fail-closed argument behavior passed, but installed non-interactive Keychain access failed: $installed_keychain_output" "Fix the Keychain trusted-app access list or signed app identity before scheduled-secret testing."
     else

@@ -24,7 +24,7 @@ public enum SettingsSurfaceContract {
     ]
 
     public static let sectionTitles = [
-        "Background Backups",
+        "Scheduled Backups",
         "App Behavior",
         "Backup & Restore Defaults",
         "Updates",
@@ -33,7 +33,7 @@ public enum SettingsSurfaceContract {
 
     public static let cardTitles = [
         "Scheduled Backups",
-        "Background Password Access",
+        "Password Access",
         "Full Disk Access",
         "Power & Reliability",
         "Menu Bar & Login",
@@ -49,7 +49,7 @@ public enum SettingsSurfaceContract {
     ]
 
     public static let controlTitles = [
-        "Background backups",
+        "Scheduled backups",
         "Pause scheduled automation",
         "Keep Mac awake during backup work",
         "Status menu",
@@ -105,17 +105,17 @@ public enum SettingsSurfaceContract {
     ]
 
     public static let capabilityTitles = [
-        "Works with the window closed",
-        "Runs as your user",
-        "Honors backup policy"
+        "Runs while Delta is closed",
+        "No admin privileges",
+        "Checks policy first"
     ]
 
     public static let requiredManualAcceptanceCoverage = [
         "Plain-language Scheduled Backups status",
-        "Background password access repair",
+        "Password access repair",
         "Compact status summary",
         "Run Due Now scheduler action",
-        "Start at Login separate from Background Backups",
+        "Start at Login separate from Scheduled Backups",
         "Sparkle automatic check and download controls",
         "Idle-sleep protection",
         "Reset controls for recommended backup and restore defaults",
@@ -140,7 +140,7 @@ public enum SettingsSurfaceContract {
         require(statusSummaryTitles, contains: "Status Menu", in: "status summary", failures: &failures)
         require(statusSummaryTitles, contains: "Backup Tools", in: "status summary", failures: &failures)
         require(cardTitles, contains: "Scheduled Backups", in: "cards", failures: &failures)
-        require(cardTitles, contains: "Background Password Access", in: "cards", failures: &failures)
+        require(cardTitles, contains: "Password Access", in: "cards", failures: &failures)
         require(cardTitles, contains: "Full Disk Access", in: "cards", failures: &failures)
         require(cardTitles, contains: "Power & Reliability", in: "cards", failures: &failures)
         require(cardTitles, contains: "Automatic Updates", in: "cards", failures: &failures)
@@ -158,7 +158,7 @@ public enum SettingsSurfaceContract {
         require(actionTitles, contains: "Send Test Alert", in: "actions", failures: &failures)
         require(actionTitles, contains: "Copy Report", in: "actions", failures: &failures)
         require(requiredManualAcceptanceCoverage, contains: "Source access warning visibility through dashboard health", in: "manual coverage", failures: &failures)
-        require(requiredManualAcceptanceCoverage, contains: "Background password access repair", in: "manual coverage", failures: &failures)
+        require(requiredManualAcceptanceCoverage, contains: "Password access repair", in: "manual coverage", failures: &failures)
         require(requiredManualAcceptanceCoverage, contains: "Destination free-space warning control", in: "manual coverage", failures: &failures)
 
         let visibleStrings = allVisibleStrings()
@@ -166,7 +166,8 @@ public enum SettingsSurfaceContract {
             "Launch" + "Agent",
             "Launch " + "Agent",
             "SMAppService" + "Status",
-            "raw" + "Value"
+            "raw" + "Value",
+            "Background " + "Backups"
         ]
         for term in forbiddenTerms where visibleStrings.contains(where: { $0.localizedCaseInsensitiveContains(term) }) {
             failures.append("Settings contract exposes implementation term '\(term)'.")
