@@ -12,7 +12,7 @@ public enum KeychainSecretError: Error, Equatable, LocalizedError {
         case let .unexpectedStatus(status):
             "Keychain operation failed with status \(status)."
         case .interactionNotAllowed:
-            "Delta could not read this saved destination secret without user interaction. Re-save the destination in Delta to create a scheduled-safe secret."
+            "Delta could not read this saved destination secret without user interaction. Use Repair Password Access in Settings or re-save the destination."
         case .invalidData: "The Keychain item did not contain UTF-8 text."
         }
     }
@@ -76,10 +76,7 @@ public struct KeychainSecretStore: Sendable {
         account: String,
         authenticationPolicy: KeychainAuthenticationPolicy = .allowUserInteraction
     ) throws -> String {
-        var query = baseQuery(account: account)
-        query[kSecReturnData as String] = true
-        query[kSecMatchLimit as String] = kSecMatchLimitOne
-        apply(authenticationPolicy, to: &query)
+        let query = loadQuery(account: account, authenticationPolicy: authenticationPolicy)
 
         var result: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
@@ -125,6 +122,14 @@ public struct KeychainSecretStore: Sendable {
         ]
     }
 
+    func loadQuery(account: String, authenticationPolicy: KeychainAuthenticationPolicy) -> [String: Any] {
+        var query = baseQuery(account: account)
+        query[kSecReturnData as String] = true
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
+        apply(authenticationPolicy, to: &query)
+        return query
+    }
+
     private func trustedApplicationAccess() throws -> SecAccess? {
         let paths = trustedApplicationPaths.filter { FileManager.default.isExecutableFile(atPath: $0) }
         guard !paths.isEmpty else {
@@ -156,6 +161,7 @@ public struct KeychainSecretStore: Sendable {
             let context = LAContext()
             context.interactionNotAllowed = true
             query[kSecUseAuthenticationContext as String] = context
+            query[kSecUseAuthenticationUI as String] = kSecUseAuthenticationUIFail
         }
     }
 
