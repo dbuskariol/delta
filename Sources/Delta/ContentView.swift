@@ -16,7 +16,7 @@ struct ContentView: View {
                 .scrollContentBackground(.hidden)
 
                 SidebarStatusView(isWorking: model.isWorking)
-            }
+                }
             .navigationSplitViewColumnWidth(min: 220, ideal: 248, max: 280)
         } detail: {
             switch model.selectedSection {
@@ -1530,6 +1530,57 @@ struct SettingsView: View {
                     .deltaTooltip("Refresh saved destination passwords so background backups can read them without interactive Keychain prompts.")
                 }
             }
+
+                SettingsCard(
+                    symbol: "key.horizontal",
+                    title: "Background Password Access",
+                    subtitle: "Verify scheduled backups can read saved destination passwords without prompts.",
+                    statusText: backgroundSecretAccessSummary.displayName,
+                    statusColor: backgroundSecretAccessStatusColor
+                ) {
+                    SettingsDescription(
+                        text: "Scheduled backups need non-interactive access to saved destination passwords and backend credentials. Delta checks that access here so unattended work fails closed instead of stopping at a Keychain prompt."
+                    )
+
+                    SettingsFactGrid(items: [
+                        SettingsFact(title: "Destinations", value: "\(model.repositories.count)"),
+                        SettingsFact(title: "Saved secrets", value: "\(backgroundSecretAccessSummary.checkedSecretCount)"),
+                        SettingsFact(title: "Background use", value: backgroundSecretAccessSummary.displayName)
+                    ])
+
+                    if backgroundSecretAccessSummary.needsRepair {
+                        SettingsNotice(
+                            symbol: "key.horizontal.fill",
+                            title: "Repair required",
+                            text: "\(backgroundSecretAccessSummary.detail) Run Repair Password Access before relying on scheduled backups.",
+                            color: .orange
+                        )
+                    } else if backgroundSecretAccessSummary.state == .unchecked {
+                        SettingsNotice(
+                            symbol: "questionmark.circle",
+                            title: "Access not checked yet",
+                            text: "Refresh status after saving a destination so Delta can confirm background password access.",
+                            color: .secondary
+                        )
+                    }
+
+                    SettingsActionBar {
+                        Button {
+                            model.repairBackgroundSecretAccess()
+                        } label: {
+                            Label("Repair Password Access", systemImage: "key")
+                        }
+                        .disabled(model.repositories.isEmpty || model.isWorking || !model.isPersistentStoreAvailable)
+                        .deltaTooltip("Refresh saved destination passwords so scheduled backups can read them without interactive Keychain prompts.")
+
+                        Button {
+                            model.reload()
+                        } label: {
+                            Label("Refresh Status", systemImage: "arrow.clockwise")
+                        }
+                        .deltaTooltip("Recheck whether saved passwords are ready for scheduled backups.")
+                    }
+                }
 
                 SettingsCard(
                 symbol: "lock.shield",

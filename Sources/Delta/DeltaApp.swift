@@ -47,6 +47,8 @@ struct DeltaApp: App {
             runAcceptanceSeedDiagnostics()
         case "--acceptance-local-lifecycle":
             runAcceptanceLocalLifecycle()
+        case "--acceptance-run-control":
+            runAcceptanceRunControl()
         case "--acceptance-external-lifecycle":
             runAcceptanceExternalLifecycle()
         case "--acceptance-preferences":
@@ -201,6 +203,22 @@ struct DeltaApp: App {
             exit(0)
         } catch {
             fputs("Delta local lifecycle acceptance error: \(error.localizedDescription)\n", stderr)
+            exit(1)
+        }
+    }
+
+    private static func runAcceptanceRunControl() -> Never {
+        guard ProcessInfo.processInfo.environment["DELTA_ENABLE_RUN_CONTROL_ACCEPTANCE"] == "1" else {
+            fputs("Delta run-control acceptance command is disabled.\n", stderr)
+            exit(64)
+        }
+
+        do {
+            let report = try AcceptanceRunControlCommand.run()
+            print(report, terminator: report.hasSuffix("\n") ? "" : "\n")
+            exit(0)
+        } catch {
+            fputs("Delta run-control acceptance error: \(error.localizedDescription)\n", stderr)
             exit(1)
         }
     }

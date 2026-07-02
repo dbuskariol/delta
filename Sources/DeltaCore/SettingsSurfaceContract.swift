@@ -33,6 +33,7 @@ public enum SettingsSurfaceContract {
 
     public static let cardTitles = [
         "Background Backup Service",
+        "Background Password Access",
         "Full Disk Access",
         "Power & Reliability",
         "Menu Bar & Login",
@@ -110,6 +111,7 @@ public enum SettingsSurfaceContract {
 
     public static let requiredManualAcceptanceCoverage = [
         "Plain-language Background Backup Service status",
+        "Background password access repair",
         "Compact status summary",
         "Run Due Now scheduler action",
         "Start at Login separate from Background Backups",
@@ -136,6 +138,7 @@ public enum SettingsSurfaceContract {
         require(statusSummaryTitles, contains: "Status Menu", in: "status summary", failures: &failures)
         require(statusSummaryTitles, contains: "Backup Tools", in: "status summary", failures: &failures)
         require(cardTitles, contains: "Background Backup Service", in: "cards", failures: &failures)
+        require(cardTitles, contains: "Background Password Access", in: "cards", failures: &failures)
         require(cardTitles, contains: "Full Disk Access", in: "cards", failures: &failures)
         require(cardTitles, contains: "Power & Reliability", in: "cards", failures: &failures)
         require(cardTitles, contains: "Automatic Updates", in: "cards", failures: &failures)
@@ -152,6 +155,7 @@ public enum SettingsSurfaceContract {
         require(actionTitles, contains: "Send Test Alert", in: "actions", failures: &failures)
         require(actionTitles, contains: "Copy Report", in: "actions", failures: &failures)
         require(requiredManualAcceptanceCoverage, contains: "Source access warning visibility through dashboard health", in: "manual coverage", failures: &failures)
+        require(requiredManualAcceptanceCoverage, contains: "Background password access repair", in: "manual coverage", failures: &failures)
 
         let visibleStrings = allVisibleStrings()
         let forbiddenTerms = [

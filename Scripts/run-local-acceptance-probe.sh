@@ -195,7 +195,7 @@ else
   fi
 
   if [[ "$language_status" -eq 0 && "$installed_diagnostics_status" -eq 0 && "$installed_preferences_status" -eq 0 ]]; then
-    append_row "settings_surface" "$(item_area settings_surface)" "Partial" "Product-language verifier passed; raw Repository/LaunchAgent terminology is blocked from user-facing strings. Installed diagnostics reported Background Password Access as Ready and Full Disk Access as $installed_full_disk_access_status. Installed preferences acceptance proved the shared Settings surface contract, required categories, compact status summary, scheduler/update/power/defaults/diagnostics controls, and preference behavior. $installed_preferences_evidence" "Open Settings and confirm visual grouping, status summary, Run Due Now scheduler action, Sparkle automatic check/download controls, idle-sleep protection, reset controls, backup freshness warnings, source-access warnings, destination-check warning controls, and activity history retention in the running app."
+    append_row "settings_surface" "$(item_area settings_surface)" "Partial" "Product-language verifier passed; raw Repository/LaunchAgent terminology is blocked from user-facing strings. Installed diagnostics reported Background Password Access as Ready and Full Disk Access as $installed_full_disk_access_status. Installed preferences acceptance proved the shared Settings surface contract, required categories, compact status summary, scheduler/update/power/defaults/diagnostics controls, and preference behavior. $installed_preferences_evidence" "Open Settings and confirm visual grouping, status summary, Background Password Access status/refresh/repair controls, Run Due Now scheduler action, Sparkle automatic check/download controls, idle-sleep protection, reset controls, backup freshness warnings, source-access warnings, destination-check warning controls, and activity history retention in the running app."
   elif [[ "$language_status" -eq 0 && "$installed_diagnostics_status" -eq 0 ]]; then
     append_row "settings_surface" "$(item_area settings_surface)" "Failed" "Product-language verifier and installed diagnostics passed, but installed preferences did not: $installed_preferences_evidence" "Fix installed preferences/defaults behavior before manual Settings acceptance."
   elif [[ "$language_status" -eq 0 ]]; then
@@ -257,6 +257,13 @@ else
     installed_local_evidence="Installed app local lifecycle acceptance passed through Delta coordinator: automatic destination preparation, first backup, no-change backup, incremental backup, newest-first restore-point cache, browser listing with nested file metadata, full restore, selected folder restore, selected file restore, dry-run restore with no writes, every overwrite policy, check, cleanup, post-cleanup check, pruned cache refresh, and saved backup log source/summary evidence. $installed_local_output"
   else
     installed_local_evidence="Installed app local lifecycle acceptance failed: $installed_local_output"
+  fi
+  installed_run_control_output="$(run_capture installed_run_control "$ROOT_DIR/Scripts/run-installed-run-control-acceptance.sh" "$APP_PATH")"
+  installed_run_control_status="$(command_status installed_run_control)"
+  if [[ "$installed_run_control_status" -eq 0 ]]; then
+    installed_run_control_evidence="Installed app run-control acceptance passed through Delta coordinator: durable pause request, resumable paused backup state, successful resume, durable cancel request, non-resumable cancelled state, cleared stop requests, job logs, and restore-point refresh after resume. $installed_run_control_output"
+  else
+    installed_run_control_evidence="Installed app run-control acceptance failed: $installed_run_control_output"
   fi
 
   mounted_acceptance_status="not_configured"
@@ -364,7 +371,11 @@ else
     else
       append_row "browse_restore_points" "$(item_area browse_restore_points)" "Failed" "$installed_local_evidence" "Fix installed restore-point browser acceptance, then confirm Restore loads and refreshes points in the UI."
     fi
-    append_row "pause_resume_cancel" "$(item_area pause_resume_cancel)" "Partial" "Automated release gate passed durable run-control and stopped-job model coverage for commit $git_commit." "Pause, resume, and cancel a real large backup from the main app and menu bar."
+    if [[ "$installed_run_control_status" -eq 0 ]]; then
+      append_row "pause_resume_cancel" "$(item_area pause_resume_cancel)" "Partial" "$installed_run_control_evidence Automated release gate also passed durable run-control and stopped-job model coverage for commit $git_commit." "Pause, resume, and cancel a real large backup from the main app and menu bar."
+    else
+      append_row "pause_resume_cancel" "$(item_area pause_resume_cancel)" "Failed" "$installed_run_control_evidence" "Fix installed pause/resume/cancel acceptance, then test the main app and menu bar controls on a real large backup."
+    fi
     if [[ "$installed_local_status" -eq 0 ]]; then
       append_row "streaming_logs" "$(item_area streaming_logs)" "Partial" "$installed_local_evidence Automated release gate also passed log formatting and persistence coverage for commit $git_commit." "Watch a real large backup and confirm fixed-height live logs, auto-scroll, source context, and expandable saved job logs."
     else
