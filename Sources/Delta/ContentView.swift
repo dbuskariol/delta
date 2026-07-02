@@ -1695,7 +1695,7 @@ struct SettingsView: View {
                 SettingsFactGrid(items: [
                     SettingsFact(title: "Menu bar", value: showsMenuBarExtra ? "Shown" : "Hidden"),
                     SettingsFact(title: "Start at login", value: appLoginItemStatusText),
-                    SettingsFact(title: "Background backups", value: "Separate")
+                    SettingsFact(title: "Scheduled runs", value: "Separate")
                 ])
 
                 SettingsDescription(

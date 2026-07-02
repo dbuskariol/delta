@@ -273,6 +273,32 @@ final class ResticRunnerTests: XCTestCase {
             "Delta could not read the saved destination password. Use Repair Password Access in Settings or re-save the destination."
         )
     }
+
+    func testClassifiedFailureMessagesUseProductLanguage() {
+        let classifiedKinds = ResticFailureKind.allCases.filter { $0 != .unknown }
+        let forbiddenTerms = [
+            "repository",
+            "restic",
+            "LaunchAgent",
+            "SMAppService"
+        ]
+
+        for kind in classifiedKinds {
+            let message = ResticFailureClassifier.userFacingMessage(
+                status: .failed,
+                failureKind: kind,
+                standardOutput: "",
+                standardError: ""
+            )
+
+            for term in forbiddenTerms {
+                XCTAssertFalse(
+                    message.localizedCaseInsensitiveContains(term),
+                    "\(kind.rawValue) message exposes implementation term '\(term)': \(message)"
+                )
+            }
+        }
+    }
 }
 
 private final class OutputRecorder: @unchecked Sendable {
