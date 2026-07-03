@@ -171,7 +171,7 @@ final class ScheduleAndParserTests: XCTestCase {
         let text = BackgroundBackupServicePresentation.purposeText
 
         XCTAssertTrue(text.contains("Scheduled Backups"))
-        XCTAssertTrue(text.contains("signed macOS background service"))
+        XCTAssertTrue(text.contains("signed automatic-runner"))
         for forbiddenTerm in ["LaunchAgent", "Launch Agent", "SMAppService", "rawValue", "Scheduler", "Register", "Unregister"] {
             XCTAssertFalse(
                 text.localizedCaseInsensitiveContains(forbiddenTerm),

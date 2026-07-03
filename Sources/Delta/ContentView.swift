@@ -1279,7 +1279,7 @@ struct SettingsView: View {
     @EnvironmentObject private var model: DeltaAppModel
     @EnvironmentObject private var softwareUpdateController: SoftwareUpdateController
     @State private var settingsCategory: SettingsCategory = .essentials
-    @State private var showsScheduledBackupsDetails = false
+    @State private var showsScheduledBackupsDetails = true
     @AppStorage(
         DeltaAppPreferenceKeys.updateCheckIntervalSeconds,
         store: DeltaAppPreferences.sharedStore()
@@ -4677,20 +4677,18 @@ struct SettingsActionBar<Content: View>: View {
     @ViewBuilder var content: Content
 
     var body: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: 8) {
-                Spacer(minLength: 0)
-                content
-            }
-            .frame(maxWidth: .infinity, alignment: .trailing)
-
-            VStack(alignment: .trailing, spacing: 8) {
-                content
-            }
-            .frame(maxWidth: .infinity, alignment: .trailing)
+        LazyVGrid(columns: columns, alignment: .leading, spacing: 8) {
+            content
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .buttonStyle(.bordered)
         .controlSize(.small)
+    }
+
+    private var columns: [GridItem] {
+        [
+            GridItem(.adaptive(minimum: 150), spacing: 8, alignment: .leading)
+        ]
     }
 }
 
