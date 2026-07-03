@@ -89,6 +89,19 @@ verify_report() {
     return 1
   fi
 
+  local runner
+  local environment
+  runner="$(report_value "$report" "Runner")"
+  environment="$(report_value "$report" "Acceptance environment")"
+  if [[ "$runner" != "Scripts/run-external-backend-acceptance.sh" || -z "$environment" ]]; then
+    record_failure "$kind report at $report is not current installed external lifecycle evidence. Run Scripts/run-external-backend-acceptance.sh $kind /Applications/Delta.app against real infrastructure."
+    return 1
+  fi
+  if [[ "$environment" != "$required_environment" ]]; then
+    record_failure "$kind report was produced against '$environment', expected '$required_environment'. Localhost/local harness evidence is not sufficient for production readiness."
+    return 1
+  fi
+
   require_report_value "$kind" "$report" "Generated" >/dev/null || failed=1
   require_report_value_equals "$kind" "$report" "App" "$APP_PATH" || failed=1
   require_report_value_equals "$kind" "$report" "Executable" "$APP_EXECUTABLE" || failed=1
@@ -116,13 +129,6 @@ verify_report() {
   report_commit="$(report_value "$report" "Git Commit")"
   if [[ "$report_commit" != "$HEAD_COMMIT" ]]; then
     record_failure "$kind report is for commit ${report_commit:-unknown}, not current commit $HEAD_COMMIT."
-    failed=1
-  fi
-
-  local environment
-  environment="$(report_value "$report" "Acceptance environment")"
-  if [[ "$environment" != "$required_environment" ]]; then
-    record_failure "$kind report was produced against '${environment:-unknown}', expected '$required_environment'. Localhost/local harness evidence is not sufficient for production readiness."
     failed=1
   fi
 

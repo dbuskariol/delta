@@ -158,6 +158,11 @@ write_good_reports
 expect_failure "missing executable provenance" "mounted report at $WORK_DIR/external-mounted-acceptance-latest.md does not record 'Executable'." run_verify
 
 write_good_reports
+/usr/bin/grep -Fv -- "- Runner:" "$WORK_DIR/external-mounted-acceptance-latest.md" >"$WORK_DIR/mounted.tmp"
+/bin/mv "$WORK_DIR/mounted.tmp" "$WORK_DIR/external-mounted-acceptance-latest.md"
+expect_failure "obsolete mounted evidence" "mounted report at $WORK_DIR/external-mounted-acceptance-latest.md is not current installed external lifecycle evidence." run_verify
+
+write_good_reports
 /usr/bin/grep -Fv -- "- Executable:" "$WORK_DIR/external-mounted-acceptance-latest.md" >"$WORK_DIR/mounted.tmp"
 /bin/mv "$WORK_DIR/mounted.tmp" "$WORK_DIR/external-mounted-acceptance-latest.md"
 /usr/bin/perl -0pi -e 's#^- Acceptance environment: real-external$#- Acceptance environment: local-harness#m' "$WORK_DIR/external-sftp-acceptance-latest.md"
