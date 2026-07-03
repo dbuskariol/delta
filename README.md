@@ -411,6 +411,8 @@ Scripts/doctor-production-readiness.sh
 
 The doctor checks signing identities, automated-gate freshness, installed-app identity, notarization and Gatekeeper state, local and manual acceptance reports, and external backend acceptance environment variables. It exits non-zero while blockers remain; set `DELTA_DOCTOR_ALLOW_BLOCKERS=1` when you only want the report.
 
+When manual rows remain, the doctor also prints the compact manual acceptance status summary. Run `Scripts/manual-acceptance-status.sh` for the full row-by-row next-action report before editing `dist/manual-acceptance/latest.md`.
+
 Production readiness and manual macOS acceptance:
 
 ```text

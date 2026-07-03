@@ -65,6 +65,12 @@ manual_report_value() {
   /usr/bin/awk -F': ' -v key="- $key" '$1 == key { print $2; exit }' "$MANUAL_REPORT" 2>/dev/null || true
 }
 
+manual_status_value() {
+  local key="$1"
+  local status_report="$2"
+  /usr/bin/awk -F': ' -v key="- $key" '$1 == key { print $2; exit }' "$status_report" 2>/dev/null || true
+}
+
 local_report_value() {
   local key="$1"
   /usr/bin/awk -F': ' -v key="- $key" '$1 == key { print $2; exit }' "$LOCAL_ACCEPTANCE_REPORT" 2>/dev/null || true
@@ -95,6 +101,7 @@ print_next_actions() {
    Scripts/collect-release-evidence.sh dist/Delta.app
 4. Complete the manual acceptance matrix for the current commit:
    Scripts/create-manual-acceptance-report.sh
+   Scripts/manual-acceptance-status.sh
    Scripts/verify-manual-acceptance.sh
 5. Run real external backend acceptance against non-local infrastructure:
    DELTA_ACCEPTANCE_MOUNTED_PATH=/Volumes/... Scripts/run-external-backend-acceptance.sh mounted /Applications/Delta.app
@@ -285,6 +292,27 @@ if [[ -f "$MANUAL_REPORT" ]]; then
   fi
 else
   block "Manual acceptance report is missing. Run Scripts/create-manual-acceptance-report.sh and complete the matrix."
+fi
+
+if [[ -x "$ROOT_DIR/Scripts/manual-acceptance-status.sh" ]]; then
+  manual_status_report="$(/usr/bin/mktemp -t delta-manual-acceptance-status-doctor.XXXXXX)"
+  if DELTA_LOCAL_ACCEPTANCE_REPORT="$LOCAL_ACCEPTANCE_REPORT" \
+    "$ROOT_DIR/Scripts/manual-acceptance-status.sh" "$MANUAL_REPORT" >"$manual_status_report" 2>/dev/null
+  then
+    printf -- "- Manual acceptance status: Passed=%s, Not run=%s, Failed=%s, Blocked=%s, Local partial=%s, Human-only=%s\n" \
+      "$(manual_status_value "Manual rows passed" "$manual_status_report")" \
+      "$(manual_status_value "Manual rows not run" "$manual_status_report")" \
+      "$(manual_status_value "Manual rows failed" "$manual_status_report")" \
+      "$(manual_status_value "Manual rows blocked" "$manual_status_report")" \
+      "$(manual_status_value "Local automated partial evidence" "$manual_status_report")" \
+      "$(manual_status_value "Local human-only rows" "$manual_status_report")"
+    printf -- "- Manual acceptance next-action report: Scripts/manual-acceptance-status.sh\n"
+  else
+    warn "Manual acceptance status report could not be generated. Run Scripts/manual-acceptance-status.sh for details."
+  fi
+  /bin/rm -f "$manual_status_report"
+else
+  block "Manual acceptance status helper is missing or not executable: Scripts/manual-acceptance-status.sh."
 fi
 
 printf "\n## External Backend Acceptance Environment\n\n"

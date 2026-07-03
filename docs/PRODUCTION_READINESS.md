@@ -131,7 +131,7 @@ To inspect those prerequisites before running the hard gate, use:
 Scripts/doctor-production-readiness.sh
 ```
 
-The doctor reports signing identity availability, automated-gate freshness, installed-app identity, notarization and Gatekeeper status, local/manual acceptance state, and configured external backend acceptance targets. It exits non-zero while production blockers remain; set `DELTA_DOCTOR_ALLOW_BLOCKERS=1` to collect the report without failing the shell.
+The doctor reports signing identity availability, automated-gate freshness, installed-app identity, notarization and Gatekeeper status, local/manual acceptance state, and configured external backend acceptance targets. When manual rows remain, it prints the compact manual acceptance status summary; run `Scripts/manual-acceptance-status.sh` for the full row-by-row next-action report. It exits non-zero while production blockers remain; set `DELTA_DOCTOR_ALLOW_BLOCKERS=1` to collect the report without failing the shell.
 
 ## Notarization Gate
 
