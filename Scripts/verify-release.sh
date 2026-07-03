@@ -28,6 +28,8 @@ fi
   "$ROOT_DIR/Scripts/doctor-production-readiness.sh" \
   "$ROOT_DIR/Scripts/manual-acceptance-status.sh" \
   "$ROOT_DIR/Scripts/manual-acceptance-status-self-test.sh" \
+  "$ROOT_DIR/Scripts/record-manual-acceptance-result.sh" \
+  "$ROOT_DIR/Scripts/record-manual-acceptance-result-self-test.sh" \
   "$ROOT_DIR/Scripts/verify-installed-app.sh" \
   "$ROOT_DIR/Scripts/verify-manual-acceptance-matrix.sh" \
   "$ROOT_DIR/Scripts/verify-manual-acceptance-self-test.sh" \
@@ -101,6 +103,14 @@ if [[ ! -x "$ROOT_DIR/Scripts/manual-acceptance-status.sh" ]]; then
 fi
 if [[ ! -x "$ROOT_DIR/Scripts/manual-acceptance-status-self-test.sh" ]]; then
   printf "Scripts/manual-acceptance-status-self-test.sh must be executable.\n" >&2
+  exit 1
+fi
+if [[ ! -x "$ROOT_DIR/Scripts/record-manual-acceptance-result.sh" ]]; then
+  printf "Scripts/record-manual-acceptance-result.sh must be executable.\n" >&2
+  exit 1
+fi
+if [[ ! -x "$ROOT_DIR/Scripts/record-manual-acceptance-result-self-test.sh" ]]; then
+  printf "Scripts/record-manual-acceptance-result-self-test.sh must be executable.\n" >&2
   exit 1
 fi
 if [[ ! -x "$ROOT_DIR/Scripts/verify-sparkle-update-artifacts.sh" ]]; then
@@ -186,6 +196,7 @@ fi
 "$ROOT_DIR/Scripts/verify-manual-acceptance-matrix.sh"
 "$ROOT_DIR/Scripts/verify-manual-acceptance-self-test.sh"
 "$ROOT_DIR/Scripts/manual-acceptance-status-self-test.sh"
+"$ROOT_DIR/Scripts/record-manual-acceptance-result-self-test.sh"
 "$ROOT_DIR/Scripts/verify-notarization-policy.sh"
 "$ROOT_DIR/Scripts/verify-ci-workflows.sh"
 "$ROOT_DIR/Scripts/bootstrap-tools.sh"

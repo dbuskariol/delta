@@ -156,7 +156,16 @@ Create an editable report from the canonical matrix:
 Scripts/create-manual-acceptance-report.sh
 ```
 
-If `dist/local-acceptance/latest.md` exists, the generated manual report copies each row's local probe status into Evidence / Notes, appends `Manual evidence: TODO`, and leaves Result as `Not run`. Fill in `dist/manual-acceptance/latest.md` as each check is performed. Use exactly `Passed`, `Failed`, `Blocked`, or `Not run` in the Result column. A `Passed` row must replace generated local-probe and follow-up text with real observed manual evidence. Use `Scripts/manual-acceptance-status.sh` at any point to merge the current manual report with the latest local probe and show the next action for every row:
+If `dist/local-acceptance/latest.md` exists, the generated manual report copies each row's local probe status into Evidence / Notes, appends `Manual evidence: TODO`, and leaves Result as `Not run`. Record each completed check with the recorder instead of hand-editing Markdown table syntax:
+
+```sh
+Scripts/record-manual-acceptance-result.sh dist/manual-acceptance/latest.md settings_surface Passed "Manual evidence: opened Settings in /Applications/Delta.app 0.1 (1), confirmed General, Defaults, Updates, and Advanced grouping, plain Scheduled Backups language, status summary, Password Access repair, Sparkle controls, defaults, and diagnostics."
+Scripts/record-manual-acceptance-result.sh dist/manual-acceptance/latest.md s3_destination Blocked "Blocked pending dedicated S3-compatible acceptance bucket credentials."
+```
+
+Use exactly `Passed`, `Failed`, `Blocked`, or `Not run` as the result value. A `Passed` row must replace generated local-probe and follow-up text with real observed manual evidence. The recorder validates row IDs, result values, basic evidence quality, symlinked `latest.md` targets, and canonical required-evidence text before rewriting the report.
+
+Use `Scripts/manual-acceptance-status.sh` at any point to merge the current manual report with the latest local probe and show the next action for every row:
 
 ```sh
 Scripts/manual-acceptance-status.sh

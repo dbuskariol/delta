@@ -12,9 +12,12 @@ cd "$ROOT_DIR"
 "$ROOT_DIR/Scripts/verify-manual-acceptance-matrix.sh"
 "$ROOT_DIR/Scripts/verify-manual-acceptance-self-test.sh"
 "$ROOT_DIR/Scripts/manual-acceptance-status-self-test.sh"
+"$ROOT_DIR/Scripts/record-manual-acceptance-result-self-test.sh"
 "$ROOT_DIR/Scripts/verify-ci-workflows.sh"
 /bin/bash -n "$ROOT_DIR/Scripts/manual-acceptance-status.sh"
 /bin/bash -n "$ROOT_DIR/Scripts/manual-acceptance-status-self-test.sh"
+/bin/bash -n "$ROOT_DIR/Scripts/record-manual-acceptance-result.sh"
+/bin/bash -n "$ROOT_DIR/Scripts/record-manual-acceptance-result-self-test.sh"
 /bin/bash -n "$ROOT_DIR/Scripts/run-installed-local-s3-acceptance.sh"
 /bin/bash -n "$ROOT_DIR/Scripts/run-installed-local-sftp-acceptance.sh"
 /bin/bash -n "$ROOT_DIR/Scripts/run-installed-local-rest-acceptance.sh"
@@ -42,6 +45,14 @@ if [[ ! -x "$ROOT_DIR/Scripts/manual-acceptance-status.sh" ]]; then
 fi
 if [[ ! -x "$ROOT_DIR/Scripts/manual-acceptance-status-self-test.sh" ]]; then
   printf "Scripts/manual-acceptance-status-self-test.sh must be executable.\n" >&2
+  exit 1
+fi
+if [[ ! -x "$ROOT_DIR/Scripts/record-manual-acceptance-result.sh" ]]; then
+  printf "Scripts/record-manual-acceptance-result.sh must be executable.\n" >&2
+  exit 1
+fi
+if [[ ! -x "$ROOT_DIR/Scripts/record-manual-acceptance-result-self-test.sh" ]]; then
+  printf "Scripts/record-manual-acceptance-result-self-test.sh must be executable.\n" >&2
   exit 1
 fi
 if [[ ! -x "$ROOT_DIR/Scripts/run-installed-menu-bar-surface-acceptance.sh" ]]; then

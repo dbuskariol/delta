@@ -388,7 +388,8 @@ Create and verify the manual macOS acceptance report:
 
 ```sh
 Scripts/create-manual-acceptance-report.sh
-# Edit dist/manual-acceptance/latest.md after testing each required item.
+Scripts/record-manual-acceptance-result.sh dist/manual-acceptance/latest.md settings_surface Passed "Manual evidence: opened Settings in /Applications/Delta.app 0.1 (1), confirmed General, Defaults, Updates, and Advanced grouping, plain Scheduled Backups language, status summary, Password Access repair, Sparkle controls, defaults, and diagnostics."
+Scripts/record-manual-acceptance-result.sh dist/manual-acceptance/latest.md s3_destination Blocked "Blocked pending dedicated S3-compatible acceptance bucket credentials."
 Scripts/manual-acceptance-status.sh
 Scripts/verify-manual-acceptance.sh
 ```
@@ -411,7 +412,7 @@ Scripts/doctor-production-readiness.sh
 
 The doctor checks signing identities, automated-gate freshness, installed-app identity, notarization and Gatekeeper state, local and manual acceptance reports, and external backend acceptance environment variables. It exits non-zero while blockers remain; set `DELTA_DOCTOR_ALLOW_BLOCKERS=1` when you only want the report.
 
-When manual rows remain, the doctor also prints the compact manual acceptance status summary. Run `Scripts/manual-acceptance-status.sh` for the full row-by-row next-action report before editing `dist/manual-acceptance/latest.md`.
+When manual rows remain, the doctor also prints the compact manual acceptance status summary. Run `Scripts/manual-acceptance-status.sh` for the full row-by-row next-action report. Use `Scripts/record-manual-acceptance-result.sh` to update rows so IDs, result values, required-evidence text, symlinked `latest.md`, and evidence quality stay valid.
 
 Production readiness and manual macOS acceptance:
 
