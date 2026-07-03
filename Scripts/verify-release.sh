@@ -4,6 +4,14 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+if [[ "${DELTA_RELEASE_ALLOW_DIRTY:-0}" != "1" \
+  && -n "$(/usr/bin/git -C "$ROOT_DIR" status --porcelain --untracked-files=all)" ]]
+then
+  printf "Release verification requires a clean git worktree so app bits, evidence, and automated-gate status match the current commit.\n" >&2
+  printf "Commit or remove local changes before running Scripts/verify-release.sh. Set DELTA_RELEASE_ALLOW_DIRTY=1 only for non-release local experiments.\n" >&2
+  exit 1
+fi
+
 /usr/bin/swift test
 
 "$ROOT_DIR/Scripts/verify-product-language.sh"

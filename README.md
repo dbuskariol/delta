@@ -254,6 +254,8 @@ Full release verification:
 Scripts/verify-release.sh
 ```
 
+The release gate refuses dirty git worktrees by default so the generated app, Sparkle artifacts, release evidence, and automated-gate status match the current commit. Use `DELTA_RELEASE_ALLOW_DIRTY=1` only for local experiments that will not be used as release evidence.
+
 Collect a release evidence report for the verified app:
 
 ```sh
