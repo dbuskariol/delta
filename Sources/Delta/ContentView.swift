@@ -1265,7 +1265,7 @@ struct SettingsView: View {
         var subtitle: String {
             switch self {
             case .essentials:
-                return "Permissions, scheduling, alerts"
+                return "Access, schedules, alerts"
             case .defaults:
                 return "Backup and restore behavior"
             case .updates:
@@ -1279,7 +1279,7 @@ struct SettingsView: View {
     @EnvironmentObject private var model: DeltaAppModel
     @EnvironmentObject private var softwareUpdateController: SoftwareUpdateController
     @State private var settingsCategory: SettingsCategory = .essentials
-    @State private var showsScheduledBackupsDetails = true
+    @State private var showsScheduledBackupsDetails = false
     @AppStorage(
         DeltaAppPreferenceKeys.updateCheckIntervalSeconds,
         store: DeltaAppPreferences.sharedStore()

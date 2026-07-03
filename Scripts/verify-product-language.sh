@@ -22,7 +22,7 @@ UI_STRING_VIOLATIONS="$(
     /usr/bin/perl -ne '
       my $visible = $_;
       $visible =~ s/\\\([^)]*\)//g;
-      if ($visible =~ /"(?:[^"\\]|\\.)*(?:\b(?:Repositories|Repository|LaunchAgent)\b|repository passwords?|repository secrets?|repository-secrets|\bLaunch Agent\b|\bbackground backups\b|\brestic work\b|backup\.example\.com\/repo|\/repo\b)(?:[^"\\]|\\.)*"/i) {
+      if ($visible =~ /"(?:[^"\\]|\\.)*(?:\b(?:Repositories|Repository|LaunchAgent)\b|SMAppServiceStatus|repository passwords?|repository secrets?|repository-secrets|\bLaunch Agent\b|\bbackground backups\b|\brestic work\b|backup\.example\.com\/repo|\/repo\b)(?:[^"\\]|\\.)*"/i) {
         print "$ARGV:$.:$_";
       }
     ' "$file"

@@ -117,6 +117,8 @@ public enum SettingsSurfaceContract {
 
     public static let requiredManualAcceptanceCoverage = [
         "Plain-language Scheduled Backups status",
+        "Plain-language scheduled backup explanation",
+        "No raw system service terminology",
         "Scheduled Backups activity shortcut",
         "Password access repair",
         "Compact status summary",
@@ -137,6 +139,7 @@ public enum SettingsSurfaceContract {
     public static let forbiddenVisibleTerms = [
         "Launch" + "Agent",
         "Launch " + "Agent",
+        "SMAppService",
         "SMAppService" + "Status",
         "raw" + "Value",
         "Background " + "Backups",
@@ -182,6 +185,8 @@ public enum SettingsSurfaceContract {
         require(actionTitles, contains: "Send Test Alert", in: "actions", failures: &failures)
         require(actionTitles, contains: "Copy Report", in: "actions", failures: &failures)
         require(requiredManualAcceptanceCoverage, contains: "Source access warning visibility through dashboard health", in: "manual coverage", failures: &failures)
+        require(requiredManualAcceptanceCoverage, contains: "Plain-language scheduled backup explanation", in: "manual coverage", failures: &failures)
+        require(requiredManualAcceptanceCoverage, contains: "No raw system service terminology", in: "manual coverage", failures: &failures)
         require(requiredManualAcceptanceCoverage, contains: "Scheduled Backups activity shortcut", in: "manual coverage", failures: &failures)
         require(requiredManualAcceptanceCoverage, contains: "Password access repair", in: "manual coverage", failures: &failures)
         require(requiredManualAcceptanceCoverage, contains: "Destination free-space warning control", in: "manual coverage", failures: &failures)
