@@ -136,6 +136,13 @@ write_good_reports
 run_verify >/dev/null
 
 write_good_reports
+write_report rest real-external "Not configured" "Not configured"
+DELTA_EXTERNAL_ACCEPTANCE_DIR="$WORK_DIR" \
+  DELTA_EXTERNAL_ACCEPTANCE_GIT_COMMIT="$HEAD_COMMIT" \
+  DELTA_EXTERNAL_ACCEPTANCE_REQUIRED_KINDS="mounted,sftp,s3,rest" \
+  "$VERIFY_SCRIPT" "$APP_PATH" >/dev/null
+
+write_good_reports
 /usr/bin/perl -0pi -e 's#^- App: .*$#- App: /Applications/OtherDelta.app#m' "$WORK_DIR/external-s3-acceptance-latest.md"
 expect_failure "mismatched app path" "expected '$APP_PATH'" run_verify
 
@@ -173,5 +180,12 @@ expect_failure_contains_all \
 
 expect_failure "missing app bundle" "app bundle not found" \
   env DELTA_EXTERNAL_ACCEPTANCE_DIR="$WORK_DIR" "$VERIFY_SCRIPT" "$WORK_DIR/Missing.app"
+
+write_good_reports
+expect_failure "unsupported required kind" "unsupported external acceptance evidence kind 'unknown'" \
+  env DELTA_EXTERNAL_ACCEPTANCE_DIR="$WORK_DIR" \
+    DELTA_EXTERNAL_ACCEPTANCE_GIT_COMMIT="$HEAD_COMMIT" \
+    DELTA_EXTERNAL_ACCEPTANCE_REQUIRED_KINDS="mounted unknown" \
+    "$VERIFY_SCRIPT" "$APP_PATH"
 
 printf "External acceptance evidence self-test passed for %s.\n" "$APP_PATH"

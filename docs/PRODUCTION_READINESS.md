@@ -94,7 +94,7 @@ The external harness requires remote URLs to include `delta-acceptance` unless `
 
 Before running a real external lifecycle, run `Scripts/preflight-external-backend-acceptance.sh all /Applications/Delta.app` or a single backend name such as `s3`. The preflight uses the installed Delta app's typed parser and credential policy, writes a redacted matrix under `dist/local-acceptance`, and fails configured-but-invalid backends before any repository initialization or backup data writes occur.
 
-Production verification requires current real-provider reports for mounted network, SFTP, and S3-compatible destinations. Localhost harness reports are deliberately rejected. After running the real lifecycles, verify the evidence before notarization sign-off:
+Production verification requires current real-provider reports for mounted network, SFTP, and S3-compatible destinations by default. Localhost harness reports are deliberately rejected. After running the real lifecycles, verify the evidence before notarization sign-off:
 
 ```sh
 Scripts/run-external-backend-acceptance.sh mounted /Applications/Delta.app
@@ -104,7 +104,14 @@ Scripts/run-external-backend-acceptance.sh s3 /Applications/Delta.app
 Scripts/verify-external-acceptance-evidence.sh /Applications/Delta.app
 ```
 
-The verifier checks that each report is for the current git commit, matches the exact app bundle path, Delta executable path, bundled backup-engine path, and app CDHash, was produced by `Scripts/run-external-backend-acceptance.sh`, is not localhost/local-harness evidence for SFTP or S3, includes destination preparation, backup, incremental/no-change backup, browse, full restore, selected restore, check, cleanup, stored job counts, and keychain cleanup evidence, and includes the S3 missing-credential probe plus the SFTP wrong-target or wrong-credential probe. `Scripts/verify-external-acceptance-evidence-self-test.sh /Applications/Delta.app` creates synthetic reports to prove stale app paths, stale CDHashes, localhost evidence, and thin lifecycle evidence are rejected by the gate itself.
+When validating the full remote-backend matrix, require every provider family explicitly:
+
+```sh
+DELTA_EXTERNAL_ACCEPTANCE_REQUIRED_KINDS='mounted sftp s3 rest b2 azure gcs swift rclone custom' \
+Scripts/verify-external-acceptance-evidence.sh /Applications/Delta.app
+```
+
+The verifier checks that each required-kind report is for the current git commit, matches the exact app bundle path, Delta executable path, bundled backup-engine path, and app CDHash, was produced by `Scripts/run-external-backend-acceptance.sh`, is not localhost/local-harness evidence for non-mounted backends, includes destination preparation, backup, incremental/no-change backup, browse, full restore, selected restore, check, cleanup, stored job counts, and keychain cleanup evidence, and includes the S3 missing-credential probe plus the SFTP wrong-target or wrong-credential probe when those kinds are required. `DELTA_EXTERNAL_ACCEPTANCE_REQUIRED_KINDS` accepts a space- or comma-separated list, and each kind can override its report path with `DELTA_EXTERNAL_ACCEPTANCE_<KIND>_REPORT`. `Scripts/verify-external-acceptance-evidence-self-test.sh /Applications/Delta.app` creates synthetic reports to prove stale app paths, stale CDHashes, localhost evidence, unsupported required kinds, and thin lifecycle evidence are rejected by the gate itself.
 
 The probe only marks machine-verifiable evidence as automated or partial evidence. It can record the installed app's own Full Disk Access diagnostic result, but it intentionally keeps Full Disk Access approval, macOS Login Items approval, closed-window schedule visibility, UI disconnect/reconnect behavior, menu bar visual interaction, Notification Center delivery, Sparkle install flow, and notarization as explicit manual follow-up where a shell process would give weak or misleading evidence.
 

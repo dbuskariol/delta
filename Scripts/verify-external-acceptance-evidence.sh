@@ -6,9 +6,7 @@ APP_PATH="${1:-${DELTA_EXTERNAL_ACCEPTANCE_APP:-$ROOT_DIR/dist/Delta.app}}"
 REPORT_DIR="${DELTA_EXTERNAL_ACCEPTANCE_DIR:-$ROOT_DIR/dist/local-acceptance}"
 HEAD_COMMIT="${DELTA_EXTERNAL_ACCEPTANCE_GIT_COMMIT:-$(/usr/bin/git -C "$ROOT_DIR" rev-parse --short HEAD)}"
 
-MOUNTED_REPORT="${DELTA_EXTERNAL_ACCEPTANCE_MOUNTED_REPORT:-$REPORT_DIR/external-mounted-acceptance-latest.md}"
-SFTP_REPORT="${DELTA_EXTERNAL_ACCEPTANCE_SFTP_REPORT:-$REPORT_DIR/external-sftp-acceptance-latest.md}"
-S3_REPORT="${DELTA_EXTERNAL_ACCEPTANCE_S3_REPORT:-$REPORT_DIR/external-s3-acceptance-latest.md}"
+REQUIRED_KINDS_RAW="${DELTA_EXTERNAL_ACCEPTANCE_REQUIRED_KINDS:-mounted sftp s3}"
 REQUIRE_SFTP_FAILURE_PROBE="${DELTA_EXTERNAL_ACCEPTANCE_REQUIRE_SFTP_FAILURE_PROBE:-1}"
 REPORT_FAILURES=()
 
@@ -19,6 +17,52 @@ fail() {
 
 record_failure() {
   REPORT_FAILURES+=("$1")
+}
+
+normalize_kind_list() {
+  local raw="$1"
+  raw="${raw//,/ }"
+  printf "%s\n" "$raw" | /usr/bin/awk '
+    {
+      for (i = 1; i <= NF; i++) {
+        if ($i != "") {
+          print tolower($i)
+        }
+      }
+    }
+  '
+}
+
+validate_kind() {
+  case "$1" in
+    mounted|sftp|rest|s3|b2|azure|gcs|swift|rclone|custom)
+      ;;
+    *)
+      fail "unsupported external acceptance evidence kind '$1'. Expected mounted, sftp, rest, s3, b2, azure, gcs, swift, rclone, or custom."
+      ;;
+  esac
+}
+
+report_path_for_kind() {
+  local kind="$1"
+  local env_key="DELTA_EXTERNAL_ACCEPTANCE_$(printf "%s" "$kind" | /usr/bin/tr '[:lower:]' '[:upper:]')_REPORT"
+  local configured="${!env_key:-}"
+  if [[ -n "$configured" ]]; then
+    printf "%s" "$configured"
+  else
+    printf "%s/external-%s-acceptance-latest.md" "$REPORT_DIR" "$kind"
+  fi
+}
+
+required_environment_for_kind() {
+  case "$1" in
+    mounted)
+      printf "mounted-network"
+      ;;
+    *)
+      printf "real-external"
+      ;;
+  esac
 }
 
 canonical_app_path() {
@@ -153,17 +197,25 @@ APP_RESTIC="$APP_PATH/Contents/MacOS/restic"
 APP_CDHASH="$(code_signature_value "$APP_PATH" CDHash)"
 [[ -n "$APP_CDHASH" ]] || fail "could not read the app CDHash for $APP_PATH."
 
-verify_report mounted "$MOUNTED_REPORT" mounted-network || true
-verify_report sftp "$SFTP_REPORT" real-external || true
-if [[ "$REQUIRE_SFTP_FAILURE_PROBE" == "1" ]]; then
-  if [[ -f "$SFTP_REPORT" || -L "$SFTP_REPORT" ]]; then
-    require_contains "$SFTP_REPORT" "- Wrong SFTP credential or target probe: Passed" || true
+REQUIRED_KINDS=()
+while IFS= read -r kind; do
+  REQUIRED_KINDS+=("$kind")
+done < <(normalize_kind_list "$REQUIRED_KINDS_RAW")
+(( ${#REQUIRED_KINDS[@]} > 0 )) || fail "DELTA_EXTERNAL_ACCEPTANCE_REQUIRED_KINDS must include at least one backend kind."
+
+for kind in "${REQUIRED_KINDS[@]}"; do
+  validate_kind "$kind"
+  report="$(report_path_for_kind "$kind")"
+  verify_report "$kind" "$report" "$(required_environment_for_kind "$kind")" || true
+  if [[ "$kind" == "sftp" && "$REQUIRE_SFTP_FAILURE_PROBE" == "1" ]]; then
+    if [[ -f "$report" || -L "$report" ]]; then
+      require_contains "$report" "- Wrong SFTP credential or target probe: Passed" || true
+    fi
   fi
-fi
-verify_report s3 "$S3_REPORT" real-external || true
-if [[ -f "$S3_REPORT" || -L "$S3_REPORT" ]]; then
-  require_contains "$S3_REPORT" "- Missing credential probe: Passed" || true
-fi
+  if [[ "$kind" == "s3" && ( -f "$report" || -L "$report" ) ]]; then
+    require_contains "$report" "- Missing credential probe: Passed" || true
+  fi
+done
 
 if (( ${#REPORT_FAILURES[@]} > 0 )); then
   printf "External acceptance evidence failed:\n" >&2
@@ -171,4 +223,4 @@ if (( ${#REPORT_FAILURES[@]} > 0 )); then
   exit 1
 fi
 
-printf "External acceptance evidence verified for mounted network, real SFTP, and real S3-compatible destinations at commit %s.\n" "$HEAD_COMMIT"
+printf "External acceptance evidence verified for required backend kinds (%s) at commit %s.\n" "${REQUIRED_KINDS[*]}" "$HEAD_COMMIT"

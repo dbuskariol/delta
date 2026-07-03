@@ -101,6 +101,7 @@ print_next_actions() {
    DELTA_ACCEPTANCE_SFTP_REPOSITORY='sftp:user@example.com:/absolute/delta-acceptance-path' Scripts/run-external-backend-acceptance.sh sftp /Applications/Delta.app
    DELTA_ACCEPTANCE_S3_REPOSITORY='s3:https://endpoint/bucket/delta-acceptance-path' AWS_ACCESS_KEY_ID=... AWS_SECRET_ACCESS_KEY=... Scripts/run-external-backend-acceptance.sh s3 /Applications/Delta.app
    Scripts/verify-external-acceptance-evidence.sh /Applications/Delta.app
+   DELTA_EXTERNAL_ACCEPTANCE_REQUIRED_KINDS='mounted sftp s3 rest b2 azure gcs swift rclone custom' Scripts/verify-external-acceptance-evidence.sh /Applications/Delta.app
 6. Rerun the final production-readiness gate:
    Scripts/verify-production-readiness.sh
 EOF

@@ -367,13 +367,20 @@ Scripts/run-external-backend-acceptance.sh rest
 
 `Scripts/preflight-external-backend-acceptance.sh` validates configured external acceptance URLs, required provider credentials, readable key/config files, and mounted-network path mapping without initializing repositories or writing backup data. Use `all` for a redacted readiness matrix or a backend name such as `s3` when a single backend must be ready before running the full lifecycle.
 
-Before external production verification, the real mounted-network, SFTP, and S3-compatible lifecycle reports must pass:
+Before external production verification, the default required real-provider reports are mounted-network, SFTP, and S3-compatible lifecycle reports:
 
 ```sh
 Scripts/verify-external-acceptance-evidence.sh /Applications/Delta.app
 ```
 
-This rejects localhost/local harness reports for SFTP and S3, requires reports for the current git commit, exact app bundle path, Delta executable path, bundled backup-engine path, and exact app CDHash, and checks the backup, browse, restore, check, cleanup, stored job counts, S3 missing-credential, and SFTP failure-probe evidence. `Scripts/verify-external-acceptance-evidence-self-test.sh /Applications/Delta.app` generates synthetic reports and proves the verifier rejects stale app paths, stale CDHashes, localhost evidence, and thin lifecycle evidence.
+When validating the full remote-backend matrix, require every configured provider family explicitly:
+
+```sh
+DELTA_EXTERNAL_ACCEPTANCE_REQUIRED_KINDS='mounted sftp s3 rest b2 azure gcs swift rclone custom' \
+Scripts/verify-external-acceptance-evidence.sh /Applications/Delta.app
+```
+
+This rejects localhost/local harness reports for every non-mounted backend, requires reports for the current git commit, exact app bundle path, Delta executable path, bundled backup-engine path, and exact app CDHash, and checks the backup, browse, restore, check, cleanup, stored job counts, keychain cleanup, S3 missing-credential, and SFTP failure-probe evidence. `DELTA_EXTERNAL_ACCEPTANCE_REQUIRED_KINDS` accepts a space- or comma-separated list, and each kind can override its report path with `DELTA_EXTERNAL_ACCEPTANCE_<KIND>_REPORT`. `Scripts/verify-external-acceptance-evidence-self-test.sh /Applications/Delta.app` generates synthetic reports and proves the verifier rejects stale app paths, stale CDHashes, localhost evidence, unsupported required kinds, and thin lifecycle evidence.
 
 Create and verify the manual macOS acceptance report:
 
