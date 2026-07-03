@@ -256,6 +256,21 @@ final class ResticRunnerTests: XCTestCase {
         )
     }
 
+    func testNoKeyFoundMapsToWrongPassword() {
+        let result = ResticRunResult(
+            exitCode: 1,
+            standardOutput: "",
+            standardError: "Fatal: no key found in repository"
+        )
+
+        XCTAssertEqual(result.status, .failed)
+        XCTAssertEqual(result.failureKind, .wrongPassword)
+        XCTAssertEqual(
+            result.userFacingMessage,
+            "The encryption password for this destination is incorrect or unavailable."
+        )
+    }
+
     func testPasswordCommandFailureMapsToRepairableDestinationSecretMessage() {
         let result = ResticRunResult(
             exitCode: 1,

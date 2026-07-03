@@ -3399,7 +3399,7 @@ struct DestinationRow: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This removes the destination from Delta and deletes cached restore point metadata. Backup data at the destination is not deleted.")
+            Text("This removes the destination from Delta, deletes cached restore point metadata, and removes Delta's saved password. Backup data at the destination is not deleted; keep the original encryption password if you may reconnect it later.")
         }
     }
 
@@ -3893,6 +3893,8 @@ struct DestinationEditorView: View {
     @State private var storageMode: SecretStorageMode = .appManagedKeychain
     @State private var passphrase = ""
     @State private var passphraseConfirmation = ""
+    @State private var replacementPassphrase = ""
+    @State private var replacementPassphraseConfirmation = ""
     @State private var credentialValues: [String: String] = [:]
 
     init(destination: BackupRepository? = nil) {
@@ -3963,8 +3965,29 @@ struct DestinationEditorView: View {
                 }
             } else if let existingDestination {
                 FieldRow(title: "Encryption password") {
-                    Text(existingDestination.secretStorageMode.displayName)
-                        .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text(existingDestination.secretStorageMode.displayName)
+                            .foregroundStyle(.secondary)
+                        SecureField("Replace saved password", text: $replacementPassphrase)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: ModalMetrics.primaryControlWidth)
+                        SecureField("Confirm replacement password", text: $replacementPassphraseConfirmation)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: ModalMetrics.primaryControlWidth)
+                        Text("Only use this when reconnecting existing encrypted backup data or rotating a known password. Delta verifies it before saving.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(width: ModalMetrics.primaryControlWidth, alignment: .leading)
+                        if !replacementPassphraseConfirmation.isEmpty && replacementPassphrase != replacementPassphraseConfirmation {
+                            InlineWarning(
+                                symbol: "exclamationmark.triangle",
+                                title: "Passwords do not match.",
+                                message: "The replacement password must match before Delta can verify it."
+                            )
+                            .frame(width: ModalMetrics.primaryControlWidth, alignment: .leading)
+                        }
+                    }
                 }
             }
 
@@ -4124,6 +4147,12 @@ struct DestinationEditorView: View {
         if existingDestination == nil && storageMode == .userManagedPassphrase {
             guard !passphrase.isEmpty, passphrase == passphraseConfirmation else { return false }
         }
+        if existingDestination != nil {
+            let hasReplacement = !replacementPassphrase.isEmpty || !replacementPassphraseConfirmation.isEmpty
+            if hasReplacement {
+                guard !replacementPassphrase.isEmpty, replacementPassphrase == replacementPassphraseConfirmation else { return false }
+            }
+        }
         return true
     }
 
@@ -4139,7 +4168,8 @@ struct DestinationEditorView: View {
                 existingDestination,
                 name: name,
                 backend: backend,
-                backendCredentials: sanitizedCredentialValues
+                backendCredentials: sanitizedCredentialValues,
+                replacementPassphrase: replacementPassphrase
             )
         } else {
             return model.createRepository(

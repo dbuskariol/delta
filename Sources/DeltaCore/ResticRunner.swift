@@ -128,7 +128,7 @@ public enum ResticFailureClassifier {
         if containsAny(text, ["repository is already locked", "unable to create lock", "already locked"]) {
             return .lockedRepository
         }
-        if containsAny(text, ["wrong password", "password is incorrect", "invalid password", "mac: authentication failed"]) {
+        if containsAny(text, ["wrong password", "no key found", "password is incorrect", "invalid password", "mac: authentication failed"]) {
             return .wrongPassword
         }
         if containsAny(text, [

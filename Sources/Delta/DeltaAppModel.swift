@@ -77,6 +77,7 @@ final class DeltaAppModel: ObservableObject {
     private let bookmarkStore = SecurityScopedBookmarkStore()
     private let volumeSourceFactory = BackupVolumeSourceFactory()
     private let repositoryValidator = BackupRepositoryValidator()
+    private let localRepositoryStateInspector = LocalResticRepositoryStateInspector()
     private let profileValidator = BackupProfileValidator()
     private let runController = ResticRunController()
     private let runControlStore = ResticRunControlStore()
@@ -261,15 +262,19 @@ final class DeltaAppModel: ObservableObject {
     ) -> Bool {
         guard let database = requirePersistentDatabase() else { return false }
         var rollbackSecretAccounts = Set<String>()
-        var didPersistRepository = false
+        var persistedRepositoryID: UUID?
         let userManagedPassphrase = passphrase ?? ""
         do {
             let validated = try repositoryValidator.validate(name: name, backend: backend)
             let repositoryID = UUID()
+            let localState = localRepositoryStateInspector.state(for: validated.backend)
+            let reconnectsPreparedLocalDestination = localState?.isPrepared == true
             if storageMode == .userManagedPassphrase {
                 guard !userManagedPassphrase.isEmpty else {
                     throw DeltaUIError.message("An encryption passphrase is required for user-managed destinations.")
                 }
+            } else if reconnectsPreparedLocalDestination {
+                throw DeltaUIError.message(existingLocalDestinationRequiresPasswordMessage(path: localState?.path))
             }
             let credentialReferences = try credentialResolver.saveCredentials(backendCredentials, repositoryID: repositoryID)
             rollbackSecretAccounts.formUnion(credentialReferences.map(\.keychainAccount))
@@ -289,15 +294,23 @@ final class DeltaAppModel: ObservableObject {
                 rollbackSecretAccounts.insert(repository.keychainAccount)
             }
             try database.saveRepository(repository)
-            didPersistRepository = true
-            try? database.appendEvent(EventLog(level: .info, message: "Destination '\(repository.name)' was created."))
+            persistedRepositoryID = repository.id
+            if reconnectsPreparedLocalDestination {
+                try validateExistingDestination(repository, database: database, path: localState?.path)
+                try? database.appendEvent(EventLog(level: .info, message: "Destination '\(repository.name)' was connected to existing encrypted backup data."))
+            } else {
+                try? database.appendEvent(EventLog(level: .info, message: "Destination '\(repository.name)' was created."))
+            }
             reload()
-            initializeRepository(repository)
+            if !reconnectsPreparedLocalDestination {
+                initializeRepository(repository)
+            }
             return true
         } catch {
-            if !didPersistRepository {
-                rollbackSecrets(accounts: rollbackSecretAccounts)
+            if let persistedRepositoryID {
+                try? database.deleteRepository(id: persistedRepositoryID)
             }
+            rollbackSecrets(accounts: rollbackSecretAccounts)
             alertMessage = error.localizedDescription
             return false
         }
@@ -308,9 +321,13 @@ final class DeltaAppModel: ObservableObject {
         _ repository: BackupRepository,
         name: String,
         backend: RepositoryBackend,
-        backendCredentials: [String: String] = [:]
+        backendCredentials: [String: String] = [:],
+        replacementPassphrase: String? = nil
     ) -> Bool {
         guard let database = requirePersistentDatabase() else { return false }
+        var previousRepository = repository
+        var previousSecret: String?
+        var didReplaceSecret = false
         do {
             let validated = try repositoryValidator.validate(
                 name: name,
@@ -320,6 +337,19 @@ final class DeltaAppModel: ObservableObject {
             var updatedRepository = repository
             updatedRepository.name = validated.name
             updatedRepository.backend = validated.backend
+            let replacementPassphrase = replacementPassphrase ?? ""
+            let replacesPassword = !replacementPassphrase.isEmpty
+            let localState = localRepositoryStateInspector.state(for: validated.backend)
+            let reconnectsPreparedLocalDestination = localState?.isPrepared == true
+            if reconnectsPreparedLocalDestination, updatedRepository.backend != repository.backend, !replacesPassword {
+                throw DeltaUIError.message(existingLocalDestinationRequiresPasswordMessage(path: localState?.path))
+            }
+            if replacesPassword {
+                previousSecret = try? secretStore.load(account: repository.keychainAccount, authenticationPolicy: .allowUserInteraction)
+                try secretStore.save(secret: replacementPassphrase, account: repository.keychainAccount)
+                didReplaceSecret = true
+                updatedRepository.secretStorageMode = .userManagedPassphrase
+            }
             updatedRepository.credentialReferences = try credentialResolver.updateCredentials(
                 backendCredentials,
                 existingReferences: repository.credentialReferences,
@@ -329,11 +359,23 @@ final class DeltaAppModel: ObservableObject {
             if updatedRepository.backend != repository.backend || updatedRepository.credentialReferences != repository.credentialReferences {
                 updatedRepository.lastVerifiedAt = nil
             }
+            previousRepository = repository
             try database.saveRepository(updatedRepository)
+            if reconnectsPreparedLocalDestination && (replacesPassword || updatedRepository.lastVerifiedAt == nil) {
+                try validateExistingDestination(updatedRepository, database: database, path: localState?.path)
+            }
             try database.appendEvent(EventLog(level: .info, message: "Destination '\(updatedRepository.name)' was updated."))
             reload()
             return true
         } catch {
+            try? database.saveRepository(previousRepository)
+            if didReplaceSecret {
+                if let previousSecret {
+                    try? secretStore.save(secret: previousSecret, account: repository.keychainAccount)
+                } else {
+                    try? secretStore.delete(account: repository.keychainAccount)
+                }
+            }
             alertMessage = error.localizedDescription
             return false
         }
@@ -343,6 +385,30 @@ final class DeltaAppModel: ObservableObject {
         for account in accounts {
             try? secretStore.delete(account: account)
         }
+    }
+
+    private func validateExistingDestination(_ repository: BackupRepository, database: DeltaDatabase, path: String?) throws {
+        do {
+            _ = try makeCoordinator(database: database).refreshSnapshots(repository: repository)
+        } catch {
+            throw DeltaUIError.message(existingLocalDestinationPasswordMismatchMessage(path: path, error: error))
+        }
+    }
+
+    private func existingLocalDestinationRequiresPasswordMessage(path: String?) -> String {
+        let location = path.map { " at '\($0)'" } ?? ""
+        return "This destination\(location) already contains encrypted backup data. Enter the original encryption password with User-managed passphrase to reconnect it, or choose an empty folder to start fresh."
+    }
+
+    private func existingLocalDestinationPasswordMismatchMessage(path: String?, error: Error) -> String {
+        let location = path.map { " at '\($0)'" } ?? ""
+        let detail = error.localizedDescription
+        if detail.localizedCaseInsensitiveContains("encryption password")
+            || detail.localizedCaseInsensitiveContains("wrong password")
+            || detail.localizedCaseInsensitiveContains("no key found") {
+            return "This destination\(location) already contains encrypted backup data, but the saved password does not unlock it. Enter the original encryption password, or choose an empty folder to start fresh."
+        }
+        return "Delta could not connect to the existing encrypted backup data\(location): \(detail)"
     }
 
     func createProfile(
