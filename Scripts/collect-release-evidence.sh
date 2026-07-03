@@ -3,6 +3,8 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP_PATH="${1:-${DELTA_EVIDENCE_APP:-$ROOT_DIR/dist/Delta.app}}"
+INSTALLED_APP_PATH="${DELTA_EVIDENCE_INSTALLED_APP:-/Applications/Delta.app}"
+EXTERNAL_ACCEPTANCE_APP_PATH="$APP_PATH"
 OUTPUT_DIR="${DELTA_EVIDENCE_DIR:-$ROOT_DIR/dist/release-evidence}"
 
 if [[ ! -d "$APP_PATH" ]]; then
@@ -98,8 +100,9 @@ append_command "Scheduled Backups Isolated Due-Run" /bin/sh -c "DELTA_APP_SUPPOR
 /bin/rm -rf "$ISOLATED_AGENT_SUPPORT"
 append_command "Scheduled Backups Acceptance" "$ROOT_DIR/Scripts/run-installed-scheduled-agent-acceptance.sh" "$APP_PATH"
 append_command "Installed Preferences Acceptance" "$ROOT_DIR/Scripts/run-installed-preferences-acceptance.sh" "$APP_PATH"
-if [[ -d "/Applications/Delta.app" ]]; then
-  append_command "Installed App Smoke Verification" "$ROOT_DIR/Scripts/verify-installed-app.sh" "/Applications/Delta.app"
+if [[ -d "$INSTALLED_APP_PATH" ]]; then
+  append_command "Installed App Smoke Verification" "$ROOT_DIR/Scripts/verify-installed-app.sh" "$INSTALLED_APP_PATH"
+  EXTERNAL_ACCEPTANCE_APP_PATH="$INSTALLED_APP_PATH"
 fi
 append_command "Bundled Backup Engine" "$APP_PATH/Contents/MacOS/restic" version
 append_command "Bundled Cloud Helper" "$APP_PATH/Contents/MacOS/rclone" version
@@ -178,7 +181,7 @@ fi
 EXTERNAL_ACCEPTANCE_PASSED="No"
 EXTERNAL_ACCEPTANCE_OUTPUT="$(/usr/bin/mktemp -t delta-external-acceptance.XXXXXX)"
 set +e
-"$ROOT_DIR/Scripts/verify-external-acceptance-evidence.sh" "$APP_PATH" >"$EXTERNAL_ACCEPTANCE_OUTPUT" 2>&1
+"$ROOT_DIR/Scripts/verify-external-acceptance-evidence.sh" "$EXTERNAL_ACCEPTANCE_APP_PATH" >"$EXTERNAL_ACCEPTANCE_OUTPUT" 2>&1
 EXTERNAL_ACCEPTANCE_STATUS=$?
 set -e
 if [[ "$EXTERNAL_ACCEPTANCE_STATUS" -eq 0 ]]; then

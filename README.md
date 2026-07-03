@@ -373,7 +373,7 @@ Before external production verification, the real mounted-network, SFTP, and S3-
 Scripts/verify-external-acceptance-evidence.sh /Applications/Delta.app
 ```
 
-This rejects localhost/local harness reports for SFTP and S3, requires reports for the current git commit and exact app CDHash, and checks the backup, browse, restore, check, cleanup, S3 missing-credential, and SFTP failure-probe evidence.
+This rejects localhost/local harness reports for SFTP and S3, requires reports for the current git commit, exact app bundle path, Delta executable path, bundled backup-engine path, and exact app CDHash, and checks the backup, browse, restore, check, cleanup, stored job counts, S3 missing-credential, and SFTP failure-probe evidence. `Scripts/verify-external-acceptance-evidence-self-test.sh /Applications/Delta.app` generates synthetic reports and proves the verifier rejects stale app paths, stale CDHashes, localhost evidence, and thin lifecycle evidence.
 
 Create and verify the manual macOS acceptance report:
 

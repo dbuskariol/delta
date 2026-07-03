@@ -187,6 +187,7 @@ esac
 if [[ ! -d "$APP_PATH" ]]; then
   fail "Delta app bundle not found at $APP_PATH"
 fi
+APP_PATH="$(cd "$APP_PATH" && /bin/pwd -P)"
 
 DELTA_EXECUTABLE="$APP_PATH/Contents/MacOS/Delta"
 if [[ ! -x "$DELTA_EXECUTABLE" ]]; then

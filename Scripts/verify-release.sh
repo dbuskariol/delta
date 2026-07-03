@@ -24,6 +24,7 @@ cd "$ROOT_DIR"
   "$ROOT_DIR/Scripts/verify-manual-acceptance.sh" \
   "$ROOT_DIR/Scripts/verify-sparkle-update-artifacts.sh" \
   "$ROOT_DIR/Scripts/verify-external-acceptance-evidence.sh" \
+  "$ROOT_DIR/Scripts/verify-external-acceptance-evidence-self-test.sh" \
   "$ROOT_DIR/Scripts/preflight-external-backend-acceptance.sh" \
   "$ROOT_DIR/Scripts/run-external-backend-acceptance.sh" \
   "$ROOT_DIR/Scripts/run-installed-diagnostics-acceptance.sh" \
@@ -90,6 +91,10 @@ if [[ ! -x "$ROOT_DIR/Scripts/verify-sparkle-update-artifacts.sh" ]]; then
 fi
 if [[ ! -x "$ROOT_DIR/Scripts/verify-external-acceptance-evidence.sh" ]]; then
   printf "Scripts/verify-external-acceptance-evidence.sh must be executable.\n" >&2
+  exit 1
+fi
+if [[ ! -x "$ROOT_DIR/Scripts/verify-external-acceptance-evidence-self-test.sh" ]]; then
+  printf "Scripts/verify-external-acceptance-evidence-self-test.sh must be executable.\n" >&2
   exit 1
 fi
 if [[ ! -x "$ROOT_DIR/Scripts/verify-no-crash-markers.sh" ]]; then
@@ -185,6 +190,7 @@ if /usr/bin/grep -q "warning:" "$BUILD_LOG"; then
 fi
 /bin/rm -f "$BUILD_LOG"
 /usr/bin/codesign --verify --strict --deep --verbose=2 "$ROOT_DIR/dist/Delta.app"
+"$ROOT_DIR/Scripts/verify-external-acceptance-evidence-self-test.sh" "$ROOT_DIR/dist/Delta.app"
 
 SIGNING_DETAILS="$(/usr/bin/codesign -dvv "$ROOT_DIR/dist/Delta.app" 2>&1)"
 if ! /usr/bin/grep -q '^TeamIdentifier=' <<<"$SIGNING_DETAILS"; then

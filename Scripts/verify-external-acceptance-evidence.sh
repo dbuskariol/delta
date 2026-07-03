@@ -16,6 +16,12 @@ fail() {
   exit 1
 }
 
+canonical_app_path() {
+  local app="$1"
+  [[ -d "$app" ]] || fail "app bundle not found at $app."
+  (cd "$app" && /bin/pwd -P)
+}
+
 report_value() {
   local report="$1"
   local key="$2"
@@ -26,6 +32,26 @@ code_signature_value() {
   local app="$1"
   local key="$2"
   /usr/bin/codesign -dvvv "$app" 2>&1 | /usr/bin/awk -F= -v key="$key" '$1 == key && value == "" { value = $2 } END { print value }'
+}
+
+require_report_value() {
+  local kind="$1"
+  local report="$2"
+  local key="$3"
+  local value
+  value="$(report_value "$report" "$key")"
+  [[ -n "$value" ]] || fail "$kind report does not record '$key'."
+  printf "%s" "$value"
+}
+
+require_report_value_equals() {
+  local kind="$1"
+  local report="$2"
+  local key="$3"
+  local expected="$4"
+  local value
+  value="$(require_report_value "$kind" "$report" "$key")"
+  [[ "$value" == "$expected" ]] || fail "$kind report records '$key' as '$value', expected '$expected'."
 }
 
 require_contains() {
@@ -43,17 +69,26 @@ verify_report() {
 
   [[ -f "$report" || -L "$report" ]] || fail "$kind report not found at $report. Run Scripts/run-external-backend-acceptance.sh $kind /Applications/Delta.app against real infrastructure."
 
+  require_report_value "$kind" "$report" "Generated" >/dev/null
+  require_report_value_equals "$kind" "$report" "App" "$APP_PATH"
+  require_report_value_equals "$kind" "$report" "Executable" "$APP_EXECUTABLE"
+  require_report_value_equals "$kind" "$report" "Restic" "$APP_RESTIC"
   require_contains "$report" "- Kind: $kind"
   require_contains "$report" "Installed external $kind lifecycle acceptance passed."
   require_contains "$report" "- Delta coordinator lifecycle: Yes"
   require_contains "$report" "- Automatic destination preparation runs: 1"
+  require_contains "$report" "- First backup status: Completed"
   require_contains "$report" "- No-change backup:"
   require_contains "$report" "- Incremental backup:"
+  require_contains "$report" "- Cached restore points:"
+  require_contains "$report" "- Latest restore point:"
   require_contains "$report" "- Restore browser entries verified:"
   require_contains "$report" "- Full restore status: Completed"
   require_contains "$report" "- Selected folder restore status: Completed"
   require_contains "$report" "- Destination check status: Completed"
   require_contains "$report" "- Cleanup runs:"
+  require_contains "$report" "- Stored backup jobs: 3"
+  require_contains "$report" "- Stored restore jobs: 2"
   require_contains "$report" "- Keychain items deleted on exit: Yes"
   require_contains "$report" "- Runner: Scripts/run-external-backend-acceptance.sh"
 
@@ -65,15 +100,19 @@ verify_report() {
   environment="$(report_value "$report" "Acceptance environment")"
   [[ "$environment" == "$required_environment" ]] || fail "$kind report was produced against '${environment:-unknown}', expected '$required_environment'. Localhost/local harness evidence is not sufficient for production readiness."
 
-  if [[ -d "$APP_PATH" ]]; then
-    local app_cdhash
-    local report_cdhash
-    app_cdhash="$(code_signature_value "$APP_PATH" CDHash)"
-    report_cdhash="$(report_value "$report" "App CDHash")"
-    [[ -n "$report_cdhash" ]] || fail "$kind report does not record the app CDHash."
-    [[ "$report_cdhash" == "$app_cdhash" ]] || fail "$kind report CDHash $report_cdhash does not match $APP_PATH CDHash $app_cdhash."
-  fi
+  local report_cdhash
+  report_cdhash="$(report_value "$report" "App CDHash")"
+  [[ -n "$report_cdhash" ]] || fail "$kind report does not record the app CDHash."
+  [[ "$report_cdhash" == "$APP_CDHASH" ]] || fail "$kind report CDHash $report_cdhash does not match $APP_PATH CDHash $APP_CDHASH."
 }
+
+APP_PATH="$(canonical_app_path "$APP_PATH")"
+APP_EXECUTABLE="$APP_PATH/Contents/MacOS/Delta"
+APP_RESTIC="$APP_PATH/Contents/MacOS/restic"
+[[ -x "$APP_EXECUTABLE" ]] || fail "Delta executable is missing or not executable at $APP_EXECUTABLE."
+[[ -x "$APP_RESTIC" ]] || fail "bundled restic is missing or not executable at $APP_RESTIC."
+APP_CDHASH="$(code_signature_value "$APP_PATH" CDHash)"
+[[ -n "$APP_CDHASH" ]] || fail "could not read the app CDHash for $APP_PATH."
 
 verify_report mounted "$MOUNTED_REPORT" mounted-network
 verify_report sftp "$SFTP_REPORT" real-external

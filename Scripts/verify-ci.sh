@@ -20,12 +20,17 @@ cd "$ROOT_DIR"
 /bin/bash -n "$ROOT_DIR/Scripts/run-installed-rclone-local-acceptance.sh"
 /bin/bash -n "$ROOT_DIR/Scripts/preflight-external-backend-acceptance.sh"
 /bin/bash -n "$ROOT_DIR/Scripts/verify-external-acceptance-evidence.sh"
+/bin/bash -n "$ROOT_DIR/Scripts/verify-external-acceptance-evidence-self-test.sh"
 if [[ ! -x "$ROOT_DIR/Scripts/preflight-external-backend-acceptance.sh" ]]; then
   printf "Scripts/preflight-external-backend-acceptance.sh must be executable.\n" >&2
   exit 1
 fi
 if [[ ! -x "$ROOT_DIR/Scripts/verify-external-acceptance-evidence.sh" ]]; then
   printf "Scripts/verify-external-acceptance-evidence.sh must be executable.\n" >&2
+  exit 1
+fi
+if [[ ! -x "$ROOT_DIR/Scripts/verify-external-acceptance-evidence-self-test.sh" ]]; then
+  printf "Scripts/verify-external-acceptance-evidence-self-test.sh must be executable.\n" >&2
   exit 1
 fi
 if [[ ! -x "$ROOT_DIR/Scripts/run-installed-menu-bar-surface-acceptance.sh" ]]; then
@@ -75,6 +80,7 @@ fi
 /bin/rm -f "$BUILD_LOG"
 
 /usr/bin/codesign --verify --strict --deep --verbose=2 "$ROOT_DIR/dist/Delta.app"
+"$ROOT_DIR/Scripts/verify-external-acceptance-evidence-self-test.sh" "$ROOT_DIR/dist/Delta.app"
 
 DELTA_SKIP_BUILD=1 "$ROOT_DIR/Scripts/package-update.sh"
 "$ROOT_DIR/Scripts/generate-appcast.sh"

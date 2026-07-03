@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP_PATH="${DELTA_DOCTOR_APP:-$ROOT_DIR/dist/Delta.app}"
 INSTALLED_APP_PATH="${DELTA_DOCTOR_INSTALLED_APP:-/Applications/Delta.app}"
+EXTERNAL_ACCEPTANCE_APP_PATH="$APP_PATH"
 LOCAL_ACCEPTANCE_REPORT="${DELTA_DOCTOR_LOCAL_ACCEPTANCE_REPORT:-$ROOT_DIR/dist/local-acceptance/latest.md}"
 MANUAL_REPORT="${DELTA_DOCTOR_MANUAL_ACCEPTANCE_REPORT:-$ROOT_DIR/dist/manual-acceptance/latest.md}"
 RELEASE_EVIDENCE_REPORT="${DELTA_DOCTOR_RELEASE_EVIDENCE_REPORT:-$ROOT_DIR/dist/release-evidence/latest.md}"
@@ -150,6 +151,7 @@ if [[ -d "$INSTALLED_APP_PATH" && -d "$APP_PATH" ]]; then
   installed_cdhash="$(signature_value "$INSTALLED_APP_PATH" CDHash)"
   if [[ -n "$app_cdhash" && "$app_cdhash" == "$installed_cdhash" ]]; then
     pass "Installed app matches the verified app CDHash."
+    EXTERNAL_ACCEPTANCE_APP_PATH="$INSTALLED_APP_PATH"
   else
     block "Installed app does not match the verified app CDHash. Run Scripts/install-app.sh dist/Delta.app."
   fi
@@ -292,7 +294,7 @@ else
 fi
 
 if [[ "$configured_external_backends" -gt 0 ]]; then
-  if "$ROOT_DIR/Scripts/preflight-external-backend-acceptance.sh" all "$APP_PATH" >/tmp/delta-external-preflight-doctor.$$ 2>&1; then
+  if "$ROOT_DIR/Scripts/preflight-external-backend-acceptance.sh" all "$EXTERNAL_ACCEPTANCE_APP_PATH" >/tmp/delta-external-preflight-doctor.$$ 2>&1; then
     preflight_report="$(/usr/bin/sed -n 's/^Wrote external backend preflight to //p' /tmp/delta-external-preflight-doctor.$$ | /usr/bin/head -n 1)"
     pass "Configured external backend preflight passed${preflight_report:+: $preflight_report}."
   else
@@ -302,7 +304,7 @@ if [[ "$configured_external_backends" -gt 0 ]]; then
   /bin/rm -f /tmp/delta-external-preflight-doctor.$$
 fi
 
-if "$ROOT_DIR/Scripts/verify-external-acceptance-evidence.sh" "$APP_PATH" >/tmp/delta-external-acceptance-evidence-doctor.$$ 2>&1; then
+if "$ROOT_DIR/Scripts/verify-external-acceptance-evidence.sh" "$EXTERNAL_ACCEPTANCE_APP_PATH" >/tmp/delta-external-acceptance-evidence-doctor.$$ 2>&1; then
   pass "$(/bin/cat /tmp/delta-external-acceptance-evidence-doctor.$$)"
 else
   evidence_output="$(/bin/cat /tmp/delta-external-acceptance-evidence-doctor.$$ 2>/dev/null || true)"
