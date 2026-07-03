@@ -1228,7 +1228,7 @@ private enum ActivityLogDetail: String, CaseIterable, Identifiable {
 }
 
 struct SettingsView: View {
-    private enum SettingsCategory: CaseIterable, Identifiable {
+    private enum SettingsCategory: CaseIterable, Hashable, Identifiable {
         case essentials
         case defaults
         case updates
@@ -1435,7 +1435,7 @@ struct SettingsView: View {
     var body: some View {
         PageScaffold(
             title: "Settings",
-            subtitle: "Permissions, scheduling, updates, and safe defaults",
+            subtitle: "Scheduling, access, alerts, updates, and safe defaults",
             actions: {
                 Button {
                     model.reload()
@@ -1479,16 +1479,20 @@ struct SettingsView: View {
             if settingsCategory == .essentials {
                 SettingsSectionLabel(
                     title: "Scheduled Backups",
-                    subtitle: "Unattended scheduling, macOS approval, and reliability controls."
+                    subtitle: "Automatic runs, macOS approval, and unattended backup readiness."
                 )
 
                 SettingsCard(
                     symbol: "clock.badge.checkmark",
                     title: "Scheduled Backups",
-                    subtitle: "Run due profiles after sign-in while Delta's main window is closed.",
+                    subtitle: "Run due backup profiles after sign-in, even when the main window is closed.",
                     statusText: backgroundBackupsPresentation.statusText,
                     statusColor: backgroundBackupsStatusColor
                 ) {
+                    SettingsDescription(
+                        text: "This is Delta's automatic backup runner. macOS approves it in Login Items, then Delta checks each profile's schedule, destination, power policy, saved password access, and destination lock before starting work."
+                    )
+
                     SettingsControlRow(
                         title: "Allow scheduled backups",
                         detail: backgroundBackupsPresentation.controlDetail
@@ -1509,11 +1513,11 @@ struct SettingsView: View {
 
                     SettingsFactGrid(items: [
                         SettingsFact(title: "Scheduled profiles", value: "\(scheduledProfileCount)"),
-                        SettingsFact(title: "Automation", value: pausesScheduledBackups ? "Paused" : "Running"),
-                        SettingsFact(title: "Password access", value: backgroundSecretAccessSummary.displayName),
-                        SettingsFact(title: "Check interval", value: "Every 5 min"),
-                        SettingsFact(title: "Runs as", value: "Your user"),
-                        SettingsFact(title: "macOS approval", value: backgroundBackupsPresentation.approvalText)
+                        SettingsFact(title: "Automatic runs", value: pausesScheduledBackups ? "Paused" : "Enabled"),
+                        SettingsFact(title: "macOS approval", value: backgroundBackupsPresentation.approvalText),
+                        SettingsFact(title: "Saved passwords", value: backgroundSecretAccessSummary.displayName),
+                        SettingsFact(title: "Policy checks", value: "Before every run"),
+                        SettingsFact(title: "Runs as", value: "Your user")
                     ])
 
                     if backgroundBackupsPresentation.needsAttention {
@@ -1577,6 +1581,12 @@ struct SettingsView: View {
                             Label("Refresh", systemImage: "arrow.clockwise")
                         }
                         .deltaTooltip("Recheck scheduled backup and system access status.")
+                        Button {
+                            model.selectedSection = .activity
+                        } label: {
+                            Label("Open Activity", systemImage: "waveform.path.ecg")
+                        }
+                        .deltaTooltip("Review recent scheduled runs, live logs, and saved job output.")
                         Button {
                             model.repairBackgroundSecretAccess()
                         } label: {
@@ -2390,75 +2400,22 @@ struct SettingsView: View {
     }
 
     private var settingsCategorySelector: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: 4) {
+        VStack(alignment: .leading, spacing: 8) {
+            Picker("Settings category", selection: $settingsCategory) {
                 ForEach(SettingsCategory.allCases) { category in
-                    settingsCategoryButton(for: category, compact: true)
+                    Label(category.title, systemImage: category.symbol)
+                        .tag(category)
                 }
             }
-            .padding(4)
+            .labelsHidden()
+            .pickerStyle(.segmented)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(DeltaTheme.panel)
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(DeltaTheme.border, lineWidth: 1)
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 8))
 
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 190), spacing: 10)], spacing: 10) {
-                ForEach(SettingsCategory.allCases) { category in
-                    settingsCategoryButton(for: category, compact: false)
-                }
-            }
+            Text(settingsCategory.subtitle)
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private func settingsCategoryButton(for category: SettingsCategory, compact: Bool) -> some View {
-        let isSelected = settingsCategory == category
-        return Button {
-            settingsCategory = category
-        } label: {
-            HStack(alignment: .center, spacing: 8) {
-                Image(systemName: category.symbol)
-                    .font(.system(size: 12, weight: .semibold))
-                    .frame(width: 22, height: 22)
-                    .foregroundStyle(isSelected ? Color.accentColor : .secondary)
-                    .background((isSelected ? Color.accentColor : Color(nsColor: .secondaryLabelColor)).opacity(0.14))
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(category.title)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-
-                    if !compact {
-                        Text(category.subtitle)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(2)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .padding(.vertical, compact ? 7 : 10)
-            .padding(.horizontal, 10)
-            .frame(maxWidth: .infinity, minHeight: compact ? 38 : 64, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(isSelected ? Color.accentColor.opacity(0.12) : Color.clear)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 6)
-                    .stroke(isSelected ? Color.accentColor.opacity(0.55) : Color.clear, lineWidth: 1)
-            )
-        }
-        .buttonStyle(.plain)
-        .deltaTooltip(category.subtitle)
-        .accessibilityLabel(category.title)
-        .accessibilityValue(isSelected ? "Selected" : category.subtitle)
     }
 
     private var backgroundSecretAccessSummary: BackgroundSecretAccessSummary {

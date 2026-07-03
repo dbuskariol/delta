@@ -30,6 +30,7 @@ final class SettingsSurfaceContractTests: XCTestCase {
         XCTAssertTrue(SettingsSurfaceContract.controlTitles.contains("Activity log detail"))
         XCTAssertTrue(SettingsSurfaceContract.controlTitles.contains("History retention"))
         XCTAssertTrue(SettingsSurfaceContract.actionTitles.contains("Run Due Now"))
+        XCTAssertTrue(SettingsSurfaceContract.actionTitles.contains("Open Activity"))
         XCTAssertTrue(SettingsSurfaceContract.actionTitles.contains("How Scheduled Backups Work"))
         XCTAssertTrue(SettingsSurfaceContract.actionTitles.contains("Repair Password Access"))
         XCTAssertTrue(SettingsSurfaceContract.actionTitles.contains("Restore Recommended"))
@@ -53,6 +54,7 @@ final class SettingsSurfaceContractTests: XCTestCase {
 
     func testSettingsSurfaceContractMapsToManualAcceptanceCoverage() {
         XCTAssertTrue(SettingsSurfaceContract.requiredManualAcceptanceCoverage.contains("Plain-language Scheduled Backups status"))
+        XCTAssertTrue(SettingsSurfaceContract.requiredManualAcceptanceCoverage.contains("Scheduled Backups activity shortcut"))
         XCTAssertTrue(SettingsSurfaceContract.requiredManualAcceptanceCoverage.contains("Password access repair"))
         XCTAssertTrue(SettingsSurfaceContract.requiredManualAcceptanceCoverage.contains("Compact status summary"))
         XCTAssertTrue(SettingsSurfaceContract.requiredManualAcceptanceCoverage.contains("Run Due Now scheduled-backup action"))

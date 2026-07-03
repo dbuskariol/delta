@@ -82,6 +82,7 @@ public enum SettingsSurfaceContract {
 
     public static let actionTitles = [
         "Run Due Now",
+        "Open Activity",
         "Review Login Items",
         "How Scheduled Backups Work",
         "Refresh",
@@ -116,6 +117,7 @@ public enum SettingsSurfaceContract {
 
     public static let requiredManualAcceptanceCoverage = [
         "Plain-language Scheduled Backups status",
+        "Scheduled Backups activity shortcut",
         "Password access repair",
         "Compact status summary",
         "Run Due Now scheduled-backup action",
@@ -172,6 +174,7 @@ public enum SettingsSurfaceContract {
         require(controlTitles, contains: "Activity log detail", in: "controls", failures: &failures)
         require(controlTitles, contains: "History retention", in: "controls", failures: &failures)
         require(actionTitles, contains: "Run Due Now", in: "actions", failures: &failures)
+        require(actionTitles, contains: "Open Activity", in: "actions", failures: &failures)
         require(actionTitles, contains: "How Scheduled Backups Work", in: "actions", failures: &failures)
         require(actionTitles, contains: "Repair Password Access", in: "actions", failures: &failures)
         require(actionTitles, contains: "Restore Recommended", in: "actions", failures: &failures)
@@ -179,6 +182,7 @@ public enum SettingsSurfaceContract {
         require(actionTitles, contains: "Send Test Alert", in: "actions", failures: &failures)
         require(actionTitles, contains: "Copy Report", in: "actions", failures: &failures)
         require(requiredManualAcceptanceCoverage, contains: "Source access warning visibility through dashboard health", in: "manual coverage", failures: &failures)
+        require(requiredManualAcceptanceCoverage, contains: "Scheduled Backups activity shortcut", in: "manual coverage", failures: &failures)
         require(requiredManualAcceptanceCoverage, contains: "Password access repair", in: "manual coverage", failures: &failures)
         require(requiredManualAcceptanceCoverage, contains: "Destination free-space warning control", in: "manual coverage", failures: &failures)
         require(requiredManualAcceptanceCoverage, contains: "Configurable new-profile schedule defaults", in: "manual coverage", failures: &failures)
