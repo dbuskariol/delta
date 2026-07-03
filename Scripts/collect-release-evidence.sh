@@ -144,6 +144,8 @@ if [[ -x "$ROOT_DIR/Scripts/run-local-acceptance-probe.sh" ]]; then
   done
 fi
 
+append_command "Manual Acceptance Status" "$ROOT_DIR/Scripts/manual-acceptance-status.sh" "$MANUAL_ACCEPTANCE_REPORT"
+
 MANUAL_MATRIX_PASSED="No"
 MANUAL_REPORT_CURRENT="No"
 if [[ -f "$MANUAL_ACCEPTANCE_REPORT" ]]; then
