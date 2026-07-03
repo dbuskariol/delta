@@ -5,6 +5,7 @@ import Security
 
 public enum KeychainSecretError: Error, Equatable, LocalizedError {
     case itemNotFound
+    case keychainUnavailable(OSStatus)
     case unexpectedStatus(OSStatus)
     case interactionNotAllowed
     case invalidData
@@ -13,6 +14,8 @@ public enum KeychainSecretError: Error, Equatable, LocalizedError {
         switch self {
         case .itemNotFound:
             "The saved destination secret is missing. Re-save the destination or repair password access in Settings."
+        case let .keychainUnavailable(status):
+            "macOS could not open the login keychain for Delta (status \(status)). Unlock or reset the login keychain in Keychain Access, then try again."
         case let .unexpectedStatus(status):
             "Keychain operation failed with status \(status)."
         case .interactionNotAllowed:
@@ -48,8 +51,7 @@ public struct KeychainSecretStore: Sendable {
         authenticationPolicy: KeychainAuthenticationPolicy = .allowUserInteraction
     ) throws {
         let data = Data(secret.utf8)
-        var query = baseQuery(account: account)
-        apply(authenticationPolicy, to: &query)
+        let query = updateQuery(account: account, authenticationPolicy: authenticationPolicy)
         let trustedAccess = try trustedApplicationAccess()
 
         var attributes: [String: Any] = [
@@ -68,12 +70,12 @@ public struct KeychainSecretStore: Sendable {
             throw keychainError(for: updateStatus)
         }
 
-        var addQuery = baseQuery(account: account)
-        addQuery[kSecValueData as String] = data
-        addQuery[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-        if let trustedAccess {
-            addQuery[kSecAttrAccess as String] = trustedAccess
-        }
+        let addQuery = addQuery(
+            account: account,
+            data: data,
+            trustedAccess: trustedAccess,
+            authenticationPolicy: authenticationPolicy
+        )
         let addStatus = SecItemAdd(addQuery as CFDictionary, nil)
         guard addStatus == errSecSuccess else {
             throw keychainError(for: addStatus)
@@ -100,10 +102,13 @@ public struct KeychainSecretStore: Sendable {
         return secret
     }
 
-    public func delete(account: String) throws {
-        let status = SecItemDelete(baseQuery(account: account) as CFDictionary)
+    public func delete(
+        account: String,
+        authenticationPolicy: KeychainAuthenticationPolicy = .failIfInteractionNeeded
+    ) throws {
+        let status = SecItemDelete(updateQuery(account: account, authenticationPolicy: authenticationPolicy) as CFDictionary)
         guard status == errSecSuccess || status == errSecItemNotFound else {
-            throw KeychainSecretError.unexpectedStatus(status)
+            throw keychainError(for: status)
         }
     }
 
@@ -128,6 +133,27 @@ public struct KeychainSecretStore: Sendable {
             kSecAttrService as String: service,
             kSecAttrAccount as String: account
         ]
+    }
+
+    func updateQuery(account: String, authenticationPolicy: KeychainAuthenticationPolicy) -> [String: Any] {
+        var query = baseQuery(account: account)
+        apply(authenticationPolicy, to: &query)
+        return query
+    }
+
+    func addQuery(
+        account: String,
+        data: Data,
+        trustedAccess: SecAccess?,
+        authenticationPolicy: KeychainAuthenticationPolicy
+    ) -> [String: Any] {
+        var query = updateQuery(account: account, authenticationPolicy: authenticationPolicy)
+        query[kSecValueData as String] = data
+        query[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        if let trustedAccess {
+            query[kSecAttrAccess as String] = trustedAccess
+        }
+        return query
     }
 
     func loadQuery(account: String, authenticationPolicy: KeychainAuthenticationPolicy) -> [String: Any] {
@@ -191,6 +217,9 @@ public struct KeychainSecretStore: Sendable {
     private func keychainError(for status: OSStatus) -> KeychainSecretError {
         if status == errSecItemNotFound {
             return .itemNotFound
+        }
+        if status == errSecNoSuchKeychain || status == errSecInvalidKeychain || status == errSecNoDefaultKeychain || status == errSecNotAvailable {
+            return .keychainUnavailable(status)
         }
         if status == errSecInteractionNotAllowed {
             return .interactionNotAllowed

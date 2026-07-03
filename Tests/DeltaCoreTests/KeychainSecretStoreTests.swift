@@ -20,9 +20,46 @@ final class KeychainSecretStoreTests: XCTestCase {
         XCTAssertNil(query[kSecUseAuthenticationUI as String])
     }
 
+    func testBackgroundUpdateQueryFailsInsteadOfPromptingForAuthentication() throws {
+        let query = KeychainSecretStore(service: "test").updateQuery(
+            account: "account",
+            authenticationPolicy: .failIfInteractionNeeded
+        )
+
+        let context = try XCTUnwrap(query[kSecUseAuthenticationContext as String] as? LAContext)
+        XCTAssertTrue(context.interactionNotAllowed)
+        XCTAssertNil(query[kSecUseAuthenticationUI as String])
+    }
+
+    func testBackgroundAddQueryFailsInsteadOfPromptingForAuthentication() throws {
+        let query = KeychainSecretStore(service: "test").addQuery(
+            account: "account",
+            data: Data("secret".utf8),
+            trustedAccess: nil,
+            authenticationPolicy: .failIfInteractionNeeded
+        )
+
+        let context = try XCTUnwrap(query[kSecUseAuthenticationContext as String] as? LAContext)
+        XCTAssertTrue(context.interactionNotAllowed)
+        XCTAssertNil(query[kSecUseAuthenticationUI as String])
+        XCTAssertEqual(query[kSecValueData as String] as? Data, Data("secret".utf8))
+    }
+
     func testInteractiveLoadQueryDoesNotForceAuthenticationFailure() {
         let query = KeychainSecretStore(service: "test").loadQuery(
             account: "account",
+            authenticationPolicy: .allowUserInteraction
+        )
+
+        XCTAssertNil(query[kSecUseAuthenticationContext as String])
+        XCTAssertNil(query[kSecUseAuthenticationUI as String])
+    }
+
+    func testInteractiveAddQueryDoesNotForceAuthenticationFailure() {
+        let query = KeychainSecretStore(service: "test").addQuery(
+            account: "account",
+            data: Data("secret".utf8),
+            trustedAccess: nil,
             authenticationPolicy: .allowUserInteraction
         )
 
@@ -34,6 +71,13 @@ final class KeychainSecretStoreTests: XCTestCase {
         XCTAssertEqual(
             KeychainSecretError.itemNotFound.localizedDescription,
             "The saved destination secret is missing. Re-save the destination or repair password access in Settings."
+        )
+    }
+
+    func testUnavailableLoginKeychainHasActionableMessage() {
+        XCTAssertEqual(
+            KeychainSecretError.keychainUnavailable(errSecNoDefaultKeychain).localizedDescription,
+            "macOS could not open the login keychain for Delta (status -25307). Unlock or reset the login keychain in Keychain Access, then try again."
         )
     }
 }
