@@ -114,6 +114,24 @@ expect_failure() {
   fi
 }
 
+expect_failure_contains_all() {
+  local name="$1"
+  shift
+  local output
+  set +e
+  output="$(run_verify 2>&1)"
+  local status=$?
+  set -e
+  [[ "$status" -ne 0 ]] || fail "$name unexpectedly passed."
+  local expected
+  for expected in "$@"; do
+    if ! /usr/bin/grep -Fq "$expected" <<<"$output"; then
+      printf "%s\n" "$output" >&2
+      fail "$name failed without expected message: $expected"
+    fi
+  done
+}
+
 write_good_reports
 run_verify >/dev/null
 
@@ -138,6 +156,15 @@ write_good_reports
 /usr/bin/grep -Fv -- "- Executable:" "$WORK_DIR/external-mounted-acceptance-latest.md" >"$WORK_DIR/mounted.tmp"
 /bin/mv "$WORK_DIR/mounted.tmp" "$WORK_DIR/external-mounted-acceptance-latest.md"
 expect_failure "missing executable provenance" "mounted report at $WORK_DIR/external-mounted-acceptance-latest.md does not record 'Executable'." run_verify
+
+write_good_reports
+/usr/bin/grep -Fv -- "- Executable:" "$WORK_DIR/external-mounted-acceptance-latest.md" >"$WORK_DIR/mounted.tmp"
+/bin/mv "$WORK_DIR/mounted.tmp" "$WORK_DIR/external-mounted-acceptance-latest.md"
+/usr/bin/perl -0pi -e 's#^- Acceptance environment: real-external$#- Acceptance environment: local-harness#m' "$WORK_DIR/external-sftp-acceptance-latest.md"
+expect_failure_contains_all \
+  "aggregated report failures" \
+  "mounted report at $WORK_DIR/external-mounted-acceptance-latest.md does not record 'Executable'." \
+  "sftp report was produced against 'local-harness', expected 'real-external'."
 
 expect_failure "missing app bundle" "app bundle not found" \
   env DELTA_EXTERNAL_ACCEPTANCE_DIR="$WORK_DIR" "$VERIFY_SCRIPT" "$WORK_DIR/Missing.app"

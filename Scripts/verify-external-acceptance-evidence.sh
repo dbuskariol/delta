@@ -10,10 +10,15 @@ MOUNTED_REPORT="${DELTA_EXTERNAL_ACCEPTANCE_MOUNTED_REPORT:-$REPORT_DIR/external
 SFTP_REPORT="${DELTA_EXTERNAL_ACCEPTANCE_SFTP_REPORT:-$REPORT_DIR/external-sftp-acceptance-latest.md}"
 S3_REPORT="${DELTA_EXTERNAL_ACCEPTANCE_S3_REPORT:-$REPORT_DIR/external-s3-acceptance-latest.md}"
 REQUIRE_SFTP_FAILURE_PROBE="${DELTA_EXTERNAL_ACCEPTANCE_REQUIRE_SFTP_FAILURE_PROBE:-1}"
+REPORT_FAILURES=()
 
 fail() {
   printf "External acceptance evidence failed: %s\n" "$1" >&2
   exit 1
+}
+
+record_failure() {
+  REPORT_FAILURES+=("$1")
 }
 
 canonical_app_path() {
@@ -40,7 +45,10 @@ require_report_value() {
   local key="$3"
   local value
   value="$(report_value "$report" "$key")"
-  [[ -n "$value" ]] || fail "$kind report at $report does not record '$key'."
+  if [[ -z "$value" ]]; then
+    record_failure "$kind report at $report does not record '$key'."
+    return 1
+  fi
   printf "%s" "$value"
 }
 
@@ -50,15 +58,23 @@ require_report_value_equals() {
   local key="$3"
   local expected="$4"
   local value
-  value="$(require_report_value "$kind" "$report" "$key")"
-  [[ "$value" == "$expected" ]] || fail "$kind report at $report records '$key' as '$value', expected '$expected'."
+  value="$(report_value "$report" "$key")"
+  if [[ -z "$value" ]]; then
+    record_failure "$kind report at $report does not record '$key'."
+    return 1
+  fi
+  if [[ "$value" != "$expected" ]]; then
+    record_failure "$kind report at $report records '$key' as '$value', expected '$expected'."
+    return 1
+  fi
 }
 
 require_contains() {
   local report="$1"
   local expected="$2"
   if ! /usr/bin/grep -Fq -- "$expected" "$report"; then
-    fail "$report is missing expected evidence: $expected"
+    record_failure "$report is missing expected evidence: $expected"
+    return 1
   fi
 }
 
@@ -66,44 +82,61 @@ verify_report() {
   local kind="$1"
   local report="$2"
   local required_environment="$3"
+  local failed=0
 
-  [[ -f "$report" || -L "$report" ]] || fail "$kind report not found at $report. Run Scripts/run-external-backend-acceptance.sh $kind /Applications/Delta.app against real infrastructure."
+  if [[ ! -f "$report" && ! -L "$report" ]]; then
+    record_failure "$kind report not found at $report. Run Scripts/run-external-backend-acceptance.sh $kind /Applications/Delta.app against real infrastructure."
+    return 1
+  fi
 
-  require_report_value "$kind" "$report" "Generated" >/dev/null
-  require_report_value_equals "$kind" "$report" "App" "$APP_PATH"
-  require_report_value_equals "$kind" "$report" "Executable" "$APP_EXECUTABLE"
-  require_report_value_equals "$kind" "$report" "Restic" "$APP_RESTIC"
-  require_contains "$report" "- Kind: $kind"
-  require_contains "$report" "Installed external $kind lifecycle acceptance passed."
-  require_contains "$report" "- Delta coordinator lifecycle: Yes"
-  require_contains "$report" "- Automatic destination preparation runs: 1"
-  require_contains "$report" "- First backup status: Completed"
-  require_contains "$report" "- No-change backup:"
-  require_contains "$report" "- Incremental backup:"
-  require_contains "$report" "- Cached restore points:"
-  require_contains "$report" "- Latest restore point:"
-  require_contains "$report" "- Restore browser entries verified:"
-  require_contains "$report" "- Full restore status: Completed"
-  require_contains "$report" "- Selected folder restore status: Completed"
-  require_contains "$report" "- Destination check status: Completed"
-  require_contains "$report" "- Cleanup runs:"
-  require_contains "$report" "- Stored backup jobs: 3"
-  require_contains "$report" "- Stored restore jobs: 2"
-  require_contains "$report" "- Keychain items deleted on exit: Yes"
-  require_contains "$report" "- Runner: Scripts/run-external-backend-acceptance.sh"
+  require_report_value "$kind" "$report" "Generated" >/dev/null || failed=1
+  require_report_value_equals "$kind" "$report" "App" "$APP_PATH" || failed=1
+  require_report_value_equals "$kind" "$report" "Executable" "$APP_EXECUTABLE" || failed=1
+  require_report_value_equals "$kind" "$report" "Restic" "$APP_RESTIC" || failed=1
+  require_contains "$report" "- Kind: $kind" || failed=1
+  require_contains "$report" "Installed external $kind lifecycle acceptance passed." || failed=1
+  require_contains "$report" "- Delta coordinator lifecycle: Yes" || failed=1
+  require_contains "$report" "- Automatic destination preparation runs: 1" || failed=1
+  require_contains "$report" "- First backup status: Completed" || failed=1
+  require_contains "$report" "- No-change backup:" || failed=1
+  require_contains "$report" "- Incremental backup:" || failed=1
+  require_contains "$report" "- Cached restore points:" || failed=1
+  require_contains "$report" "- Latest restore point:" || failed=1
+  require_contains "$report" "- Restore browser entries verified:" || failed=1
+  require_contains "$report" "- Full restore status: Completed" || failed=1
+  require_contains "$report" "- Selected folder restore status: Completed" || failed=1
+  require_contains "$report" "- Destination check status: Completed" || failed=1
+  require_contains "$report" "- Cleanup runs:" || failed=1
+  require_contains "$report" "- Stored backup jobs: 3" || failed=1
+  require_contains "$report" "- Stored restore jobs: 2" || failed=1
+  require_contains "$report" "- Keychain items deleted on exit: Yes" || failed=1
+  require_contains "$report" "- Runner: Scripts/run-external-backend-acceptance.sh" || failed=1
 
   local report_commit
   report_commit="$(report_value "$report" "Git Commit")"
-  [[ "$report_commit" == "$HEAD_COMMIT" ]] || fail "$kind report is for commit ${report_commit:-unknown}, not current commit $HEAD_COMMIT."
+  if [[ "$report_commit" != "$HEAD_COMMIT" ]]; then
+    record_failure "$kind report is for commit ${report_commit:-unknown}, not current commit $HEAD_COMMIT."
+    failed=1
+  fi
 
   local environment
   environment="$(report_value "$report" "Acceptance environment")"
-  [[ "$environment" == "$required_environment" ]] || fail "$kind report was produced against '${environment:-unknown}', expected '$required_environment'. Localhost/local harness evidence is not sufficient for production readiness."
+  if [[ "$environment" != "$required_environment" ]]; then
+    record_failure "$kind report was produced against '${environment:-unknown}', expected '$required_environment'. Localhost/local harness evidence is not sufficient for production readiness."
+    failed=1
+  fi
 
   local report_cdhash
   report_cdhash="$(report_value "$report" "App CDHash")"
-  [[ -n "$report_cdhash" ]] || fail "$kind report at $report does not record the app CDHash."
-  [[ "$report_cdhash" == "$APP_CDHASH" ]] || fail "$kind report CDHash $report_cdhash does not match $APP_PATH CDHash $APP_CDHASH."
+  if [[ -z "$report_cdhash" ]]; then
+    record_failure "$kind report at $report does not record the app CDHash."
+    failed=1
+  elif [[ "$report_cdhash" != "$APP_CDHASH" ]]; then
+    record_failure "$kind report CDHash $report_cdhash does not match $APP_PATH CDHash $APP_CDHASH."
+    failed=1
+  fi
+
+  return "$failed"
 }
 
 APP_PATH="$(canonical_app_path "$APP_PATH")"
@@ -114,12 +147,22 @@ APP_RESTIC="$APP_PATH/Contents/MacOS/restic"
 APP_CDHASH="$(code_signature_value "$APP_PATH" CDHash)"
 [[ -n "$APP_CDHASH" ]] || fail "could not read the app CDHash for $APP_PATH."
 
-verify_report mounted "$MOUNTED_REPORT" mounted-network
-verify_report sftp "$SFTP_REPORT" real-external
+verify_report mounted "$MOUNTED_REPORT" mounted-network || true
+verify_report sftp "$SFTP_REPORT" real-external || true
 if [[ "$REQUIRE_SFTP_FAILURE_PROBE" == "1" ]]; then
-  require_contains "$SFTP_REPORT" "- Wrong SFTP credential or target probe: Passed"
+  if [[ -f "$SFTP_REPORT" || -L "$SFTP_REPORT" ]]; then
+    require_contains "$SFTP_REPORT" "- Wrong SFTP credential or target probe: Passed" || true
+  fi
 fi
-verify_report s3 "$S3_REPORT" real-external
-require_contains "$S3_REPORT" "- Missing credential probe: Passed"
+verify_report s3 "$S3_REPORT" real-external || true
+if [[ -f "$S3_REPORT" || -L "$S3_REPORT" ]]; then
+  require_contains "$S3_REPORT" "- Missing credential probe: Passed" || true
+fi
+
+if (( ${#REPORT_FAILURES[@]} > 0 )); then
+  printf "External acceptance evidence failed:\n" >&2
+  printf -- "- %s\n" "${REPORT_FAILURES[@]}" >&2
+  exit 1
+fi
 
 printf "External acceptance evidence verified for mounted network, real SFTP, and real S3-compatible destinations at commit %s.\n" "$HEAD_COMMIT"

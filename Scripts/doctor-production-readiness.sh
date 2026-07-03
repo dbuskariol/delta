@@ -17,7 +17,16 @@ warnings=0
 print_status() {
   local status="$1"
   local message="$2"
-  printf -- "- [%s] %s\n" "$status" "$message"
+  local first_line=1
+  local line
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    if [[ "$first_line" -eq 1 ]]; then
+      printf -- "- [%s] %s\n" "$status" "$line"
+      first_line=0
+    else
+      printf -- "  %s\n" "$line"
+    fi
+  done <<<"$message"
 }
 
 pass() {
