@@ -365,12 +365,18 @@ DELTA_SKIP_BUILD=1 "$ROOT_DIR/Scripts/package-update.sh"
 "$ROOT_DIR/Scripts/verify-sparkle-update-artifacts.sh" "$ROOT_DIR/dist/Delta.app" "$ROOT_DIR/dist/updates"
 
 GATE_STATUS_DIR="$ROOT_DIR/dist/release-evidence"
+APP_CDHASH="$(/usr/bin/codesign -dvvv "$ROOT_DIR/dist/Delta.app" 2>&1 | /usr/bin/awk -F= '$1 == "CDHash" && value == "" { value = $2 } END { print value }')"
+if [[ -z "$APP_CDHASH" ]]; then
+  printf "Could not read release app CDHash for automated gate status.\n" >&2
+  exit 1
+fi
 /bin/mkdir -p "$GATE_STATUS_DIR"
 cat >"$GATE_STATUS_DIR/automated-gate-status" <<EOF
 status=Passed
 git_commit=$(/usr/bin/git -C "$ROOT_DIR" rev-parse --short HEAD 2>/dev/null || printf "unknown")
 generated_at=$(/bin/date -u +%Y%m%dT%H%M%SZ)
 app_path=$ROOT_DIR/dist/Delta.app
+app_cdhash=$APP_CDHASH
 EOF
 
 printf "Release verification passed for %s\n" "$ROOT_DIR/dist/Delta.app"

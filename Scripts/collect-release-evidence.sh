@@ -11,6 +11,11 @@ if [[ ! -d "$APP_PATH" ]]; then
   printf "Delta app bundle not found at %s\n" "$APP_PATH" >&2
   exit 1
 fi
+APP_PATH="$(cd "$(dirname "$APP_PATH")" && pwd -P)/$(basename "$APP_PATH")"
+EXTERNAL_ACCEPTANCE_APP_PATH="$APP_PATH"
+if [[ -d "$INSTALLED_APP_PATH" ]]; then
+  INSTALLED_APP_PATH="$(cd "$(dirname "$INSTALLED_APP_PATH")" && pwd -P)/$(basename "$INSTALLED_APP_PATH")"
+fi
 
 mkdir -p "$OUTPUT_DIR"
 
@@ -47,15 +52,35 @@ gate_status_value() {
   /usr/bin/awk -F= -v key="$key" '$1 == key { print $2; exit }' "$GATE_STATUS_FILE" 2>/dev/null || true
 }
 
+signature_value() {
+  local app="$1"
+  local key="$2"
+  /usr/bin/codesign -dvvv "$app" 2>&1 | /usr/bin/awk -F= -v key="$key" '$1 == key && value == "" { value = $2 } END { print value }'
+}
+
 manual_report_value() {
   local key="$1"
   /usr/bin/awk -F': ' -v key="- $key" '$1 == key { print $2; exit }' "$MANUAL_ACCEPTANCE_REPORT" 2>/dev/null || true
 }
 
+APP_CDHASH="$(signature_value "$APP_PATH" CDHash)"
 AUTOMATED_GATE_STATUS="${DELTA_AUTOMATED_GATE_STATUS:-}"
+AUTOMATED_GATE_APP_HASH_MATCH="No"
 if [[ -z "$AUTOMATED_GATE_STATUS" && -f "$GATE_STATUS_FILE" ]]; then
-  if [[ "$(gate_status_value git_commit)" == "$GIT_COMMIT" ]]; then
-    AUTOMATED_GATE_STATUS="$(gate_status_value status)"
+  gate_commit="$(gate_status_value git_commit)"
+  gate_app_path="$(gate_status_value app_path)"
+  gate_app_cdhash="$(gate_status_value app_cdhash)"
+  if [[ "$gate_commit" == "$GIT_COMMIT" ]]; then
+    if [[ "$(gate_status_value status)" == "Passed" \
+      && -n "$APP_CDHASH" \
+      && "$gate_app_cdhash" == "$APP_CDHASH" \
+      && ( -z "$gate_app_path" || "$gate_app_path" == "$APP_PATH" ) ]]
+    then
+      AUTOMATED_GATE_STATUS="Passed"
+      AUTOMATED_GATE_APP_HASH_MATCH="Yes"
+    else
+      AUTOMATED_GATE_STATUS="Stale or mismatched app hash for $GIT_COMMIT"
+    fi
   else
     AUTOMATED_GATE_STATUS="Not recorded for $GIT_COMMIT"
   fi
@@ -82,6 +107,7 @@ cat >"$OUTPUT" <<EOF
 - Version: $SHORT_VERSION
 - Build: $BUILD_VERSION
 - Git Commit: $GIT_COMMIT
+- App CDHash: ${APP_CDHASH:-Unknown}
 - Host macOS: $(/usr/bin/sw_vers -productVersion) ($(/usr/bin/sw_vers -buildVersion))
 
 ## Automated Evidence
@@ -199,6 +225,7 @@ fi
 
 READY_FOR_EXTERNAL_DISTRIBUTION="No"
 if [[ "$AUTOMATED_GATE_STATUS" == "Passed" \
+  && "$AUTOMATED_GATE_APP_HASH_MATCH" == "Yes" \
   && "$MANUAL_MATRIX_PASSED" == "Yes" \
   && "$MANUAL_REPORT_CURRENT" == "Yes" \
   && "$EXTERNAL_ACCEPTANCE_PASSED" == "Yes" \
@@ -217,6 +244,7 @@ Manual matrix passed: $MANUAL_MATRIX_PASSED
 ## Release Decision
 
 - Automated gate passed: $AUTOMATED_GATE_STATUS
+- Automated gate app hash matches: $AUTOMATED_GATE_APP_HASH_MATCH
 - Manual report matches git commit: $MANUAL_REPORT_CURRENT
 - Manual matrix passed: $MANUAL_MATRIX_PASSED
 - Real external backend acceptance passed: $EXTERNAL_ACCEPTANCE_PASSED

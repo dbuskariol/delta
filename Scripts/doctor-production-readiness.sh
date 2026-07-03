@@ -119,6 +119,13 @@ printf "# Delta Production Readiness Doctor\n\n"
 head_commit="$(/usr/bin/git -C "$ROOT_DIR" rev-parse --short HEAD)"
 printf -- "- Repository: %s\n" "$ROOT_DIR"
 printf -- "- Commit: %s\n" "$head_commit"
+if [[ -d "$APP_PATH" ]]; then
+  APP_PATH="$(cd "$(dirname "$APP_PATH")" && pwd -P)/$(basename "$APP_PATH")"
+fi
+if [[ -d "$INSTALLED_APP_PATH" ]]; then
+  INSTALLED_APP_PATH="$(cd "$(dirname "$INSTALLED_APP_PATH")" && pwd -P)/$(basename "$INSTALLED_APP_PATH")"
+fi
+EXTERNAL_ACCEPTANCE_APP_PATH="$APP_PATH"
 printf -- "- App: %s\n" "$APP_PATH"
 printf -- "- Installed app: %s\n\n" "$INSTALLED_APP_PATH"
 
@@ -155,6 +162,21 @@ if [[ -f "$GATE_STATUS_FILE" ]]; then
   gate_commit="$(gate_status_value git_commit)"
   if [[ "$gate_status" == "Passed" && "$gate_commit" == "$head_commit" ]]; then
     pass "Automated release gate passed for current commit $head_commit."
+    gate_recorded_app_path="$(gate_status_value app_path)"
+    gate_recorded_app_cdhash="$(gate_status_value app_cdhash)"
+    if [[ -n "$gate_recorded_app_path" && "$gate_recorded_app_path" != "$APP_PATH" ]]; then
+      block "Automated release gate was recorded for $gate_recorded_app_path, not current app path $APP_PATH. Rerun Scripts/verify-release.sh."
+    fi
+    if [[ -z "$gate_recorded_app_cdhash" ]]; then
+      block "Automated release gate status does not record the verified app CDHash. Rerun Scripts/verify-release.sh."
+    elif [[ -d "$APP_PATH" ]]; then
+      current_app_cdhash="$(signature_value "$APP_PATH" CDHash)"
+      if [[ -n "$current_app_cdhash" && "$gate_recorded_app_cdhash" == "$current_app_cdhash" ]]; then
+        pass "Automated release gate app CDHash matches the current app."
+      else
+        block "Automated release gate app CDHash does not match the current app. Rerun Scripts/verify-release.sh."
+      fi
+    fi
   elif [[ "$gate_status" == "Passed" ]]; then
     block "Automated release gate passed for $gate_commit, not current commit $head_commit. Rerun Scripts/verify-release.sh."
   else

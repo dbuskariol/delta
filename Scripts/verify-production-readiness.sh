@@ -42,6 +42,8 @@ fi
 if [[ ! -d "$INSTALLED_APP" ]]; then
   fail "installed app not found at $INSTALLED_APP. Run Scripts/install-app.sh after building the release candidate."
 fi
+APP="$(cd "$(dirname "$APP")" && pwd -P)/$(basename "$APP")"
+INSTALLED_APP="$(cd "$(dirname "$INSTALLED_APP")" && pwd -P)/$(basename "$INSTALLED_APP")"
 
 if [[ "${DELTA_PRODUCTION_ALLOW_DIRTY:-0}" != "1" \
   && -n "$(/usr/bin/git -C "$ROOT_DIR" status --porcelain --untracked-files=all)" ]]
@@ -84,6 +86,17 @@ fi
 
 APP_CDHASH="$(code_signature_value "$APP" CDHash)"
 INSTALLED_CDHASH="$(code_signature_value "$INSTALLED_APP" CDHash)"
+GATE_APP_PATH="$(gate_status_value app_path)"
+GATE_APP_CDHASH="$(gate_status_value app_cdhash)"
+if [[ -n "$GATE_APP_PATH" && "$GATE_APP_PATH" != "$APP" ]]; then
+  fail "automated gate was recorded for $GATE_APP_PATH, not release app $APP."
+fi
+if [[ -z "$GATE_APP_CDHASH" ]]; then
+  fail "automated gate status does not record the verified app CDHash. Rerun Scripts/verify-release.sh."
+fi
+if [[ -z "$APP_CDHASH" || "$GATE_APP_CDHASH" != "$APP_CDHASH" ]]; then
+  fail "automated gate app CDHash does not match the release app. Rerun Scripts/verify-release.sh."
+fi
 if [[ -z "$APP_CDHASH" || "$APP_CDHASH" != "$INSTALLED_CDHASH" ]]; then
   fail "installed app code signature hash does not match the verified release app."
 fi
