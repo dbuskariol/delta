@@ -134,6 +134,11 @@ write_good_reports
 /bin/mv "$WORK_DIR/mounted.tmp" "$WORK_DIR/external-mounted-acceptance-latest.md"
 expect_failure "missing stored job count" "Stored backup jobs: 3" run_verify
 
+write_good_reports
+/usr/bin/grep -Fv -- "- Executable:" "$WORK_DIR/external-mounted-acceptance-latest.md" >"$WORK_DIR/mounted.tmp"
+/bin/mv "$WORK_DIR/mounted.tmp" "$WORK_DIR/external-mounted-acceptance-latest.md"
+expect_failure "missing executable provenance" "mounted report at $WORK_DIR/external-mounted-acceptance-latest.md does not record 'Executable'." run_verify
+
 expect_failure "missing app bundle" "app bundle not found" \
   env DELTA_EXTERNAL_ACCEPTANCE_DIR="$WORK_DIR" "$VERIFY_SCRIPT" "$WORK_DIR/Missing.app"
 

@@ -71,6 +71,32 @@ first_row_for_id() {
   /usr/bin/awk -F'|' -v id="$id" '$2 ~ " " id " " { gsub(/^[ \t]+|[ \t]+$/, "", $4); print $4; exit }' "$LOCAL_ACCEPTANCE_REPORT" 2>/dev/null || true
 }
 
+print_next_actions() {
+  cat <<'EOF'
+
+## Next Actions
+
+1. Install a Developer ID Application certificate, then rebuild the release app with that identity:
+   DELTA_CODESIGN_IDENTITY="Developer ID Application: ..." Scripts/verify-release.sh
+2. Store notarization credentials in the keychain and notarize the verified app:
+   xcrun notarytool store-credentials "Delta Notary" --apple-id ... --team-id ... --password ...
+   DELTA_NOTARY_KEYCHAIN_PROFILE="Delta Notary" Scripts/notarize-release.sh dist/Delta.app
+3. Install the notarized app and refresh release evidence:
+   Scripts/install-app.sh dist/Delta.app
+   Scripts/collect-release-evidence.sh dist/Delta.app
+4. Complete the manual acceptance matrix for the current commit:
+   Scripts/create-manual-acceptance-report.sh
+   Scripts/verify-manual-acceptance.sh
+5. Run real external backend acceptance against non-local infrastructure:
+   DELTA_ACCEPTANCE_MOUNTED_PATH=/Volumes/... Scripts/run-external-backend-acceptance.sh mounted /Applications/Delta.app
+   DELTA_ACCEPTANCE_SFTP_REPOSITORY='sftp:user@example.com:/absolute/delta-acceptance-path' Scripts/run-external-backend-acceptance.sh sftp /Applications/Delta.app
+   DELTA_ACCEPTANCE_S3_REPOSITORY='s3:https://endpoint/bucket/delta-acceptance-path' AWS_ACCESS_KEY_ID=... AWS_SECRET_ACCESS_KEY=... Scripts/run-external-backend-acceptance.sh s3 /Applications/Delta.app
+   Scripts/verify-external-acceptance-evidence.sh /Applications/Delta.app
+6. Rerun the final production-readiness gate:
+   Scripts/verify-production-readiness.sh
+EOF
+}
+
 printf "# Delta Production Readiness Doctor\n\n"
 
 head_commit="$(/usr/bin/git -C "$ROOT_DIR" rev-parse --short HEAD)"
@@ -319,6 +345,8 @@ if [[ "$blockers" -eq 0 ]]; then
   printf -- "- Ready for production verification: Yes\n"
   exit 0
 fi
+
+print_next_actions
 
 printf -- "- Ready for production verification: No\n"
 if [[ "${DELTA_DOCTOR_ALLOW_BLOCKERS:-0}" == "1" ]]; then

@@ -40,7 +40,7 @@ require_report_value() {
   local key="$3"
   local value
   value="$(report_value "$report" "$key")"
-  [[ -n "$value" ]] || fail "$kind report does not record '$key'."
+  [[ -n "$value" ]] || fail "$kind report at $report does not record '$key'."
   printf "%s" "$value"
 }
 
@@ -51,7 +51,7 @@ require_report_value_equals() {
   local expected="$4"
   local value
   value="$(require_report_value "$kind" "$report" "$key")"
-  [[ "$value" == "$expected" ]] || fail "$kind report records '$key' as '$value', expected '$expected'."
+  [[ "$value" == "$expected" ]] || fail "$kind report at $report records '$key' as '$value', expected '$expected'."
 }
 
 require_contains() {
@@ -102,7 +102,7 @@ verify_report() {
 
   local report_cdhash
   report_cdhash="$(report_value "$report" "App CDHash")"
-  [[ -n "$report_cdhash" ]] || fail "$kind report does not record the app CDHash."
+  [[ -n "$report_cdhash" ]] || fail "$kind report at $report does not record the app CDHash."
   [[ "$report_cdhash" == "$APP_CDHASH" ]] || fail "$kind report CDHash $report_cdhash does not match $APP_PATH CDHash $APP_CDHASH."
 }
 
