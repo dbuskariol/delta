@@ -1,7 +1,6 @@
 import Foundation
 
 public enum DeltaAppPreferenceKeys {
-    public static let activityLogDetail = "Delta.activityLogDetail"
     public static let backupFreshnessWarningHours = "Delta.backupFreshnessWarningHours"
     public static let destinationFreeSpaceWarningGiB = "Delta.destinationFreeSpaceWarningGiB"
     public static let destinationVerificationWarningHours = "Delta.destinationVerificationWarningHours"
@@ -79,7 +78,6 @@ public enum DeltaAppPreferenceKeys {
     ]
 
     public static let appBehavior = [
-        activityLogDetail,
         operationalHistoryRetentionDays,
         pausesScheduledBackups,
         preventsIdleSleepDuringJobs,

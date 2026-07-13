@@ -169,6 +169,85 @@ final class DatabaseTests: XCTestCase {
         XCTAssertEqual(repositoryLogs.first?.id, entry.id)
     }
 
+    func testJobLogPagesAreBoundedNewestFirstAndFilterIssues() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let database = try DeltaDatabase(url: directory.appendingPathComponent("Delta.sqlite"))
+        let repositoryID = UUID()
+        let jobID = UUID()
+        for index in 0..<25 {
+            try database.appendJobLog(
+                JobLogEntry(
+                    jobID: jobID,
+                    repositoryID: repositoryID,
+                    date: Date(timeIntervalSince1970: TimeInterval(index)),
+                    stream: index.isMultiple(of: 7) ? .standardError : .standardOutput,
+                    message: "line-\(index)"
+                )
+            )
+        }
+
+        let newestPage = try database.fetchJobLogPage(jobID: jobID, limit: 10)
+        XCTAssertEqual(newestPage.entries.map(\.message), (15..<25).map { "line-\($0)" })
+        XCTAssertEqual(newestPage.totalCount, 25)
+        XCTAssertEqual(newestPage.issueCount, 4)
+        XCTAssertTrue(newestPage.hasMore)
+
+        let earlierPage = try database.fetchJobLogPage(
+            jobID: jobID,
+            before: try XCTUnwrap(newestPage.nextCursor),
+            limit: 10
+        )
+        XCTAssertEqual(earlierPage.entries.map(\.message), (5..<15).map { "line-\($0)" })
+        XCTAssertTrue(earlierPage.hasMore)
+
+        let issuePage = try database.fetchJobLogPage(jobID: jobID, limit: 10, issuesOnly: true)
+        XCTAssertEqual(issuePage.entries.map(\.message), ["line-0", "line-7", "line-14", "line-21"])
+        XCTAssertFalse(issuePage.hasMore)
+    }
+
+    func testJobLogPageReadsIssueRowsCreatedBeforeStreamIndexMigration() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let databaseURL = directory.appendingPathComponent("Delta.sqlite")
+        let jobID = UUID()
+        let repositoryID = UUID()
+        let entryID = UUID()
+        let payload = """
+        {"id":"\(entryID.uuidString)","jobID":"\(jobID.uuidString)","repositoryID":"\(repositoryID.uuidString)","date":"2026-07-14T00:00:00.000Z","stream":"standardError","message":"legacy issue"}
+        """
+        let queue = try DatabaseQueue(path: databaseURL.path)
+        try queue.write { db in
+            try db.execute(sql: """
+                CREATE TABLE job_logs (
+                    id TEXT PRIMARY KEY NOT NULL,
+                    job_id TEXT NOT NULL,
+                    repository_id TEXT NOT NULL,
+                    payload TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                )
+                """)
+            try db.execute(
+                sql: """
+                    INSERT INTO job_logs (id, job_id, repository_id, payload, created_at)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                arguments: [entryID.uuidString, jobID.uuidString, repositoryID.uuidString, payload, "2026-07-14T00:00:00.000Z"]
+            )
+        }
+
+        let database = try DeltaDatabase(url: databaseURL)
+        let page = try database.fetchJobLogPage(jobID: jobID, issuesOnly: true)
+
+        XCTAssertEqual(page.entries.map(\.message), ["legacy issue"])
+        XCTAssertEqual(page.totalCount, 1)
+        XCTAssertEqual(page.issueCount, 1)
+    }
+
     func testPruneOperationalHistoryDeletesOldLocalActivityWithoutDeletingRestorePoints() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)

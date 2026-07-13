@@ -24,8 +24,8 @@ The product goal is simple: make serious backup practices approachable without h
 - **Backup health monitoring** with source-access warnings, configurable freshness, destination-verification, and local/mounted free-space warnings for scheduled profiles with no completed backup, stale restore points, failed runs, stopped runs, unchecked destinations, stale destination checks, low-capacity destinations, or unavailable local/mounted destinations.
 - **Notification Center alerts** for failed or warning jobs, with optional successful-backup summaries and a Settings test alert. The signed scheduler uses the same notification policy for scheduled runs.
 - **Full or browsed selected restore** with backup browsing, file/folder selection, configurable dry-run and verification defaults, overwrite policies, original-path restore, chosen-folder restore, and optional pre-restore backup.
-- **Streaming and saved backup logs** from restic stdout/stderr with source context, stable processed-file counters, clean change summaries, fixed-height live panes, and expandable per-job audit history.
-- **Settings and diagnostics** with a compact health summary for system access, schedules, password access, updates, notifications, and bundled backup tools, plus controls for pausing automatic runs, repairing password access for unattended backups, freshness/check/free-space health thresholds, new-backup defaults, restore safety defaults, idle-sleep protection during active jobs, menu bar visibility, start-at-login, Activity log detail, scheduled-run tests, signed update checks/downloads, app version, scheduler status, tool paths, profile/destination counts, recent jobs, and local support paths.
+- **Streaming and saved backup logs** from restic stdout/stderr with source context, stable processed-file counters, clean change summaries, and a native Activity workspace that opens warning runs directly on their issue rows. Run history is virtualized and full output is loaded from SQLite in bounded cursor pages, so large histories remain responsive.
+- **Settings and diagnostics** with a compact health summary for system access, schedules, password access, updates, notifications, and bundled backup tools, plus controls for pausing automatic runs, repairing password access for unattended backups, freshness/check/free-space health thresholds, new-backup defaults, restore safety defaults, idle-sleep protection during active jobs, menu bar visibility, start-at-login, activity history retention, scheduled-run tests, signed update checks/downloads, app version, scheduler status, tool paths, profile/destination counts, recent jobs, and local support paths.
 - **Sparkle automatic updates** with generated appcast/update archive support.
 
 ## How It Works
@@ -114,7 +114,7 @@ Settings include Pause automatic runs for temporarily suspending due scheduled r
 
 Delta can also hold a macOS activity assertion while a backup, restore, destination check, or cleanup is actively running. This is enabled by default to reduce the chance of long unattended jobs being interrupted by idle sleep. It does not force a scheduled backup to start on battery or in Low Power Mode; those profile policies are still evaluated before work begins.
 
-Diagnostics settings include live-log detail and local activity history retention. History retention removes old job summaries, saved output, restore requests, and app events from Delta's SQLite database. It does not remove restore points or backup data from any destination.
+Diagnostics settings include local activity history retention. History retention removes old job summaries, saved output, restore requests, and app events from Delta's SQLite database. It does not remove restore points or backup data from any destination. The Activity workspace always uses bounded, on-demand pages rather than exposing a setting that can accidentally render an unbounded log surface.
 
 ## Scheduling And Maintenance
 

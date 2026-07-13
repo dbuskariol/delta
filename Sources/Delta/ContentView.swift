@@ -1519,102 +1519,514 @@ private extension Array where Element == ResticSnapshotEntry {
 
 struct ActivityView: View {
     @EnvironmentObject private var model: DeltaAppModel
-    @AppStorage(
-        DeltaAppPreferenceKeys.activityLogDetail,
-        store: DeltaAppPreferences.sharedStore()
-    ) private var activityLogDetailRawValue = ActivityLogDetail.standard.rawValue
+    @State private var section: ActivitySection = .jobs
+    @State private var jobFilter: ActivityJobFilter = .all
+    @State private var selectedJobID: UUID?
 
     var body: some View {
-        PageScaffold(title: "Activity", subtitle: "Jobs, destination checks, and system events") {
-            SurfaceSection(title: "Live Backup Logs", symbol: "terminal") {
-                LiveLogViewport(
-                    lines: Array(model.liveLogLines.suffix(activityLogDetail.liveLineLimit)),
-                    isWorking: model.isWorking
-                )
-            }
-
-            SurfaceSection(title: "Saved Job Logs", symbol: "doc.text.magnifyingglass") {
-                PersistentLogViewport(
-                    entries: Array(model.jobLogs.suffix(activityLogDetail.savedPreviewLineLimit)),
-                    jobs: model.jobs
-                )
-            }
-
-            SurfaceSection(title: "Recent Jobs", symbol: "waveform.path.ecg") {
-                if model.jobs.isEmpty {
-                    CompactEmptyRow(text: "No jobs have run yet.")
-                } else {
-                    LazyVStack(spacing: 0) {
-                        ForEach(model.jobs) { job in
-                            JobRow(job: job)
-                        }
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(alignment: .top, spacing: 16) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("Activity")
+                        .font(.system(size: 28, weight: .semibold, design: .rounded))
+                    Text("Run history, issues, and diagnostic output")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Picker("View", selection: $section) {
+                    ForEach(ActivitySection.allCases) { item in
+                        Text(item.title).tag(item)
                     }
                 }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+                .frame(width: 210)
+                Button {
+                    model.reload()
+                } label: {
+                    Label("Refresh", systemImage: "arrow.clockwise")
+                }
+                .buttonStyle(.bordered)
             }
 
-            SurfaceSection(title: "Events", symbol: "list.bullet.rectangle") {
-                if model.events.isEmpty {
-                    CompactEmptyRow(text: "No events recorded.")
-                } else {
-                    LazyVStack(spacing: 0) {
-                        ForEach(model.events) { event in
-                            EventRow(event: event)
+            Group {
+                switch section {
+                case .jobs:
+                    activityWorkspace
+                case .events:
+                    ActivityEventList(events: model.events)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(DeltaTheme.panel)
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(DeltaTheme.border, lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+        }
+        .padding(.horizontal, 24)
+        .padding(.vertical, 22)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(DeltaTheme.background)
+        .task {
+            reconcileSelection()
+        }
+        .onChange(of: model.jobs) { _, _ in
+            reconcileSelection()
+        }
+        .onChange(of: jobFilter) { _, _ in
+            reconcileSelection()
+        }
+    }
+
+    private var activityWorkspace: some View {
+        HStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack {
+                    Text("Runs")
+                        .font(.headline)
+                    Spacer()
+                    Picker("Filter", selection: $jobFilter) {
+                        ForEach(ActivityJobFilter.allCases) { filter in
+                            Text(filter.title).tag(filter)
                         }
                     }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .frame(width: 150)
                 }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+
+                Divider()
+
+                if visibleJobs.isEmpty {
+                    ContentUnavailableView(
+                        jobFilter == .attention ? "No Runs Need Attention" : "No Runs Yet",
+                        systemImage: jobFilter == .attention ? "checkmark.circle" : "clock.arrow.circlepath",
+                        description: Text(jobFilter == .attention ? "Warning and failed runs appear here." : "Backup and maintenance history will appear here.")
+                    )
+                } else {
+                    List(selection: $selectedJobID) {
+                        ForEach(visibleJobs) { job in
+                            ActivityJobListRow(
+                                job: job,
+                                profileName: profileName(for: job)
+                            )
+                            .tag(job.id)
+                        }
+                    }
+                    .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
+                }
+            }
+            .frame(width: 300)
+
+            Divider()
+
+            if let selectedJob {
+                ActivityJobDetailView(
+                    job: selectedJob,
+                    profileName: profileName(for: selectedJob),
+                    repositoryName: repositoryName(for: selectedJob)
+                )
+                .id(selectedJob.id)
+            } else {
+                ContentUnavailableView(
+                    "Select a Run",
+                    systemImage: "waveform.path.ecg",
+                    description: Text("Choose a run to inspect its result and output.")
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
     }
 
-    private var activityLogDetail: ActivityLogDetail {
-        ActivityLogDetail.normalized(activityLogDetailRawValue)
+    private var visibleJobs: [JobRun] {
+        switch jobFilter {
+        case .all:
+            model.jobs
+        case .attention:
+            model.jobs.filter { $0.status == .warning || $0.status == .failed }
+        }
+    }
+
+    private var selectedJob: JobRun? {
+        guard let selectedJobID else { return nil }
+        return visibleJobs.first { $0.id == selectedJobID }
+    }
+
+    private func profileName(for job: JobRun) -> String? {
+        job.profileID.flatMap { profileID in
+            model.profiles.first { $0.id == profileID }?.name
+        }
+    }
+
+    private func repositoryName(for job: JobRun) -> String? {
+        model.repositories.first { $0.id == job.repositoryID }?.name
+    }
+
+    private func reconcileSelection() {
+        guard selectedJob == nil else { return }
+        selectedJobID = visibleJobs.first?.id
     }
 }
 
-private enum ActivityLogDetail: String, CaseIterable, Identifiable {
-    case compact
-    case standard
-    case detailed
+private enum ActivitySection: String, CaseIterable, Identifiable {
+    case jobs
+    case events
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .compact: "Compact"
-        case .standard: "Standard"
-        case .detailed: "Detailed"
+        case .jobs: "Runs"
+        case .events: "Events"
         }
     }
+}
 
-    var description: String {
+private enum ActivityJobFilter: String, CaseIterable, Identifiable {
+    case all
+    case attention
+
+    var id: String { rawValue }
+
+    var title: String {
         switch self {
-        case .compact:
-            return "Show fewer lines for quieter troubleshooting."
-        case .standard:
-            return "Balanced live output and saved job previews."
-        case .detailed:
-            return "Show more output when diagnosing long-running jobs."
+        case .all: "All Runs"
+        case .attention: "Needs Attention"
         }
     }
+}
 
-    var liveLineLimit: Int {
+private enum ActivityLogFilter: String, CaseIterable, Identifiable {
+    case issues
+    case all
+
+    var id: String { rawValue }
+
+    var title: String {
         switch self {
-        case .compact: 120
-        case .standard: 300
-        case .detailed: 500
+        case .issues: "Issues"
+        case .all: "All Output"
+        }
+    }
+}
+
+private struct ActivityJobListRow: View {
+    var job: JobRun
+    var profileName: String?
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: job.status.activitySymbol)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(job.status.activityColor)
+                .frame(width: 18, height: 18)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(profileName ?? job.kind.displayName)
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+                HStack(spacing: 5) {
+                    Text(job.status.displayName)
+                        .foregroundStyle(job.status.activityColor)
+                    Text("·")
+                    Text(job.startedAt.formatted(date: .abbreviated, time: .shortened))
+                        .foregroundStyle(.secondary)
+                }
+                .font(.caption)
+                .lineLimit(1)
+                if job.kind != .backup || profileName != nil {
+                    Text(job.kind.displayName)
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.vertical, 5)
+    }
+}
+
+private struct ActivityJobDetailView: View {
+    @EnvironmentObject private var model: DeltaAppModel
+    var job: JobRun
+    var profileName: String?
+    var repositoryName: String?
+
+    @State private var logFilter: ActivityLogFilter
+    @State private var entries: [JobLogEntry] = []
+    @State private var totalCount = 0
+    @State private var issueCount = 0
+    @State private var nextCursor: JobLogCursor?
+    @State private var hasMore = false
+    @State private var isLoading = false
+    @State private var loadError: String?
+
+    init(job: JobRun, profileName: String?, repositoryName: String?) {
+        self.job = job
+        self.profileName = profileName
+        self.repositoryName = repositoryName
+        _logFilter = State(initialValue: job.status == .warning || job.status == .failed ? .issues : .all)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 14) {
+                StatusIcon(symbol: job.status.activitySymbol, color: job.status.activityColor)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(profileName ?? job.kind.displayName)
+                        .font(.title3.weight(.semibold))
+                    Text(jobMetadata)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                StatusPill(status: job.status)
+            }
+
+            if let message = job.message, !message.isEmpty,
+               job.status == .warning || job.status == .failed || job.status == .cancelled {
+                ActivityResultNotice(status: job.status, message: message)
+            }
+
+            if let summary = job.backupSummary {
+                BackupSummaryMetricRow(summary: summary)
+            }
+
+            Divider()
+
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(logFilter == .issues ? "Issues" : "Output")
+                        .font(.headline)
+                    Text(logCountSummary)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                if issueCount > 0 || job.status == .warning || job.status == .failed {
+                    Picker("Output", selection: $logFilter) {
+                        ForEach(ActivityLogFilter.allCases) { filter in
+                            Text(filter.title).tag(filter)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.segmented)
+                    .frame(width: 190)
+                }
+                if hasMore {
+                    Button {
+                        Task { await loadMore() }
+                    } label: {
+                        Label("Earlier", systemImage: "arrow.up")
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(isLoading)
+                }
+            }
+
+            Group {
+                if isLoading && entries.isEmpty {
+                    ProgressView("Loading output...")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if let loadError {
+                    ContentUnavailableView(
+                        "Output Unavailable",
+                        systemImage: "exclamationmark.triangle",
+                        description: Text(loadError)
+                    )
+                } else if entries.isEmpty {
+                    ContentUnavailableView(
+                        logFilter == .issues ? "No Issue Details" : "No Output Saved",
+                        systemImage: logFilter == .issues ? "checkmark.circle" : "doc.text",
+                        description: Text(logFilter == .issues ? "This run did not save any issue lines." : "This run did not save diagnostic output.")
+                    )
+                } else {
+                    List(entries) { entry in
+                        ActivityLogRow(entry: entry)
+                    }
+                    .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .task(id: loadIdentity) {
+            await loadInitialPage()
         }
     }
 
-    var savedPreviewLineLimit: Int {
+    private var loadIdentity: String {
+        let liveRevision = job.status == .running ? model.jobLogs.count : 0
+        return "\(job.id.uuidString)-\(logFilter.rawValue)-\(liveRevision)"
+    }
+
+    private var jobMetadata: String {
+        var parts = [
+            job.kind.displayName,
+            job.startedAt.formatted(date: .abbreviated, time: .shortened)
+        ]
+        if let repositoryName {
+            parts.append(repositoryName)
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    private var logCountSummary: String {
+        if logFilter == .issues {
+            return "\(issueCount) \(issueCount == 1 ? "issue" : "issues") · \(totalCount) total lines"
+        }
+        return "\(totalCount) total \(totalCount == 1 ? "line" : "lines")"
+    }
+
+    private func loadInitialPage() async {
+        let requestedFilter = logFilter
+        isLoading = true
+        loadError = nil
+        do {
+            let page = try await model.activityLogPage(
+                for: job.id,
+                issuesOnly: requestedFilter == .issues
+            )
+            guard !Task.isCancelled, logFilter == requestedFilter else { return }
+            entries = page.entries
+            totalCount = page.totalCount
+            issueCount = page.issueCount
+            nextCursor = page.nextCursor
+            hasMore = page.hasMore
+        } catch {
+            guard !Task.isCancelled, logFilter == requestedFilter else { return }
+            entries = []
+            nextCursor = nil
+            hasMore = false
+            loadError = error.localizedDescription
+        }
+        if logFilter == requestedFilter {
+            isLoading = false
+        }
+    }
+
+    private func loadMore() async {
+        guard hasMore, let nextCursor, !isLoading else { return }
+        let requestedFilter = logFilter
+        isLoading = true
+        loadError = nil
+        do {
+            let page = try await model.activityLogPage(
+                for: job.id,
+                before: nextCursor,
+                issuesOnly: requestedFilter == .issues
+            )
+            guard !Task.isCancelled, logFilter == requestedFilter else { return }
+            entries = page.entries + entries
+            totalCount = page.totalCount
+            issueCount = page.issueCount
+            self.nextCursor = page.nextCursor
+            hasMore = page.hasMore
+        } catch {
+            guard !Task.isCancelled, logFilter == requestedFilter else { return }
+            loadError = error.localizedDescription
+        }
+        if logFilter == requestedFilter {
+            isLoading = false
+        }
+    }
+}
+
+private struct ActivityResultNotice: View {
+    var status: JobStatus
+    var message: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: status.activitySymbol)
+                .foregroundStyle(status.activityColor)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(status.displayName)
+                    .font(.subheadline.weight(.semibold))
+                Text(message)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(status.activityColor.opacity(0.10))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+    }
+}
+
+private struct ActivityLogRow: View {
+    var entry: JobLogEntry
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Text(entry.date.formatted(date: .omitted, time: .standard))
+                .font(.system(.caption, design: .monospaced))
+                .foregroundStyle(.tertiary)
+                .frame(width: 74, alignment: .leading)
+            Text(entry.stream == .standardError ? "ISSUE" : "INFO")
+                .font(.system(.caption2, design: .monospaced).weight(.semibold))
+                .foregroundStyle(entry.stream == .standardError ? .orange : .secondary)
+                .frame(width: 42, alignment: .leading)
+            Text(entry.message)
+                .font(.system(.caption, design: .monospaced))
+                .foregroundStyle(entry.stream == .standardError ? .primary : .secondary)
+                .textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.vertical, 3)
+    }
+}
+
+private struct ActivityEventList: View {
+    var events: [EventLog]
+
+    var body: some View {
+        if events.isEmpty {
+            ContentUnavailableView(
+                "No Events",
+                systemImage: "list.bullet.rectangle",
+                description: Text("System and scheduling events will appear here.")
+            )
+        } else {
+            List(events) { event in
+                EventRow(event: event)
+            }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+        }
+    }
+}
+
+private extension JobStatus {
+    var activityColor: Color {
         switch self {
-        case .compact: 120
-        case .standard: 240
-        case .detailed: 500
+        case .succeeded: .green
+        case .warning: .orange
+        case .failed: .red
+        case .running: .blue
+        case .queued: .secondary
+        case .cancelled: .gray
         }
     }
 
-    static func normalized(_ rawValue: String) -> ActivityLogDetail {
-        ActivityLogDetail(rawValue: rawValue) ?? .standard
+    var activitySymbol: String {
+        switch self {
+        case .succeeded: "checkmark.circle.fill"
+        case .warning: "exclamationmark.triangle.fill"
+        case .failed: "xmark.circle.fill"
+        case .running: "arrow.trianglehead.2.clockwise.rotate.90"
+        case .queued: "clock.fill"
+        case .cancelled: "stop.circle.fill"
+        }
     }
 }
 
@@ -1675,10 +2087,6 @@ struct SettingsView: View {
         DeltaAppPreferenceKeys.updateCheckIntervalSeconds,
         store: DeltaAppPreferences.sharedStore()
     ) private var updateCheckIntervalSeconds = AppUpdateCheckInterval.daily.rawValue
-    @AppStorage(
-        DeltaAppPreferenceKeys.activityLogDetail,
-        store: DeltaAppPreferences.sharedStore()
-    ) private var activityLogDetailRawValue = ActivityLogDetail.standard.rawValue
     @AppStorage(
         DeltaAppPreferenceKeys.operationalHistoryRetentionDays,
         store: DeltaAppPreferences.sharedStore()
@@ -2695,20 +3103,6 @@ struct SettingsView: View {
                 subtitle: "Control troubleshooting output and generate support information without secrets."
             ) {
                 SettingsControlRow(
-                    title: "Activity log detail",
-                    detail: activityLogDetail.description
-                ) {
-                    Picker("", selection: $activityLogDetailRawValue) {
-                        ForEach(ActivityLogDetail.allCases) { detail in
-                            Text(detail.title).tag(detail.rawValue)
-                        }
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.segmented)
-                    .frame(width: 260)
-                }
-
-                SettingsControlRow(
                     title: "History retention",
                     detail: "Automatically remove old job summaries, saved output, restore requests, and events. Backup data and restore points are not affected."
                 ) {
@@ -2726,7 +3120,7 @@ struct SettingsView: View {
                 }
 
                 SettingsFactGrid(items: [
-                    SettingsFact(title: "Live view", value: activityLogDetail.title),
+                    SettingsFact(title: "Activity view", value: "Paged on demand"),
                     SettingsFact(title: "Saved history", value: operationalHistoryRetention.summaryText),
                     SettingsFact(title: "Backup data", value: "Unaffected")
                 ])
@@ -2761,7 +3155,6 @@ struct SettingsView: View {
             model.refreshSystemState(force: true)
             automaticallyChecksForUpdates = softwareUpdateController.automaticallyChecksForUpdates
             automaticallyDownloadsUpdates = softwareUpdateController.automaticallyDownloadsUpdates
-            activityLogDetailRawValue = activityLogDetail.rawValue
             normalizeOperationalHistoryRetention()
             normalizeHealthMonitoring()
             normalizeBackupDefaults()
@@ -2918,10 +3311,6 @@ struct SettingsView: View {
             || (pausesScheduledBackups && scheduledProfileCount > 0)
             || backgroundBackupsPresentation.needsAttention
             || (sendsJobNotifications && !notificationAuthorizationState.canDeliver)
-    }
-
-    private var activityLogDetail: ActivityLogDetail {
-        ActivityLogDetail.normalized(activityLogDetailRawValue)
     }
 
     private var operationalHistoryRetention: OperationalHistoryRetention {
@@ -5863,25 +6252,6 @@ struct ActionLine: View {
     }
 }
 
-struct JobRow: View {
-    var job: JobRun
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            StatusPill(status: job.status)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(job.kind.displayName)
-                    .font(.system(.body, design: .rounded))
-                BackupRunSummaryLine(job: job)
-            }
-            Spacer()
-            Text(job.startedAt.formatted(date: .abbreviated, time: .shortened))
-                .foregroundStyle(.secondary)
-        }
-        .padding(.vertical, 6)
-    }
-}
-
 struct BackupRunSummaryLine: View {
     var job: JobRun
 
@@ -6014,245 +6384,6 @@ struct EventRow: View {
     }
 }
 
-struct LiveLogViewport: View {
-    var lines: [ResticOutputEvent]
-    var isWorking: Bool
-
-    var body: some View {
-        LogViewport(
-            height: DeltaTheme.liveLogPaneHeight,
-            itemCount: lines.count,
-            bottomID: lines.last?.id
-        ) {
-            if lines.isEmpty {
-                CompactEmptyRow(text: isWorking ? "Waiting for backup output..." : "No backup output is streaming right now.")
-            } else {
-                ForEach(lines) { line in
-                    LiveLogRow(line: line)
-                        .id(line.id)
-                }
-            }
-        }
-        .font(.system(.caption, design: .monospaced))
-        .textSelection(.enabled)
-    }
-}
-
-struct PersistentLogViewport: View {
-    var entries: [JobLogEntry]
-    var jobs: [JobRun]
-
-    var body: some View {
-        PlainLogViewport(height: DeltaTheme.savedLogPaneHeight) {
-            if entries.isEmpty {
-                CompactEmptyRow(text: "No saved job output yet.")
-            } else {
-                ForEach(jobLogGroups) { group in
-                    SavedJobLogGroupView(group: group)
-                }
-            }
-        }
-        .font(.system(.caption, design: .monospaced))
-        .textSelection(.enabled)
-    }
-
-    private var jobLogGroups: [SavedJobLogGroup] {
-        let jobByID = Dictionary(uniqueKeysWithValues: jobs.map { ($0.id, $0) })
-        return Dictionary(grouping: entries, by: \.jobID)
-            .map { jobID, entries in
-                SavedJobLogGroup(
-                    id: jobID,
-                    job: jobByID[jobID],
-                    entries: entries.sorted { $0.date < $1.date }
-                )
-            }
-            .sorted { $0.latestDate > $1.latestDate }
-    }
-}
-
-struct SavedJobLogGroup: Identifiable {
-    var id: UUID
-    var job: JobRun?
-    var entries: [JobLogEntry]
-
-    var latestDate: Date {
-        entries.map(\.date).max() ?? .distantPast
-    }
-}
-
-struct SavedJobLogGroupView: View {
-    @EnvironmentObject private var model: DeltaAppModel
-    var group: SavedJobLogGroup
-    @State private var isExpanded = false
-    @State private var loadedEntries: [JobLogEntry] = []
-
-    var body: some View {
-        DisclosureGroup(isExpanded: $isExpanded) {
-            VStack(alignment: .leading, spacing: 6) {
-                ForEach(displayEntries) { entry in
-                    PersistentLogRow(entry: entry, job: group.job)
-                        .id(entry.id)
-                }
-            }
-            .padding(.top, 6)
-            .padding(.leading, 14)
-        } label: {
-            HStack(spacing: 10) {
-                Text(jobTitle)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-                Text(group.latestDate.formatted(date: .omitted, time: .standard))
-                    .foregroundStyle(.tertiary)
-                Spacer()
-                Text(lineCountLabel)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .onChange(of: isExpanded) { _, expanded in
-            if expanded && loadedEntries.isEmpty {
-                loadedEntries = model.savedLogs(for: group.id)
-            }
-        }
-    }
-
-    private var displayEntries: [JobLogEntry] {
-        isExpanded && !loadedEntries.isEmpty ? loadedEntries : group.entries
-    }
-
-    private var lineCountLabel: String {
-        if isExpanded && !loadedEntries.isEmpty {
-            return "\(loadedEntries.count) \(loadedEntries.count == 1 ? "line" : "lines")"
-        }
-        return "\(group.entries.count) preview \(group.entries.count == 1 ? "line" : "lines")"
-    }
-
-    private var jobTitle: String {
-        guard let job = group.job else {
-            return "Job \(group.id.uuidString.prefix(8))"
-        }
-        return "\(job.kind.displayName) \(group.id.uuidString.prefix(6))"
-    }
-}
-
-struct LogViewport<BottomID: Hashable, Content: View>: View {
-    var height: CGFloat
-    var itemCount: Int
-    var bottomID: BottomID?
-    @ViewBuilder var content: Content
-
-    var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 6) {
-                    content
-                }
-                .padding(.vertical, 8)
-                .padding(.horizontal, 10)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .frame(height: height)
-            .background(DeltaTheme.logPaneBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 6))
-            .overlay(
-                RoundedRectangle(cornerRadius: 6)
-                    .stroke(DeltaTheme.border, lineWidth: 1)
-            )
-            .onAppear {
-                scrollToBottom(with: proxy)
-            }
-            .onChange(of: itemCount) { _, _ in
-                scrollToBottom(with: proxy)
-            }
-        }
-    }
-
-    private func scrollToBottom(with proxy: ScrollViewProxy) {
-        guard let bottomID else {
-            return
-        }
-        DispatchQueue.main.async {
-            withAnimation(.easeOut(duration: 0.12)) {
-                proxy.scrollTo(bottomID, anchor: .bottom)
-            }
-        }
-    }
-}
-
-struct PlainLogViewport<Content: View>: View {
-    var height: CGFloat
-    @ViewBuilder var content: Content
-
-    var body: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 8) {
-                content
-            }
-            .padding(.vertical, 8)
-            .padding(.horizontal, 10)
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .frame(height: height)
-        .background(DeltaTheme.logPaneBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 6))
-        .overlay(
-            RoundedRectangle(cornerRadius: 6)
-                .stroke(DeltaTheme.border, lineWidth: 1)
-        )
-    }
-}
-
-struct LiveLogRow: View {
-    var line: ResticOutputEvent
-
-    var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text(line.date.formatted(date: .omitted, time: .standard))
-                .foregroundStyle(.tertiary)
-                .frame(width: 72, alignment: .leading)
-            Text(line.stream == .standardError ? "ERR" : "OUT")
-                .foregroundStyle(line.stream == .standardError ? .orange : .secondary)
-                .frame(width: 30, alignment: .leading)
-            Text(line.message)
-                .foregroundStyle(line.stream == .standardError ? .primary : .secondary)
-                .lineLimit(4)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-}
-
-struct PersistentLogRow: View {
-    var entry: JobLogEntry
-    var job: JobRun?
-
-    var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text(entry.date.formatted(date: .omitted, time: .standard))
-                .foregroundStyle(.tertiary)
-                .frame(width: 72, alignment: .leading)
-            Text(jobLabel)
-                .foregroundStyle(.secondary)
-                .frame(width: 118, alignment: .leading)
-                .lineLimit(1)
-                .truncationMode(.tail)
-            Text(entry.stream == .standardError ? "ERR" : "OUT")
-                .foregroundStyle(entry.stream == .standardError ? .orange : .secondary)
-                .frame(width: 30, alignment: .leading)
-            Text(entry.message)
-                .foregroundStyle(entry.stream == .standardError ? .primary : .secondary)
-                .lineLimit(4)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private var jobLabel: String {
-        guard let job else {
-            return String(entry.jobID.uuidString.prefix(8))
-        }
-        return "\(job.kind.displayName) \(entry.jobID.uuidString.prefix(6))"
-    }
-}
-
 struct CompactEmptyRow: View {
     var text: String
 
@@ -6271,8 +6402,6 @@ enum DeltaTheme {
     static let badge = Color(nsColor: .tertiarySystemFill)
     static let tooltipBackground = Color(nsColor: .windowBackgroundColor).opacity(0.98)
     static let logPaneBackground = Color(nsColor: .textBackgroundColor).opacity(0.16)
-    static let liveLogPaneHeight: CGFloat = 300
-    static let savedLogPaneHeight: CGFloat = 220
     static let statColumns = [
         GridItem(.adaptive(minimum: 190), spacing: 12)
     ]

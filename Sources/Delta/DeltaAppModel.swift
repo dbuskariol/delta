@@ -18,7 +18,11 @@ private struct DeltaDatabaseSnapshot: Sendable {
         repositories = try database.fetchRepositories()
         profiles = try database.fetchProfiles()
         jobs = try database.fetchJobRuns(limit: 100)
-        jobLogs = try database.fetchJobLogs(limit: 300)
+        if let runningJob = jobs.first(where: { $0.status == .running }) {
+            jobLogs = try database.fetchJobLogs(jobID: runningJob.id, limit: 200)
+        } else {
+            jobLogs = []
+        }
         snapshots = try database.fetchSnapshots()
         snapshotsByRepository = try database.fetchSnapshotsByRepository()
         events = try database.fetchEvents(limit: 200)
@@ -342,14 +346,26 @@ final class DeltaAppModel: ObservableObject {
         )
     }
 
-    func savedLogs(for jobID: UUID, limit: Int = 10_000) -> [JobLogEntry] {
-        guard let database = requirePersistentDatabase() else { return [] }
-        do {
-            return try database.fetchJobLogs(jobID: jobID, limit: limit)
-        } catch {
-            alertMessage = error.localizedDescription
-            return []
+    func activityLogPage(
+        for jobID: UUID,
+        before cursor: JobLogCursor? = nil,
+        limit: Int = 200,
+        issuesOnly: Bool = false
+    ) async throws -> JobLogPage {
+        guard let database else {
+            throw DeltaUIError.message(
+                persistentStoreErrorMessage
+                    ?? "Delta cannot access its local app data. Reopen Delta and try again."
+            )
         }
+        return try await Task.detached(priority: .userInitiated) {
+            try database.fetchJobLogPage(
+                jobID: jobID,
+                before: cursor,
+                limit: limit,
+                issuesOnly: issuesOnly
+            )
+        }.value
     }
 
     @discardableResult

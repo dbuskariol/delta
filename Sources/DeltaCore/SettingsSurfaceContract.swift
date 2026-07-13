@@ -76,7 +76,6 @@ public enum SettingsSurfaceContract {
         "Automatic checks",
         "Check interval",
         "Download in background",
-        "Activity log detail",
         "History retention"
     ]
 
@@ -174,7 +173,6 @@ public enum SettingsSurfaceContract {
         require(controlTitles, contains: "Destination free space", in: "controls", failures: &failures)
         require(controlTitles, contains: "Schedule new profiles", in: "controls", failures: &failures)
         require(controlTitles, contains: "Default schedule", in: "controls", failures: &failures)
-        require(controlTitles, contains: "Activity log detail", in: "controls", failures: &failures)
         require(controlTitles, contains: "History retention", in: "controls", failures: &failures)
         require(actionTitles, contains: "Run Due Now", in: "actions", failures: &failures)
         require(actionTitles, contains: "Open Activity", in: "actions", failures: &failures)

@@ -449,7 +449,7 @@ else
       append_row "pause_resume_cancel" "$(item_area pause_resume_cancel)" "Failed" "$installed_run_control_evidence" "Fix installed pause/resume/cancel acceptance, then test the main app and menu bar controls on a real large backup."
     fi
     if [[ "$installed_local_status" -eq 0 ]]; then
-      append_row "streaming_logs" "$(item_area streaming_logs)" "Partial" "$installed_local_evidence Automated release gate also passed log formatting and persistence coverage for commit $git_commit." "Watch a real large backup and confirm fixed-height live logs, auto-scroll, source context, and expandable saved job logs."
+      append_row "streaming_logs" "$(item_area streaming_logs)" "Partial" "$installed_local_evidence Automated release gate also passed log formatting, cursor pagination, legacy-row migration, and persistence coverage for commit $git_commit." "Open Activity with a large history and confirm instant loading, smooth run-list scrolling, issue-first warning details, stable Earlier pagination, source context, and live append behavior."
     else
       append_row "streaming_logs" "$(item_area streaming_logs)" "Failed" "$installed_local_evidence" "Fix installed backup-log acceptance, then watch a real large backup in the UI."
     fi

@@ -27,7 +27,6 @@ final class SettingsSurfaceContractTests: XCTestCase {
         XCTAssertTrue(SettingsSurfaceContract.controlTitles.contains("Destination free space"))
         XCTAssertTrue(SettingsSurfaceContract.controlTitles.contains("Schedule new profiles"))
         XCTAssertTrue(SettingsSurfaceContract.controlTitles.contains("Default schedule"))
-        XCTAssertTrue(SettingsSurfaceContract.controlTitles.contains("Activity log detail"))
         XCTAssertTrue(SettingsSurfaceContract.controlTitles.contains("History retention"))
         XCTAssertTrue(SettingsSurfaceContract.actionTitles.contains("Run Due Now"))
         XCTAssertTrue(SettingsSurfaceContract.actionTitles.contains("Open Activity"))

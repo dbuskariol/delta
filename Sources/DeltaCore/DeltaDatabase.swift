@@ -34,6 +34,38 @@ public struct OperationalHistoryPruneResult: Equatable, Sendable {
     }
 }
 
+public struct JobLogCursor: Equatable, Sendable {
+    public var createdAt: String
+    public var id: String
+
+    public init(createdAt: String, id: String) {
+        self.createdAt = createdAt
+        self.id = id
+    }
+}
+
+public struct JobLogPage: Equatable, Sendable {
+    public var entries: [JobLogEntry]
+    public var totalCount: Int
+    public var issueCount: Int
+    public var nextCursor: JobLogCursor?
+    public var hasMore: Bool
+
+    public init(
+        entries: [JobLogEntry],
+        totalCount: Int,
+        issueCount: Int,
+        nextCursor: JobLogCursor?,
+        hasMore: Bool
+    ) {
+        self.entries = entries
+        self.totalCount = totalCount
+        self.issueCount = issueCount
+        self.nextCursor = nextCursor
+        self.hasMore = hasMore
+    }
+}
+
 public final class DeltaDatabase: @unchecked Sendable {
     private let queue: DatabaseQueue
     private let encoder: JSONEncoder
@@ -139,10 +171,17 @@ public final class DeltaDatabase: @unchecked Sendable {
         try queue.write { db in
             try db.execute(
                 sql: """
-                INSERT INTO job_logs (id, job_id, repository_id, payload, created_at)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO job_logs (id, job_id, repository_id, stream, payload, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
                 """,
-                arguments: [entry.id.uuidString, entry.jobID.uuidString, entry.repositoryID.uuidString, payload, timestamp]
+                arguments: [
+                    entry.id.uuidString,
+                    entry.jobID.uuidString,
+                    entry.repositoryID.uuidString,
+                    entry.stream.rawValue,
+                    payload,
+                    timestamp
+                ]
             )
         }
     }
@@ -177,6 +216,114 @@ public final class DeltaDatabase: @unchecked Sendable {
                 }
                 return try decoder.decode(JobLogEntry.self, from: data)
             }
+        }
+    }
+
+    public func fetchJobLogPage(
+        jobID: UUID,
+        before cursor: JobLogCursor? = nil,
+        limit: Int = 200,
+        issuesOnly: Bool = false
+    ) throws -> JobLogPage {
+        let safeLimit = max(1, min(limit, 500))
+        let jobIDString = jobID.uuidString
+
+        return try queue.read { db in
+            let counts = try Row.fetchOne(
+                db,
+                sql: """
+                SELECT
+                    COUNT(*) AS total_count,
+                    COALESCE(SUM(
+                        CASE WHEN COALESCE(stream, json_extract(payload, '$.stream')) = ?
+                        THEN 1 ELSE 0 END
+                    ), 0) AS issue_count
+                FROM job_logs
+                WHERE job_id = ?
+                """,
+                arguments: [ResticOutputStream.standardError.rawValue, jobIDString]
+            )
+            let totalCount: Int = counts?["total_count"] ?? 0
+            let issueCount: Int = counts?["issue_count"] ?? 0
+
+            let requestedLimit = safeLimit + 1
+            let rows: [Row]
+            if let cursor, issuesOnly {
+                rows = try Row.fetchAll(
+                    db,
+                    sql: """
+                    SELECT id, payload, created_at FROM job_logs
+                    WHERE job_id = ?
+                      AND COALESCE(stream, json_extract(payload, '$.stream')) = ?
+                      AND (created_at < ? OR (created_at = ? AND id < ?))
+                    ORDER BY created_at DESC, id DESC
+                    LIMIT ?
+                    """,
+                    arguments: [
+                        jobIDString,
+                        ResticOutputStream.standardError.rawValue,
+                        cursor.createdAt,
+                        cursor.createdAt,
+                        cursor.id,
+                        requestedLimit
+                    ]
+                )
+            } else if issuesOnly {
+                rows = try Row.fetchAll(
+                    db,
+                    sql: """
+                    SELECT id, payload, created_at FROM job_logs
+                    WHERE job_id = ?
+                      AND COALESCE(stream, json_extract(payload, '$.stream')) = ?
+                    ORDER BY created_at DESC, id DESC
+                    LIMIT ?
+                    """,
+                    arguments: [jobIDString, ResticOutputStream.standardError.rawValue, requestedLimit]
+                )
+            } else if let cursor {
+                rows = try Row.fetchAll(
+                    db,
+                    sql: """
+                    SELECT id, payload, created_at FROM job_logs
+                    WHERE job_id = ?
+                      AND (created_at < ? OR (created_at = ? AND id < ?))
+                    ORDER BY created_at DESC, id DESC
+                    LIMIT ?
+                    """,
+                    arguments: [jobIDString, cursor.createdAt, cursor.createdAt, cursor.id, requestedLimit]
+                )
+            } else {
+                rows = try Row.fetchAll(
+                    db,
+                    sql: """
+                    SELECT id, payload, created_at FROM job_logs
+                    WHERE job_id = ?
+                    ORDER BY created_at DESC, id DESC
+                    LIMIT ?
+                    """,
+                    arguments: [jobIDString, requestedLimit]
+                )
+            }
+
+            let hasMore = rows.count > safeLimit
+            let pageRows = Array(rows.prefix(safeLimit))
+            let entries = try pageRows.reversed().map { row in
+                let payload: String = row["payload"]
+                guard let data = payload.data(using: .utf8) else {
+                    throw DeltaDatabaseError.invalidPayload("job_logs")
+                }
+                return try decoder.decode(JobLogEntry.self, from: data)
+            }
+            let nextCursor = pageRows.last.map { row in
+                JobLogCursor(createdAt: row["created_at"], id: row["id"])
+            }
+            return JobLogPage(
+                entries: entries,
+                totalCount: totalCount,
+                issueCount: issueCount,
+                nextCursor: hasMore ? nextCursor : nil,
+                hasMore: hasMore
+            )
         }
     }
 
@@ -369,13 +516,21 @@ public final class DeltaDatabase: @unchecked Sendable {
                 id TEXT PRIMARY KEY NOT NULL,
                 job_id TEXT NOT NULL,
                 repository_id TEXT NOT NULL,
+                stream TEXT,
                 payload TEXT NOT NULL,
                 created_at TEXT NOT NULL
             )
             """)
+            let jobLogColumns = try Row.fetchAll(db, sql: "PRAGMA table_info(job_logs)")
+                .map { row -> String in row["name"] }
+            if !jobLogColumns.contains("stream") {
+                try db.execute(sql: "ALTER TABLE job_logs ADD COLUMN stream TEXT")
+            }
             try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_job_logs_job_id ON job_logs(job_id)")
             try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_job_logs_repository_id ON job_logs(repository_id)")
             try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_job_logs_created_at ON job_logs(created_at)")
+            try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_job_logs_job_cursor ON job_logs(job_id, created_at, id)")
+            try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_job_logs_job_stream_cursor ON job_logs(job_id, stream, created_at, id)")
         }
     }
 
