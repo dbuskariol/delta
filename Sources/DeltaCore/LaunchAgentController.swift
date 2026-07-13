@@ -1,7 +1,8 @@
 import Foundation
+import CryptoKit
 
 #if canImport(ServiceManagement)
-import ServiceManagement
+@preconcurrency import ServiceManagement
 #endif
 
 public enum LaunchAgentRegistrationStatus: Equatable, Sendable {
@@ -77,6 +78,72 @@ public enum LaunchAgentRegistrationStatus: Equatable, Sendable {
     }
 }
 
+public enum LaunchAgentRegistrationAction: Equatable, Sendable {
+    case none
+    case register
+    case reregister
+}
+
+public enum LaunchAgentRegistrationPolicy {
+    public static func action(
+        status: LaunchAgentRegistrationStatus,
+        hasEnabledSchedules: Bool,
+        registeredFingerprint: String?,
+        currentFingerprint: String?
+    ) -> LaunchAgentRegistrationAction {
+        guard hasEnabledSchedules else {
+            return .none
+        }
+
+        switch status {
+        case .notRegistered:
+            return .register
+        case .enabled:
+            guard let currentFingerprint else {
+                return .none
+            }
+            return registeredFingerprint == currentFingerprint ? .none : .reregister
+        case .requiresApproval, .notFound, .unavailable, .unknown:
+            return .none
+        }
+    }
+}
+
+public enum LaunchAgentRegistrationFingerprint {
+    public static func current(
+        bundle: Bundle = .main,
+        plistName: String = LaunchAgentController.defaultPlistName
+    ) -> String? {
+        let plistURL = bundle.bundleURL
+            .appendingPathComponent("Contents/Library/LaunchAgents", isDirectory: true)
+            .appendingPathComponent(plistName)
+        guard
+            let executableURL = agentExecutableURL(in: bundle),
+            let executableData = try? Data(contentsOf: executableURL),
+            let plistData = try? Data(contentsOf: plistURL)
+        else {
+            return nil
+        }
+        return fingerprint(executableData: executableData, plistData: plistData)
+    }
+
+    public static func fingerprint(executableData: Data, plistData: Data) -> String {
+        var hasher = SHA256()
+        hasher.update(data: executableData)
+        hasher.update(data: plistData)
+        return hasher.finalize().map { String(format: "%02x", $0) }.joined()
+    }
+
+    private static func agentExecutableURL(in bundle: Bundle) -> URL? {
+        if let executableURL = bundle.url(forAuxiliaryExecutable: "DeltaAgent") {
+            return executableURL
+        }
+        return bundle.executableURL?
+            .deletingLastPathComponent()
+            .appendingPathComponent("DeltaAgent")
+    }
+}
+
 public enum LaunchAgentController {
     public static let defaultPlistName = "com.delta.backup.agent.plist"
 
@@ -92,6 +159,28 @@ public enum LaunchAgentController {
         #if canImport(ServiceManagement)
         if #available(macOS 13.0, *) {
             try SMAppService.agent(plistName: plistName).unregister()
+        }
+        #endif
+    }
+
+    public static func reregister(plistName: String = defaultPlistName) async throws {
+        #if canImport(ServiceManagement)
+        if #available(macOS 13.0, *) {
+            let service = SMAppService.agent(plistName: plistName)
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                service.unregister { error in
+                    if let error {
+                        continuation.resume(throwing: error)
+                        return
+                    }
+                    do {
+                        try service.register()
+                        continuation.resume(returning: ())
+                    } catch {
+                        continuation.resume(throwing: error)
+                    }
+                }
+            }
         }
         #endif
     }

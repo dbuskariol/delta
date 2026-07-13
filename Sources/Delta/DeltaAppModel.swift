@@ -4,6 +4,42 @@ import Foundation
 import SwiftUI
 import UniformTypeIdentifiers
 
+private struct DeltaDatabaseSnapshot: Sendable {
+    var repositories: [BackupRepository]
+    var profiles: [BackupProfile]
+    var jobs: [JobRun]
+    var jobLogs: [JobLogEntry]
+    var snapshots: [ResticSnapshot]
+    var snapshotsByRepository: [UUID: [ResticSnapshot]]
+    var events: [EventLog]
+    var sourceHealthWarnings: [DashboardHealthWarning]
+
+    init(database: DeltaDatabase) throws {
+        repositories = try database.fetchRepositories()
+        profiles = try database.fetchProfiles()
+        jobs = try database.fetchJobRuns(limit: 100)
+        jobLogs = try database.fetchJobLogs(limit: 300)
+        snapshots = try database.fetchSnapshots()
+        snapshotsByRepository = try database.fetchSnapshotsByRepository()
+        events = try database.fetchEvents(limit: 200)
+        sourceHealthWarnings = DashboardHealthEvaluator().sourceWarnings(profiles: profiles)
+    }
+}
+
+private struct DeltaSystemStateSnapshot: Sendable {
+    var fullDiskAccessStatus: FullDiskAccessStatus
+    var launchAgentStatus: LaunchAgentRegistrationStatus
+    var appLoginItemStatus: LaunchAgentRegistrationStatus
+
+    static func current() -> DeltaSystemStateSnapshot {
+        DeltaSystemStateSnapshot(
+            fullDiskAccessStatus: FullDiskAccessProbe().check(),
+            launchAgentStatus: LaunchAgentController.status(),
+            appLoginItemStatus: AppLoginItemController.status()
+        )
+    }
+}
+
 struct ActiveOperation: Identifiable, Equatable {
     var id = UUID()
     var kind: JobKind
@@ -46,7 +82,7 @@ final class DeltaAppModel: ObservableObject {
     @Published var snapshots: [ResticSnapshot] = []
     @Published var snapshotsByRepository: [UUID: [ResticSnapshot]] = [:]
     @Published private(set) var snapshotEntryCache: [String: [ResticSnapshotEntry]] = [:]
-    @Published private(set) var snapshotEntryLoadingKey: String?
+    @Published private(set) var snapshotEntryLoadingKeys: Set<String> = []
     @Published var events: [EventLog] = []
     @Published private(set) var sourceHealthWarnings: [DashboardHealthWarning] = []
     @Published private(set) var backgroundSecretAccessReports: [RepositorySecretAccessReport] = []
@@ -62,13 +98,15 @@ final class DeltaAppModel: ObservableObject {
     @Published private(set) var persistentStoreErrorMessage: String?
     @Published private(set) var launchAgentStatus = LaunchAgentController.status()
     @Published private(set) var appLoginItemStatus = AppLoginItemController.status()
+    @Published private(set) var scheduledBackupServiceError: String?
 
     var isPersistentStoreAvailable: Bool {
         persistentStoreErrorMessage == nil
     }
 
     var scheduledBackupsNeedAgentSetup: Bool {
-        profiles.contains { $0.schedule.isEnabled } && launchAgentStatus.blocksScheduledBackups
+        profiles.contains { $0.schedule.isEnabled }
+            && (launchAgentStatus.blocksScheduledBackups || scheduledBackupServiceError != nil)
     }
 
     private var database: DeltaDatabase?
@@ -83,6 +121,12 @@ final class DeltaAppModel: ObservableObject {
     private let runControlStore = ResticRunControlStore()
     private var localOperationIsRunning = false
     private var databaseRefreshTask: Task<Void, Never>?
+    private var reloadTask: Task<Void, Never>?
+    private var systemStateRefreshTask: Task<Void, Never>?
+    private var backgroundSecretAccessTask: Task<Void, Never>?
+    private var backgroundRegistrationTask: Task<Void, Never>?
+    private var reloadWasRequested = false
+    private var lastSystemStateRefreshAt: Date?
     private var lastLiveLogWasStatus = false
     private var lastOperationalHistoryPruneAt: Date?
     private var lastBackgroundSecretAccessCheckAt: Date?
@@ -94,53 +138,53 @@ final class DeltaAppModel: ObservableObject {
         persistentStoreErrorMessage = result.errorMessage
         alertMessage = result.errorMessage
         if result.errorMessage == nil {
+            if let database {
+                _ = try? makeCoordinator(database: database).recoverAbandonedRunningJobs()
+                pruneOperationalHistoryIfNeeded()
+            }
             reload()
+            refreshSystemState(force: true)
             startDatabaseRefreshLoop()
         }
     }
 
     deinit {
         databaseRefreshTask?.cancel()
+        reloadTask?.cancel()
+        systemStateRefreshTask?.cancel()
+        backgroundSecretAccessTask?.cancel()
+        backgroundRegistrationTask?.cancel()
     }
 
     func reload() {
         guard reopenPersistentStoreIfNeeded(), let database else {
-            sourceHealthWarnings = []
-            backgroundSecretAccessReports = []
-            fullDiskAccessStatus = FullDiskAccessProbe().check()
-            launchAgentStatus = LaunchAgentController.status()
-            appLoginItemStatus = AppLoginItemController.status()
+            publishIfChanged(&sourceHealthWarnings, [])
+            publishIfChanged(&backgroundSecretAccessReports, [])
+            refreshSystemState(force: true)
             return
         }
-        do {
-            if !localOperationIsRunning {
-                _ = try makeCoordinator(database: database).recoverAbandonedRunningJobs()
-                pruneOperationalHistoryIfNeeded()
+
+        guard reloadTask == nil else {
+            reloadWasRequested = true
+            return
+        }
+
+        reloadTask = Task { [weak self] in
+            let result = await Task.detached(priority: .utility) {
+                Result { try DeltaDatabaseSnapshot(database: database) }
+            }.value
+            guard let self, !Task.isCancelled else { return }
+            self.reloadTask = nil
+            switch result {
+            case let .success(snapshot):
+                self.apply(snapshot)
+            case let .failure(error):
+                self.alertMessage = error.localizedDescription
             }
-            let storedRepositories = try database.fetchRepositories()
-            let storedProfiles = try database.fetchProfiles()
-            let storedJobs = try database.fetchJobRuns(limit: 100)
-            let storedJobLogs = try database.fetchJobLogs(limit: 300)
-            repositories = storedRepositories
-            profiles = storedProfiles
-            jobs = storedJobs
-            jobLogs = storedJobLogs
-            snapshots = try database.fetchSnapshots()
-            snapshotsByRepository = try database.fetchSnapshotsByRepository()
-            events = try database.fetchEvents(limit: 200)
-            sourceHealthWarnings = DashboardHealthEvaluator().sourceWarnings(profiles: storedProfiles)
-            refreshBackgroundSecretAccessStatusIfNeeded(repositories: storedRepositories)
-            fullDiskAccessStatus = FullDiskAccessProbe().check()
-            launchAgentStatus = LaunchAgentController.status()
-            appLoginItemStatus = AppLoginItemController.status()
-            reconcileObservedActiveJob(
-                jobs: storedJobs,
-                jobLogs: storedJobLogs,
-                profiles: storedProfiles,
-                repositories: storedRepositories
-            )
-        } catch {
-            alertMessage = error.localizedDescription
+            if self.reloadWasRequested {
+                self.reloadWasRequested = false
+                self.reload()
+            }
         }
     }
 
@@ -148,11 +192,67 @@ final class DeltaAppModel: ObservableObject {
         databaseRefreshTask?.cancel()
         databaseRefreshTask = Task { [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 2_000_000_000)
-                await MainActor.run {
-                    self?.reload()
-                }
+                guard let self else { return }
+                let interval: UInt64 = self.isWorking ? 1_000_000_000 : 8_000_000_000
+                try? await Task.sleep(nanoseconds: interval)
+                guard !Task.isCancelled else { return }
+                self.reload()
+                self.refreshSystemState()
             }
+        }
+    }
+
+    private func apply(_ snapshot: DeltaDatabaseSnapshot) {
+        let jobsChanged = jobs != snapshot.jobs
+        let logsChanged = jobLogs != snapshot.jobLogs
+
+        publishIfChanged(&repositories, snapshot.repositories)
+        publishIfChanged(&profiles, snapshot.profiles)
+        publishIfChanged(&jobs, snapshot.jobs)
+        publishIfChanged(&jobLogs, snapshot.jobLogs)
+        publishIfChanged(&snapshots, snapshot.snapshots)
+        publishIfChanged(&snapshotsByRepository, snapshot.snapshotsByRepository)
+        publishIfChanged(&events, snapshot.events)
+        publishIfChanged(&sourceHealthWarnings, snapshot.sourceHealthWarnings)
+
+        refreshBackgroundSecretAccessStatusIfNeeded(repositories: snapshot.repositories)
+        synchronizeScheduledBackupsRegistration()
+        if jobsChanged || logsChanged {
+            reconcileObservedActiveJob(
+                jobs: snapshot.jobs,
+                jobLogs: snapshot.jobLogs,
+                profiles: snapshot.profiles,
+                repositories: snapshot.repositories
+            )
+        }
+    }
+
+    private func publishIfChanged<Value: Equatable>(_ value: inout Value, _ replacement: Value) {
+        if value != replacement {
+            value = replacement
+        }
+    }
+
+    func refreshSystemState(force: Bool = false) {
+        let now = Date()
+        if !force,
+           let lastSystemStateRefreshAt,
+           now.timeIntervalSince(lastSystemStateRefreshAt) < 60 {
+            return
+        }
+        guard systemStateRefreshTask == nil else { return }
+        lastSystemStateRefreshAt = now
+
+        systemStateRefreshTask = Task { [weak self] in
+            let snapshot = await Task.detached(priority: .utility) {
+                DeltaSystemStateSnapshot.current()
+            }.value
+            guard let self, !Task.isCancelled else { return }
+            self.systemStateRefreshTask = nil
+            self.publishIfChanged(&self.fullDiskAccessStatus, snapshot.fullDiskAccessStatus)
+            self.publishIfChanged(&self.launchAgentStatus, snapshot.launchAgentStatus)
+            self.publishIfChanged(&self.appLoginItemStatus, snapshot.appLoginItemStatus)
+            self.synchronizeScheduledBackupsRegistration()
         }
     }
 
@@ -649,7 +749,7 @@ final class DeltaAppModel: ObservableObject {
     }
 
     func isLoadingSnapshotEntries(repositoryID: UUID, snapshotID: String, directoryPath: String?) -> Bool {
-        snapshotEntryLoadingKey == snapshotEntryCacheKey(repositoryID: repositoryID, snapshotID: snapshotID, directoryPath: directoryPath)
+        snapshotEntryLoadingKeys.contains(snapshotEntryCacheKey(repositoryID: repositoryID, snapshotID: snapshotID, directoryPath: directoryPath))
     }
 
     func loadSnapshotEntries(repository: BackupRepository, snapshotID: String, directoryPath: String?, force: Bool = false) {
@@ -665,7 +765,10 @@ final class DeltaAppModel: ObservableObject {
         if !force, snapshotEntryCache[key] != nil {
             return
         }
-        snapshotEntryLoadingKey = key
+        guard !snapshotEntryLoadingKeys.contains(key) else {
+            return
+        }
+        snapshotEntryLoadingKeys.insert(key)
         let coordinator = makeCoordinator(database: database)
         Task.detached(priority: .userInitiated) {
             do {
@@ -675,18 +778,12 @@ final class DeltaAppModel: ObservableObject {
                     directoryPath: directoryPath
                 )
                 await MainActor.run {
-                    guard self.snapshotEntryLoadingKey == key else {
-                        return
-                    }
                     self.snapshotEntryCache[key] = entries
-                    self.snapshotEntryLoadingKey = nil
+                    self.snapshotEntryLoadingKeys.remove(key)
                 }
             } catch {
                 await MainActor.run {
-                    guard self.snapshotEntryLoadingKey == key else {
-                        return
-                    }
-                    self.snapshotEntryLoadingKey = nil
+                    self.snapshotEntryLoadingKeys.remove(key)
                     self.alertMessage = error.localizedDescription
                 }
             }
@@ -710,20 +807,18 @@ final class DeltaAppModel: ObservableObject {
     }
 
     func registerAgent() {
-        do {
-            try LaunchAgentController.register()
-            launchAgentStatus = LaunchAgentController.status()
-            alertMessage = backgroundBackupsRegistrationMessage(for: launchAgentStatus)
-        } catch {
-            launchAgentStatus = LaunchAgentController.status()
-            alertMessage = error.localizedDescription
-        }
+        launchAgentStatus = LaunchAgentController.status()
+        synchronizeScheduledBackupsRegistration(hasEnabledSchedules: true, showsResultAlert: true)
     }
 
     func unregisterAgent() {
         do {
             try LaunchAgentController.unregister()
             launchAgentStatus = LaunchAgentController.status()
+            scheduledBackupServiceError = nil
+            DeltaAppPreferences.sharedStore().removeObject(
+                forKey: DeltaAppPreferenceKeys.scheduledBackupServiceFingerprint
+            )
             alertMessage = "Scheduled Backups were turned off."
         } catch {
             launchAgentStatus = LaunchAgentController.status()
@@ -794,20 +889,89 @@ final class DeltaAppModel: ObservableObject {
         }
 
         launchAgentStatus = LaunchAgentController.status()
-        if launchAgentStatus == .notRegistered {
-            do {
-                try LaunchAgentController.register()
-                launchAgentStatus = LaunchAgentController.status()
-                try? database?.appendEvent(EventLog(level: .info, message: "Scheduled Backups registration was requested for scheduled profile '\(profile.name)'."))
-            } catch {
-                launchAgentStatus = LaunchAgentController.status()
-                alertMessage = "Scheduled backups were saved, but the scheduler could not be turned on: \(error.localizedDescription)"
-                return
+        synchronizeScheduledBackupsRegistration(hasEnabledSchedules: true)
+        try? database?.appendEvent(EventLog(level: .info, message: "Scheduled Backups registration was checked for scheduled profile '\(profile.name)'."))
+    }
+
+    private func synchronizeScheduledBackupsRegistration(
+        hasEnabledSchedules: Bool? = nil,
+        showsResultAlert: Bool = false
+    ) {
+        guard backgroundRegistrationTask == nil else { return }
+        let hasEnabledSchedules = hasEnabledSchedules ?? profiles.contains { $0.schedule.isEnabled }
+        guard hasEnabledSchedules else { return }
+
+        let currentFingerprint = LaunchAgentRegistrationFingerprint.current()
+        let registeredFingerprint = DeltaAppPreferences.string(
+            for: DeltaAppPreferenceKeys.scheduledBackupServiceFingerprint,
+            default: ""
+        )
+        let action = LaunchAgentRegistrationPolicy.action(
+            status: launchAgentStatus,
+            hasEnabledSchedules: hasEnabledSchedules,
+            registeredFingerprint: registeredFingerprint.isEmpty ? nil : registeredFingerprint,
+            currentFingerprint: currentFingerprint
+        )
+
+        guard let currentFingerprint else {
+            scheduledBackupServiceError = "Delta could not verify its scheduled-backup service. Reinstall the app before relying on automatic backups."
+            if showsResultAlert {
+                alertMessage = scheduledBackupServiceError
             }
+            return
         }
 
-        if launchAgentStatus.blocksScheduledBackups {
-            alertMessage = "Scheduled backups were saved. \(launchAgentStatus.detail)"
+        guard action != .none else {
+            scheduledBackupServiceError = nil
+            if showsResultAlert {
+                alertMessage = backgroundBackupsRegistrationMessage(for: launchAgentStatus)
+            }
+            return
+        }
+
+        backgroundRegistrationTask = Task { [weak self] in
+            guard let self else { return }
+            defer { self.backgroundRegistrationTask = nil }
+            do {
+                switch action {
+                case .none:
+                    break
+                case .register:
+                    try LaunchAgentController.register()
+                case .reregister:
+                    try await LaunchAgentController.reregister()
+                }
+
+                let status = LaunchAgentController.status()
+                self.publishIfChanged(&self.launchAgentStatus, status)
+                if status == .enabled || status == .requiresApproval {
+                    DeltaAppPreferences.sharedStore().set(
+                        currentFingerprint,
+                        forKey: DeltaAppPreferenceKeys.scheduledBackupServiceFingerprint
+                    )
+                }
+                self.scheduledBackupServiceError = nil
+                try? self.database?.appendEvent(
+                    EventLog(
+                        level: .info,
+                        message: action == .reregister
+                            ? "Scheduled Backups registration was refreshed for the installed Delta version."
+                            : "Scheduled Backups registration was enabled."
+                    )
+                )
+                if showsResultAlert {
+                    self.alertMessage = self.backgroundBackupsRegistrationMessage(for: status)
+                }
+            } catch {
+                let status = LaunchAgentController.status()
+                self.publishIfChanged(&self.launchAgentStatus, status)
+                let message = "Scheduled backups could not be enabled: \(error.localizedDescription)"
+                self.scheduledBackupServiceError = message
+                try? self.database?.appendEvent(EventLog(level: .error, message: message))
+                if showsResultAlert {
+                    self.alertMessage = message
+                }
+            }
         }
     }
 
@@ -976,7 +1140,9 @@ final class DeltaAppModel: ObservableObject {
         now: Date = Date()
     ) {
         guard !repositories.isEmpty else {
-            backgroundSecretAccessReports = []
+            backgroundSecretAccessTask?.cancel()
+            backgroundSecretAccessTask = nil
+            publishIfChanged(&backgroundSecretAccessReports, [])
             lastBackgroundSecretAccessCheckAt = nil
             lastBackgroundSecretAccessSignature = ""
             return
@@ -1000,9 +1166,18 @@ final class DeltaAppModel: ObservableObject {
         }
 
         let repairer = RepositorySecretAccessRepairer(secretStore: secretStore)
-        backgroundSecretAccessReports = repositories.map { repairer.verify(repository: $0) }
         lastBackgroundSecretAccessCheckAt = now
         lastBackgroundSecretAccessSignature = signature
+        backgroundSecretAccessTask?.cancel()
+        backgroundSecretAccessTask = Task { [weak self] in
+            let reports = await Task.detached(priority: .utility) {
+                repositories.map { repairer.verify(repository: $0) }
+            }.value
+            guard let self, !Task.isCancelled else { return }
+            self.backgroundSecretAccessTask = nil
+            guard self.lastBackgroundSecretAccessSignature == signature else { return }
+            self.publishIfChanged(&self.backgroundSecretAccessReports, reports)
+        }
     }
 
     private func operationalHistoryPruneMessage(_ result: OperationalHistoryPruneResult) -> String {

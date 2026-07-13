@@ -35,6 +35,12 @@ struct ContentView: View {
             }
         }
         .background(DeltaTheme.background)
+        .onChange(of: model.selectedSection) { _, section in
+            model.reload()
+            if section == .settings {
+                model.refreshSystemState(force: true)
+            }
+        }
         .alert("Delta", isPresented: alertBinding) {
             Button("OK") {
                 model.alertMessage = nil
@@ -78,7 +84,7 @@ struct DashboardView: View {
     var body: some View {
         PageScaffold(
             title: "Dashboard",
-            subtitle: "Encrypted, deduplicated backup operations",
+            subtitle: "Backup health, recent results, and what runs next",
             actions: {
                 Button {
                     model.runDueBackups()
@@ -121,7 +127,7 @@ struct DashboardView: View {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("Scheduled Backups Need Approval")
                                 .font(.headline)
-                            Text(model.launchAgentStatus.detail)
+                            Text(model.scheduledBackupServiceError ?? model.launchAgentStatus.detail)
                                 .foregroundStyle(.secondary)
                         }
                         Spacer()
@@ -241,20 +247,12 @@ struct DashboardView: View {
                 }
             }
 
-            SectionHeader(title: "Backup Profiles")
-            if model.profiles.isEmpty {
-                EmptyStateView(
-                    symbol: "externaldrive.badge.plus",
-                    title: "No backup profiles",
-                    message: "Create a backup profile after adding a storage destination."
-                )
-            } else {
-                VStack(spacing: 10) {
-                    ForEach(model.profiles) { profile in
-                        ProfileRow(profile: profile, showsInlineProgress: false)
-                    }
-                }
-            }
+            SectionHeader(title: "Backup Overview")
+            DashboardBackupOverview(
+                profiles: model.profiles,
+                jobs: model.jobs,
+                onOpenBackups: { model.selectedSection = .backups }
+            )
         }
     }
 
@@ -313,6 +311,161 @@ struct DashboardView: View {
     }
 }
 
+private struct DashboardBackupOverview: View {
+    var profiles: [BackupProfile]
+    var jobs: [JobRun]
+    var onOpenBackups: () -> Void
+
+    var body: some View {
+        Card {
+            if profiles.isEmpty {
+                HStack(spacing: 12) {
+                    StatusIcon(symbol: "externaldrive.badge.plus", color: .secondary)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("No backup profiles")
+                            .font(.headline)
+                        Text("Add a destination, then create a profile for the folders or volume you want to protect.")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button("Open Backups", action: onOpenBackups)
+                        .buttonStyle(.bordered)
+                }
+            } else {
+                HStack(alignment: .top, spacing: 0) {
+                    DashboardBackupFact(
+                        symbol: "clock.badge.checkmark",
+                        title: "Next automatic backup",
+                        value: nextBackupTitle,
+                        detail: nextBackupDetail,
+                        color: nextBackupIsDue ? .orange : .blue
+                    )
+                    Divider()
+                        .padding(.horizontal, 20)
+                    DashboardBackupFact(
+                        symbol: lastBackupSymbol,
+                        title: "Last backup",
+                        value: lastBackupTitle,
+                        detail: lastBackupDetail,
+                        color: lastBackupColor
+                    )
+                    Divider()
+                        .padding(.horizontal, 20)
+                    VStack(alignment: .trailing, spacing: 8) {
+                        Text("\(profiles.count) \(profiles.count == 1 ? "profile" : "profiles")")
+                            .font(.subheadline.weight(.semibold))
+                        Text("Schedules and retention are managed on Backups.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.trailing)
+                        Button("Manage Backups", action: onOpenBackups)
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                }
+            }
+        }
+    }
+
+    private var latestBackup: JobRun? {
+        jobs
+            .filter { $0.kind == .backup && $0.status != .queued && $0.status != .running }
+            .max { $0.startedAt < $1.startedAt }
+    }
+
+    private var scheduledCandidates: [(profile: BackupProfile, decision: ScheduleDecision)] {
+        profiles.compactMap { profile in
+            guard profile.schedule.isEnabled else { return nil }
+            let lastAttempt = jobs
+                .filter { $0.profileID == profile.id && $0.kind == .backup && $0.status != .queued }
+                .compactMap { $0.finishedAt ?? $0.startedAt }
+                .max()
+            return (profile, ScheduleEvaluator().decision(for: profile.schedule, lastRun: lastAttempt))
+        }
+    }
+
+    private var nextCandidate: (profile: BackupProfile, decision: ScheduleDecision)? {
+        if let due = scheduledCandidates.first(where: { $0.decision.isDue }) {
+            return due
+        }
+        return scheduledCandidates
+            .filter { $0.decision.nextRun != nil }
+            .min { lhs, rhs in
+                (lhs.decision.nextRun ?? .distantFuture) < (rhs.decision.nextRun ?? .distantFuture)
+            }
+    }
+
+    private var nextBackupIsDue: Bool { nextCandidate?.decision.isDue == true }
+
+    private var nextBackupTitle: String {
+        guard let nextCandidate else { return "No active schedules" }
+        if nextCandidate.decision.isDue { return "Due now" }
+        return nextCandidate.decision.nextRun?.formatted(date: .abbreviated, time: .shortened) ?? "Not scheduled"
+    }
+
+    private var nextBackupDetail: String {
+        nextCandidate?.profile.name ?? "Enable a profile schedule to run backups automatically."
+    }
+
+    private var lastBackupTitle: String {
+        guard let latestBackup else { return "No completed backups" }
+        return (latestBackup.finishedAt ?? latestBackup.startedAt).formatted(date: .abbreviated, time: .shortened)
+    }
+
+    private var lastBackupDetail: String {
+        guard let latestBackup else { return "Run a profile to create the first restore point." }
+        let profileName = latestBackup.profileID.flatMap { id in profiles.first { $0.id == id }?.name }
+        return [profileName, latestBackup.status.displayName].compactMap { $0 }.joined(separator: " · ")
+    }
+
+    private var lastBackupSymbol: String {
+        switch latestBackup?.status {
+        case .failed: "xmark.circle"
+        case .warning: "exclamationmark.triangle"
+        case .cancelled: "pause.circle"
+        default: "checkmark.circle"
+        }
+    }
+
+    private var lastBackupColor: Color {
+        switch latestBackup?.status {
+        case .failed: .red
+        case .warning, .cancelled: .orange
+        case .succeeded: .green
+        default: .secondary
+        }
+    }
+}
+
+private struct DashboardBackupFact: View {
+    var symbol: String
+    var title: String
+    var value: String
+    var detail: String
+    var color: Color
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            StatusIcon(symbol: symbol, color: color)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Text(value)
+                    .font(.headline)
+                    .lineLimit(1)
+                Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
 struct BackupsView: View {
     @EnvironmentObject private var model: DeltaAppModel
     @State private var isPresentingProfileSheet = false
@@ -354,7 +507,7 @@ struct BackupsView: View {
         .sheet(isPresented: $isPresentingProfileSheet) {
             ProfileEditorView()
                 .environmentObject(model)
-                .frame(width: ModalMetrics.sheetWidth, height: 720)
+                .frame(width: ModalMetrics.sheetWidth, height: ModalMetrics.sheetHeight)
         }
     }
 }
@@ -441,7 +594,6 @@ struct DestinationsView: View {
         .sheet(isPresented: $isPresentingDestinationSheet) {
             DestinationEditorView()
                 .environmentObject(model)
-                .frame(width: ModalMetrics.sheetWidth)
         }
     }
 }
@@ -464,6 +616,7 @@ struct RestoreView: View {
     @State private var snapshotID = ""
     @State private var selectedRestorePaths: Set<String> = []
     @State private var browserPathStack: [String] = []
+    @State private var expandedBrowserPaths: Set<String> = []
     @State private var destinationPath = ""
     @State private var restoreOriginalPaths = false
     @State private var conflictPolicy: RestoreConflictPolicy = .ifChanged
@@ -476,7 +629,7 @@ struct RestoreView: View {
     var body: some View {
         PageScaffold(
             title: "Restore",
-            subtitle: "Recover complete restore points or specific paths",
+            subtitle: "Browse an earlier backup and recover exactly what you need",
             actions: {
                 Button {
                     if let repository = selectedRepository {
@@ -528,6 +681,9 @@ struct RestoreView: View {
                 SnapshotBrowserPanel(
                     entries: browserEntries,
                     selectedPaths: $selectedRestorePaths,
+                    expandedPaths: $expandedBrowserPaths,
+                    repository: selectedRepository,
+                    snapshotID: snapshotID,
                     currentPath: currentBrowserDirectory,
                     selectedCount: normalizedSelectedRestorePaths.count,
                     isLoading: isLoadingBrowserEntries,
@@ -535,8 +691,10 @@ struct RestoreView: View {
                     emptyMessage: browserEmptyMessage,
                     onOpen: openBrowserDirectory,
                     onBack: navigateBrowserBack,
+                    onRoot: navigateBrowserRoot,
                     onRefresh: refreshCurrentBrowserDirectory,
-                    onClearSelection: clearRestoreSelection
+                    onClearSelection: clearRestoreSelection,
+                    onLoadChildren: loadBrowserDirectoryChildren
                 )
             }
 
@@ -576,15 +734,17 @@ struct RestoreView: View {
                         }
                     }
 
-                    RestoreFormRow(title: "Conflicts") {
+                    RestoreFormRow(title: "Existing files") {
                         Picker("Conflicts", selection: $conflictPolicy) {
                             ForEach(RestoreConflictPolicy.allCases, id: \.self) { policy in
                                 Text(policy.displayName).tag(policy)
                             }
                         }
                         .labelsHidden()
-                        .frame(width: 170, alignment: .leading)
+                        .frame(width: 220, alignment: .leading)
+                    }
 
+                    RestoreFormRow(title: "Options") {
                         Toggle("Preview only", isOn: $dryRun)
                             .toggleStyle(.checkbox)
                         Toggle("Verify files", isOn: $verify)
@@ -593,7 +753,7 @@ struct RestoreView: View {
                             .deltaTooltip(dryRun ? "Verification runs after a real restore writes files." : "Verify restored file contents after writing.")
                     }
 
-                    RestoreFormRow(title: "Pre-restore backup") {
+                    RestoreFormRow(title: "Safety backup") {
                         Picker("Pre-restore backup", selection: $preRestoreProfileID) {
                             Text("None").tag(UUID?.none)
                             ForEach(model.profiles) { profile in
@@ -623,13 +783,13 @@ struct RestoreView: View {
             applyRestoreDefaultsIfNeeded()
             repositoryID = repositoryID ?? model.repositories.first?.id
             reconcileSelectedRestorePoint()
-            refreshRestorePointsForSelectedRepository()
+            refreshRestorePointsIfNeeded()
         }
         .onChange(of: repositoryID) { _, _ in
             snapshotID = ""
             resetBrowser()
             reconcileSelectedRestorePoint()
-            refreshRestorePointsForSelectedRepository()
+            refreshRestorePointsIfNeeded()
         }
         .onChange(of: restorePointIDs) { _, _ in
             reconcileSelectedRestorePoint()
@@ -713,7 +873,7 @@ struct RestoreView: View {
             return selectedSnapshot.paths
                 .map { path in
                     ResticSnapshotEntry(
-                        name: Self.displayName(for: path),
+                        name: SnapshotBrowserPaths.displayName(for: path),
                         path: path,
                         type: .directory
                     )
@@ -728,7 +888,7 @@ struct RestoreView: View {
             snapshotID: snapshotID,
             directoryPath: currentBrowserDirectory
         ) ?? [])
-        .filter { Self.normalizedPath($0.path) != Self.normalizedPath(currentBrowserDirectory) }
+        .filter { SnapshotBrowserPaths.normalized($0.path) != SnapshotBrowserPaths.normalized(currentBrowserDirectory) }
         .sortedForBrowser()
     }
 
@@ -842,10 +1002,19 @@ struct RestoreView: View {
         model.refreshSnapshots(repository: repository)
     }
 
+    private func refreshRestorePointsIfNeeded() {
+        guard repositorySnapshots.isEmpty else { return }
+        refreshRestorePointsForSelectedRepository()
+    }
+
     private func openBrowserDirectory(_ path: String) {
         guard let repository = selectedRepository, !snapshotID.isEmpty else {
             return
         }
+        guard currentBrowserDirectory != path else {
+            return
+        }
+        expandedBrowserPaths.insert(path)
         browserPathStack.append(path)
         model.loadSnapshotEntries(repository: repository, snapshotID: snapshotID, directoryPath: path)
     }
@@ -855,6 +1024,10 @@ struct RestoreView: View {
             return
         }
         browserPathStack.removeLast()
+    }
+
+    private func navigateBrowserRoot() {
+        browserPathStack.removeAll()
     }
 
     private func refreshCurrentBrowserDirectory() {
@@ -869,6 +1042,13 @@ struct RestoreView: View {
         )
     }
 
+    private func loadBrowserDirectoryChildren(_ path: String, force: Bool) {
+        guard let repository = selectedRepository, !snapshotID.isEmpty else {
+            return
+        }
+        model.loadSnapshotEntries(repository: repository, snapshotID: snapshotID, directoryPath: path, force: force)
+    }
+
     private func clearRestoreSelection() {
         selectedRestorePaths.removeAll()
     }
@@ -876,10 +1056,11 @@ struct RestoreView: View {
     private func resetBrowser() {
         selectedRestorePaths.removeAll()
         browserPathStack.removeAll()
+        expandedBrowserPaths.removeAll()
     }
 
     private static func normalizedRestorePaths(_ paths: [String]) -> [String] {
-        let normalized = Set(paths.map(normalizedPath).filter { !$0.isEmpty })
+        let normalized = Set(paths.map(SnapshotBrowserPaths.normalized).filter { !$0.isEmpty })
         return normalized
             .filter { path in
                 !normalized.contains { candidate in
@@ -888,30 +1069,14 @@ struct RestoreView: View {
             }
             .sorted()
     }
-
-    private static func normalizedPath(_ path: String) -> String {
-        let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else {
-            return ""
-        }
-        if trimmed == "/" {
-            return "/"
-        }
-        return trimmed.hasSuffix("/") ? String(trimmed.dropLast()) : trimmed
-    }
-
-    private static func displayName(for path: String) -> String {
-        if path == "/" {
-            return "System volume (/)"
-        }
-        let name = URL(fileURLWithPath: path).lastPathComponent
-        return name.isEmpty ? path : name
-    }
 }
 
 struct SnapshotBrowserPanel: View {
     var entries: [ResticSnapshotEntry]
     @Binding var selectedPaths: Set<String>
+    @Binding var expandedPaths: Set<String>
+    var repository: BackupRepository?
+    var snapshotID: String
     var currentPath: String?
     var selectedCount: Int
     var isLoading: Bool
@@ -919,8 +1084,10 @@ struct SnapshotBrowserPanel: View {
     var emptyMessage: String
     var onOpen: (String) -> Void
     var onBack: () -> Void
+    var onRoot: () -> Void
     var onRefresh: () -> Void
     var onClearSelection: () -> Void
+    var onLoadChildren: (String, Bool) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -956,25 +1123,16 @@ struct SnapshotBrowserPanel: View {
             }
 
             if let currentPath {
-                HStack(spacing: 8) {
-                    Button {
-                        onBack()
-                    } label: {
-                        Label("Back", systemImage: "chevron.left")
-                    }
-                    .buttonStyle(.borderless)
-                    .disabled(isLoading)
-
-                    Text(currentPath)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                }
+                SnapshotBrowserPathBar(
+                    path: currentPath,
+                    isLoading: isLoading,
+                    onBack: onBack,
+                    onRoot: onRoot
+                )
             }
 
             browserBody
-                .frame(height: 280)
+                .frame(height: 330)
 
             Text(selectedCount == 0 ? "No files or folders selected. Delta will restore everything from this restore point." : "Delta will restore only the selected files and folders.")
                 .font(.caption)
@@ -1006,18 +1164,19 @@ struct SnapshotBrowserPanel: View {
                     .padding()
             } else {
                 ScrollView {
-                    LazyVStack(spacing: 0) {
+                    LazyVStack(alignment: .leading, spacing: 2) {
                         ForEach(entries) { entry in
-                            SnapshotBrowserRow(
+                            SnapshotBrowserTreeNode(
                                 entry: entry,
-                                isSelected: selectionBinding(for: entry.path),
-                                canOpen: canBrowse && entry.type.isDirectory,
-                                onOpen: { onOpen(entry.path) }
+                                selectedPaths: $selectedPaths,
+                                expandedPaths: $expandedPaths,
+                                repository: repository,
+                                snapshotID: snapshotID,
+                                canBrowse: canBrowse,
+                                depth: 0,
+                                onOpen: onOpen,
+                                onLoadChildren: onLoadChildren
                             )
-                            if entry.id != entries.last?.id {
-                                Divider()
-                                    .padding(.leading, 42)
-                            }
                         }
                     }
                     .padding(8)
@@ -1029,36 +1188,97 @@ struct SnapshotBrowserPanel: View {
     private var currentTitle: String {
         currentPath == nil ? "Backed-up sources" : "Folder contents"
     }
+}
 
-    private func selectionBinding(for path: String) -> Binding<Bool> {
-        Binding(
-            get: { selectedPaths.contains(path) },
-            set: { selected in
-                if selected {
-                    selectedPaths.insert(path)
-                } else {
-                    selectedPaths.remove(path)
-                }
+struct SnapshotBrowserPathBar: View {
+    var path: String
+    var isLoading: Bool
+    var onBack: () -> Void
+    var onRoot: () -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Button {
+                onBack()
+            } label: {
+                Label("Back", systemImage: "chevron.left")
             }
-        )
+            .buttonStyle(.borderless)
+            .disabled(isLoading)
+
+            Button {
+                onRoot()
+            } label: {
+                Label("Sources", systemImage: "externaldrive")
+            }
+            .buttonStyle(.borderless)
+            .disabled(isLoading)
+
+            Text(path)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.horizontal, 2)
     }
 }
 
-struct SnapshotBrowserRow: View {
+struct SnapshotBrowserTreeNode: View {
+    @EnvironmentObject private var model: DeltaAppModel
+
     var entry: ResticSnapshotEntry
-    @Binding var isSelected: Bool
-    var canOpen: Bool
-    var onOpen: () -> Void
+    @Binding var selectedPaths: Set<String>
+    @Binding var expandedPaths: Set<String>
+    var repository: BackupRepository?
+    var snapshotID: String
+    var canBrowse: Bool
+    var depth: Int
+    var onOpen: (String) -> Void
+    var onLoadChildren: (String, Bool) -> Void
+    @State private var isHovering = false
 
     var body: some View {
-        HStack(spacing: 10) {
-            Toggle("", isOn: $isSelected)
+        VStack(alignment: .leading, spacing: 2) {
+            row
+
+            if entry.type.isDirectory && isExpanded {
+                if isLoadingChildren && childEntries.isEmpty {
+                    SnapshotBrowserIndentedText(text: "Loading...", depth: depth + 1)
+                } else if childEntries.isEmpty {
+                    SnapshotBrowserIndentedText(text: "Empty folder", depth: depth + 1)
+                } else {
+                    ForEach(childEntries) { child in
+                        SnapshotBrowserTreeNode(
+                            entry: child,
+                            selectedPaths: $selectedPaths,
+                            expandedPaths: $expandedPaths,
+                            repository: repository,
+                            snapshotID: snapshotID,
+                            canBrowse: canBrowse,
+                            depth: depth + 1,
+                            onOpen: onOpen,
+                            onLoadChildren: onLoadChildren
+                        )
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var row: some View {
+        HStack(spacing: 8) {
+            disclosureButton
+
+            Toggle("", isOn: selectionBinding)
                 .toggleStyle(.checkbox)
                 .labelsHidden()
-                .frame(width: 20)
+                .frame(width: 18)
 
-            Image(systemName: entry.type.isDirectory ? "folder.fill" : iconName)
-                .foregroundStyle(entry.type.isDirectory ? .blue : .secondary)
+            Image(systemName: iconName)
+                .foregroundStyle(iconColor)
                 .frame(width: 18)
 
             VStack(alignment: .leading, spacing: 2) {
@@ -1072,30 +1292,73 @@ struct SnapshotBrowserRow: View {
                     .truncationMode(.middle)
             }
 
-            Spacer(minLength: 12)
+            Spacer(minLength: 10)
 
-            if let sizeText {
-                Text(sizeText)
+            if isLoadingChildren {
+                ProgressView()
+                    .controlSize(.small)
+                    .frame(width: 16, height: 16)
+            } else if let detailText {
+                Text(detailText)
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
 
-            if canOpen {
+            if entry.type.isDirectory {
                 Button {
-                    onOpen()
+                    onOpen(entry.path)
                 } label: {
-                    Image(systemName: "chevron.right")
+                    Image(systemName: "arrow.right.circle")
+                        .frame(width: 18, height: 18)
                 }
                 .buttonStyle(.borderless)
-                .deltaTooltip("Browse folder")
+                .disabled(!canBrowse)
+                .accessibilityLabel("Open \(entry.name)")
+                .deltaTooltip("Open folder")
             } else {
                 Color.clear
                     .frame(width: 18, height: 18)
             }
         }
         .padding(.horizontal, 8)
-        .padding(.vertical, 7)
+        .padding(.vertical, 6)
+        .padding(.leading, CGFloat(depth) * 18)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(rowBackground)
+        )
         .contentShape(Rectangle())
+        .onHover { hovering in
+            isHovering = hovering
+        }
+        .onTapGesture(count: 2) {
+            if entry.type.isDirectory {
+                onOpen(entry.path)
+            } else {
+                toggleSelection()
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var disclosureButton: some View {
+        if entry.type.isDirectory {
+            Button {
+                toggleExpanded()
+            } label: {
+                Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 16, height: 16)
+            }
+            .buttonStyle(.plain)
+            .disabled(!canExpand)
+            .accessibilityLabel(isExpanded ? "Collapse \(entry.name)" : "Expand \(entry.name)")
+        } else {
+            Color.clear
+                .frame(width: 16, height: 16)
+        }
     }
 
     private var iconName: String {
@@ -1111,11 +1374,135 @@ struct SnapshotBrowserRow: View {
         }
     }
 
-    private var sizeText: String? {
+    private var iconColor: Color {
+        switch entry.type {
+        case .directory:
+            return .blue
+        case .symlink:
+            return .purple
+        case .file, .other:
+            return .secondary
+        }
+    }
+
+    private var detailText: String? {
+        if entry.type.isDirectory, let repository, !snapshotID.isEmpty {
+            let count = model.snapshotEntries(repositoryID: repository.id, snapshotID: snapshotID, directoryPath: entry.path)?
+                .filter { SnapshotBrowserPaths.normalized($0.path) != SnapshotBrowserPaths.normalized(entry.path) }
+                .count
+            return count.map { "\($0) items" }
+        }
         guard let size = entry.size, !entry.type.isDirectory else {
             return nil
         }
         return ByteCountFormatter.string(fromByteCount: size, countStyle: .file)
+    }
+
+    private var childEntries: [ResticSnapshotEntry] {
+        guard let repository, !snapshotID.isEmpty else {
+            return []
+        }
+        return (model.snapshotEntries(repositoryID: repository.id, snapshotID: snapshotID, directoryPath: entry.path) ?? [])
+            .filter { SnapshotBrowserPaths.normalized($0.path) != SnapshotBrowserPaths.normalized(entry.path) }
+            .sortedForBrowser()
+    }
+
+    private var isLoadingChildren: Bool {
+        guard let repository, !snapshotID.isEmpty else {
+            return false
+        }
+        return model.isLoadingSnapshotEntries(repositoryID: repository.id, snapshotID: snapshotID, directoryPath: entry.path)
+    }
+
+    private var canExpand: Bool {
+        canBrowse && entry.type.isDirectory
+    }
+
+    private var isExpanded: Bool {
+        expandedPaths.contains(entry.path)
+    }
+
+    private var isSelected: Bool {
+        selectedPaths.contains(entry.path)
+    }
+
+    private var rowBackground: Color {
+        if isSelected {
+            return DeltaTheme.badge.opacity(0.95)
+        }
+        if isHovering {
+            return DeltaTheme.badge.opacity(0.45)
+        }
+        return .clear
+    }
+
+    private var selectionBinding: Binding<Bool> {
+        Binding(
+            get: { selectedPaths.contains(entry.path) },
+            set: { selected in
+                if selected {
+                    selectedPaths.insert(entry.path)
+                } else {
+                    selectedPaths.remove(entry.path)
+                }
+            }
+        )
+    }
+
+    private func toggleExpanded() {
+        guard canExpand else {
+            return
+        }
+        withAnimation(.easeOut(duration: 0.12)) {
+            if isExpanded {
+                expandedPaths.remove(entry.path)
+            } else {
+                expandedPaths.insert(entry.path)
+                onLoadChildren(entry.path, false)
+            }
+        }
+    }
+
+    private func toggleSelection() {
+        if isSelected {
+            selectedPaths.remove(entry.path)
+        } else {
+            selectedPaths.insert(entry.path)
+        }
+    }
+}
+
+struct SnapshotBrowserIndentedText: View {
+    var text: String
+    var depth: Int
+
+    var body: some View {
+        Text(text)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .padding(.vertical, 6)
+            .padding(.leading, 70 + CGFloat(depth) * 18)
+    }
+}
+
+private enum SnapshotBrowserPaths {
+    static func normalized(_ path: String) -> String {
+        let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return ""
+        }
+        if trimmed == "/" {
+            return "/"
+        }
+        return trimmed.hasSuffix("/") ? String(trimmed.dropLast()) : trimmed
+    }
+
+    static func displayName(for path: String) -> String {
+        if path == "/" {
+            return "System volume (/)"
+        }
+        let name = URL(fileURLWithPath: path).lastPathComponent
+        return name.isEmpty ? path : name
     }
 }
 
@@ -1157,8 +1544,10 @@ struct ActivityView: View {
                 if model.jobs.isEmpty {
                     CompactEmptyRow(text: "No jobs have run yet.")
                 } else {
-                    ForEach(model.jobs) { job in
-                        JobRow(job: job)
+                    LazyVStack(spacing: 0) {
+                        ForEach(model.jobs) { job in
+                            JobRow(job: job)
+                        }
                     }
                 }
             }
@@ -1167,8 +1556,10 @@ struct ActivityView: View {
                 if model.events.isEmpty {
                     CompactEmptyRow(text: "No events recorded.")
                 } else {
-                    ForEach(model.events) { event in
-                        EventRow(event: event)
+                    LazyVStack(spacing: 0) {
+                        ForEach(model.events) { event in
+                            EventRow(event: event)
+                        }
                     }
                 }
             }
@@ -1439,6 +1830,7 @@ struct SettingsView: View {
             actions: {
                 Button {
                     model.reload()
+                    model.refreshSystemState(force: true)
                 } label: {
                     Label("Refresh", systemImage: "arrow.clockwise")
                 }
@@ -1465,13 +1857,12 @@ struct SettingsView: View {
                 }
             }
 
-            SettingsOverviewCard(
+            SettingsHealthBanner(
                 symbol: settingsOverviewSymbol,
                 title: settingsOverviewTitle,
                 detail: settingsOverviewDetail,
                 statusText: settingsOverviewStatusText,
-                statusColor: settingsOverviewStatusColor,
-                items: settingsStatusItems
+                statusColor: settingsOverviewStatusColor
             )
 
             settingsCategorySelector
@@ -1486,7 +1877,7 @@ struct SettingsView: View {
                     symbol: "clock.badge.checkmark",
                     title: "Scheduled Backups",
                     subtitle: "Run due backup profiles after sign-in, even when the main window is closed.",
-                    statusText: backgroundBackupsPresentation.statusText,
+                    statusText: model.scheduledBackupServiceError == nil ? backgroundBackupsPresentation.statusText : "Needs Repair",
                     statusColor: backgroundBackupsStatusColor
                 ) {
                     SettingsDescription(
@@ -1520,7 +1911,14 @@ struct SettingsView: View {
                         SettingsFact(title: "Runs as", value: "Your user")
                     ])
 
-                    if backgroundBackupsPresentation.needsAttention {
+                    if let scheduledBackupServiceError = model.scheduledBackupServiceError {
+                        SettingsNotice(
+                            symbol: "exclamationmark.triangle",
+                            title: "Automatic backup service needs repair",
+                            text: scheduledBackupServiceError,
+                            color: .red
+                        )
+                    } else if backgroundBackupsPresentation.needsAttention {
                         SettingsNotice(
                             symbol: "person.crop.circle.badge.exclamationmark",
                             title: backgroundBackupsPresentation.attentionTitle ?? "Scheduled backups need attention",
@@ -1577,6 +1975,7 @@ struct SettingsView: View {
                         .deltaTooltip("Open macOS Login Items to approve or inspect Delta scheduled backups.")
                         Button {
                             model.reload()
+                            model.refreshSystemState(force: true)
                         } label: {
                             Label("Refresh", systemImage: "arrow.clockwise")
                         }
@@ -1881,7 +2280,7 @@ struct SettingsView: View {
                     }
                     .labelsHidden()
                     .pickerStyle(.segmented)
-                    .frame(width: 300)
+                    .frame(width: settingsControlRowControlWidth, alignment: .leading)
                     .onChange(of: backupFreshnessWarningHours) { _, _ in
                         normalizeHealthMonitoring()
                     }
@@ -1898,7 +2297,7 @@ struct SettingsView: View {
                     }
                     .labelsHidden()
                     .pickerStyle(.segmented)
-                    .frame(width: 300)
+                    .frame(width: settingsControlRowControlWidth, alignment: .leading)
                     .onChange(of: destinationVerificationWarningHours) { _, _ in
                         normalizeHealthMonitoring()
                     }
@@ -1915,19 +2314,11 @@ struct SettingsView: View {
                     }
                     .labelsHidden()
                     .pickerStyle(.segmented)
-                    .frame(width: 320)
+                    .frame(width: settingsControlRowControlWidth, alignment: .leading)
                     .onChange(of: destinationFreeSpaceWarningGiB) { _, _ in
                         normalizeHealthMonitoring()
                     }
                 }
-
-                SettingsFactGrid(items: [
-                    SettingsFact(title: "Backups", value: backupFreshnessThreshold.summaryText),
-                    SettingsFact(title: "Destinations", value: destinationVerificationThreshold.summaryText),
-                    SettingsFact(title: "Free space", value: destinationFreeSpaceThreshold.summaryText),
-                    SettingsFact(title: "Dashboard", value: "Attention only"),
-                    SettingsFact(title: "Profiles", value: "Unchanged")
-                ])
 
                 SettingsActionBar {
                     Button {
@@ -1971,7 +2362,7 @@ struct SettingsView: View {
                         }
                         .labelsHidden()
                         .pickerStyle(.segmented)
-                        .frame(width: settingsControlRowControlWidth)
+                        .frame(width: settingsControlRowControlWidth, alignment: .leading)
                         .onChange(of: defaultProfileScheduleKindRawValue) { _, _ in
                             normalizeBackupDefaults()
                         }
@@ -2007,6 +2398,13 @@ struct SettingsView: View {
                         .labelsHidden()
                         .toggleStyle(.switch)
                 }
+            }
+
+                SettingsCard(
+                    symbol: "clock.arrow.circlepath",
+                    title: "Retention & Cleanup Defaults",
+                    subtitle: "Storage, verification, and history defaults for newly-created profiles."
+                ) {
 
                 SettingsControlRow(
                     title: "Free space after cleanup",
@@ -2033,33 +2431,26 @@ struct SettingsView: View {
                     HStack(spacing: 8) {
                         TextField("Upload KiB/s", text: defaultUploadLimitBinding)
                             .textFieldStyle(.roundedBorder)
-                            .frame(width: 112)
+                            .frame(maxWidth: .infinity)
                         TextField("Download KiB/s", text: defaultDownloadLimitBinding)
                             .textFieldStyle(.roundedBorder)
-                            .frame(width: 128)
+                            .frame(maxWidth: .infinity)
                     }
+                    .frame(width: settingsControlRowControlWidth, alignment: .leading)
                 }
 
                 SettingsControlRow(
                     title: "Default retention",
                     detail: "How many restore points new profiles keep before scheduled cleanup removes older ones."
                 ) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack(spacing: 8) {
-                            Stepper("Hourly \(defaultProfileKeepHourly)", value: $defaultProfileKeepHourly, in: 0...168)
-                                .frame(width: 100, alignment: .leading)
-                            Stepper("Daily \(defaultProfileKeepDaily)", value: $defaultProfileKeepDaily, in: 0...365)
-                                .frame(width: 100, alignment: .leading)
-                            Stepper("Weekly \(defaultProfileKeepWeekly)", value: $defaultProfileKeepWeekly, in: 0...260)
-                                .frame(width: 104, alignment: .leading)
-                        }
-                        HStack(spacing: 8) {
-                            Stepper("Monthly \(defaultProfileKeepMonthly)", value: $defaultProfileKeepMonthly, in: 0...120)
-                                .frame(width: 112, alignment: .leading)
-                            Stepper("Yearly \(defaultProfileKeepYearly)", value: $defaultProfileKeepYearly, in: 0...50)
-                                .frame(width: 100, alignment: .leading)
-                        }
+                    LazyVGrid(columns: settingsCounterColumns, alignment: .leading, spacing: 10) {
+                        Stepper("Hourly \(defaultProfileKeepHourly)", value: $defaultProfileKeepHourly, in: 0...168)
+                        Stepper("Daily \(defaultProfileKeepDaily)", value: $defaultProfileKeepDaily, in: 0...365)
+                        Stepper("Weekly \(defaultProfileKeepWeekly)", value: $defaultProfileKeepWeekly, in: 0...260)
+                        Stepper("Monthly \(defaultProfileKeepMonthly)", value: $defaultProfileKeepMonthly, in: 0...120)
+                        Stepper("Yearly \(defaultProfileKeepYearly)", value: $defaultProfileKeepYearly, in: 0...50)
                     }
+                    .frame(width: settingsControlRowControlWidth, alignment: .leading)
                 }
 
                 SettingsControlRow(
@@ -2075,23 +2466,14 @@ struct SettingsView: View {
                     title: "Cleanup cadence",
                     detail: "How often new profiles should free unneeded data and run post-cleanup checks."
                 ) {
-                    HStack(spacing: 10) {
+                    LazyVGrid(columns: settingsCounterColumns, alignment: .leading, spacing: 10) {
                         Stepper("Every \(defaultProfileMaintenanceIntervalDays)d", value: $defaultProfileMaintenanceIntervalDays, in: 1...90)
-                            .frame(width: 130, alignment: .leading)
-                        TimeControls(hour: $defaultProfileMaintenanceHour, minute: $defaultProfileMaintenanceMinute)
+                        Stepper("Hour \(defaultProfileMaintenanceHour)", value: $defaultProfileMaintenanceHour, in: 0...23)
+                        Stepper("Minute \(defaultProfileMaintenanceMinute)", value: $defaultProfileMaintenanceMinute, in: 0...59)
                     }
+                    .frame(width: settingsControlRowControlWidth, alignment: .leading)
                     .disabled(!defaultProfileMaintenanceEnabled)
                 }
-
-                SettingsFactGrid(items: [
-                    SettingsFact(title: "Schedule", value: defaultScheduleSummary),
-                    SettingsFact(title: "Retention", value: defaultRetentionSummary),
-                    SettingsFact(title: "Bandwidth", value: defaultBandwidthSummary),
-                    SettingsFact(title: "Cleanup", value: defaultCleanupSummary),
-                    SettingsFact(title: "Destination locks", value: "Automatic"),
-                    SettingsFact(title: "Backup type", value: "Incremental"),
-                    SettingsFact(title: "Existing profiles", value: "Unchanged")
-                ])
 
                 SettingsActionBar {
                     Button {
@@ -2147,7 +2529,7 @@ struct SettingsView: View {
                         }
                     }
                     .labelsHidden()
-                    .frame(width: 210)
+                    .frame(width: settingsControlRowControlWidth, alignment: .leading)
                     .onChange(of: defaultRestoreConflictPolicyRawValue) { _, _ in
                         normalizeRestorePreferences()
                     }
@@ -2203,7 +2585,7 @@ struct SettingsView: View {
                     }
                     .labelsHidden()
                     .pickerStyle(.segmented)
-                    .frame(width: 250)
+                    .frame(width: settingsControlRowControlWidth, alignment: .leading)
                     .disabled(!automaticallyChecksForUpdates)
                     .onChange(of: updateCheckIntervalSeconds) { _, _ in
                         applyUpdatePreferences()
@@ -2222,13 +2604,6 @@ struct SettingsView: View {
                             applyUpdatePreferences()
                         }
                 }
-
-                SettingsFactGrid(items: [
-                    SettingsFact(title: "Checks", value: automaticallyChecksForUpdates ? AppUpdateCheckInterval.normalized(updateCheckIntervalSeconds).title : "Off"),
-                    SettingsFact(title: "Downloads", value: automaticallyDownloadsUpdates && automaticallyChecksForUpdates ? "Background" : "Manual"),
-                    SettingsFact(title: "Packages", value: "Signed"),
-                    SettingsFact(title: "Install", value: "Prompted")
-                ])
 
                 SettingsActionBar {
                     Button {
@@ -2383,6 +2758,7 @@ struct SettingsView: View {
             }
         }
         .onAppear {
+            model.refreshSystemState(force: true)
             automaticallyChecksForUpdates = softwareUpdateController.automaticallyChecksForUpdates
             automaticallyDownloadsUpdates = softwareUpdateController.automaticallyDownloadsUpdates
             activityLogDetailRawValue = activityLogDetail.rawValue
@@ -2459,6 +2835,9 @@ struct SettingsView: View {
         if backgroundSecretAccessSummary.needsRepair {
             return "Password access needs repair"
         }
+        if model.scheduledBackupServiceError != nil {
+            return "Scheduled backups need repair"
+        }
         if pausesScheduledBackups && scheduledProfileCount > 0 {
             return "Scheduled backups are paused"
         }
@@ -2494,6 +2873,9 @@ struct SettingsView: View {
         if backgroundSecretAccessSummary.needsRepair {
             return "\(backgroundSecretAccessSummary.detail) Repair access before relying on unattended scheduled backups."
         }
+        if let scheduledBackupServiceError = model.scheduledBackupServiceError {
+            return scheduledBackupServiceError
+        }
         if pausesScheduledBackups && scheduledProfileCount > 0 {
             return "Automatic scheduled runs are paused. Manual Back Up Now actions still work for individual profiles."
         }
@@ -2511,11 +2893,14 @@ struct SettingsView: View {
     }
 
     private var settingsOverviewStatusColor: Color {
-        if !model.isPersistentStoreAvailable || backupToolStatusText != "Ready" {
+        if !model.isPersistentStoreAvailable
+            || backupToolStatusText != "Ready"
+            || model.scheduledBackupServiceError != nil {
             return .red
         }
         if !model.fullDiskAccessStatus.hasLikelyFullDiskAccess
             || backgroundSecretAccessSummary.needsRepair
+            || model.scheduledBackupServiceError != nil
             || (pausesScheduledBackups && scheduledProfileCount > 0)
             || backgroundBackupsPresentation.needsAttention
             || (sendsJobNotifications && !notificationAuthorizationState.canDeliver) {
@@ -2529,63 +2914,10 @@ struct SettingsView: View {
             || backupToolStatusText != "Ready"
             || !model.fullDiskAccessStatus.hasLikelyFullDiskAccess
             || backgroundSecretAccessSummary.needsRepair
+            || model.scheduledBackupServiceError != nil
             || (pausesScheduledBackups && scheduledProfileCount > 0)
             || backgroundBackupsPresentation.needsAttention
             || (sendsJobNotifications && !notificationAuthorizationState.canDeliver)
-    }
-
-    private var settingsStatusItems: [SettingsStatusItem] {
-        [
-            SettingsStatusItem(
-                title: SettingsSurfaceContract.statusSummaryTitles[0],
-                value: fullDiskAccessStatusText,
-                symbol: "lock.shield",
-                color: fullDiskAccessStatusColor,
-                detail: model.fullDiskAccessStatus.hasLikelyFullDiskAccess ? "Protected folders readable" : "Action required"
-            ),
-            SettingsStatusItem(
-                title: SettingsSurfaceContract.statusSummaryTitles[1],
-                value: backgroundBackupsPresentation.statusText,
-                symbol: "clock.badge.checkmark",
-                color: backgroundBackupsStatusColor,
-                detail: backgroundBackupsPresentation.statusDetail
-            ),
-            SettingsStatusItem(
-                title: SettingsSurfaceContract.statusSummaryTitles[2],
-                value: backgroundSecretAccessSummary.displayName,
-                symbol: "key.horizontal",
-                color: backgroundSecretAccessStatusColor,
-                detail: backgroundSecretAccessSummary.detail
-            ),
-            SettingsStatusItem(
-                title: SettingsSurfaceContract.statusSummaryTitles[3],
-                value: automaticUpdatesStatusText,
-                symbol: "arrow.down.circle",
-                color: automaticUpdatesStatusColor,
-                detail: automaticUpdatesSummaryDetail
-            ),
-            SettingsStatusItem(
-                title: SettingsSurfaceContract.statusSummaryTitles[4],
-                value: notificationStatusText,
-                symbol: "bell.badge",
-                color: notificationStatusColor,
-                detail: sendsJobNotifications ? "Job alerts configured" : "Alerts disabled"
-            ),
-            SettingsStatusItem(
-                title: SettingsSurfaceContract.statusSummaryTitles[5],
-                value: showsMenuBarExtra ? "Shown" : "Hidden",
-                symbol: "menubar.rectangle",
-                color: showsMenuBarExtra ? .green : .secondary,
-                detail: model.appLoginItemStatus == .enabled ? "Starts at login" : "Login optional"
-            ),
-            SettingsStatusItem(
-                title: SettingsSurfaceContract.statusSummaryTitles[6],
-                value: backupToolStatusText,
-                symbol: "externaldrive.badge.checkmark",
-                color: backupToolStatusColor,
-                detail: backupToolStatusDetail
-            )
-        ]
     }
 
     private var activityLogDetail: ActivityLogDetail {
@@ -2774,26 +3106,6 @@ struct SettingsView: View {
         ScheduleEditorKind(rawValue: defaultProfileScheduleKindRawValue) ?? .daily
     }
 
-    private var defaultScheduleSummary: String {
-        guard defaultProfileScheduleEnabled else {
-            return "Off"
-        }
-
-        switch defaultProfileScheduleKind {
-        case .hourly:
-            return "Hourly min \(twoDigit(defaultProfileScheduleMinute))"
-        case .daily:
-            return "Daily \(twoDigit(defaultProfileScheduleHour)):\(twoDigit(defaultProfileScheduleMinute))"
-        case .weekly:
-            let weekday = Calendar.current.shortWeekdaySymbols[clamped(defaultProfileScheduleWeekday, to: 1...7) - 1]
-            return "\(weekday) \(twoDigit(defaultProfileScheduleHour)):\(twoDigit(defaultProfileScheduleMinute))"
-        case .monthly:
-            return "Day \(defaultProfileScheduleDay) \(twoDigit(defaultProfileScheduleHour)):\(twoDigit(defaultProfileScheduleMinute))"
-        case .custom:
-            return "Every \(defaultProfileScheduleIntervalMinutes)m"
-        }
-    }
-
     private var backupDefaultsStatusText: String {
         !defaultProfileScheduleEnabled
             || defaultProfileScheduleKind != .daily
@@ -2891,40 +3203,6 @@ struct SettingsView: View {
             get: { defaultProfileDownloadLimitKiB > 0 ? String(defaultProfileDownloadLimitKiB) : "" },
             set: { defaultProfileDownloadLimitKiB = normalizedOptionalPositiveInteger(from: $0, maximum: 1_048_576) }
         )
-    }
-
-    private var defaultBandwidthSummary: String {
-        switch (defaultProfileUploadLimitKiB, defaultProfileDownloadLimitKiB) {
-        case let (upload, download) where upload > 0 && download > 0:
-            return "Up \(upload) / Down \(download)"
-        case let (upload, _) where upload > 0:
-            return "Upload \(upload)"
-        case let (_, download) where download > 0:
-            return "Download \(download)"
-        default:
-            return "Unlimited"
-        }
-    }
-
-    private var defaultRetentionSummary: String {
-        let components = [
-            "\(defaultProfileKeepHourly)h",
-            "\(defaultProfileKeepDaily)d",
-            "\(defaultProfileKeepWeekly)w",
-            "\(defaultProfileKeepMonthly)m"
-        ]
-        let base = components.joined(separator: " / ")
-        guard defaultProfileKeepYearly > 0 else {
-            return base
-        }
-        return "\(base) / \(defaultProfileKeepYearly)y"
-    }
-
-    private var defaultCleanupSummary: String {
-        guard defaultProfileMaintenanceEnabled else {
-            return "Manual"
-        }
-        return "Every \(defaultProfileMaintenanceIntervalDays)d at \(twoDigit(defaultProfileMaintenanceHour)):\(twoDigit(defaultProfileMaintenanceMinute))"
     }
 
     private var backupFreshnessThreshold: BackupFreshnessWarningThreshold {
@@ -3092,6 +3370,9 @@ struct SettingsView: View {
     }
 
     private var backgroundBackupsStatusColor: Color {
+        if model.scheduledBackupServiceError != nil {
+            return .red
+        }
         switch backgroundBackupsPresentation.severity {
         case .ready:
             return .green
@@ -3131,19 +3412,47 @@ struct SettingsView: View {
     }
 }
 
+private let rowFactColumns = [
+    GridItem(.adaptive(minimum: 180), spacing: 16, alignment: .leading)
+]
+
+private struct RowFact: View {
+    var symbol: String
+    var title: String
+    var value: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 9) {
+            Image(systemName: symbol)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: 18, height: 18)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text(value)
+                    .font(.caption.weight(.semibold))
+                    .lineLimit(2)
+                    .truncationMode(.middle)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
 struct ProfileRow: View {
     @EnvironmentObject private var model: DeltaAppModel
     var profile: BackupProfile
-    var showsInlineProgress = true
     @State private var isPresentingEditor = false
     @State private var isConfirmingDelete = false
 
     var body: some View {
         Card {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 14) {
                 HStack(alignment: .top, spacing: 14) {
                     StatusIcon(symbol: profile.sourceMode == .fullVolume ? "internaldrive" : "folder", color: statusColor)
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 5) {
                         HStack(spacing: 8) {
                             Text(profile.name)
                                 .font(.headline)
@@ -3154,30 +3463,15 @@ struct ProfileRow: View {
                                 StateBadge(text: "Paused", color: .orange)
                             }
                         }
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(sourceSummary)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                                .truncationMode(.middle)
-                            Text(repositorySummary)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                                .truncationMode(.middle)
-                        }
-                        HStack(spacing: 8) {
-                            MetadataBadge(text: profile.sourceMode.displayName)
-                            MetadataBadge(text: scheduleSummary)
-                            MetadataBadge(text: retentionSummary)
-                        }
-                        if let latestBackupRun {
-                            BackupRunSummaryLine(job: latestBackupRun)
-                        }
+                        Text(sourceSummary)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                            .truncationMode(.middle)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                    VStack(alignment: .trailing, spacing: 8) {
+                    HStack(spacing: 8) {
                         Button {
                             if isPausedBackup {
                                 model.resumeBackup(profile: profile)
@@ -3192,26 +3486,50 @@ struct ProfileRow: View {
                         .disabled(model.isWorking || !model.isPersistentStoreAvailable)
                         .fixedSize()
                         .deltaTooltip(primaryActionTooltip)
-                        .accessibilityLabel(primaryActionTitle)
 
-                        HStack(spacing: 8) {
-                            IconButton(symbol: "pencil", help: "Edit sources, exclusions, destination, schedule, and retention") {
+                        Menu {
+                            Button {
                                 isPresentingEditor = true
+                            } label: {
+                                Label("Edit Profile", systemImage: "pencil")
                             }
-                            .disabled(model.isWorking || !model.isPersistentStoreAvailable)
-                            IconButton(symbol: "scissors", help: "Run retention cleanup for this profile") {
+                            Button {
                                 model.prune(profile: profile)
+                            } label: {
+                                Label("Clean Up Old Backups", systemImage: "scissors")
                             }
                             .disabled(model.isWorking || !model.isPersistentStoreAvailable)
-                            IconButton(symbol: "trash", help: "Delete this backup profile") {
+                            Divider()
+                            Button(role: .destructive) {
                                 isConfirmingDelete = true
+                            } label: {
+                                Label("Delete Profile", systemImage: "trash")
                             }
-                            .disabled(model.isWorking || !model.isPersistentStoreAvailable)
+                        } label: {
+                            Image(systemName: "ellipsis")
+                                .frame(width: 18, height: 18)
                         }
+                        .menuStyle(.button)
+                        .controlSize(.small)
+                        .disabled(model.isWorking || !model.isPersistentStoreAvailable)
+                        .accessibilityLabel("More actions for \(profile.name)")
+                        .deltaTooltip("More profile actions")
                     }
                 }
 
-                if isActiveBackup && showsInlineProgress {
+                Divider()
+
+                LazyVGrid(columns: rowFactColumns, alignment: .leading, spacing: 12) {
+                    RowFact(symbol: "externaldrive", title: "Destination", value: repositoryName)
+                    RowFact(symbol: "calendar", title: "Schedule", value: scheduleStatusSummary)
+                    RowFact(symbol: "clock.arrow.circlepath", title: "Retention", value: retentionSummary)
+                }
+
+                if let latestBackupRun, !isActiveBackup {
+                    BackupRunSummaryLine(job: latestBackupRun)
+                }
+
+                if isActiveBackup {
                     InlineBackupProgress(
                         progress: model.activeProgress,
                         progressFraction: model.activeDisplayedProgressFraction,
@@ -3228,7 +3546,7 @@ struct ProfileRow: View {
         .sheet(isPresented: $isPresentingEditor) {
             ProfileEditorView(profile: profile)
                 .environmentObject(model)
-                .frame(width: ModalMetrics.sheetWidth, height: 720)
+                .frame(width: ModalMetrics.sheetWidth, height: ModalMetrics.sheetHeight)
         }
         .confirmationDialog("Delete Backup Profile?", isPresented: $isConfirmingDelete) {
             Button("Delete", role: .destructive) {
@@ -3268,7 +3586,12 @@ struct ProfileRow: View {
         if isPausedBackup {
             return .orange
         }
-        return .gray
+        switch latestBackupRun?.status {
+        case .succeeded: return .green
+        case .warning: return .orange
+        case .failed: return .red
+        default: return .secondary
+        }
     }
 
     private var primaryActionTitle: String {
@@ -3301,9 +3624,8 @@ struct ProfileRow: View {
         return "Start this backup profile immediately."
     }
 
-    private var repositorySummary: String {
-        let repositoryName = model.repositories.first(where: { $0.id == profile.repositoryID })?.name ?? "Missing destination"
-        return "Destination: \(repositoryName)"
+    private var repositoryName: String {
+        model.repositories.first(where: { $0.id == profile.repositoryID })?.name ?? "Missing destination"
     }
 
     private var scheduleSummary: String {
@@ -3323,7 +3645,16 @@ struct ProfileRow: View {
     }
 
     private var retentionSummary: String {
-        "Keep \(profile.retention.keepDaily)d/\(profile.retention.keepWeekly)w/\(profile.retention.keepMonthly)m"
+        "\(profile.retention.keepDaily)d · \(profile.retention.keepWeekly)w · \(profile.retention.keepMonthly)m"
+    }
+
+    private var scheduleStatusSummary: String {
+        guard profile.schedule.isEnabled else { return "Off" }
+        let lastAttempt = latestBackupRun.flatMap { $0.finishedAt ?? $0.startedAt }
+        let decision = ScheduleEvaluator().decision(for: profile.schedule, lastRun: lastAttempt)
+        if decision.isDue { return "Due now" }
+        guard let nextRun = decision.nextRun else { return scheduleSummary }
+        return nextRun.formatted(date: .abbreviated, time: .shortened)
     }
 
     private func weekdayName(_ weekday: Int) -> String {
@@ -3341,57 +3672,78 @@ struct DestinationRow: View {
 
     var body: some View {
         Card {
-            HStack(alignment: .top, spacing: 14) {
-                StatusIcon(symbol: destination.backend.kind == .local ? "externaldrive" : "network", color: .teal)
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(destination.name)
-                        .font(.headline)
-                        .lineLimit(1)
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(destination.backend.kind.displayName)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Text(backendSummary)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(alignment: .top, spacing: 14) {
+                    StatusIcon(symbol: destination.backend.kind == .local ? "externaldrive" : "network", color: destination.lastVerifiedAt == nil ? .secondary : .teal)
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(destination.name)
+                            .font(.headline)
                             .lineLimit(1)
+                        Text(backendSummary)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
                             .truncationMode(.middle)
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
                     HStack(spacing: 8) {
-                        MetadataBadge(text: destination.secretStorageMode.displayName)
-                        MetadataBadge(text: verificationSummary)
+                        Button {
+                            model.checkRepository(destination)
+                        } label: {
+                            Label("Check", systemImage: "checkmark.shield")
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                        .disabled(model.isWorking || !model.isPersistentStoreAvailable)
+                        .deltaTooltip("Verify this destination and a sample of stored backup data.")
+
+                        Menu {
+                            Button {
+                                isPresentingEditor = true
+                            } label: {
+                                Label("Edit Destination", systemImage: "pencil")
+                            }
+                            Button {
+                                model.refreshSnapshots(repository: destination)
+                            } label: {
+                                Label("Refresh Restore Points", systemImage: "arrow.clockwise")
+                            }
+                            Button {
+                                model.initializeRepository(destination)
+                            } label: {
+                                Label("Repair Destination Setup", systemImage: "wrench.and.screwdriver")
+                            }
+                            Divider()
+                            Button(role: .destructive) {
+                                isConfirmingDelete = true
+                            } label: {
+                                Label("Remove Destination", systemImage: "trash")
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis")
+                                .frame(width: 18, height: 18)
+                        }
+                        .menuStyle(.button)
+                        .controlSize(.small)
+                        .disabled(model.isWorking || !model.isPersistentStoreAvailable)
+                        .accessibilityLabel("More actions for \(destination.name)")
+                        .deltaTooltip("More destination actions")
                     }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
 
-                HStack(spacing: 8) {
-                    IconButton(symbol: "pencil", help: "Edit destination settings and credentials") {
-                        isPresentingEditor = true
-                    }
-                    .disabled(model.isWorking || !model.isPersistentStoreAvailable)
-                    IconButton(symbol: "shippingbox.and.arrow.backward", help: "Retry destination preparation") {
-                        model.initializeRepository(destination)
-                    }
-                    .disabled(model.isWorking || !model.isPersistentStoreAvailable)
-                    IconButton(symbol: "checkmark.shield", help: "Check destination integrity") {
-                        model.checkRepository(destination)
-                    }
-                    .disabled(model.isWorking || !model.isPersistentStoreAvailable)
-                    IconButton(symbol: "arrow.clockwise", help: "Refresh restore points from this destination") {
-                        model.refreshSnapshots(repository: destination)
-                    }
-                    .disabled(model.isWorking || !model.isPersistentStoreAvailable)
-                    IconButton(symbol: "trash", help: "Remove this destination from Delta") {
-                        isConfirmingDelete = true
-                    }
-                    .disabled(model.isWorking || !model.isPersistentStoreAvailable)
+                Divider()
+
+                LazyVGrid(columns: rowFactColumns, alignment: .leading, spacing: 12) {
+                    RowFact(symbol: "shippingbox", title: "Type", value: destination.backend.kind.displayName)
+                    RowFact(symbol: "clock.arrow.circlepath", title: "Restore Points", value: "\(restorePointCount)")
+                    RowFact(symbol: "checkmark.seal", title: "Last Check", value: verificationSummary)
                 }
             }
         }
         .sheet(isPresented: $isPresentingEditor) {
             DestinationEditorView(destination: destination)
                 .environmentObject(model)
-                .frame(width: ModalMetrics.sheetWidth)
         }
         .confirmationDialog("Remove Destination?", isPresented: $isConfirmingDelete) {
             Button("Remove", role: .destructive) {
@@ -3407,7 +3759,11 @@ struct DestinationRow: View {
         guard let lastVerifiedAt = destination.lastVerifiedAt else {
             return "Not checked"
         }
-        return "Verified \(lastVerifiedAt.formatted(date: .abbreviated, time: .shortened))"
+        return lastVerifiedAt.formatted(date: .abbreviated, time: .shortened)
+    }
+
+    private var restorePointCount: Int {
+        model.snapshotsByRepository[destination.id]?.count ?? 0
     }
 
     private var backendSummary: String {
@@ -3507,156 +3863,161 @@ struct ProfileEditorView: View {
 
     var body: some View {
         SheetScaffold(title: sheetTitle, subtitle: sheetSubtitle) {
-            FieldRow(title: "Name") {
-                TextField("Profile name", text: $name)
-                    .textFieldStyle(.roundedBorder)
-            }
-
-            FieldRow(title: "Source type") {
-                Picker("Source", selection: $mode) {
-                    ForEach(BackupSourceMode.allCases, id: \.self) { mode in
-                        Text(mode.displayName).tag(mode)
-                    }
+            SheetFormSection(
+                title: "Backup Content",
+                subtitle: "Choose what Delta protects and where encrypted backup data is stored.",
+                symbol: "folder"
+            ) {
+                FieldRow(title: "Name") {
+                    TextField("Profile name", text: $name)
+                        .textFieldStyle(.roundedBorder)
                 }
-                .labelsHidden()
-                .pickerStyle(.segmented)
-                .frame(width: 230, alignment: .leading)
-            }
 
-            FieldRow(title: "Sources") {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 10) {
-                        if mode == .fullVolume {
-                            Button {
-                                sources = [model.startupVolumeSource()]
-                            } label: {
-                                Label("Startup Volume", systemImage: "internaldrive")
-                            }
-                            Button {
-                                let selectedSources = model.chooseBackupVolumeSources(allowsMultipleSelection: true)
-                                if !selectedSources.isEmpty {
-                                    sources = selectedSources
-                                }
-                            } label: {
-                                Label("Choose Volume", systemImage: "externaldrive.badge.plus")
-                            }
-                        } else {
-                            Button {
-                                let selectedSources = model.chooseBackupSources(allowsMultipleSelection: true, includeSubvolumes: true)
-                                if !selectedSources.isEmpty {
-                                    sources = selectedSources
-                                }
-                            } label: {
-                                Label("Choose Folders", systemImage: "folder.badge.plus")
-                            }
-                        }
-                    }
-                    Text(sourceSummaryText)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                        .frame(maxWidth: 460, alignment: .leading)
-                }
-            }
-
-            FieldRow(title: "Extra excludes") {
-                ExclusionPatternEditor(text: $customExcludePatternsText)
-                    .frame(width: ModalMetrics.primaryControlWidth)
-            }
-
-            FieldRow(title: "Destination") {
-                Picker("Destination", selection: $repositoryID) {
-                    Text("Choose").tag(UUID?.none)
-                    ForEach(model.repositories) { repository in
-                        Text(repository.name).tag(Optional(repository.id))
-                    }
-                }
-                .labelsHidden()
-                .frame(width: 264, alignment: .leading)
-            }
-
-            FieldRow(title: "Schedule") {
-                VStack(alignment: .leading, spacing: 10) {
-                    Picker("Schedule", selection: $scheduleKind) {
-                        ForEach(ScheduleEditorKind.allCases) { kind in
-                            Text(kind.displayName).tag(kind)
+                FieldRow(title: "Source type") {
+                    Picker("Source", selection: $mode) {
+                        ForEach(BackupSourceMode.allCases, id: \.self) { mode in
+                            Text(mode.displayName).tag(mode)
                         }
                     }
                     .labelsHidden()
                     .pickerStyle(.segmented)
-                    .frame(width: 350, alignment: .leading)
+                    .frame(width: 260, alignment: .leading)
+                }
 
-                    scheduleControls
+                FieldRow(title: "Sources") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 10) {
+                            if mode == .fullVolume {
+                                Button {
+                                    sources = [model.startupVolumeSource()]
+                                } label: {
+                                    Label("Startup Volume", systemImage: "internaldrive")
+                                }
+                                Button {
+                                    let selectedSources = model.chooseBackupVolumeSources(allowsMultipleSelection: true)
+                                    if !selectedSources.isEmpty {
+                                        sources = selectedSources
+                                    }
+                                } label: {
+                                    Label("Choose Volume", systemImage: "externaldrive.badge.plus")
+                                }
+                            }
+                            if mode == .customFolders {
+                                Button {
+                                    let selectedSources = model.chooseBackupSources(allowsMultipleSelection: true, includeSubvolumes: true)
+                                    if !selectedSources.isEmpty {
+                                        sources = selectedSources
+                                    }
+                                } label: {
+                                    Label("Choose Folders", systemImage: "folder.badge.plus")
+                                }
+                            }
+                        }
+                        Text(sourceSummaryText)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                            .truncationMode(.middle)
+                            .frame(maxWidth: ModalMetrics.primaryControlWidth, alignment: .leading)
+                    }
+                }
+
+                FieldRow(title: "Destination") {
+                    Picker("Destination", selection: $repositoryID) {
+                        Text("Choose").tag(UUID?.none)
+                        ForEach(model.repositories) { repository in
+                            Text(repository.name).tag(Optional(repository.id))
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(width: 300, alignment: .leading)
+                }
+
+                FieldRow(title: "Extra excludes") {
+                    ExclusionPatternEditor(text: $customExcludePatternsText)
+                        .frame(width: ModalMetrics.primaryControlWidth)
                 }
             }
 
-            FieldRow(title: "Run policy") {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 18) {
+            SheetFormSection(
+                title: "Automatic Schedule",
+                subtitle: "Set when this profile runs and which power or network limits apply.",
+                symbol: "calendar"
+            ) {
+                FieldRow(title: "Frequency") {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Picker("Schedule", selection: $scheduleKind) {
+                            ForEach(ScheduleEditorKind.allCases) { kind in
+                                Text(kind.displayName).tag(kind)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.segmented)
+                        .frame(width: ModalMetrics.primaryControlWidth, alignment: .leading)
+
+                        scheduleControls
+                    }
+                }
+
+                FieldRow(title: "Run policy") {
+                    LazyVGrid(columns: modalOptionColumns, alignment: .leading, spacing: 10) {
                         Toggle("Enabled", isOn: $scheduleEnabled)
                             .toggleStyle(.checkbox)
-                            .frame(width: 170, alignment: .leading)
                         Toggle("Catch up missed runs", isOn: $catchUpMissedRuns)
                             .toggleStyle(.checkbox)
-                            .frame(width: 210, alignment: .leading)
-                    }
-                    HStack(spacing: 18) {
                         Toggle("Run on battery", isOn: $runOnBattery)
                             .toggleStyle(.checkbox)
-                            .frame(width: 170, alignment: .leading)
                         Toggle("Run in Low Power Mode", isOn: $runInLowPowerMode)
                             .toggleStyle(.checkbox)
-                            .frame(width: 210, alignment: .leading)
                     }
+                    .frame(width: ModalMetrics.primaryControlWidth, alignment: .leading)
                 }
-            }
 
-            FieldRow(title: "Bandwidth") {
-                HStack(spacing: 10) {
-                    TextField("Upload KiB/s", text: $uploadLimit)
-                        .textFieldStyle(.roundedBorder)
-                        .frame(width: 132)
-                    TextField("Download KiB/s", text: $downloadLimit)
-                        .textFieldStyle(.roundedBorder)
-                        .frame(width: 132)
-                }
-            }
-
-            FieldRow(title: "Retention") {
-                VStack(alignment: .leading, spacing: 10) {
+                FieldRow(title: "Speed limits") {
                     HStack(spacing: 10) {
+                        TextField("Upload KiB/s", text: $uploadLimit)
+                            .textFieldStyle(.roundedBorder)
+                        TextField("Download KiB/s", text: $downloadLimit)
+                            .textFieldStyle(.roundedBorder)
+                    }
+                    .frame(width: ModalMetrics.primaryControlWidth)
+                }
+            }
+
+            SheetFormSection(
+                title: "Retention & Cleanup",
+                subtitle: "Keep useful history while reclaiming destination space on a predictable schedule.",
+                symbol: "clock.arrow.circlepath"
+            ) {
+                FieldRow(title: "Restore points") {
+                    LazyVGrid(columns: modalRetentionColumns, alignment: .leading, spacing: 10) {
                         Stepper("Hourly \(keepHourly)", value: $keepHourly, in: 0...168)
-                            .frame(width: 122, alignment: .leading)
                         Stepper("Daily \(keepDaily)", value: $keepDaily, in: 0...365)
-                            .frame(width: 122, alignment: .leading)
                         Stepper("Weekly \(keepWeekly)", value: $keepWeekly, in: 0...260)
-                            .frame(width: 132, alignment: .leading)
-                    }
-                    HStack(spacing: 10) {
                         Stepper("Monthly \(keepMonthly)", value: $keepMonthly, in: 0...120)
-                            .frame(width: 122, alignment: .leading)
                         Stepper("Yearly \(keepYearly)", value: $keepYearly, in: 0...50)
-                            .frame(width: 122, alignment: .leading)
                     }
-                    HStack(spacing: 18) {
-                        Toggle("Free space after cleanup", isOn: $pruneAfterForget)
-                            .toggleStyle(.checkbox)
-                            .frame(width: 170, alignment: .leading)
-                        Toggle("Verify after cleanup", isOn: $checkAfterPrune)
-                            .toggleStyle(.checkbox)
-                            .frame(width: 170, alignment: .leading)
-                    }
-                    Divider()
-                        .frame(width: 390)
-                    HStack(spacing: 18) {
-                        Toggle("Automatic cleanup", isOn: $maintenanceEnabled)
-                            .toggleStyle(.checkbox)
-                            .frame(width: 170, alignment: .leading)
-                        Stepper("Every \(maintenanceIntervalDays) days", value: $maintenanceIntervalDays, in: 1...90)
-                            .frame(width: 170, alignment: .leading)
-                    }
-                    TimeControls(hour: $maintenanceHour, minute: $maintenanceMinute)
+                    .frame(width: ModalMetrics.primaryControlWidth, alignment: .leading)
+                }
+
+                FieldRow(title: "Cleanup") {
+                    VStack(alignment: .leading, spacing: 12) {
+                    LazyVGrid(columns: modalOptionColumns, alignment: .leading, spacing: 10) {
+                            Toggle("Free space after cleanup", isOn: $pruneAfterForget)
+                                .toggleStyle(.checkbox)
+                            Toggle("Verify after cleanup", isOn: $checkAfterPrune)
+                                .toggleStyle(.checkbox)
+                            Toggle("Automatic cleanup", isOn: $maintenanceEnabled)
+                                .toggleStyle(.checkbox)
+                        }
+                        Divider()
+                        HStack(spacing: 16) {
+                            Stepper("Every \(maintenanceIntervalDays) days", value: $maintenanceIntervalDays, in: 1...90)
+                            TimeControls(hour: $maintenanceHour, minute: $maintenanceMinute)
+                        }
                         .disabled(!maintenanceEnabled)
+                    }
+                    .frame(width: ModalMetrics.primaryControlWidth, alignment: .leading)
                 }
             }
 
@@ -3913,79 +4274,91 @@ struct DestinationEditorView: View {
 
     var body: some View {
         SheetScaffold(title: sheetTitle, subtitle: sheetSubtitle) {
-            FieldRow(title: "Name") {
-                TextField("Destination name", text: $name)
-                    .textFieldStyle(.roundedBorder)
-            }
-
-            FieldRow(title: "Type") {
-                Picker("Type", selection: $kind) {
-                    ForEach(RepositoryBackendKind.allCases, id: \.self) { kind in
-                        Text(kind.displayName).tag(kind)
-                    }
+            SheetFormSection(
+                title: "Location",
+                subtitle: "Choose the drive, server, or cloud location that stores encrypted backup data.",
+                symbol: "externaldrive"
+            ) {
+                FieldRow(title: "Name") {
+                    TextField("Destination name", text: $name)
+                        .textFieldStyle(.roundedBorder)
                 }
-                .labelsHidden()
-                .frame(width: ModalMetrics.primaryControlWidth, alignment: .leading)
-            }
 
-            backendFields
-            credentialFields
-
-            if existingDestination == nil {
-                FieldRow(title: "Encryption password") {
-                    Picker("Password", selection: $storageMode) {
-                        ForEach(SecretStorageMode.allCases, id: \.self) { mode in
-                            Text(mode.displayName).tag(mode)
+                FieldRow(title: "Type") {
+                    Picker("Type", selection: $kind) {
+                        ForEach(RepositoryBackendKind.allCases, id: \.self) { kind in
+                            Text(kind.displayName).tag(kind)
                         }
                     }
                     .labelsHidden()
-                    .pickerStyle(.segmented)
-                    .frame(width: 360, alignment: .leading)
+                    .frame(width: ModalMetrics.primaryControlWidth, alignment: .leading)
                 }
 
-                if storageMode == .userManagedPassphrase {
-                    FieldRow(title: "Passphrase") {
-                        SecureField("Encryption passphrase", text: $passphrase)
-                            .textFieldStyle(.roundedBorder)
+                backendFields
+                credentialFields
+            }
+
+            SheetFormSection(
+                title: "Encryption",
+                subtitle: "Every Delta destination is encrypted. Choose who manages the password needed for restore.",
+                symbol: "lock.shield"
+            ) {
+                if existingDestination == nil {
+                    FieldRow(title: "Password") {
+                        Picker("Password", selection: $storageMode) {
+                            ForEach(SecretStorageMode.allCases, id: \.self) { mode in
+                                Text(mode.displayName).tag(mode)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.segmented)
+                        .frame(width: ModalMetrics.primaryControlWidth, alignment: .leading)
                     }
-                    FieldRow(title: "Confirm") {
-                        SecureField("Confirm encryption passphrase", text: $passphraseConfirmation)
-                            .textFieldStyle(.roundedBorder)
-                    }
-                    if !passphraseConfirmation.isEmpty && passphrase != passphraseConfirmation {
-                        FieldRow(title: "") {
-                            InlineWarning(
-                                symbol: "exclamationmark.triangle",
-                                title: "Passphrases do not match.",
-                                message: "This password is required to restore encrypted backup data."
-                            )
-                            .frame(width: ModalMetrics.primaryControlWidth, alignment: .leading)
+
+                    if storageMode == .userManagedPassphrase {
+                        FieldRow(title: "Passphrase") {
+                            SecureField("Encryption passphrase", text: $passphrase)
+                                .textFieldStyle(.roundedBorder)
+                        }
+                        FieldRow(title: "Confirm") {
+                            SecureField("Confirm encryption passphrase", text: $passphraseConfirmation)
+                                .textFieldStyle(.roundedBorder)
+                        }
+                        if !passphraseConfirmation.isEmpty && passphrase != passphraseConfirmation {
+                            FieldRow(title: "") {
+                                InlineWarning(
+                                    symbol: "exclamationmark.triangle",
+                                    title: "Passphrases do not match.",
+                                    message: "This password is required to restore encrypted backup data."
+                                )
+                                .frame(width: ModalMetrics.primaryControlWidth, alignment: .leading)
+                            }
                         }
                     }
-                }
-            } else if let existingDestination {
-                FieldRow(title: "Encryption password") {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text(existingDestination.secretStorageMode.displayName)
-                            .foregroundStyle(.secondary)
-                        SecureField("Replace saved password", text: $replacementPassphrase)
-                            .textFieldStyle(.roundedBorder)
-                            .frame(width: ModalMetrics.primaryControlWidth)
-                        SecureField("Confirm replacement password", text: $replacementPassphraseConfirmation)
-                            .textFieldStyle(.roundedBorder)
-                            .frame(width: ModalMetrics.primaryControlWidth)
-                        Text("Only use this when reconnecting existing encrypted backup data or rotating a known password. Delta verifies it before saving.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .frame(width: ModalMetrics.primaryControlWidth, alignment: .leading)
-                        if !replacementPassphraseConfirmation.isEmpty && replacementPassphrase != replacementPassphraseConfirmation {
-                            InlineWarning(
-                                symbol: "exclamationmark.triangle",
-                                title: "Passwords do not match.",
-                                message: "The replacement password must match before Delta can verify it."
-                            )
-                            .frame(width: ModalMetrics.primaryControlWidth, alignment: .leading)
+                } else if let existingDestination {
+                    FieldRow(title: "Password") {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text(existingDestination.secretStorageMode.displayName)
+                                .foregroundStyle(.secondary)
+                            SecureField("Replace saved password", text: $replacementPassphrase)
+                                .textFieldStyle(.roundedBorder)
+                                .frame(width: ModalMetrics.primaryControlWidth)
+                            SecureField("Confirm replacement password", text: $replacementPassphraseConfirmation)
+                                .textFieldStyle(.roundedBorder)
+                                .frame(width: ModalMetrics.primaryControlWidth)
+                            Text("Only use this when reconnecting existing encrypted backup data or rotating a known password. Delta verifies it before saving.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .frame(width: ModalMetrics.primaryControlWidth, alignment: .leading)
+                            if !replacementPassphraseConfirmation.isEmpty && replacementPassphrase != replacementPassphraseConfirmation {
+                                InlineWarning(
+                                    symbol: "exclamationmark.triangle",
+                                    title: "Passwords do not match.",
+                                    message: "The replacement password must match before Delta can verify it."
+                                )
+                                .frame(width: ModalMetrics.primaryControlWidth, alignment: .leading)
+                            }
                         }
                     }
                 }
@@ -4002,6 +4375,8 @@ struct DestinationEditorView: View {
                 .disabled(!canCreate || !model.isPersistentStoreAvailable)
             }
         }
+        .frame(width: ModalMetrics.sheetWidth, height: preferredSheetHeight)
+        .animation(.easeInOut(duration: 0.18), value: preferredSheetHeight)
         .onChange(of: kind) { _, newKind in
             let fields = ResticBackendCredentialTemplates.fields(for: newKind)
             credentialValues = Dictionary(uniqueKeysWithValues: fields.map { ($0.environmentKey, credentialValues[$0.environmentKey] ?? "") })
@@ -4016,6 +4391,29 @@ struct DestinationEditorView: View {
         existingDestination == nil ? "Choose where encrypted restore points are stored." : "Update where encrypted restore points are stored."
     }
 
+    private var preferredSheetHeight: CGFloat {
+        let fieldHeight: CGFloat = 36
+        let backendRows: Int
+        switch kind {
+        case .local, .rest, .custom:
+            backendRows = 1
+        case .backblazeB2, .azureBlob, .googleCloudStorage, .swiftObjectStorage, .rclone:
+            backendRows = 2
+        case .s3:
+            backendRows = 4
+        case .sftp:
+            backendRows = 7
+        }
+
+        let credentialRows = ResticBackendCredentialTemplates.fields(for: kind).count
+        let passphraseRows = existingDestination == nil && storageMode == .userManagedPassphrase ? 2 : 0
+        let replacementPasswordHeight: CGFloat = existingDestination == nil ? 0 : 132
+        let contentHeight = ModalMetrics.compactDestinationSheetHeight
+            + CGFloat(max(backendRows - 1, 0) + credentialRows + passphraseRows) * fieldHeight
+            + replacementPasswordHeight
+        return min(contentHeight, ModalMetrics.sheetHeight)
+    }
+
     @ViewBuilder
     private var backendFields: some View {
         switch kind {
@@ -4024,7 +4422,7 @@ struct DestinationEditorView: View {
                 HStack {
                     TextField("Destination folder", text: $primary)
                         .textFieldStyle(.roundedBorder)
-                        .frame(width: ModalMetrics.primaryControlWidth)
+                        .frame(width: 460)
                     Button {
                         if let path = model.chooseFolder().first {
                             primary = path
@@ -4251,7 +4649,7 @@ struct PageScaffold<Actions: View, Content: View>: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
+            LazyVStack(alignment: .leading, spacing: 18) {
                 HStack(alignment: .top, spacing: 16) {
                     VStack(alignment: .leading, spacing: 5) {
                         Text(title)
@@ -4301,12 +4699,64 @@ struct SheetScaffold<Content: View>: View {
     }
 }
 
+struct SheetFormSection<Content: View>: View {
+    var title: String
+    var subtitle: String
+    var symbol: String
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: symbol)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 24, height: 24)
+                    .background(DeltaTheme.badge)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title)
+                        .font(.headline)
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Divider()
+            VStack(alignment: .leading, spacing: 12) {
+                content
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(DeltaTheme.badge.opacity(0.35))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(DeltaTheme.border, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+}
+
 enum ModalMetrics {
     static let sheetWidth: CGFloat = 760
+    static let sheetHeight: CGFloat = 720
+    static let compactDestinationSheetHeight: CGFloat = 500
     static let labelWidth: CGFloat = 154
-    static let contentWidth: CGFloat = 548
-    static let primaryControlWidth: CGFloat = 420
+    static let contentWidth: CGFloat = 520
+    static let primaryControlWidth: CGFloat = 500
 }
+
+private let modalOptionColumns = [
+    GridItem(.flexible(minimum: 190), spacing: 16, alignment: .leading),
+    GridItem(.flexible(minimum: 190), spacing: 16, alignment: .leading)
+]
+
+private let modalRetentionColumns = [
+    GridItem(.adaptive(minimum: 145), spacing: 12, alignment: .leading)
+]
 
 struct Card<Content: View>: View {
     @ViewBuilder var content: Content
@@ -4409,90 +4859,30 @@ struct SurfaceSection<Content: View>: View {
     }
 }
 
-struct SettingsStatusItem: Identifiable {
-    var id: String { title }
-    var title: String
-    var value: String
-    var symbol: String
-    var color: Color
-    var detail: String
-}
-
-struct SettingsOverviewCard: View {
+struct SettingsHealthBanner: View {
     var symbol: String
     var title: String
     var detail: String
     var statusText: String
     var statusColor: Color
-    var items: [SettingsStatusItem]
 
     var body: some View {
         Card {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(alignment: .top, spacing: 14) {
-                    StatusIcon(symbol: symbol, color: statusColor)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(title)
-                            .font(.headline)
-                        Text(detail)
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                    StateBadge(text: statusText, color: statusColor)
-                        .lineLimit(1)
+            HStack(alignment: .top, spacing: 14) {
+                StatusIcon(symbol: symbol, color: statusColor)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(.headline)
+                    Text(detail)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-
-                Divider()
-
-                LazyVGrid(columns: columns, spacing: 12) {
-                    ForEach(items) { item in
-                        SettingsOverviewItem(item: item)
-                    }
-                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                StateBadge(text: statusText, color: statusColor)
+                    .lineLimit(1)
             }
         }
-    }
-
-    private var columns: [GridItem] {
-        [
-            GridItem(.adaptive(minimum: 210), spacing: 12)
-        ]
-    }
-}
-
-struct SettingsOverviewItem: View {
-    var item: SettingsStatusItem
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 10) {
-            Image(systemName: item.symbol)
-                .font(.system(size: 13, weight: .semibold))
-                .frame(width: 24, height: 24)
-                .foregroundStyle(item.color)
-                .background(item.color.opacity(0.14))
-                .clipShape(RoundedRectangle(cornerRadius: 7))
-                .padding(.top, 1)
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(item.title)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                Text(item.value)
-                    .font(.subheadline.weight(.semibold))
-                    .lineLimit(1)
-                Text(item.detail)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -4651,8 +5041,14 @@ struct SettingsFactGrid: View {
     }
 }
 
-private let settingsControlRowLabelWidth: CGFloat = 260
-private let settingsControlRowControlWidth: CGFloat = 340
+private let settingsControlRowLabelWidth: CGFloat = 250
+private let settingsControlRowControlWidth: CGFloat = 440
+private let settingsControlRowSpacing: CGFloat = 24
+private let settingsCounterColumns = [
+    GridItem(.flexible(), spacing: 12, alignment: .leading),
+    GridItem(.flexible(), spacing: 12, alignment: .leading),
+    GridItem(.flexible(), spacing: 12, alignment: .leading)
+]
 
 struct SettingsControlRow<Control: View>: View {
     var title: String
@@ -4662,31 +5058,38 @@ struct SettingsControlRow<Control: View>: View {
     var body: some View {
         ViewThatFits(in: .horizontal) {
             horizontalLayout
-            verticalLayout
+            stackedLayout
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var horizontalLayout: some View {
-        HStack(alignment: .top, spacing: 18) {
+        HStack(alignment: .top, spacing: settingsControlRowSpacing) {
             label
                 .frame(width: settingsControlRowLabelWidth, alignment: .leading)
 
-            control
-                .frame(width: settingsControlRowControlWidth, alignment: .leading)
+            controlColumn
+        }
+        .frame(
+            minWidth: settingsControlRowLabelWidth + settingsControlRowSpacing + settingsControlRowControlWidth,
+            maxWidth: .infinity,
+            alignment: .leading
+        )
+    }
 
-            Spacer(minLength: 0)
+    private var stackedLayout: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            label
+            controlColumn
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private var verticalLayout: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            label
+    private var controlColumn: some View {
+        ZStack(alignment: .topLeading) {
             control
-                .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(width: settingsControlRowControlWidth, alignment: .topLeading)
     }
 
     private var label: some View {
@@ -4697,7 +5100,6 @@ struct SettingsControlRow<Control: View>: View {
             Text(detail)
                 .font(.callout)
                 .foregroundStyle(.secondary)
-                .lineLimit(3)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -4832,7 +5234,7 @@ struct FieldRow<Content: View>: View {
                 .font(.subheadline.weight(.medium))
                 .lineLimit(1)
                 .truncationMode(.middle)
-                .frame(width: ModalMetrics.labelWidth, alignment: .trailing)
+                .frame(width: ModalMetrics.labelWidth, alignment: .leading)
                 .padding(.top, 5)
             content
                 .frame(width: ModalMetrics.contentWidth, alignment: .leading)
@@ -5125,37 +5527,6 @@ struct StatusIcon: View {
             .background(color.opacity(0.14))
             .foregroundStyle(color)
             .clipShape(RoundedRectangle(cornerRadius: 8))
-    }
-}
-
-struct MetadataBadge: View {
-    var text: String
-
-    var body: some View {
-        Text(text)
-            .font(.caption.weight(.medium))
-            .lineLimit(1)
-            .minimumScaleFactor(0.85)
-            .padding(.horizontal, 9)
-            .padding(.vertical, 5)
-            .background(DeltaTheme.badge)
-            .clipShape(Capsule())
-    }
-}
-
-struct IconButton: View {
-    var symbol: String
-    var help: String
-    var action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Image(systemName: symbol)
-                .frame(width: 18, height: 18)
-        }
-        .buttonStyle(.bordered)
-        .accessibilityLabel(help)
-        .deltaTooltip(help)
     }
 }
 

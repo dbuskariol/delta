@@ -33,6 +33,7 @@ public enum DeltaAppPreferenceKeys {
     public static let pausesScheduledBackups = "Delta.pausesScheduledBackups"
     public static let preventsIdleSleepDuringJobs = "Delta.preventsIdleSleepDuringJobs"
     public static let previewsRestoresByDefault = "Delta.previewsRestoresByDefault"
+    public static let scheduledBackupServiceFingerprint = "Delta.scheduledBackupServiceFingerprint"
     public static let sendsJobNotifications = "Delta.sendsJobNotifications"
     public static let sendsSuccessfulBackupNotifications = "Delta.sendsSuccessfulBackupNotifications"
     public static let showsMenuBarExtra = "Delta.showsMenuBarExtra"
