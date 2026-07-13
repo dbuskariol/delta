@@ -463,8 +463,16 @@ final class DeltaAppModel: ObservableObject {
         }
     }
 
-    func reconnectRepositoryPassword(_ repository: BackupRepository, originalPassword: String) async -> Bool {
-        guard let database = requirePersistentDatabase(), !localOperationIsRunning else { return false }
+    func reconnectRepositoryPassword(_ repository: BackupRepository, originalPassword: String) async throws -> String? {
+        guard let database else {
+            throw DeltaUIError.message(
+                persistentStoreErrorMessage
+                    ?? "Delta cannot access its local app data. Reopen Delta and try again."
+            )
+        }
+        guard !localOperationIsRunning else {
+            throw DeltaUIError.message("Wait for the current Delta job to finish, then reconnect this destination.")
+        }
         localOperationIsRunning = true
         isWorking = true
         activeOperation = ActiveOperation(
@@ -473,13 +481,15 @@ final class DeltaAppModel: ObservableObject {
             title: "Reconnecting \(repository.name)",
             detail: "Validating the original encryption password"
         )
+        defer {
+            localOperationIsRunning = false
+            isWorking = false
+            activeOperation = nil
+        }
         let manager = makeRepositoryPasswordManager()
         let result = await Task.detached(priority: .userInitiated) {
             Result { try manager.reconnect(repository: repository, originalPassword: originalPassword) }
         }.value
-        localOperationIsRunning = false
-        isWorking = false
-        activeOperation = nil
 
         switch result {
         case .success:
@@ -489,20 +499,27 @@ final class DeltaAppModel: ObservableObject {
             do {
                 try database.saveRepository(updatedRepository)
                 try database.appendEvent(EventLog(level: .info, message: "Password access for destination '\(repository.name)' was reconnected and verified."))
-                reload()
-                return true
             } catch {
-                alertMessage = error.localizedDescription
-                return false
+                reload()
+                return "The original password was verified and saved, but Delta could not update its local status: \(error.localizedDescription)"
             }
+            reload()
+            return nil
         case let .failure(error):
-            alertMessage = error.localizedDescription
-            return false
+            throw error
         }
     }
 
-    func rotateRepositoryPassword(_ repository: BackupRepository, newPassword: String) async -> Bool {
-        guard let database = requirePersistentDatabase(), !localOperationIsRunning else { return false }
+    func rotateRepositoryPassword(_ repository: BackupRepository, newPassword: String) async throws -> String? {
+        guard let database else {
+            throw DeltaUIError.message(
+                persistentStoreErrorMessage
+                    ?? "Delta cannot access its local app data. Reopen Delta and try again."
+            )
+        }
+        guard !localOperationIsRunning else {
+            throw DeltaUIError.message("Wait for the current Delta job to finish, then change this password.")
+        }
         localOperationIsRunning = true
         isWorking = true
         activeOperation = ActiveOperation(
@@ -511,22 +528,28 @@ final class DeltaAppModel: ObservableObject {
             title: "Changing password for \(repository.name)",
             detail: "Adding and verifying a new encryption key"
         )
+        defer {
+            localOperationIsRunning = false
+            isWorking = false
+            activeOperation = nil
+        }
         let manager = makeRepositoryPasswordManager()
         let result = await Task.detached(priority: .userInitiated) {
             Result { try manager.rotate(repository: repository, newPassword: newPassword) }
         }.value
-        localOperationIsRunning = false
-        isWorking = false
-        activeOperation = nil
 
         switch result {
         case let .success(changeResult):
             var updatedRepository = repository
             updatedRepository.secretStorageMode = .userManagedPassphrase
             updatedRepository.lastVerifiedAt = Date()
+            let retainedOldKey = changeResult == .completedWithOldKeyRetained
+            var warnings: [String] = []
+            if retainedOldKey {
+                warnings.append("The new password is active and verified, but Delta could not retire the previous encryption key. Backups can continue; retry the password change after checking destination availability.")
+            }
             do {
                 try database.saveRepository(updatedRepository)
-                let retainedOldKey = changeResult == .completedWithOldKeyRetained
                 try database.appendEvent(
                     EventLog(
                         level: retainedOldKey ? .warning : .info,
@@ -535,18 +558,13 @@ final class DeltaAppModel: ObservableObject {
                             : "The password for destination '\(repository.name)' was changed and the previous encryption key was retired."
                     )
                 )
-                if retainedOldKey {
-                    alertMessage = "The new password is active and verified, but Delta could not retire the previous encryption key. Backups can continue; retry the password change after checking destination availability."
-                }
-                reload()
-                return true
             } catch {
-                alertMessage = error.localizedDescription
-                return false
+                warnings.append("The password was changed and verified, but Delta could not update its local status: \(error.localizedDescription)")
             }
+            reload()
+            return warnings.isEmpty ? nil : warnings.joined(separator: " ")
         case let .failure(error):
-            alertMessage = error.localizedDescription
-            return false
+            throw error
         }
     }
 

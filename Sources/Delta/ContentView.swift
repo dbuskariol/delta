@@ -3822,45 +3822,91 @@ struct DestinationPasswordView: View {
     @State private var password = ""
     @State private var confirmation = ""
     @State private var isSubmitting = false
+    @State private var operationError: String?
 
     var body: some View {
-        SheetScaffold(title: title, subtitle: subtitle) {
-            SheetFormSection(title: sectionTitle, subtitle: sectionSubtitle, symbol: symbol) {
-                FieldRow(title: fieldTitle) {
-                    SecureField(fieldPlaceholder, text: $password)
-                        .textFieldStyle(.roundedBorder)
-                }
-                if mode == .rotate {
-                    FieldRow(title: "Confirm") {
-                        SecureField("Confirm new password", text: $confirmation)
-                            .textFieldStyle(.roundedBorder)
-                    }
-                    FieldRow(title: "") {
-                        Text("Use at least 12 characters. Delta never puts passwords in process arguments, environment variables, logs, or temporary files.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
+        VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.title2.weight(.semibold))
+                Text(subtitle)
+                    .foregroundStyle(.secondary)
             }
+            .padding(.horizontal, 22)
+            .padding(.top, 22)
+            .padding(.bottom, 16)
 
-            SettingsNotice(
-                symbol: mode == .rotate ? "checkmark.shield" : "lock.open",
-                title: noticeTitle,
-                text: noticeText,
-                color: .blue
-            )
+            Divider()
 
-            SheetActions {
+            VStack(alignment: .leading, spacing: 16) {
+                SheetFormSection(title: sectionTitle, subtitle: sectionSubtitle, symbol: symbol) {
+                    FieldRow(title: fieldTitle) {
+                        SecureField(fieldPlaceholder, text: $password)
+                            .textFieldStyle(.roundedBorder)
+                            .disabled(isSubmitting)
+                    }
+                    if mode == .rotate {
+                        FieldRow(title: "Confirm") {
+                            SecureField("Confirm new password", text: $confirmation)
+                                .textFieldStyle(.roundedBorder)
+                                .disabled(isSubmitting)
+                        }
+                        FieldRow(title: "") {
+                            Text("Use at least 12 characters. Delta never puts passwords in process arguments, environment variables, logs, or temporary files.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+
+                SettingsNotice(
+                    symbol: mode == .rotate ? "checkmark.shield" : "lock.open",
+                    title: noticeTitle,
+                    text: noticeText,
+                    color: .blue
+                )
+
+                if let operationError {
+                    InlineWarning(
+                        symbol: "exclamationmark.triangle.fill",
+                        title: errorTitle,
+                        message: operationError
+                    )
+                }
+
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 22)
+            .padding(.vertical, 18)
+
+            Divider()
+
+            HStack(spacing: 8) {
+                Spacer()
                 Button("Cancel") { dismiss() }
                     .disabled(isSubmitting)
-                Button(actionTitle) { submit() }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(!canSubmit || isSubmitting || model.isWorking)
+                Button { submit() } label: {
+                    HStack(spacing: 7) {
+                        if isSubmitting {
+                            ProgressView()
+                                .controlSize(.small)
+                        }
+                        Text(isSubmitting ? progressActionTitle : actionTitle)
+                    }
+                    .frame(minWidth: 124)
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(!canSubmit || isSubmitting || model.isWorking)
             }
+            .padding(.horizontal, 22)
+            .padding(.vertical, 16)
         }
-        .frame(width: ModalMetrics.sheetWidth, height: mode == .rotate ? 440 : 340)
+        .frame(width: ModalMetrics.sheetWidth, height: sheetHeight)
+        .background(DeltaTheme.background)
         .interactiveDismissDisabled(isSubmitting)
+        .onChange(of: password) { _, _ in operationError = nil }
+        .onChange(of: confirmation) { _, _ in operationError = nil }
     }
 
     private var title: String {
@@ -3909,6 +3955,23 @@ struct DestinationPasswordView: View {
         mode == .rotate ? "Change Password" : "Reconnect"
     }
 
+    private var progressActionTitle: String {
+        mode == .rotate ? "Changing..." : "Checking..."
+    }
+
+    private var errorTitle: String {
+        mode == .rotate ? "Password could not be changed" : "Destination could not be reconnected"
+    }
+
+    private var sheetHeight: CGFloat {
+        switch (mode, operationError == nil) {
+        case (.reconnect, true): 390
+        case (.reconnect, false): 480
+        case (.rotate, true): 490
+        case (.rotate, false): 580
+        }
+    }
+
     private var canSubmit: Bool {
         switch mode {
         case .reconnect:
@@ -3919,20 +3982,28 @@ struct DestinationPasswordView: View {
     }
 
     private func submit() {
+        guard canSubmit, !isSubmitting else { return }
+        operationError = nil
         isSubmitting = true
         Task {
-            let succeeded: Bool
-            switch mode {
-            case .reconnect:
-                succeeded = await model.reconnectRepositoryPassword(destination, originalPassword: password)
-            case .rotate:
-                succeeded = await model.rotateRepositoryPassword(destination, newPassword: password)
-            }
-            isSubmitting = false
-            if succeeded {
+            do {
+                let warning: String?
+                switch mode {
+                case .reconnect:
+                    warning = try await model.reconnectRepositoryPassword(destination, originalPassword: password)
+                case .rotate:
+                    warning = try await model.rotateRepositoryPassword(destination, newPassword: password)
+                }
                 password = ""
                 confirmation = ""
+                isSubmitting = false
                 dismiss()
+                if let warning {
+                    model.alertMessage = warning
+                }
+            } catch {
+                isSubmitting = false
+                operationError = error.localizedDescription
             }
         }
     }
