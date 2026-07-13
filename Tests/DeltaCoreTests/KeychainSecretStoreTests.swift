@@ -9,6 +9,16 @@ final class KeychainSecretStoreTests: XCTestCase {
         XCTAssertEqual(KeychainSecretStore.accessPromptName, "Delta destination secrets")
     }
 
+    func testExistingSecretUpdateDoesNotRewriteAccessControl() {
+        let attributes = KeychainSecretStore(service: "test")
+            .existingItemValueUpdateAttributes(data: Data("replacement".utf8))
+
+        XCTAssertEqual(attributes.count, 1)
+        XCTAssertEqual(attributes[kSecValueData as String] as? Data, Data("replacement".utf8))
+        XCTAssertNil(attributes[kSecAttrAccess as String])
+        XCTAssertNil(attributes[kSecAttrAccessible as String])
+    }
+
     func testBackgroundLoadQueryFailsInsteadOfPromptingForAuthentication() throws {
         let query = KeychainSecretStore(service: "test").loadQuery(
             account: "account",

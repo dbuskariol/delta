@@ -22,6 +22,20 @@ final class ResticRunnerTests: XCTestCase {
         XCTAssertEqual(result.standardError, "stderr-line\n")
     }
 
+    func testRunnerDeliversSensitiveInputThroughStandardInput() throws {
+        let command = ResticCommand(
+            executableURL: URL(fileURLWithPath: "/bin/sh"),
+            arguments: ["-c", "IFS= read -r value; test \"${#value}\" -eq 17 && printf 'received\\n'"],
+            sensitiveStandardInput: Data("not-a-real-secret\n".utf8)
+        )
+
+        let result = try ResticRunner().run(command)
+
+        XCTAssertEqual(result.status, .succeeded)
+        XCTAssertEqual(result.standardOutput, "received\n")
+        XCTAssertFalse(command.redactedDescription.contains("not-a-real-secret"))
+    }
+
     func testRunnerCanPauseRunningProcess() throws {
         let controller = ResticRunController()
         let runner = ResticRunner(runController: controller)

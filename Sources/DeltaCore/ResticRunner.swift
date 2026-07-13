@@ -320,8 +320,10 @@ public final class ResticRunner: ResticRunning, @unchecked Sendable {
 
         let stdoutPipe = Pipe()
         let stderrPipe = Pipe()
+        let stdinPipe = command.sensitiveStandardInput == nil ? nil : Pipe()
         process.standardOutput = stdoutPipe
         process.standardError = stderrPipe
+        process.standardInput = stdinPipe
 
         let combinedOutputHandler: (@Sendable (ResticOutputEvent) -> Void)? = { [outputHandler] event in
             outputHandler?(event)
@@ -347,7 +349,16 @@ public final class ResticRunner: ResticRunning, @unchecked Sendable {
             }
         }
 
-        try process.run()
+        do {
+            try process.run()
+        } catch {
+            try? stdinPipe?.fileHandleForWriting.close()
+            throw error
+        }
+        if let sensitiveStandardInput = command.sensitiveStandardInput, let stdinPipe {
+            stdinPipe.fileHandleForWriting.write(sensitiveStandardInput)
+            try? stdinPipe.fileHandleForWriting.close()
+        }
         let controller = runController ?? (stopReasonProvider == nil ? nil : ResticRunController())
         let stopMonitor = ResticStopRequestMonitor(
             controller: controller,

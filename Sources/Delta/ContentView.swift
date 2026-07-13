@@ -3668,6 +3668,7 @@ struct DestinationRow: View {
     @EnvironmentObject private var model: DeltaAppModel
     var destination: BackupRepository
     @State private var isPresentingEditor = false
+    @State private var passwordSheetMode: DestinationPasswordSheetMode?
     @State private var isConfirmingDelete = false
 
     var body: some View {
@@ -3703,6 +3704,16 @@ struct DestinationRow: View {
                                 isPresentingEditor = true
                             } label: {
                                 Label("Edit Destination", systemImage: "pencil")
+                            }
+                            Button {
+                                passwordSheetMode = .rotate
+                            } label: {
+                                Label("Change Encryption Password", systemImage: "key.horizontal")
+                            }
+                            Button {
+                                passwordSheetMode = .reconnect
+                            } label: {
+                                Label("Reconnect with Original Password", systemImage: "link.badge.plus")
                             }
                             Button {
                                 model.refreshSnapshots(repository: destination)
@@ -3743,6 +3754,10 @@ struct DestinationRow: View {
         }
         .sheet(isPresented: $isPresentingEditor) {
             DestinationEditorView(destination: destination)
+                .environmentObject(model)
+        }
+        .sheet(item: $passwordSheetMode) { mode in
+            DestinationPasswordView(destination: destination, mode: mode)
                 .environmentObject(model)
         }
         .confirmationDialog("Remove Destination?", isPresented: $isConfirmingDelete) {
@@ -3788,6 +3803,137 @@ struct DestinationRow: View {
             return "\(remote):\(path)"
         case let .custom(repository):
             return repository
+        }
+    }
+}
+
+enum DestinationPasswordSheetMode: String, Identifiable {
+    case reconnect
+    case rotate
+
+    var id: String { rawValue }
+}
+
+struct DestinationPasswordView: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var model: DeltaAppModel
+    let destination: BackupRepository
+    let mode: DestinationPasswordSheetMode
+    @State private var password = ""
+    @State private var confirmation = ""
+    @State private var isSubmitting = false
+
+    var body: some View {
+        SheetScaffold(title: title, subtitle: subtitle) {
+            SheetFormSection(title: sectionTitle, subtitle: sectionSubtitle, symbol: symbol) {
+                FieldRow(title: fieldTitle) {
+                    SecureField(fieldPlaceholder, text: $password)
+                        .textFieldStyle(.roundedBorder)
+                }
+                if mode == .rotate {
+                    FieldRow(title: "Confirm") {
+                        SecureField("Confirm new password", text: $confirmation)
+                            .textFieldStyle(.roundedBorder)
+                    }
+                    FieldRow(title: "") {
+                        Text("Use at least 12 characters. Delta never puts passwords in process arguments, environment variables, logs, or temporary files.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+
+            SettingsNotice(
+                symbol: mode == .rotate ? "checkmark.shield" : "lock.open",
+                title: noticeTitle,
+                text: noticeText,
+                color: .blue
+            )
+
+            SheetActions {
+                Button("Cancel") { dismiss() }
+                    .disabled(isSubmitting)
+                Button(actionTitle) { submit() }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(!canSubmit || isSubmitting || model.isWorking)
+            }
+        }
+        .frame(width: ModalMetrics.sheetWidth, height: mode == .rotate ? 440 : 340)
+        .interactiveDismissDisabled(isSubmitting)
+    }
+
+    private var title: String {
+        mode == .rotate ? "Change Encryption Password" : "Reconnect Destination"
+    }
+
+    private var subtitle: String {
+        mode == .rotate
+            ? "Replace the password used to unlock \(destination.name)."
+            : "Restore access without changing encrypted backup data."
+    }
+
+    private var sectionTitle: String {
+        mode == .rotate ? "New Password" : "Original Password"
+    }
+
+    private var sectionSubtitle: String {
+        mode == .rotate
+            ? "Delta adds and verifies a new key before retiring the old key."
+            : "Enter the password that currently unlocks the existing backup."
+    }
+
+    private var symbol: String {
+        mode == .rotate ? "key.horizontal" : "link"
+    }
+
+    private var fieldTitle: String {
+        mode == .rotate ? "New Password" : "Password"
+    }
+
+    private var fieldPlaceholder: String {
+        mode == .rotate ? "New encryption password" : "Original encryption password"
+    }
+
+    private var noticeTitle: String {
+        mode == .rotate ? "Transactional key rotation" : "Validation before saving"
+    }
+
+    private var noticeText: String {
+        mode == .rotate
+            ? "The current key remains valid until the new key works and Keychain has been updated. A failure cannot silently lock you out."
+            : "Delta tests this password against the destination first. An incorrect value never replaces the saved password."
+    }
+
+    private var actionTitle: String {
+        mode == .rotate ? "Change Password" : "Reconnect"
+    }
+
+    private var canSubmit: Bool {
+        switch mode {
+        case .reconnect:
+            return !password.isEmpty
+        case .rotate:
+            return password.count >= 12 && password == confirmation
+        }
+    }
+
+    private func submit() {
+        isSubmitting = true
+        Task {
+            let succeeded: Bool
+            switch mode {
+            case .reconnect:
+                succeeded = await model.reconnectRepositoryPassword(destination, originalPassword: password)
+            case .rotate:
+                succeeded = await model.rotateRepositoryPassword(destination, newPassword: password)
+            }
+            isSubmitting = false
+            if succeeded {
+                password = ""
+                confirmation = ""
+                dismiss()
+            }
         }
     }
 }
@@ -4254,8 +4400,6 @@ struct DestinationEditorView: View {
     @State private var storageMode: SecretStorageMode = .appManagedKeychain
     @State private var passphrase = ""
     @State private var passphraseConfirmation = ""
-    @State private var replacementPassphrase = ""
-    @State private var replacementPassphraseConfirmation = ""
     @State private var credentialValues: [String: String] = [:]
 
     init(destination: BackupRepository? = nil) {
@@ -4337,29 +4481,14 @@ struct DestinationEditorView: View {
                     }
                 } else if let existingDestination {
                     FieldRow(title: "Password") {
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text(existingDestination.secretStorageMode.displayName)
-                                .foregroundStyle(.secondary)
-                            SecureField("Replace saved password", text: $replacementPassphrase)
-                                .textFieldStyle(.roundedBorder)
-                                .frame(width: ModalMetrics.primaryControlWidth)
-                            SecureField("Confirm replacement password", text: $replacementPassphraseConfirmation)
-                                .textFieldStyle(.roundedBorder)
-                                .frame(width: ModalMetrics.primaryControlWidth)
-                            Text("Only use this when reconnecting existing encrypted backup data or rotating a known password. Delta verifies it before saving.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                                .frame(width: ModalMetrics.primaryControlWidth, alignment: .leading)
-                            if !replacementPassphraseConfirmation.isEmpty && replacementPassphrase != replacementPassphraseConfirmation {
-                                InlineWarning(
-                                    symbol: "exclamationmark.triangle",
-                                    title: "Passwords do not match.",
-                                    message: "The replacement password must match before Delta can verify it."
-                                )
-                                .frame(width: ModalMetrics.primaryControlWidth, alignment: .leading)
-                            }
-                        }
+                        Text(existingDestination.secretStorageMode.displayName)
+                            .foregroundStyle(.secondary)
+                    }
+                    FieldRow(title: "") {
+                        Text("Use the destination actions menu to reconnect or change the encryption password.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
             }
@@ -4407,10 +4536,8 @@ struct DestinationEditorView: View {
 
         let credentialRows = ResticBackendCredentialTemplates.fields(for: kind).count
         let passphraseRows = existingDestination == nil && storageMode == .userManagedPassphrase ? 2 : 0
-        let replacementPasswordHeight: CGFloat = existingDestination == nil ? 0 : 132
         let contentHeight = ModalMetrics.compactDestinationSheetHeight
             + CGFloat(max(backendRows - 1, 0) + credentialRows + passphraseRows) * fieldHeight
-            + replacementPasswordHeight
         return min(contentHeight, ModalMetrics.sheetHeight)
     }
 
@@ -4545,12 +4672,6 @@ struct DestinationEditorView: View {
         if existingDestination == nil && storageMode == .userManagedPassphrase {
             guard !passphrase.isEmpty, passphrase == passphraseConfirmation else { return false }
         }
-        if existingDestination != nil {
-            let hasReplacement = !replacementPassphrase.isEmpty || !replacementPassphraseConfirmation.isEmpty
-            if hasReplacement {
-                guard !replacementPassphrase.isEmpty, replacementPassphrase == replacementPassphraseConfirmation else { return false }
-            }
-        }
         return true
     }
 
@@ -4566,8 +4687,7 @@ struct DestinationEditorView: View {
                 existingDestination,
                 name: name,
                 backend: backend,
-                backendCredentials: sanitizedCredentialValues,
-                replacementPassphrase: replacementPassphrase
+                backendCredentials: sanitizedCredentialValues
             )
         } else {
             return model.createRepository(

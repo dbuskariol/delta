@@ -421,13 +421,10 @@ final class DeltaAppModel: ObservableObject {
         _ repository: BackupRepository,
         name: String,
         backend: RepositoryBackend,
-        backendCredentials: [String: String] = [:],
-        replacementPassphrase: String? = nil
+        backendCredentials: [String: String] = [:]
     ) -> Bool {
         guard let database = requirePersistentDatabase() else { return false }
         var previousRepository = repository
-        var previousSecret: String?
-        var didReplaceSecret = false
         do {
             let validated = try repositoryValidator.validate(
                 name: name,
@@ -437,18 +434,10 @@ final class DeltaAppModel: ObservableObject {
             var updatedRepository = repository
             updatedRepository.name = validated.name
             updatedRepository.backend = validated.backend
-            let replacementPassphrase = replacementPassphrase ?? ""
-            let replacesPassword = !replacementPassphrase.isEmpty
             let localState = localRepositoryStateInspector.state(for: validated.backend)
             let reconnectsPreparedLocalDestination = localState?.isPrepared == true
-            if reconnectsPreparedLocalDestination, updatedRepository.backend != repository.backend, !replacesPassword {
+            if reconnectsPreparedLocalDestination, updatedRepository.backend != repository.backend {
                 throw DeltaUIError.message(existingLocalDestinationRequiresPasswordMessage(path: localState?.path))
-            }
-            if replacesPassword {
-                previousSecret = try? secretStore.load(account: repository.keychainAccount, authenticationPolicy: .allowUserInteraction)
-                try secretStore.save(secret: replacementPassphrase, account: repository.keychainAccount)
-                didReplaceSecret = true
-                updatedRepository.secretStorageMode = .userManagedPassphrase
             }
             updatedRepository.credentialReferences = try credentialResolver.updateCredentials(
                 backendCredentials,
@@ -461,7 +450,7 @@ final class DeltaAppModel: ObservableObject {
             }
             previousRepository = repository
             try database.saveRepository(updatedRepository)
-            if reconnectsPreparedLocalDestination && (replacesPassword || updatedRepository.lastVerifiedAt == nil) {
+            if reconnectsPreparedLocalDestination && updatedRepository.lastVerifiedAt == nil {
                 try validateExistingDestination(updatedRepository, database: database, path: localState?.path)
             }
             try database.appendEvent(EventLog(level: .info, message: "Destination '\(updatedRepository.name)' was updated."))
@@ -469,13 +458,93 @@ final class DeltaAppModel: ObservableObject {
             return true
         } catch {
             try? database.saveRepository(previousRepository)
-            if didReplaceSecret {
-                if let previousSecret {
-                    try? secretStore.save(secret: previousSecret, account: repository.keychainAccount)
-                } else {
-                    try? secretStore.delete(account: repository.keychainAccount)
-                }
+            alertMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    func reconnectRepositoryPassword(_ repository: BackupRepository, originalPassword: String) async -> Bool {
+        guard let database = requirePersistentDatabase(), !localOperationIsRunning else { return false }
+        localOperationIsRunning = true
+        isWorking = true
+        activeOperation = ActiveOperation(
+            kind: .check,
+            repositoryID: repository.id,
+            title: "Reconnecting \(repository.name)",
+            detail: "Validating the original encryption password"
+        )
+        let manager = makeRepositoryPasswordManager()
+        let result = await Task.detached(priority: .userInitiated) {
+            Result { try manager.reconnect(repository: repository, originalPassword: originalPassword) }
+        }.value
+        localOperationIsRunning = false
+        isWorking = false
+        activeOperation = nil
+
+        switch result {
+        case .success:
+            var updatedRepository = repository
+            updatedRepository.secretStorageMode = .userManagedPassphrase
+            updatedRepository.lastVerifiedAt = Date()
+            do {
+                try database.saveRepository(updatedRepository)
+                try database.appendEvent(EventLog(level: .info, message: "Password access for destination '\(repository.name)' was reconnected and verified."))
+                reload()
+                return true
+            } catch {
+                alertMessage = error.localizedDescription
+                return false
             }
+        case let .failure(error):
+            alertMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    func rotateRepositoryPassword(_ repository: BackupRepository, newPassword: String) async -> Bool {
+        guard let database = requirePersistentDatabase(), !localOperationIsRunning else { return false }
+        localOperationIsRunning = true
+        isWorking = true
+        activeOperation = ActiveOperation(
+            kind: .check,
+            repositoryID: repository.id,
+            title: "Changing password for \(repository.name)",
+            detail: "Adding and verifying a new encryption key"
+        )
+        let manager = makeRepositoryPasswordManager()
+        let result = await Task.detached(priority: .userInitiated) {
+            Result { try manager.rotate(repository: repository, newPassword: newPassword) }
+        }.value
+        localOperationIsRunning = false
+        isWorking = false
+        activeOperation = nil
+
+        switch result {
+        case let .success(changeResult):
+            var updatedRepository = repository
+            updatedRepository.secretStorageMode = .userManagedPassphrase
+            updatedRepository.lastVerifiedAt = Date()
+            do {
+                try database.saveRepository(updatedRepository)
+                let retainedOldKey = changeResult == .completedWithOldKeyRetained
+                try database.appendEvent(
+                    EventLog(
+                        level: retainedOldKey ? .warning : .info,
+                        message: retainedOldKey
+                            ? "The password for destination '\(repository.name)' was changed, but its previous encryption key could not be retired."
+                            : "The password for destination '\(repository.name)' was changed and the previous encryption key was retired."
+                    )
+                )
+                if retainedOldKey {
+                    alertMessage = "The new password is active and verified, but Delta could not retire the previous encryption key. Backups can continue; retry the password change after checking destination availability."
+                }
+                reload()
+                return true
+            } catch {
+                alertMessage = error.localizedDescription
+                return false
+            }
+        case let .failure(error):
             alertMessage = error.localizedDescription
             return false
         }
@@ -1403,6 +1472,28 @@ final class DeltaAppModel: ObservableObject {
                     self?.activeJobID = jobID
                     self?.appendLiveLog(event)
                 }
+            }
+        )
+    }
+
+    private func makeRepositoryPasswordManager() -> RepositoryPasswordManager {
+        let secretStore = secretStore
+        return RepositoryPasswordManager(
+            commandBuilder: ResticCommandBuilder(
+                resticExecutableURL: ResticExecutableLocator().locate(),
+                secretBridgeURL: Self.secretBridgeURL(),
+                secretBridgeArguments: ["--secret-bridge"]
+            ),
+            runner: ResticRunner(),
+            loadSavedPassword: { account in
+                try secretStore.load(account: account, authenticationPolicy: .failIfInteractionNeeded)
+            },
+            savePassword: { password, account in
+                try secretStore.save(
+                    secret: password,
+                    account: account,
+                    authenticationPolicy: .failIfInteractionNeeded
+                )
             }
         )
     }

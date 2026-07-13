@@ -28,9 +28,12 @@ final class ResticIntegrationTests: XCTestCase {
 
         let repository = BackupRepository(name: "Integration", backend: .local(path: repo.path), keychainAccount: "test-\(UUID().uuidString)")
         let bridge = root.appendingPathComponent("password-helper.sh")
+        let passwordState = root.appendingPathComponent("password-state")
+        try "integration-test-password\n".write(to: passwordState, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: passwordState.path)
         try """
         #!/bin/sh
-        printf '%s\\n' 'integration-test-password'
+        /bin/cat '\(passwordState.path)'
         """.write(to: bridge, atomically: true, encoding: .utf8)
         try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: bridge.path)
 
@@ -161,6 +164,44 @@ final class ResticIntegrationTests: XCTestCase {
 
         let postPruneCheck = try runner.run(try builder.check(repository: repository, readDataSubset: "1/100"))
         XCTAssertEqual(postPruneCheck.status, .succeeded)
+
+        let passwordManager = RepositoryPasswordManager(
+            commandBuilder: builder,
+            runner: runner,
+            loadSavedPassword: { _ in
+                try String(contentsOf: passwordState, encoding: .utf8)
+                    .trimmingCharacters(in: .newlines)
+            },
+            savePassword: { password, _ in
+                try "\(password)\n".write(to: passwordState, atomically: true, encoding: .utf8)
+                try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: passwordState.path)
+            }
+        )
+        let passwordChange = try passwordManager.rotate(
+            repository: repository,
+            newPassword: "integration-rotated-password"
+        )
+        XCTAssertEqual(passwordChange, .completed)
+
+        let oldPasswordResult = try runner.run(
+            try builder.validateRepositoryPassword(
+                repository: repository,
+                password: "integration-test-password"
+            )
+        )
+        XCTAssertEqual(oldPasswordResult.failureKind, .wrongPassword)
+        let newPasswordResult = try runner.run(
+            try builder.validateRepositoryPassword(
+                repository: repository,
+                password: "integration-rotated-password"
+            )
+        )
+        XCTAssertEqual(newPasswordResult.status, .succeeded)
+
+        let keysResult = try runner.run(try builder.repositoryKeys(repository: repository))
+        XCTAssertEqual(keysResult.status, .succeeded)
+        let keys = try JSONSerialization.jsonObject(with: Data(keysResult.standardOutput.utf8)) as? [[String: Any]]
+        XCTAssertEqual(keys?.count, 1)
     }
 
     private func snapshots(

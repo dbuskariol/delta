@@ -15,6 +15,7 @@ The product goal is simple: make serious backup practices approachable without h
 - **Destination validation before save** for required fields, new or changed writable local paths, REST URLs, SFTP paths/ports, S3 endpoint/bucket fields, and rclone remote syntax.
 - **Non-interactive SFTP scheduling** with optional SSH private-key file configuration, SSH batch mode, host-key change protection, and keepalive options so scheduled jobs fail clearly instead of waiting for password prompts.
 - **Automatic destination preparation** after a destination is added, with a first-backup safety net for local/mounted destinations that pass a real write/delete probe and unverified remote destinations that still have no encrypted backup metadata.
+- **Safe password recovery and rotation** with separate reconnect and change-password workflows. Reconnect validates the original password before changing Keychain; rotation adds and verifies a new restic key before retiring the previous key.
 - **Scheduled backups** through Delta's signed macOS scheduled-backup service, registered with `SMAppService` under the hood, with scheduler-started jobs reflected back into the app and menu bar.
 - **Power-aware scheduling** with a Pause automatic runs setting, battery and Low Power Mode controls, plus optional idle-sleep protection while backup, restore, check, and cleanup jobs are actively running.
 - **Retention maintenance** with scheduled forget/prune/check windows.
@@ -70,6 +71,7 @@ Important implementation details:
 - **Operation-aware destination checks** allow a first backup to prepare a writable new local destination or an uninitialized remote destination, while restore, browse, check, and cleanup require an existing destination before restic is invoked.
 - **Keychain secrets** use `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly` and are read by the same signed Delta executable in app, scheduled, and restic password-command paths. Password Access checks use an interaction-disabled authentication context and fail closed instead of showing system prompts. Delta surfaces Password Access health so users can repair saved destination access before scheduled backups depend on it. The tiny `DeltaSecurity` compatibility shim is kept only for trusted-application access-list support in local development.
 - **Password Access repair** rewrites saved destination passwords and backend credentials through the current signed app identity if a development build or old local Keychain item would otherwise prompt during scheduled jobs.
+- **Transactional password rotation** takes the same per-destination lock as backup jobs, identifies only the active restic key, adds the replacement key, atomically updates Keychain, verifies access through the normal password bridge, and then retires the previous key. The previous key remains usable on any pre-commit failure.
 - **Destination credential forms** use provider-specific labels and only hide actual password/token fields; non-secret values such as account names and rclone config paths stay readable.
 - **SFTP authentication** uses SSH config, ssh-agent, or an optional destination-level private-key path. Delta forces SSH batch mode, accepts first-use host keys without prompting, rejects changed host keys, and does not rely on interactive SSH password prompts.
 - **Security-scoped bookmarks** preserve access to selected source folders where macOS requires it.
@@ -171,6 +173,9 @@ The browser loads source roots from the selected restore point immediately and a
 - Destination passwords and backend credentials are stored in Keychain under Delta's destination-secret namespace.
 - New user-managed encryption passphrases must be entered twice before the destination can be saved.
 - Restic receives the destination password through a short-lived password command, not a long-lived plaintext environment variable.
+- Reconnecting existing backup data validates the original password through restic before replacing the saved Keychain value.
+- Changing a password stages a second restic key, updates Keychain only after the new key exists, verifies the normal unattended access path, and removes only the formerly active key. New passwords are sent to restic through standard input via `/dev/stdin`, never through arguments, environment variables, logs, or temporary files.
+- Existing Keychain items receive value-only updates. Delta changes trusted-application access lists only through the explicit Password Access repair workflow, avoiding repeated authorization prompts during normal password or credential changes.
 - Removing a destination from Delta first verifies no backup profile still uses it, removes cached app state, then cleans up saved password and credential items without deleting backup data at the destination.
 - Command, stream, and final-message redaction hides destination URLs, destination-file paths, password-command values, and common backend secret assignments from logs/descriptions.
 - Backend credentials are injected only into a curated child-process environment for the restic run; Delta does not forward arbitrary ambient environment secrets.

@@ -25,12 +25,20 @@ If restic reports that password resolution failed through the bridge, Delta maps
 
 App-managed destinations use a generated Keychain password stored under `com.delta.backup.destination-secrets` with a `Delta destination secrets` access label. User-managed passphrase destinations require confirmation before the password is stored.
 
+Password recovery and password rotation are intentionally separate operations:
+
+- **Reconnect with Original Password** runs `snapshots --json` with `--password-file /dev/stdin`. Delta saves the supplied password only after restic proves that it unlocks the destination.
+- **Change Encryption Password** acquires Delta's per-destination lock, runs `key list --json` to identify the currently active key, runs `key add --new-password-file /dev/stdin`, stores the replacement in Keychain, verifies it through the normal `--password-command` path, and then runs `key remove <old-key-id>`. Other pre-existing recovery keys are preserved. If Keychain storage or verification fails, Delta restores the previous Keychain value and removes the staged key. If old-key removal fails after verification, the new password remains active and Delta reports that the previous key was retained.
+
+Sensitive stdin payloads are held only for the child-process lifetime. Password values are not included in process arguments, process environments, command descriptions, job logs, or temporary files. Existing Keychain item updates replace only `kSecValueData`; trusted-application ACL rewrites are reserved for the explicit Password Access repair action so normal saves do not produce a cascade of authorization prompts.
+
 Relevant files:
 
 - `Sources/DeltaCore/ResticCommand.swift`
 - `Sources/Delta/DeltaApp.swift`
 - `Sources/DeltaSecretBridge/main.swift`
 - `Sources/DeltaCore/KeychainSecretStore.swift`
+- `Sources/DeltaCore/RepositoryPasswordManager.swift`
 
 ## Backends
 

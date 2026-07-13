@@ -52,17 +52,13 @@ public struct KeychainSecretStore: Sendable {
     ) throws {
         let data = Data(secret.utf8)
         let query = updateQuery(account: account, authenticationPolicy: authenticationPolicy)
-        let trustedAccess = try trustedApplicationAccess()
-
-        var attributes: [String: Any] = [
-            kSecValueData as String: data,
-            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-        ]
-        if let trustedAccess {
-            attributes[kSecAttrAccess as String] = trustedAccess
-        }
-
-        let updateStatus = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
+        // Updating an existing item's ACL can trigger an authorization prompt for each
+        // trusted executable. Password changes only need an atomic value replacement;
+        // ACL changes are handled by the explicit password-access repair workflow.
+        let updateStatus = SecItemUpdate(
+            query as CFDictionary,
+            existingItemValueUpdateAttributes(data: data) as CFDictionary
+        )
         if updateStatus == errSecSuccess {
             return
         }
@@ -73,13 +69,17 @@ public struct KeychainSecretStore: Sendable {
         let addQuery = addQuery(
             account: account,
             data: data,
-            trustedAccess: trustedAccess,
+            trustedAccess: try trustedApplicationAccess(),
             authenticationPolicy: authenticationPolicy
         )
         let addStatus = SecItemAdd(addQuery as CFDictionary, nil)
         guard addStatus == errSecSuccess else {
             throw keychainError(for: addStatus)
         }
+    }
+
+    func existingItemValueUpdateAttributes(data: Data) -> [String: Any] {
+        [kSecValueData as String: data]
     }
 
     public func load(

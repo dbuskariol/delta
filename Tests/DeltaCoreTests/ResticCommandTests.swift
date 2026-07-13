@@ -63,6 +63,43 @@ final class ResticCommandTests: XCTestCase {
         )
     }
 
+    func testPasswordRotationCommandsKeepNewPasswordOutOfArgumentsEnvironmentAndLogs() throws {
+        let repository = BackupRepository(
+            name: "Local",
+            backend: .local(path: "/tmp/repo"),
+            keychainAccount: "account"
+        )
+        let builder = makeBuilder()
+        let password = "correct horse battery staple"
+
+        let command = try builder.addRepositoryKey(repository: repository, password: password)
+
+        XCTAssertTrue(command.arguments.contains("--new-password-file"))
+        XCTAssertTrue(command.arguments.contains("/dev/stdin"))
+        XCTAssertFalse(command.arguments.contains { $0.contains(password) })
+        XCTAssertFalse(command.environment.values.contains { $0.contains(password) })
+        XCTAssertFalse(command.redactedDescription.contains(password))
+        XCTAssertEqual(command.sensitiveStandardInput, Data("\(password)\n".utf8))
+    }
+
+    func testReconnectCommandUsesStandardInputInsteadOfPasswordBridge() throws {
+        let repository = BackupRepository(
+            name: "Local",
+            backend: .local(path: "/tmp/repo"),
+            keychainAccount: "account"
+        )
+
+        let command = try makeBuilder().validateRepositoryPassword(
+            repository: repository,
+            password: "original-password"
+        )
+
+        XCTAssertTrue(command.arguments.contains("--password-file"))
+        XCTAssertTrue(command.arguments.contains("/dev/stdin"))
+        XCTAssertFalse(command.arguments.contains("--password-command"))
+        XCTAssertFalse(command.redactedDescription.contains("original-password"))
+    }
+
     func testBackendURLBuilderSupportsPrimaryBackends() throws {
         let builder = ResticBackendURLBuilder()
 

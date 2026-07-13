@@ -4,11 +4,18 @@ public struct ResticCommand: Equatable, Sendable {
     public var executableURL: URL
     public var arguments: [String]
     public var environment: [String: String]
+    var sensitiveStandardInput: Data?
 
-    public init(executableURL: URL, arguments: [String], environment: [String: String] = [:]) {
+    public init(
+        executableURL: URL,
+        arguments: [String],
+        environment: [String: String] = [:],
+        sensitiveStandardInput: Data? = nil
+    ) {
         self.executableURL = executableURL
         self.arguments = arguments
         self.environment = environment
+        self.sensitiveStandardInput = sensitiveStandardInput
     }
 
     public var redactedDescription: String {
@@ -42,7 +49,8 @@ public struct ResticCommand: Equatable, Sendable {
         "--repo",
         "--repository-file",
         "--password-command",
-        "--password-file"
+        "--password-file",
+        "--new-password-file"
     ]
 
     private static let sensitiveInlineOptionPrefixes = [
@@ -50,7 +58,8 @@ public struct ResticCommand: Equatable, Sendable {
         "--repo=",
         "--repository-file=",
         "--password-command=",
-        "--password-file="
+        "--password-file=",
+        "--new-password-file="
     ]
 }
 
@@ -173,6 +182,31 @@ public struct ResticCommandBuilder: Sendable {
         try command(repository: repository, subcommand: ["snapshots", "--json"])
     }
 
+    public func repositoryKeys(repository: BackupRepository) throws -> ResticCommand {
+        try command(repository: repository, subcommand: ["key", "list", "--json"])
+    }
+
+    public func addRepositoryKey(repository: BackupRepository, password: String) throws -> ResticCommand {
+        try command(
+            repository: repository,
+            subcommand: ["key", "add", "--new-password-file", "/dev/stdin"],
+            sensitiveStandardInput: Self.passwordInput(password)
+        )
+    }
+
+    public func removeRepositoryKey(repository: BackupRepository, keyID: String) throws -> ResticCommand {
+        try command(repository: repository, subcommand: ["key", "remove", keyID])
+    }
+
+    public func validateRepositoryPassword(repository: BackupRepository, password: String) throws -> ResticCommand {
+        try command(
+            repository: repository,
+            subcommand: ["snapshots", "--json"],
+            passwordSource: .standardInput,
+            sensitiveStandardInput: Self.passwordInput(password)
+        )
+    }
+
     public func listSnapshotEntries(repository: BackupRepository, snapshotID: String, directoryPath: String? = nil) throws -> ResticCommand {
         let snapshotID = snapshotID.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !snapshotID.isEmpty else {
@@ -258,18 +292,22 @@ public struct ResticCommandBuilder: Sendable {
     private func command(
         repository: BackupRepository,
         extraGlobalArguments: [String] = [],
-        subcommand: [String]
+        subcommand: [String],
+        passwordSource: PasswordSource = .secretBridge,
+        sensitiveStandardInput: Data? = nil
     ) throws -> ResticCommand {
         let repositoryURL = try backendURLBuilder.repositoryURL(for: repository.backend)
-        let passwordCommand = ([secretBridgeURL.path] + secretBridgeArguments + [repository.keychainAccount])
-            .map(ShellEscaper.singleQuoted)
-            .joined(separator: " ")
-
-        var globalArguments = [
-            "-r", repositoryURL,
-            "--password-command", passwordCommand,
-            "--cleanup-cache"
-        ]
+        var globalArguments = ["-r", repositoryURL]
+        switch passwordSource {
+        case .secretBridge:
+            let passwordCommand = ([secretBridgeURL.path] + secretBridgeArguments + [repository.keychainAccount])
+                .map(ShellEscaper.singleQuoted)
+                .joined(separator: " ")
+            globalArguments += ["--password-command", passwordCommand]
+        case .standardInput:
+            globalArguments += ["--password-file", "/dev/stdin"]
+        }
+        globalArguments.append("--cleanup-cache")
         globalArguments += backendOptionArguments(for: repository)
         globalArguments += extraGlobalArguments
 
@@ -282,8 +320,18 @@ public struct ResticCommandBuilder: Sendable {
         return ResticCommand(
             executableURL: resticExecutableURL,
             arguments: globalArguments + subcommand,
-            environment: environment
+            environment: environment,
+            sensitiveStandardInput: sensitiveStandardInput
         )
+    }
+
+    private enum PasswordSource {
+        case secretBridge
+        case standardInput
+    }
+
+    private static func passwordInput(_ password: String) -> Data {
+        Data("\(password)\n".utf8)
     }
 
     private func bandwidthArguments(from schedule: BackupSchedule) -> [String] {
