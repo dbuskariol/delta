@@ -74,6 +74,44 @@ final class JobNotificationPolicyTests: XCTestCase {
         XCTAssertEqual(content.body, "Mac to SSD. Some files could not be read.")
     }
 
+    func testAcknowledgedBackupWarningDoesNotNotifyButRetainsWarningState() {
+        let job = JobRun(
+            repositoryID: UUID(),
+            kind: .backup,
+            status: .warning,
+            message: "Some files could not be read."
+        )
+
+        XCTAssertNil(JobNotificationPolicy.content(
+            for: job,
+            settings: JobNotificationSettings(isEnabled: true),
+            profileName: "Mac",
+            repositoryName: "SSD",
+            warningIssuesAreAcknowledged: true
+        ))
+        XCTAssertEqual(job.status, .warning)
+    }
+
+    func testAcknowledgmentDoesNotSuppressFailuresOrMaintenanceWarnings() {
+        let failedBackup = JobRun(repositoryID: UUID(), kind: .backup, status: .failed)
+        let warningCheck = JobRun(repositoryID: UUID(), kind: .check, status: .warning)
+
+        XCTAssertNotNil(JobNotificationPolicy.content(
+            for: failedBackup,
+            settings: JobNotificationSettings(isEnabled: true),
+            profileName: "Mac",
+            repositoryName: "SSD",
+            warningIssuesAreAcknowledged: true
+        ))
+        XCTAssertNotNil(JobNotificationPolicy.content(
+            for: warningCheck,
+            settings: JobNotificationSettings(isEnabled: true),
+            profileName: nil,
+            repositoryName: "SSD",
+            warningIssuesAreAcknowledged: true
+        ))
+    }
+
     func testSuccessfulBackupNotificationRequiresSuccessOptIn() throws {
         let job = JobRun(
             repositoryID: UUID(),

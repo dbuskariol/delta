@@ -103,6 +103,7 @@ final class DeltaAppModel: ObservableObject {
     @Published private(set) var launchAgentStatus = LaunchAgentController.status()
     @Published private(set) var appLoginItemStatus = AppLoginItemController.status()
     @Published private(set) var scheduledBackupServiceError: String?
+    @Published private(set) var backupIssueAcknowledgmentRevision = 0
 
     var isPersistentStoreAvailable: Bool {
         persistentStoreErrorMessage == nil
@@ -121,6 +122,7 @@ final class DeltaAppModel: ObservableObject {
     private let repositoryValidator = BackupRepositoryValidator()
     private let localRepositoryStateInspector = LocalResticRepositoryStateInspector()
     private let profileValidator = BackupProfileValidator()
+    private let backupIssueAcknowledgmentStore = BackupIssueAcknowledgmentStore()
     private let runController = ResticRunController()
     private let runControlStore = ResticRunControlStore()
     private var localOperationIsRunning = false
@@ -663,6 +665,70 @@ final class DeltaAppModel: ObservableObject {
         } catch {
             alertMessage = error.localizedDescription
         }
+    }
+
+    @discardableResult
+    func addBackupIssueExclusions(_ patterns: [String], profileID: UUID) -> Bool {
+        guard let database = requirePersistentDatabase() else { return false }
+        guard var profile = profiles.first(where: { $0.id == profileID }) else {
+            alertMessage = "The backup profile for this issue no longer exists."
+            return false
+        }
+        let requestedPatterns = Set(patterns.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) })
+            .filter { !$0.isEmpty }
+        let newPatterns = requestedPatterns.subtracting(profile.excludePatterns)
+        guard !newPatterns.isEmpty else { return true }
+
+        do {
+            profile.excludePatterns.append(contentsOf: newPatterns.sorted())
+            profile.updatedAt = Date()
+            let validatedProfile = try profileValidator.validate(
+                profile,
+                knownRepositoryIDs: knownRepositoryIDs()
+            ).profile
+            try database.saveProfile(validatedProfile)
+            try database.appendEvent(
+                EventLog(
+                    level: .info,
+                    message: "Added \(newPatterns.count) reviewed backup \(newPatterns.count == 1 ? "exclusion" : "exclusions") to '\(validatedProfile.name)'."
+                )
+            )
+            requestBackgroundBackupsIfNeeded(for: validatedProfile)
+            reload()
+            return true
+        } catch {
+            alertMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    func isBackupIssueAcknowledged(_ issue: BackupIssue, profileID: UUID) -> Bool {
+        _ = backupIssueAcknowledgmentRevision
+        return backupIssueAcknowledgmentStore.isAcknowledged(issue, profileID: profileID)
+    }
+
+    func setBackupIssuesAcknowledged(_ acknowledged: Bool, issues: [BackupIssue], profileID: UUID) {
+        guard !issues.isEmpty else { return }
+        backupIssueAcknowledgmentStore.setAcknowledged(acknowledged, issues: issues, profileID: profileID)
+        backupIssueAcknowledgmentRevision &+= 1
+        if let database {
+            let action = acknowledged ? "Acknowledged" : "Restored alerts for"
+            let profileName = profiles.first(where: { $0.id == profileID })?.name ?? "backup profile"
+            try? database.appendEvent(
+                EventLog(
+                    level: .info,
+                    message: "\(action) \(issues.count) recurring backup \(issues.count == 1 ? "issue" : "issues") for '\(profileName)'."
+                )
+            )
+        }
+    }
+
+    func revealBackupIssue(_ issue: BackupIssue) {
+        var url = URL(fileURLWithPath: issue.path)
+        while !FileManager.default.fileExists(atPath: url.path), url.path != "/" {
+            url.deleteLastPathComponent()
+        }
+        NSWorkspace.shared.activateFileViewerSelecting([url])
     }
 
     func deleteProfile(_ profile: BackupProfile) {
@@ -1479,11 +1545,16 @@ final class DeltaAppModel: ObservableObject {
         let profilesByID = Dictionary(uniqueKeysWithValues: profiles.map { ($0.id, $0.name) })
         let repositoriesByID = Dictionary(uniqueKeysWithValues: repositories.map { ($0.id, $0.name) })
         for job in completedJobs {
+            let issues = database.flatMap { try? $0.fetchBackupIssues(jobID: job.id) } ?? []
+            let warningIssuesAreAcknowledged = job.profileID.map {
+                backupIssueAcknowledgmentStore.allAcknowledged(issues, profileID: $0)
+            } ?? false
             guard let content = JobNotificationPolicy.content(
                 for: job,
                 settings: settings,
                 profileName: job.profileID.flatMap { profilesByID[$0] },
-                repositoryName: repositoriesByID[job.repositoryID]
+                repositoryName: repositoriesByID[job.repositoryID],
+                warningIssuesAreAcknowledged: warningIssuesAreAcknowledged
             ) else {
                 continue
             }

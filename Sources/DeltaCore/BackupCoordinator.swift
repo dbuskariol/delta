@@ -749,13 +749,15 @@ public final class BackupCoordinator: @unchecked Sendable {
         repositoryID: UUID,
         event: ResticOutputEvent
     ) {
+        let backupIssue = ResticLogFormatter.backupIssue(for: event.message)
         recordJobLog(
             jobID: jobID,
             profileID: profileID,
             repositoryID: repositoryID,
             date: event.date,
             stream: event.stream,
-            message: ResticLogFormatter.displayMessage(for: event.message)
+            message: backupIssue?.displayMessage ?? ResticLogFormatter.displayMessage(for: event.message),
+            backupIssue: backupIssue
         )
     }
 
@@ -776,7 +778,8 @@ public final class BackupCoordinator: @unchecked Sendable {
         repositoryID: UUID,
         date: Date = Date(),
         stream: ResticOutputStream,
-        message: String
+        message: String,
+        backupIssue: BackupIssue? = nil
     ) {
         let cleanedMessage = String(message.trimmingCharacters(in: .whitespacesAndNewlines).prefix(4_000))
         guard !cleanedMessage.isEmpty else {
@@ -790,7 +793,8 @@ public final class BackupCoordinator: @unchecked Sendable {
                     repositoryID: repositoryID,
                     date: date,
                     stream: stream,
-                    message: cleanedMessage
+                    message: cleanedMessage,
+                    backupIssue: backupIssue
                 )
             )
         } catch {

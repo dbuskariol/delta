@@ -481,6 +481,7 @@ public struct JobLogEntry: Codable, Identifiable, Equatable, Sendable {
     public var date: Date
     public var stream: ResticOutputStream
     public var message: String
+    public var backupIssue: BackupIssue?
 
     public init(
         id: UUID = UUID(),
@@ -489,7 +490,8 @@ public struct JobLogEntry: Codable, Identifiable, Equatable, Sendable {
         repositoryID: UUID,
         date: Date = Date(),
         stream: ResticOutputStream,
-        message: String
+        message: String,
+        backupIssue: BackupIssue? = nil
     ) {
         self.id = id
         self.jobID = jobID
@@ -498,6 +500,7 @@ public struct JobLogEntry: Codable, Identifiable, Equatable, Sendable {
         self.date = date
         self.stream = stream
         self.message = message
+        self.backupIssue = backupIssue
     }
 }
 

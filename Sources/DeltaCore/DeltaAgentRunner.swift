@@ -44,12 +44,18 @@ public enum DeltaAgentRunner {
 
         let profilesByID = Dictionary(uniqueKeysWithValues: try database.fetchProfiles().map { ($0.id, $0.name) })
         let repositoriesByID = Dictionary(uniqueKeysWithValues: try database.fetchRepositories().map { ($0.id, $0.name) })
+        let acknowledgmentStore = BackupIssueAcknowledgmentStore()
         for job in jobs {
+            let issues = (try? database.fetchBackupIssues(jobID: job.id)) ?? []
+            let warningIssuesAreAcknowledged = job.profileID.map {
+                acknowledgmentStore.allAcknowledged(issues, profileID: $0)
+            } ?? false
             guard let content = JobNotificationPolicy.content(
                 for: job,
                 settings: settings,
                 profileName: job.profileID.flatMap { profilesByID[$0] },
-                repositoryName: repositoriesByID[job.repositoryID]
+                repositoryName: repositoriesByID[job.repositoryID],
+                warningIssuesAreAcknowledged: warningIssuesAreAcknowledged
             ) else {
                 continue
             }

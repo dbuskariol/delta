@@ -237,14 +237,20 @@ public final class DeltaDatabase: @unchecked Sendable {
                     COALESCE(SUM(
                         CASE WHEN COALESCE(stream, json_extract(payload, '$.stream')) = ?
                         THEN 1 ELSE 0 END
-                    ), 0) AS issue_count
+                    ), 0) AS stderr_count,
+                    COALESCE(SUM(
+                        CASE WHEN json_type(payload, '$.backupIssue') IS NOT NULL
+                        THEN 1 ELSE 0 END
+                    ), 0) AS structured_issue_count
                 FROM job_logs
                 WHERE job_id = ?
                 """,
                 arguments: [ResticOutputStream.standardError.rawValue, jobIDString]
             )
             let totalCount: Int = counts?["total_count"] ?? 0
-            let issueCount: Int = counts?["issue_count"] ?? 0
+            let stderrCount: Int = counts?["stderr_count"] ?? 0
+            let structuredIssueCount: Int = counts?["structured_issue_count"] ?? 0
+            let issueCount = structuredIssueCount > 0 ? structuredIssueCount : stderrCount
 
             let requestedLimit = safeLimit + 1
             let rows: [Row]
@@ -324,6 +330,28 @@ public final class DeltaDatabase: @unchecked Sendable {
                 nextCursor: hasMore ? nextCursor : nil,
                 hasMore: hasMore
             )
+        }
+    }
+
+    public func fetchBackupIssues(jobID: UUID) throws -> [BackupIssue] {
+        try queue.read { db in
+            let rows = try Row.fetchAll(
+                db,
+                sql: """
+                SELECT payload FROM job_logs
+                WHERE job_id = ?
+                  AND json_type(payload, '$.backupIssue') IS NOT NULL
+                ORDER BY created_at ASC, id ASC
+                """,
+                arguments: [jobID.uuidString]
+            )
+            return try rows.compactMap { row in
+                let payload: String = row["payload"]
+                guard let data = payload.data(using: .utf8) else {
+                    throw DeltaDatabaseError.invalidPayload("job_logs")
+                }
+                return try decoder.decode(JobLogEntry.self, from: data).backupIssue
+            }
         }
     }
 

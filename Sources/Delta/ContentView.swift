@@ -1859,6 +1859,11 @@ private struct ActivityJobDetailView: View {
                         systemImage: logFilter == .issues ? "checkmark.circle" : "doc.text",
                         description: Text(logFilter == .issues ? "This run did not save any issue lines." : "This run did not save diagnostic output.")
                     )
+                } else if logFilter == .issues, !structuredIssues.isEmpty {
+                    BackupIssueReviewList(
+                        issues: structuredIssues,
+                        profileID: job.profileID
+                    )
                 } else {
                     List(entries) { entry in
                         ActivityLogRow(entry: entry)
@@ -1881,6 +1886,10 @@ private struct ActivityJobDetailView: View {
     private var loadIdentity: String {
         let liveRevision = job.status == .running ? model.jobLogs.count : 0
         return "\(job.id.uuidString)-\(logFilter.rawValue)-\(liveRevision)"
+    }
+
+    private var structuredIssues: [BackupIssue] {
+        entries.compactMap(\.backupIssue)
     }
 
     private var jobMetadata: String {
@@ -1951,6 +1960,306 @@ private struct ActivityJobDetailView: View {
         }
         if logFilter == requestedFilter {
             isLoading = false
+        }
+    }
+}
+
+private struct PendingBackupIssueExclusion: Identifiable {
+    var id = UUID()
+    var patterns: [String]
+    var title: String
+    var message: String
+}
+
+private struct BackupIssueReviewList: View {
+    @EnvironmentObject private var model: DeltaAppModel
+    var issues: [BackupIssue]
+    var profileID: UUID?
+
+    @State private var pendingExclusion: PendingBackupIssueExclusion?
+
+    var body: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 0) {
+                reviewHeader
+                    .padding(.bottom, 14)
+
+                ForEach(Array(groups.enumerated()), id: \.element.id) { index, group in
+                    BackupIssueGroupView(
+                        group: group,
+                        profileID: profileID,
+                        excludedPatterns: excludedPatterns,
+                        requestExactExclusion: requestExactExclusion,
+                        setAcknowledged: setAcknowledged
+                    )
+                    if index < groups.count - 1 {
+                        Divider()
+                            .padding(.vertical, 14)
+                    }
+                }
+            }
+            .padding(.horizontal, 2)
+        }
+        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+        .alert(item: $pendingExclusion) { request in
+            Alert(
+                title: Text(request.title),
+                message: Text(request.message),
+                primaryButton: .destructive(Text("Exclude")) {
+                    guard let profileID else { return }
+                    _ = model.addBackupIssueExclusions(request.patterns, profileID: profileID)
+                },
+                secondaryButton: .cancel()
+            )
+        }
+    }
+
+    private var reviewHeader: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 10) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("\(issues.count) omitted \(issues.count == 1 ? "item" : "items")")
+                        .font(.subheadline.weight(.semibold))
+                    Text("The restore point exists, but these items were not included.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+            if let profile {
+                HStack(spacing: 8) {
+                    Button {
+                        model.runNow(profile: profile)
+                    } label: {
+                        Label("Back Up Again", systemImage: "arrow.clockwise")
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .disabled(model.isWorking)
+                    if !availableRecommendedExclusions.isEmpty {
+                        Button {
+                            requestRecommendedExclusions()
+                        } label: {
+                            Label("Apply Recommended", systemImage: "checkmark.shield")
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                    }
+                }
+            }
+            Text("Excluding an item changes future backups. Acknowledging it only silences repeat alerts; the run remains a warning.")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var excludedPatterns: Set<String> {
+        Set(profile?.excludePatterns ?? [])
+    }
+
+    private var profile: BackupProfile? {
+        guard let profileID else { return nil }
+        return model.profiles.first(where: { $0.id == profileID })
+    }
+
+    private var recommendedExclusions: [BackupIssueExclusionRecommendation] {
+        let recommendations = issues.compactMap(\.recommendedExclusion)
+        return Dictionary(grouping: recommendations, by: \.pattern)
+            .values
+            .compactMap(\.first)
+            .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
+    }
+
+    private var availableRecommendedExclusions: [BackupIssueExclusionRecommendation] {
+        recommendedExclusions.filter { !excludedPatterns.contains($0.pattern) }
+    }
+
+    private var groups: [BackupIssueGroup] {
+        BackupIssueGroup.grouped(issues)
+    }
+
+    private func requestExactExclusion(_ issue: BackupIssue) {
+        pendingExclusion = PendingBackupIssueExclusion(
+            patterns: [issue.exactExclusionPattern],
+            title: "Exclude this item?",
+            message: "Future restore points will omit \(issue.path). Existing restore points are unchanged."
+        )
+    }
+
+    private func requestRecommendedExclusions() {
+        let recommendations = availableRecommendedExclusions
+        guard !recommendations.isEmpty else { return }
+        pendingExclusion = PendingBackupIssueExclusion(
+            patterns: recommendations.map(\.pattern),
+            title: "Apply recommended exclusions?",
+            message: "Delta will omit \(recommendations.count) reviewed generated-data \(recommendations.count == 1 ? "location" : "locations") from future restore points. Existing restore points are unchanged."
+        )
+    }
+
+    private func setAcknowledged(_ acknowledged: Bool, issues: [BackupIssue]) {
+        guard let profileID else { return }
+        model.setBackupIssuesAcknowledged(acknowledged, issues: issues, profileID: profileID)
+    }
+}
+
+private struct BackupIssueGroupView: View {
+    @EnvironmentObject private var model: DeltaAppModel
+    var group: BackupIssueGroup
+    var profileID: UUID?
+    var excludedPatterns: Set<String>
+    var requestExactExclusion: (BackupIssue) -> Void
+    var setAcknowledged: (Bool, [BackupIssue]) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: group.category.symbol)
+                    .foregroundStyle(group.category.color)
+                    .frame(width: 18)
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Text(group.category.title)
+                            .font(.subheadline.weight(.semibold))
+                        Text("\(group.issues.count)")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                    Text(group.category.guidance)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer()
+                if profileID != nil {
+                    Button(allAcknowledged ? "Restore Alerts" : "Acknowledge Group") {
+                        setAcknowledged(!allAcknowledged, group.issues)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
+            }
+
+            ForEach(Array(group.issues.enumerated()), id: \.offset) { index, issue in
+                if index > 0 {
+                    Divider()
+                        .padding(.leading, 26)
+                }
+                BackupIssueRow(
+                    issue: issue,
+                    profileID: profileID,
+                    isExcluded: excludedPatterns.contains(issue.exactExclusionPattern)
+                        || issue.recommendedExclusion.map { excludedPatterns.contains($0.pattern) } == true,
+                    requestExclusion: { requestExactExclusion(issue) },
+                    setAcknowledged: { setAcknowledged($0, [issue]) }
+                )
+                .padding(.leading, 26)
+            }
+        }
+    }
+
+    private var allAcknowledged: Bool {
+        guard let profileID else { return false }
+        return group.issues.allSatisfy { model.isBackupIssueAcknowledged($0, profileID: profileID) }
+    }
+}
+
+private struct BackupIssueRow: View {
+    @EnvironmentObject private var model: DeltaAppModel
+    var issue: BackupIssue
+    var profileID: UUID?
+    var isExcluded: Bool
+    var requestExclusion: () -> Void
+    var setAcknowledged: (Bool) -> Void
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 14) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(issue.path)
+                    .font(.system(.caption, design: .monospaced).weight(.medium))
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(issue.reason)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                if let operation = issue.operation {
+                    Text(operation.capitalized)
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            if profileID != nil {
+                VStack(alignment: .trailing, spacing: 6) {
+                    HStack(spacing: 6) {
+                        if isExcluded {
+                            Label("Excluded", systemImage: "checkmark")
+                                .foregroundStyle(.green)
+                        }
+                        if isAcknowledged {
+                            Label("Alerts off", systemImage: "bell.slash")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .font(.caption)
+
+                    Menu {
+                        Button {
+                            model.revealBackupIssue(issue)
+                        } label: {
+                            Label("Reveal in Finder", systemImage: "folder")
+                        }
+                        if !isExcluded {
+                            Button(action: requestExclusion) {
+                                Label("Exclude from Future Backups", systemImage: "minus.circle")
+                            }
+                        }
+                        Button {
+                            setAcknowledged(!isAcknowledged)
+                        } label: {
+                            Label(
+                                isAcknowledged ? "Restore Repeat Alerts" : "Acknowledge Repeat Alerts",
+                                systemImage: isAcknowledged ? "bell" : "bell.slash"
+                            )
+                        }
+                    } label: {
+                        Label("Actions", systemImage: "ellipsis.circle")
+                    }
+                    .menuStyle(.borderlessButton)
+                    .controlSize(.small)
+                    .fixedSize()
+                }
+            }
+        }
+        .padding(.vertical, 2)
+    }
+
+    private var isAcknowledged: Bool {
+        guard let profileID else { return false }
+        return model.isBackupIssueAcknowledged(issue, profileID: profileID)
+    }
+}
+
+private extension BackupIssueCategory {
+    var symbol: String {
+        switch self {
+        case .permissionDenied: "lock.fill"
+        case .changedDuringRead: "arrow.triangle.2.circlepath"
+        case .unavailable: "questionmark.folder"
+        case .inputOutput: "externaldrive.badge.exclamationmark"
+        case .resourceBusy: "clock.badge.exclamationmark"
+        case .unsupported: "nosign"
+        case .other: "exclamationmark.triangle.fill"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .permissionDenied, .inputOutput: .orange
+        case .changedDuringRead: .blue
+        case .unavailable, .resourceBusy: .secondary
+        case .unsupported, .other: .secondary
         }
     }
 }

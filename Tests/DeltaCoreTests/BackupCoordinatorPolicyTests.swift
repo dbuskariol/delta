@@ -1017,6 +1017,24 @@ final class BackupCoordinatorPolicyTests: XCTestCase {
         XCTAssertTrue(recorder.events.contains { $0.jobID == job.id && $0.event == event })
     }
 
+    func testRunPersistsStructuredResticBackupIssue() throws {
+        let fixture = try Fixture()
+        let rawIssue = #"{"message_type":"error","error":{"message":"open /Users/me/private: permission denied"},"during":"archival","item":"/Users/me/private"}"#
+        let runner = MockResticRunner(
+            results: [.success, .emptySnapshotList],
+            streamedEvents: [ResticOutputEvent(stream: .standardError, message: rawIssue)]
+        )
+        let coordinator = fixture.makeCoordinator(runner: runner)
+
+        let job = try coordinator.runBackup(profile: fixture.profile(), repository: fixture.repository)
+        let issues = try fixture.database.fetchBackupIssues(jobID: job.id)
+
+        XCTAssertEqual(issues.count, 1)
+        XCTAssertEqual(issues.first?.path, "/Users/me/private")
+        XCTAssertEqual(issues.first?.reason, "open: permission denied")
+        XCTAssertEqual(issues.first?.category, .permissionDenied)
+    }
+
     func testRunnerThrowMarksJobFailedAndPersistsFailureLog() throws {
         let fixture = try Fixture()
         let runner = ThrowingResticRunner(error: TestRunError.processLaunchFailed)
@@ -1164,6 +1182,7 @@ private final class MockResticRunner: ResticStreamingRunning, @unchecked Sendabl
     private let lock = NSLock()
     private var results: [ResticRunResult]
     private let streamedEvents: [ResticOutputEvent]
+    private var hasStreamedEvents = false
     private(set) var commands: [ResticCommand] = []
 
     init(results: [ResticRunResult], streamedEvents: [ResticOutputEvent] = []) {
@@ -1179,7 +1198,8 @@ private final class MockResticRunner: ResticStreamingRunning, @unchecked Sendabl
         lock.lock()
         commands.append(command)
         let result = results.isEmpty ? .success : results.removeFirst()
-        let events = streamedEvents
+        let events = hasStreamedEvents ? [] : streamedEvents
+        hasStreamedEvents = true
         lock.unlock()
         for event in events {
             outputHandler?(event)

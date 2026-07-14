@@ -44,6 +44,20 @@ public enum BackupExcludePolicy {
         return Array(Set(patterns)).sorted()
     }
 
+    public static func literalPattern(for path: String) -> String {
+        var result = ""
+        for character in path {
+            switch character {
+            case "\\", "*", "?", "[":
+                result.append("\\")
+                result.append(character)
+            default:
+                result.append(character)
+            }
+        }
+        return result
+    }
+
     private static func normalizedLocalRepositoryPath(_ path: String) -> String? {
         let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {

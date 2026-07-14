@@ -178,6 +178,11 @@ public enum ResticLogFormatter {
         return object["message_type"] as? String == "status"
     }
 
+    public static func backupIssue(for rawMessage: String) -> BackupIssue? {
+        guard let object = jsonObject(from: rawMessage) else { return nil }
+        return backupIssue(from: object)
+    }
+
     private static func jsonObject(from rawMessage: String) -> [String: Any]? {
         let trimmed = rawMessage.trimmingCharacters(in: .whitespacesAndNewlines)
         guard
@@ -267,11 +272,44 @@ public enum ResticLogFormatter {
     }
 
     private static func errorMessage(from object: [String: Any]) -> String {
-        let message = (object["message"] as? String) ?? (object["error"] as? String) ?? "A backup item could not be processed."
+        if let issue = backupIssue(from: object) {
+            return issue.displayMessage
+        }
+        let message = nestedErrorMessage(from: object) ?? "A backup item could not be processed."
         if let item = object["item"] as? String, !item.isEmpty {
             return "\(message): \(item)"
         }
         return message
+    }
+
+    private static func backupIssue(from object: [String: Any]) -> BackupIssue? {
+        guard
+            object["message_type"] as? String == "error",
+            let path = object["item"] as? String,
+            !path.isEmpty
+        else {
+            return nil
+        }
+        return BackupIssue(
+            path: SensitiveLogRedactor.redact(path),
+            reason: SensitiveLogRedactor.redact(nestedErrorMessage(from: object) ?? "The item could not be read."),
+            operation: (object["during"] as? String).map(SensitiveLogRedactor.redact)
+        )
+    }
+
+    private static func nestedErrorMessage(from object: [String: Any]) -> String? {
+        if let message = object["message"] as? String, !message.isEmpty {
+            return message
+        }
+        if let message = object["error"] as? String, !message.isEmpty {
+            return message
+        }
+        if let error = object["error"] as? [String: Any],
+           let message = error["message"] as? String,
+           !message.isEmpty {
+            return message
+        }
+        return nil
     }
 
     private static func number(_ value: Any?) -> Double? {

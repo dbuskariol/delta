@@ -43,9 +43,13 @@ public enum JobNotificationPolicy {
         for job: JobRun,
         settings: JobNotificationSettings,
         profileName: String?,
-        repositoryName: String?
+        repositoryName: String?,
+        warningIssuesAreAcknowledged: Bool = false
     ) -> JobNotificationContent? {
         guard settings.isEnabled else {
+            return nil
+        }
+        if job.kind == .backup, job.status == .warning, warningIssuesAreAcknowledged {
             return nil
         }
 

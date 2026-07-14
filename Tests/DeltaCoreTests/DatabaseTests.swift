@@ -208,6 +208,41 @@ final class DatabaseTests: XCTestCase {
         XCTAssertFalse(issuePage.hasMore)
     }
 
+    func testStructuredBackupIssuesRoundTripAndDoNotCountSummaryWarning() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let database = try DeltaDatabase(url: directory.appendingPathComponent("Delta.sqlite"))
+        let repositoryID = UUID()
+        let jobID = UUID()
+        let issue = BackupIssue(path: "/Users/me/private", reason: "permission denied", operation: "archival")
+        try database.appendJobLog(
+            JobLogEntry(
+                jobID: jobID,
+                repositoryID: repositoryID,
+                stream: .standardError,
+                message: issue.displayMessage,
+                backupIssue: issue
+            )
+        )
+        try database.appendJobLog(
+            JobLogEntry(
+                jobID: jobID,
+                repositoryID: repositoryID,
+                stream: .standardError,
+                message: "Warning: at least one source file could not be read"
+            )
+        )
+
+        let page = try database.fetchJobLogPage(jobID: jobID, issuesOnly: true)
+        let issues = try database.fetchBackupIssues(jobID: jobID)
+
+        XCTAssertEqual(page.totalCount, 2)
+        XCTAssertEqual(page.issueCount, 1)
+        XCTAssertEqual(issues, [issue])
+    }
+
     func testJobLogPageReadsIssueRowsCreatedBeforeStreamIndexMigration() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
