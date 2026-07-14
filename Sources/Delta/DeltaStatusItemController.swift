@@ -169,15 +169,15 @@ final class DeltaStatusItemController: NSObject, ObservableObject, NSPopoverDele
             isPersistentStoreAvailable: model?.isPersistentStoreAvailable ?? false,
             isWorking: model?.isWorking ?? false,
             activeJobKind: model?.activeOperation?.kind,
-            latestBackupStatus: latestBackupStatus
+            latestBackupStatus: latestBackupRun?.status,
+            acknowledgedOmissionCount: latestBackupRun.flatMap { model?.acknowledgedWarningIssueCounts[$0.id] }
         )
     }
 
-    private var latestBackupStatus: JobStatus? {
+    private var latestBackupRun: JobRun? {
         model?.jobs
             .filter { $0.kind == .backup }
-            .max { $0.startedAt < $1.startedAt }?
-            .status
+            .max { $0.startedAt < $1.startedAt }
     }
 }
 

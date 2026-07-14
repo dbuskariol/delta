@@ -36,6 +36,13 @@ enum AcceptanceMenuBarSurfaceCommand {
             activeJobKind: nil,
             latestBackupStatus: .warning
         )
+        let acknowledgedWarning = MenuBarStatusPresentation.make(
+            isPersistentStoreAvailable: true,
+            isWorking: false,
+            activeJobKind: nil,
+            latestBackupStatus: .warning,
+            acknowledgedOmissionCount: 6
+        )
         let failed = MenuBarStatusPresentation.make(
             isPersistentStoreAvailable: true,
             isWorking: false,
@@ -55,6 +62,7 @@ enum AcceptanceMenuBarSurfaceCommand {
         try require(completed.headerText == "Last backup completed", "Completed backup menu bar status changed.")
         try require(completed.badgeText == "Ready", "Completed backup should return the status badge to Ready.")
         try require(warning.badgeText == "Completed with warnings", "Warning backup badge changed.")
+        try require(acknowledgedWarning.badgeText == "Ready", "Acknowledged omissions should return the status badge to Ready.")
         try require(failed.badgeText == "Failed", "Failed backup badge changed.")
         try require(blocked.badgeText == "Blocked", "Blocked menu bar badge changed.")
 

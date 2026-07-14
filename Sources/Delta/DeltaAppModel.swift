@@ -13,6 +13,7 @@ private struct DeltaDatabaseSnapshot: Sendable {
     var snapshotsByRepository: [UUID: [ResticSnapshot]]
     var events: [EventLog]
     var sourceHealthWarnings: [DashboardHealthWarning]
+    var acknowledgedWarningIssueCounts: [UUID: Int]
 
     init(database: DeltaDatabase) throws {
         repositories = try database.fetchRepositories()
@@ -27,6 +28,21 @@ private struct DeltaDatabaseSnapshot: Sendable {
         snapshotsByRepository = try database.fetchSnapshotsByRepository()
         events = try database.fetchEvents(limit: 200)
         sourceHealthWarnings = DashboardHealthEvaluator().sourceWarnings(profiles: profiles)
+        let warningJobs = jobs.filter {
+            $0.kind == .backup && $0.status == .warning && $0.profileID != nil
+        }
+        let issuesByJobID = try database.fetchBackupIssues(jobIDs: warningJobs.map(\.id))
+        let acknowledgmentStore = BackupIssueAcknowledgmentStore()
+        acknowledgedWarningIssueCounts = Dictionary(uniqueKeysWithValues: warningJobs.compactMap { job in
+            guard
+                let profileID = job.profileID,
+                let issues = issuesByJobID[job.id],
+                acknowledgmentStore.allAcknowledged(issues, profileID: profileID)
+            else {
+                return nil
+            }
+            return (job.id, issues.count)
+        })
     }
 }
 
@@ -104,6 +120,7 @@ final class DeltaAppModel: ObservableObject {
     @Published private(set) var appLoginItemStatus = AppLoginItemController.status()
     @Published private(set) var scheduledBackupServiceError: String?
     @Published private(set) var backupIssueAcknowledgmentRevision = 0
+    @Published private(set) var acknowledgedWarningIssueCounts: [UUID: Int] = [:]
 
     var isPersistentStoreAvailable: Bool {
         persistentStoreErrorMessage == nil
@@ -220,6 +237,7 @@ final class DeltaAppModel: ObservableObject {
         publishIfChanged(&snapshotsByRepository, snapshot.snapshotsByRepository)
         publishIfChanged(&events, snapshot.events)
         publishIfChanged(&sourceHealthWarnings, snapshot.sourceHealthWarnings)
+        publishIfChanged(&acknowledgedWarningIssueCounts, snapshot.acknowledgedWarningIssueCounts)
 
         refreshBackgroundSecretAccessStatusIfNeeded(repositories: snapshot.repositories)
         synchronizeScheduledBackupsRegistration()
@@ -707,6 +725,13 @@ final class DeltaAppModel: ObservableObject {
         return backupIssueAcknowledgmentStore.isAcknowledged(issue, profileID: profileID)
     }
 
+    func outcomePresentation(for job: JobRun) -> JobOutcomePresentation {
+        JobOutcomePresentation(
+            status: job.status,
+            acknowledgedOmissionCount: acknowledgedWarningIssueCounts[job.id]
+        )
+    }
+
     func setBackupIssuesAcknowledged(_ acknowledged: Bool, issues: [BackupIssue], profileID: UUID) {
         guard !issues.isEmpty else { return }
         backupIssueAcknowledgmentStore.setAcknowledged(acknowledged, issues: issues, profileID: profileID)
@@ -721,6 +746,7 @@ final class DeltaAppModel: ObservableObject {
                 )
             )
         }
+        reload()
     }
 
     func revealBackupIssue(_ issue: BackupIssue) {

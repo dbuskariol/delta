@@ -243,6 +243,46 @@ final class DatabaseTests: XCTestCase {
         XCTAssertEqual(issues, [issue])
     }
 
+    func testStructuredBackupIssuesCanBeFetchedForMultipleJobsInOneRead() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let database = try DeltaDatabase(url: directory.appendingPathComponent("Delta.sqlite"))
+        let repositoryID = UUID()
+        let firstJobID = UUID()
+        let secondJobID = UUID()
+        let ignoredJobID = UUID()
+        let firstIssue = BackupIssue(path: "/one", reason: "permission denied")
+        let secondIssue = BackupIssue(path: "/two", reason: "file changed as we read it")
+        for (jobID, issue) in [(firstJobID, firstIssue), (secondJobID, secondIssue)] {
+            try database.appendJobLog(
+                JobLogEntry(
+                    jobID: jobID,
+                    repositoryID: repositoryID,
+                    stream: .standardError,
+                    message: issue.displayMessage,
+                    backupIssue: issue
+                )
+            )
+        }
+        try database.appendJobLog(
+            JobLogEntry(
+                jobID: ignoredJobID,
+                repositoryID: repositoryID,
+                stream: .standardError,
+                message: "not requested",
+                backupIssue: BackupIssue(path: "/ignored", reason: "permission denied")
+            )
+        )
+
+        let issuesByJobID = try database.fetchBackupIssues(jobIDs: [firstJobID, secondJobID])
+
+        XCTAssertEqual(issuesByJobID[firstJobID], [firstIssue])
+        XCTAssertEqual(issuesByJobID[secondJobID], [secondIssue])
+        XCTAssertNil(issuesByJobID[ignoredJobID])
+    }
+
     func testJobLogPageReadsIssueRowsCreatedBeforeStreamIndexMigration() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)

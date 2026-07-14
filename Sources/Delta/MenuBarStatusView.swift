@@ -111,14 +111,17 @@ struct DeltaMenuBarView: View {
                     .font(.subheadline.weight(.semibold))
                 Spacer()
                 if let lastBackupRun {
-                    StatusPill(status: lastBackupRun.status)
+                    StatusPill(outcome: model.outcomePresentation(for: lastBackupRun))
                 }
             }
             if let lastBackupRun {
                 Text(lastBackupRun.startedAt.formatted(date: .abbreviated, time: .shortened))
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                BackupRunSummaryLine(job: lastBackupRun)
+                BackupRunSummaryLine(
+                    job: lastBackupRun,
+                    outcome: model.outcomePresentation(for: lastBackupRun)
+                )
                 if restorePointCount > 0 {
                     Text("\(restorePointCount) restore \(restorePointCount == 1 ? "point" : "points") available")
                         .font(.caption)
@@ -266,7 +269,8 @@ struct DeltaMenuBarView: View {
             isPersistentStoreAvailable: model.isPersistentStoreAvailable,
             isWorking: model.isWorking,
             activeJobKind: model.activeOperation?.kind,
-            latestBackupStatus: lastBackupRun?.status
+            latestBackupStatus: lastBackupRun?.status,
+            acknowledgedOmissionCount: lastBackupRun.flatMap { model.acknowledgedWarningIssueCounts[$0.id] }
         )
     }
 

@@ -90,4 +90,20 @@ final class MenuBarStatusPresentationTests: XCTestCase {
             XCTAssertEqual(presentation.tone, .attention)
         }
     }
+
+    func testAcknowledgedOmissionsReturnMenuBarToReady() {
+        let presentation = MenuBarStatusPresentation.make(
+            isPersistentStoreAvailable: true,
+            isWorking: false,
+            activeJobKind: nil,
+            latestBackupStatus: .warning,
+            acknowledgedOmissionCount: 6
+        )
+
+        XCTAssertEqual(presentation.symbolName, "externaldrive.badge.checkmark")
+        XCTAssertEqual(presentation.headerText, "Last backup completed")
+        XCTAssertEqual(presentation.badgeText, "Ready")
+        XCTAssertEqual(presentation.tone, .ready)
+        XCTAssertTrue(presentation.accessibilityLabel.contains("6 known omissions"))
+    }
 }

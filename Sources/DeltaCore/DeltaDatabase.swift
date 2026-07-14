@@ -355,6 +355,39 @@ public final class DeltaDatabase: @unchecked Sendable {
         }
     }
 
+    public func fetchBackupIssues(jobIDs: [UUID]) throws -> [UUID: [BackupIssue]] {
+        let uniqueJobIDs = Array(Set(jobIDs))
+        guard !uniqueJobIDs.isEmpty else { return [:] }
+        let placeholders = Array(repeating: "?", count: uniqueJobIDs.count).joined(separator: ", ")
+        return try queue.read { db in
+            let rows = try Row.fetchAll(
+                db,
+                sql: """
+                SELECT job_id, payload FROM job_logs
+                WHERE job_id IN (\(placeholders))
+                  AND json_type(payload, '$.backupIssue') IS NOT NULL
+                ORDER BY job_id ASC, created_at ASC, id ASC
+                """,
+                arguments: StatementArguments(uniqueJobIDs.map(\.uuidString))
+            )
+            var issuesByJobID: [UUID: [BackupIssue]] = [:]
+            for row in rows {
+                let jobIDString: String = row["job_id"]
+                guard let jobID = UUID(uuidString: jobIDString) else {
+                    throw DeltaDatabaseError.invalidPayload("job_logs")
+                }
+                let payload: String = row["payload"]
+                guard let data = payload.data(using: .utf8) else {
+                    throw DeltaDatabaseError.invalidPayload("job_logs")
+                }
+                if let issue = try decoder.decode(JobLogEntry.self, from: data).backupIssue {
+                    issuesByJobID[jobID, default: []].append(issue)
+                }
+            }
+            return issuesByJobID
+        }
+    }
+
     public func saveSnapshot(_ snapshot: ResticSnapshot, repositoryID: UUID) throws {
         let payload = try encodedPayload(snapshot, table: "snapshots")
         let timestamp = Self.timestampString(Date())

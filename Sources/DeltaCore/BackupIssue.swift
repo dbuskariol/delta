@@ -207,7 +207,11 @@ public struct BackupIssueAcknowledgmentStore {
     }
 
     public func allAcknowledged(_ issues: [BackupIssue], profileID: UUID) -> Bool {
-        !issues.isEmpty && issues.allSatisfy { isAcknowledged($0, profileID: profileID) }
+        guard !issues.isEmpty else { return false }
+        let values = fingerprints
+        return issues.allSatisfy {
+            values.contains($0.acknowledgmentFingerprint(profileID: profileID))
+        }
     }
 
     public func setAcknowledged(_ acknowledged: Bool, issues: [BackupIssue], profileID: UUID) {

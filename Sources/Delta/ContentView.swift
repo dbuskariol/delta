@@ -251,6 +251,7 @@ struct DashboardView: View {
             DashboardBackupOverview(
                 profiles: model.profiles,
                 jobs: model.jobs,
+                acknowledgedWarningIssueCounts: model.acknowledgedWarningIssueCounts,
                 onOpenBackups: { model.selectedSection = .backups }
             )
         }
@@ -314,6 +315,7 @@ struct DashboardView: View {
 private struct DashboardBackupOverview: View {
     var profiles: [BackupProfile]
     var jobs: [JobRun]
+    var acknowledgedWarningIssueCounts: [UUID: Int]
     var onOpenBackups: () -> Void
 
     var body: some View {
@@ -417,11 +419,12 @@ private struct DashboardBackupOverview: View {
     private var lastBackupDetail: String {
         guard let latestBackup else { return "Run a profile to create the first restore point." }
         let profileName = latestBackup.profileID.flatMap { id in profiles.first { $0.id == id }?.name }
-        return [profileName, latestBackup.status.displayName].compactMap { $0 }.joined(separator: " · ")
+        let outcome = outcome(for: latestBackup)
+        return [profileName, outcome.displayName, outcome.detailText].compactMap { $0 }.joined(separator: " · ")
     }
 
     private var lastBackupSymbol: String {
-        switch latestBackup?.status {
+        switch latestBackup.map(outcome(for:))?.visualStatus {
         case .failed: "xmark.circle"
         case .warning: "exclamationmark.triangle"
         case .cancelled: "pause.circle"
@@ -430,12 +433,19 @@ private struct DashboardBackupOverview: View {
     }
 
     private var lastBackupColor: Color {
-        switch latestBackup?.status {
+        switch latestBackup.map(outcome(for:))?.visualStatus {
         case .failed: .red
         case .warning, .cancelled: .orange
         case .succeeded: .green
         default: .secondary
         }
+    }
+
+    private func outcome(for job: JobRun) -> JobOutcomePresentation {
+        JobOutcomePresentation(
+            status: job.status,
+            acknowledgedOmissionCount: acknowledgedWarningIssueCounts[job.id]
+        )
     }
 }
 
@@ -1620,7 +1630,8 @@ struct ActivityView: View {
                         ForEach(visibleJobs) { job in
                             ActivityJobListRow(
                                 job: job,
-                                profileName: profileName(for: job)
+                                profileName: profileName(for: job),
+                                outcome: model.outcomePresentation(for: job)
                             )
                             .tag(job.id)
                         }
@@ -1663,7 +1674,7 @@ struct ActivityView: View {
         case .all:
             model.jobs
         case .attention:
-            model.jobs.filter { $0.status == .warning || $0.status == .failed }
+            model.jobs.filter { model.outcomePresentation(for: $0).needsAttention }
         }
     }
 
@@ -1733,27 +1744,32 @@ private enum ActivityLogFilter: String, CaseIterable, Identifiable {
 private struct ActivityJobListRow: View {
     var job: JobRun
     var profileName: String?
+    var outcome: JobOutcomePresentation
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
-            Image(systemName: job.status.activitySymbol)
+            Image(systemName: outcome.activitySymbol)
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(job.status.activityColor)
+                .foregroundStyle(outcome.activityColor)
                 .frame(width: 18, height: 18)
             VStack(alignment: .leading, spacing: 4) {
                 Text(profileName ?? job.kind.displayName)
                     .font(.subheadline.weight(.semibold))
                     .lineLimit(1)
                 HStack(spacing: 5) {
-                    Text(job.status.displayName)
-                        .foregroundStyle(job.status.activityColor)
+                    Text(outcome.displayName)
+                        .foregroundStyle(outcome.activityColor)
                     Text("·")
                     Text(job.startedAt.formatted(date: .abbreviated, time: .shortened))
                         .foregroundStyle(.secondary)
                 }
                 .font(.caption)
                 .lineLimit(1)
-                if job.kind != .backup || profileName != nil {
+                if let detailText = outcome.detailText {
+                    Text(detailText)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else if job.kind != .backup || profileName != nil {
                     Text(job.kind.displayName)
                         .font(.caption)
                         .foregroundStyle(.tertiary)
@@ -1790,7 +1806,7 @@ private struct ActivityJobDetailView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .top, spacing: 14) {
-                StatusIcon(symbol: job.status.activitySymbol, color: job.status.activityColor)
+                StatusIcon(symbol: outcome.activitySymbol, color: outcome.activityColor)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(profileName ?? job.kind.displayName)
                         .font(.title3.weight(.semibold))
@@ -1799,12 +1815,12 @@ private struct ActivityJobDetailView: View {
                         .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                StatusPill(status: job.status)
+                StatusPill(outcome: outcome)
             }
 
             if let message = job.message, !message.isEmpty,
                job.status == .warning || job.status == .failed || job.status == .cancelled {
-                ActivityResultNotice(status: job.status, message: message)
+                ActivityResultNotice(outcome: outcome, message: message)
             }
 
             if let summary = job.backupSummary {
@@ -1815,7 +1831,7 @@ private struct ActivityJobDetailView: View {
 
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(logFilter == .issues ? "Issues" : "Output")
+                    Text(logSectionTitle)
                         .font(.headline)
                     Text(logCountSummary)
                         .font(.caption)
@@ -1825,7 +1841,8 @@ private struct ActivityJobDetailView: View {
                 if issueCount > 0 || job.status == .warning || job.status == .failed {
                     Picker("Output", selection: $logFilter) {
                         ForEach(ActivityLogFilter.allCases) { filter in
-                            Text(filter.title).tag(filter)
+                            Text(filter == .issues && outcome.hasKnownOmissions ? "Omissions" : filter.title)
+                                .tag(filter)
                         }
                     }
                     .labelsHidden()
@@ -1888,6 +1905,10 @@ private struct ActivityJobDetailView: View {
         return "\(job.id.uuidString)-\(logFilter.rawValue)-\(liveRevision)"
     }
 
+    private var outcome: JobOutcomePresentation {
+        model.outcomePresentation(for: job)
+    }
+
     private var structuredIssues: [BackupIssue] {
         entries.compactMap(\.backupIssue)
     }
@@ -1905,9 +1926,19 @@ private struct ActivityJobDetailView: View {
 
     private var logCountSummary: String {
         if logFilter == .issues {
+            if outcome.hasKnownOmissions {
+                return "\(issueCount) known \(issueCount == 1 ? "omission" : "omissions") · \(totalCount) total lines"
+            }
             return "\(issueCount) \(issueCount == 1 ? "issue" : "issues") · \(totalCount) total lines"
         }
         return "\(totalCount) total \(totalCount == 1 ? "line" : "lines")"
+    }
+
+    private var logSectionTitle: String {
+        if logFilter == .issues, outcome.hasKnownOmissions {
+            return "Known Omissions"
+        }
+        return logFilter == .issues ? "Issues" : "Output"
     }
 
     private func loadInitialPage() async {
@@ -2047,11 +2078,23 @@ private struct BackupIssueReviewList: View {
                     }
                 }
             }
-            Text("Excluding an item changes future backups. Acknowledging it only silences repeat alerts; the run remains a warning.")
+            Text(reviewGuidance)
                 .font(.caption)
                 .foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)
         }
+    }
+
+    private var allIssuesAcknowledged: Bool {
+        guard let profileID, !issues.isEmpty else { return false }
+        return issues.allSatisfy { model.isBackupIssueAcknowledged($0, profileID: profileID) }
+    }
+
+    private var reviewGuidance: String {
+        if allIssuesAcknowledged {
+            return "These known omissions remain visible for audit, but no longer require attention. Excluding an item changes future backups."
+        }
+        return "Acknowledging a reviewed omission removes repeat attention while preserving it for audit. Excluding an item changes future backups."
     }
 
     private var excludedPatterns: Set<String> {
@@ -2265,17 +2308,17 @@ private extension BackupIssueCategory {
 }
 
 private struct ActivityResultNotice: View {
-    var status: JobStatus
+    var outcome: JobOutcomePresentation
     var message: String
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
-            Image(systemName: status.activitySymbol)
-                .foregroundStyle(status.activityColor)
+            Image(systemName: outcome.activitySymbol)
+                .foregroundStyle(outcome.activityColor)
             VStack(alignment: .leading, spacing: 3) {
-                Text(status.displayName)
+                Text(outcome.displayName)
                     .font(.subheadline.weight(.semibold))
-                Text(message)
+                Text(noticeMessage)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -2283,8 +2326,15 @@ private struct ActivityResultNotice: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(status.activityColor.opacity(0.10))
+        .background(outcome.activityColor.opacity(0.10))
         .clipShape(RoundedRectangle(cornerRadius: 6))
+    }
+
+    private var noticeMessage: String {
+        if outcome.hasKnownOmissions {
+            return "Backup completed with \(outcome.detailText ?? "known omissions"). No new issues need attention."
+        }
+        return message
     }
 }
 
@@ -2354,6 +2404,11 @@ private extension JobStatus {
         case .cancelled: "stop.circle.fill"
         }
     }
+}
+
+private extension JobOutcomePresentation {
+    var activityColor: Color { visualStatus.activityColor }
+    var activitySymbol: String { visualStatus.activitySymbol }
 }
 
 struct SettingsView: View {
@@ -4241,7 +4296,10 @@ struct ProfileRow: View {
                 }
 
                 if let latestBackupRun, !isActiveBackup {
-                    BackupRunSummaryLine(job: latestBackupRun)
+                    BackupRunSummaryLine(
+                        job: latestBackupRun,
+                        outcome: model.outcomePresentation(for: latestBackupRun)
+                    )
                 }
 
                 if isActiveBackup {
@@ -4301,7 +4359,7 @@ struct ProfileRow: View {
         if isPausedBackup {
             return .orange
         }
-        switch latestBackupRun?.status {
+        switch latestBackupRun.map(model.outcomePresentation(for:))?.visualStatus {
         case .succeeded: return .green
         case .warning: return .orange
         case .failed: return .red
@@ -6492,10 +6550,18 @@ struct TooltipBubble: View {
 }
 
 struct StatusPill: View {
-    var status: JobStatus
+    var outcome: JobOutcomePresentation
+
+    init(status: JobStatus) {
+        outcome = JobOutcomePresentation(status: status)
+    }
+
+    init(outcome: JobOutcomePresentation) {
+        self.outcome = outcome
+    }
 
     var body: some View {
-        Text(status.displayName)
+        Text(outcome.displayName)
             .font(.caption.weight(.medium))
             .padding(.horizontal, 9)
             .padding(.vertical, 5)
@@ -6505,7 +6571,7 @@ struct StatusPill: View {
     }
 
     private var color: Color {
-        switch status {
+        switch outcome.visualStatus {
         case .succeeded: .green
         case .warning: .orange
         case .failed: .red
@@ -6580,17 +6646,35 @@ struct ActionLine: View {
 
 struct BackupRunSummaryLine: View {
     var job: JobRun
+    var outcome: JobOutcomePresentation?
+
+    init(job: JobRun, outcome: JobOutcomePresentation? = nil) {
+        self.job = job
+        self.outcome = outcome
+    }
 
     var body: some View {
-        if let summary {
-            BackupSummaryMetricRow(summary: summary)
-        } else if let summaryText {
-            Text(summaryText)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .truncationMode(.tail)
+        VStack(alignment: .leading, spacing: 5) {
+            if let summary {
+                BackupSummaryMetricRow(summary: summary)
+            } else if let summaryText {
+                Text(summaryText)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            if let detailText = effectiveOutcome.detailText {
+                Label(detailText, systemImage: "checkmark.shield")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var effectiveOutcome: JobOutcomePresentation {
+        outcome ?? JobOutcomePresentation(status: job.status)
     }
 
     private var summary: ResticBackupSummary? {

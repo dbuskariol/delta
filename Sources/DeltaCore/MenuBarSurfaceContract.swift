@@ -108,6 +108,16 @@ public enum MenuBarSurfaceContract {
         require(warningBackup.headerText == "Last backup completed with warnings", "Warning backup status should preserve warning context.", failures: &failures)
         require(warningBackup.badgeText == "Completed with warnings", "Warning backup badge should be explicit.", failures: &failures)
 
+        let acknowledgedWarningBackup = MenuBarStatusPresentation.make(
+            isPersistentStoreAvailable: true,
+            isWorking: false,
+            activeJobKind: nil,
+            latestBackupStatus: .warning,
+            acknowledgedOmissionCount: 6
+        )
+        require(acknowledgedWarningBackup.headerText == "Last backup completed", "Known omissions should not remain an attention state.", failures: &failures)
+        require(acknowledgedWarningBackup.badgeText == "Ready", "Known omissions should return the status menu to Ready.", failures: &failures)
+
         let pausedSchedules = MenuBarActionAvailability.make(
             profileCount: 1,
             isPersistentStoreAvailable: true,

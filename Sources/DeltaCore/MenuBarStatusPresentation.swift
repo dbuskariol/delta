@@ -32,7 +32,8 @@ public struct MenuBarStatusPresentation: Equatable, Sendable {
         isPersistentStoreAvailable: Bool,
         isWorking: Bool,
         activeJobKind: JobKind?,
-        latestBackupStatus: JobStatus?
+        latestBackupStatus: JobStatus?,
+        acknowledgedOmissionCount: Int? = nil
     ) -> MenuBarStatusPresentation {
         guard isPersistentStoreAvailable else {
             return MenuBarStatusPresentation(
@@ -66,6 +67,20 @@ public struct MenuBarStatusPresentation: Equatable, Sendable {
                 headerText: "Ready",
                 badgeText: "Ready",
                 accessibilityLabel: "Delta, ready",
+                tone: .ready
+            )
+        }
+
+        let outcome = JobOutcomePresentation(
+            status: latestBackupStatus,
+            acknowledgedOmissionCount: acknowledgedOmissionCount
+        )
+        if outcome.hasKnownOmissions {
+            return MenuBarStatusPresentation(
+                symbolName: "externaldrive.badge.checkmark",
+                headerText: "Last backup completed",
+                badgeText: "Ready",
+                accessibilityLabel: "Delta, last backup completed with \(outcome.detailText ?? "known omissions")",
                 tone: .ready
             )
         }
