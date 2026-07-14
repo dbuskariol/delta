@@ -1,0 +1,1008 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		097A404E4414515E28E764D6 /* SecurityScopedBookmarkStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9665691705094DCCCCB0B6C5 /* SecurityScopedBookmarkStoreTests.swift */; };
+		0ABD788A6172D098AA38F81D /* AcceptancePreferencesCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE6A815EB59DE930FD35BD00 /* AcceptancePreferencesCommand.swift */; };
+		1328BD13947B4A7BB630D181 /* com.delta.backup.agent.plist in CopyFiles */ = {isa = PBXBuildFile; fileRef = 0ADB0DD0967BA62D3FC96293 /* com.delta.backup.agent.plist */; };
+		18ACB2ECC45697909B9B2529 /* ExternalBackendAcceptanceContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27C19FB33A107F678CEFAAF8 /* ExternalBackendAcceptanceContractTests.swift */; };
+		1ED629821224952E3276E050 /* AcceptanceScheduledAgentCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 105B76879B8FC480030A19BE /* AcceptanceScheduledAgentCommand.swift */; };
+		2027C3FB1098F3492B00283A /* AcceptanceRunControlCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA64B4A668B87F7512220A9B /* AcceptanceRunControlCommand.swift */; };
+		2578751D52B2A1C0927C8DFE /* DeltaSecretBridge in Embed Dependencies */ = {isa = PBXBuildFile; fileRef = C187F0FAE587A5D82E7F5656 /* DeltaSecretBridge */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		2B04F4FC01267432E7A14C57 /* JobOutcomePresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 736F93E2BF229347BFCBE2F8 /* JobOutcomePresentationTests.swift */; };
+		2C1208B9F3521C0AFB39D194 /* DeltaAgentInvocationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2385CFCBB16BD1494ACA33CF /* DeltaAgentInvocationTests.swift */; };
+		2C7D0974CD35C41AA5095594 /* JobNotificationPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19D887B1ACEDE2D6C09C8000 /* JobNotificationPolicyTests.swift */; };
+		3121D73BF95E13F619702FE9 /* ResticRunnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C78E6D327A9AF1BFC1D9D415 /* ResticRunnerTests.swift */; };
+		35BC803C15D7A9E52CE023D3 /* ResticIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB6AC70C7ED86BC4D033C111 /* ResticIntegrationTests.swift */; };
+		39FDF2E5C9CB29118E006EA5 /* MenuBarStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D64AAF0246FEBF54B67CBDA /* MenuBarStatusView.swift */; };
+		3D2FF8C37FCA8C0076780DAD /* KeychainSecretStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7346DAB2492303B2A5B3CE07 /* KeychainSecretStoreTests.swift */; };
+		43ABEBB2D6173FC5C6C90757 /* DeltaAppPreferencesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB51075B150C5939DB1710E6 /* DeltaAppPreferencesTests.swift */; };
+		4962F97FD0FB6AC0CF6DCCD0 /* DeltaSecretBridgeInvocationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0C2927B1805F99361D0CF8C /* DeltaSecretBridgeInvocationTests.swift */; };
+		5B70F7C869E45340A16F320C /* DeltaAppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C689DD8002FF144F0BBDFA0 /* DeltaAppModel.swift */; };
+		5CA7A8F074245167F537EC33 /* DeltaStatusItemController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C8EBC5743918653A990E127 /* DeltaStatusItemController.swift */; };
+		5E74A2864D611C95D4B16C53 /* BackupRepositoryValidatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60662F8E292C6D0E19930606 /* BackupRepositoryValidatorTests.swift */; };
+		621397CD4E56E214C4DDB87A /* LocalResticRepositoryStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C4A667E9E42243147C08811 /* LocalResticRepositoryStateTests.swift */; };
+		64141E1D0FB14802AB8BC078 /* DeltaAgent in Embed Dependencies */ = {isa = PBXBuildFile; fileRef = 90C05D1A78563BC85C480E22 /* DeltaAgent */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		65B9CD4B618F79AFEE926EFB /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = BF978C7761D75EFC2838CBFB /* PrivacyInfo.xcprivacy */; };
+		66092FAE699D90AE8BD1849D /* RepositorySecretAccessRepairerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31631FB1119CA423C2316D3D /* RepositorySecretAccessRepairerTests.swift */; };
+		6647158F5EE693AC3F59E566 /* MenuBarStatusPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F39618B1197A8C91626F6FFF /* MenuBarStatusPresentationTests.swift */; };
+		66BB43D03ECF6E37BBB88024 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21481C079AB6867C30A4F3FD /* main.swift */; };
+		693D234D9E946657B9F130A6 /* AcceptanceMenuBarSurfaceCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = B999257F396A0F64F0398EED /* AcceptanceMenuBarSurfaceCommand.swift */; };
+		718D7BA0F53FD16A248A29F6 /* MenuBarActionAvailabilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D46869C8CBD03EC85C534F3 /* MenuBarActionAvailabilityTests.swift */; };
+		7B695AD87646FFE3B689FEAD /* restic in CopyFiles */ = {isa = PBXBuildFile; fileRef = 94F7A5586AACBFE334A09F59 /* restic */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		826BE6760F669CA08894D664 /* Delta.icns in Resources */ = {isa = PBXBuildFile; fileRef = 6997F645BACBEC9B5B9E0413 /* Delta.icns */; };
+		88932C250CE8317D3B56613D /* RepositoryAvailabilityCheckerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87245FFEC494241E1D9B99E6 /* RepositoryAvailabilityCheckerTests.swift */; };
+		8B514413D4D6E93D14CB5A20 /* AcceptanceExternalLifecycleCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3842119C6B1424E3BFCA0FE3 /* AcceptanceExternalLifecycleCommand.swift */; };
+		9095749E315C736B88E47D59 /* DeltaCore in Frameworks */ = {isa = PBXBuildFile; productRef = 918C73C6E40AF62A197A38F2 /* DeltaCore */; };
+		93AA657C2700E460B497B600 /* DeltaCore in Frameworks */ = {isa = PBXBuildFile; productRef = 875302222B948F9EFF66A576 /* DeltaCore */; };
+		93FB219683BAD3F579598B93 /* BackupIssueTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FA439C7D5363A04D7F1A12A /* BackupIssueTests.swift */; };
+		94C36C73CBAFBB503D39CE79 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 15A7EE11B4F68F429B02D4E5 /* GRDB */; };
+		99FA22EB79350F602FA9282A /* ModelDisplayNameTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EEDDA234F5F66B29F47427B /* ModelDisplayNameTests.swift */; };
+		9C0B85D88F5122E1BE31BB38 /* DeltaCore in Frameworks */ = {isa = PBXBuildFile; productRef = B0A7C44860E1D7AFDB407D74 /* DeltaCore */; };
+		9CC7D9A3105FC793C30D908F /* DatabaseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2473445B9D9A9D881B483BC /* DatabaseTests.swift */; };
+		9E2C0447088C8FC630633F5F /* SettingsSurfaceContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6BF102EB1BD98E5D5657FFF /* SettingsSurfaceContractTests.swift */; };
+		A16862EEE844387DE467AE1E /* MenuBarSurfaceContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13B30181189C15B52C4319A1 /* MenuBarSurfaceContractTests.swift */; };
+		A58CA0BFC077F1A0A4929204 /* RepositoryPasswordManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD662A2D16D0727151CA40FF /* RepositoryPasswordManagerTests.swift */; };
+		A5AD5E1873CEC9AEE66D3B8C /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = AAD90650D816CFE15D833746 /* Sparkle */; };
+		A75662335E4E43BBF9D94D6E /* BackupExcludePatternParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AC7E62B0B40B2E457A5EF13 /* BackupExcludePatternParserTests.swift */; };
+		AA07C1A4FA04DD7B0948A1E5 /* BackupSourceAccessCheckerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2D20B1B7700FF8516BD2AD6 /* BackupSourceAccessCheckerTests.swift */; };
+		AE0B72E51C791D06EBEE26B3 /* BackupProgressEstimatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3D4771174A3C1D3954A2208 /* BackupProgressEstimatorTests.swift */; };
+		B0A5501150894AA490522AAA /* RestorePointSelectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32B059142DCC54DC33391574 /* RestorePointSelectionTests.swift */; };
+		BB1F237EECF13DBF7BA3B2E9 /* SoftwareUpdateController.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF15AA707E58E0D6314C6448 /* SoftwareUpdateController.swift */; };
+		C2E6FAD3D446EC722568209C /* DeltaApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 408CAF3A34551DD8211A0E5D /* DeltaApp.swift */; };
+		CF98F7E1409F4EC0AA417050 /* ResticCommandTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFB74FA5A66EF2594ABA0131 /* ResticCommandTests.swift */; };
+		D606EFCA12C9B5F6EED023D9 /* LaunchAgentRegistrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F16DA68894561686DEA8769C /* LaunchAgentRegistrationTests.swift */; };
+		D8044B2C97B8EAEB75A3698E /* ScheduleAndParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28211A66D1218CE1E78AC0EA /* ScheduleAndParserTests.swift */; };
+		D932DBDE6F71FAF49F884AE3 /* DashboardHealthEvaluatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA5F9026EDD0D3D67DDAD5A9 /* DashboardHealthEvaluatorTests.swift */; };
+		D959DF644B5D3331BFB08057 /* AcceptanceLocalLifecycleCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0A24E43E6682CB42F5393F /* AcceptanceLocalLifecycleCommand.swift */; };
+		D977E864445CEFDAC3002C52 /* DiagnosticReportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F62B404376AE1D1BCDCC2C0 /* DiagnosticReportTests.swift */; };
+		D9FA9D63A1F7A0E8FB50B7CF /* DeltaCore in Frameworks */ = {isa = PBXBuildFile; productRef = 7BDCDF2D53DC627A5FD4D8A1 /* DeltaCore */; };
+		EB5B4083BB8AC105DB6993E7 /* BackupCoordinatorPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A8390A42C8E8A373ADA3D68 /* BackupCoordinatorPolicyTests.swift */; };
+		F3203DFD59DC7F4FFE02D71D /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8BB4195C935BC82AE2E2E32 /* ContentView.swift */; };
+		F8EABC77914D984C2C033FE8 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A858D46FB140BF355087590 /* main.swift */; };
+		F9EE161871FAC8D71CD58822 /* BackupProfileValidatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 087E559C37295F9E4361047A /* BackupProfileValidatorTests.swift */; };
+		FD49626B62BA9BCD2F8044A7 /* AppDirectoriesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10ED99C37CABF597A584C91 /* AppDirectoriesTests.swift */; };
+		FDBDB2DB4F064758B6487E1C /* rclone in CopyFiles */ = {isa = PBXBuildFile; fileRef = CDB65970E85BEF26A0DDCE11 /* rclone */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		37FC0DBD789D9888B0A64730 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 8E818563DD40DA0B0CF5E3E0 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 7D412528A7F8A2AD1EEC8AD0;
+			remoteInfo = DeltaSecretBridge;
+		};
+		80D2076EB3061FE80A3A39B1 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 8E818563DD40DA0B0CF5E3E0 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C4C1BF76E0B079D197966A16;
+			remoteInfo = DeltaAgent;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		244BD7518ACCA23E79B5CF22 /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = Contents/Library/LaunchAgents;
+			dstSubfolderSpec = 1;
+			files = (
+				1328BD13947B4A7BB630D181 /* com.delta.backup.agent.plist in CopyFiles */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		85D30A7382F344B7165CA6F4 /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 6;
+			files = (
+				FDBDB2DB4F064758B6487E1C /* rclone in CopyFiles */,
+				7B695AD87646FFE3B689FEAD /* restic in CopyFiles */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9A72168F974738C92F8D1A57 /* Embed Dependencies */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 6;
+			files = (
+				64141E1D0FB14802AB8BC078 /* DeltaAgent in Embed Dependencies */,
+				2578751D52B2A1C0927C8DFE /* DeltaSecretBridge in Embed Dependencies */,
+			);
+			name = "Embed Dependencies";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		087E559C37295F9E4361047A /* BackupProfileValidatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupProfileValidatorTests.swift; sourceTree = "<group>"; };
+		0AC7E62B0B40B2E457A5EF13 /* BackupExcludePatternParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupExcludePatternParserTests.swift; sourceTree = "<group>"; };
+		0ADB0DD0967BA62D3FC96293 /* com.delta.backup.agent.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = com.delta.backup.agent.plist; sourceTree = "<group>"; };
+		0C689DD8002FF144F0BBDFA0 /* DeltaAppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeltaAppModel.swift; sourceTree = "<group>"; };
+		105B76879B8FC480030A19BE /* AcceptanceScheduledAgentCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AcceptanceScheduledAgentCommand.swift; sourceTree = "<group>"; };
+		13B30181189C15B52C4319A1 /* MenuBarSurfaceContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarSurfaceContractTests.swift; sourceTree = "<group>"; };
+		19D887B1ACEDE2D6C09C8000 /* JobNotificationPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JobNotificationPolicyTests.swift; sourceTree = "<group>"; };
+		21481C079AB6867C30A4F3FD /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		2385CFCBB16BD1494ACA33CF /* DeltaAgentInvocationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeltaAgentInvocationTests.swift; sourceTree = "<group>"; };
+		27C19FB33A107F678CEFAAF8 /* ExternalBackendAcceptanceContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExternalBackendAcceptanceContractTests.swift; sourceTree = "<group>"; };
+		28211A66D1218CE1E78AC0EA /* ScheduleAndParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduleAndParserTests.swift; sourceTree = "<group>"; };
+		2D46869C8CBD03EC85C534F3 /* MenuBarActionAvailabilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarActionAvailabilityTests.swift; sourceTree = "<group>"; };
+		2F62B404376AE1D1BCDCC2C0 /* DiagnosticReportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticReportTests.swift; sourceTree = "<group>"; };
+		2FA439C7D5363A04D7F1A12A /* BackupIssueTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupIssueTests.swift; sourceTree = "<group>"; };
+		31631FB1119CA423C2316D3D /* RepositorySecretAccessRepairerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepositorySecretAccessRepairerTests.swift; sourceTree = "<group>"; };
+		32B059142DCC54DC33391574 /* RestorePointSelectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestorePointSelectionTests.swift; sourceTree = "<group>"; };
+		3842119C6B1424E3BFCA0FE3 /* AcceptanceExternalLifecycleCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AcceptanceExternalLifecycleCommand.swift; sourceTree = "<group>"; };
+		3EEDDA234F5F66B29F47427B /* ModelDisplayNameTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelDisplayNameTests.swift; sourceTree = "<group>"; };
+		408CAF3A34551DD8211A0E5D /* DeltaApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeltaApp.swift; sourceTree = "<group>"; };
+		4284CEB88D9D4AC95B4881C9 /* Delta.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Delta.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		4A858D46FB140BF355087590 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		53841A1CBB1F03F83015D7D4 /* DeltaCoreTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DeltaCoreTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		5A8390A42C8E8A373ADA3D68 /* BackupCoordinatorPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupCoordinatorPolicyTests.swift; sourceTree = "<group>"; };
+		60662F8E292C6D0E19930606 /* BackupRepositoryValidatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupRepositoryValidatorTests.swift; sourceTree = "<group>"; };
+		6997F645BACBEC9B5B9E0413 /* Delta.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = Delta.icns; sourceTree = "<group>"; };
+		7346DAB2492303B2A5B3CE07 /* KeychainSecretStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainSecretStoreTests.swift; sourceTree = "<group>"; };
+		736F93E2BF229347BFCBE2F8 /* JobOutcomePresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JobOutcomePresentationTests.swift; sourceTree = "<group>"; };
+		7C8EBC5743918653A990E127 /* DeltaStatusItemController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeltaStatusItemController.swift; sourceTree = "<group>"; };
+		87245FFEC494241E1D9B99E6 /* RepositoryAvailabilityCheckerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepositoryAvailabilityCheckerTests.swift; sourceTree = "<group>"; };
+		8C4A667E9E42243147C08811 /* LocalResticRepositoryStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalResticRepositoryStateTests.swift; sourceTree = "<group>"; };
+		8D64AAF0246FEBF54B67CBDA /* MenuBarStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarStatusView.swift; sourceTree = "<group>"; };
+		90C05D1A78563BC85C480E22 /* DeltaAgent */ = {isa = PBXFileReference; includeInIndex = 0; path = DeltaAgent; sourceTree = BUILT_PRODUCTS_DIR; };
+		94F7A5586AACBFE334A09F59 /* restic */ = {isa = PBXFileReference; path = restic; sourceTree = "<group>"; };
+		9665691705094DCCCCB0B6C5 /* SecurityScopedBookmarkStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecurityScopedBookmarkStoreTests.swift; sourceTree = "<group>"; };
+		A2473445B9D9A9D881B483BC /* DatabaseTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseTests.swift; sourceTree = "<group>"; };
+		A8BB4195C935BC82AE2E2E32 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		AFB74FA5A66EF2594ABA0131 /* ResticCommandTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResticCommandTests.swift; sourceTree = "<group>"; };
+		B10ED99C37CABF597A584C91 /* AppDirectoriesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDirectoriesTests.swift; sourceTree = "<group>"; };
+		B2D20B1B7700FF8516BD2AD6 /* BackupSourceAccessCheckerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupSourceAccessCheckerTests.swift; sourceTree = "<group>"; };
+		B999257F396A0F64F0398EED /* AcceptanceMenuBarSurfaceCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AcceptanceMenuBarSurfaceCommand.swift; sourceTree = "<group>"; };
+		BC0A24E43E6682CB42F5393F /* AcceptanceLocalLifecycleCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AcceptanceLocalLifecycleCommand.swift; sourceTree = "<group>"; };
+		BD662A2D16D0727151CA40FF /* RepositoryPasswordManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepositoryPasswordManagerTests.swift; sourceTree = "<group>"; };
+		BE6A815EB59DE930FD35BD00 /* AcceptancePreferencesCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AcceptancePreferencesCommand.swift; sourceTree = "<group>"; };
+		BF978C7761D75EFC2838CBFB /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		C187F0FAE587A5D82E7F5656 /* DeltaSecretBridge */ = {isa = PBXFileReference; includeInIndex = 0; path = DeltaSecretBridge; sourceTree = BUILT_PRODUCTS_DIR; };
+		C78E6D327A9AF1BFC1D9D415 /* ResticRunnerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResticRunnerTests.swift; sourceTree = "<group>"; };
+		CA5F9026EDD0D3D67DDAD5A9 /* DashboardHealthEvaluatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardHealthEvaluatorTests.swift; sourceTree = "<group>"; };
+		CDB65970E85BEF26A0DDCE11 /* rclone */ = {isa = PBXFileReference; path = rclone; sourceTree = "<group>"; };
+		D0C2927B1805F99361D0CF8C /* DeltaSecretBridgeInvocationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeltaSecretBridgeInvocationTests.swift; sourceTree = "<group>"; };
+		D3D4771174A3C1D3954A2208 /* BackupProgressEstimatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupProgressEstimatorTests.swift; sourceTree = "<group>"; };
+		D6BF102EB1BD98E5D5657FFF /* SettingsSurfaceContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsSurfaceContractTests.swift; sourceTree = "<group>"; };
+		DB51075B150C5939DB1710E6 /* DeltaAppPreferencesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeltaAppPreferencesTests.swift; sourceTree = "<group>"; };
+		EF15AA707E58E0D6314C6448 /* SoftwareUpdateController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoftwareUpdateController.swift; sourceTree = "<group>"; };
+		F16DA68894561686DEA8769C /* LaunchAgentRegistrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchAgentRegistrationTests.swift; sourceTree = "<group>"; };
+		F2113C926A61F09E32502FA4 /* delta */ = {isa = PBXFileReference; lastKnownFileType = folder; name = delta; path = .; sourceTree = SOURCE_ROOT; };
+		F39618B1197A8C91626F6FFF /* MenuBarStatusPresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarStatusPresentationTests.swift; sourceTree = "<group>"; };
+		FA64B4A668B87F7512220A9B /* AcceptanceRunControlCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AcceptanceRunControlCommand.swift; sourceTree = "<group>"; };
+		FB6AC70C7ED86BC4D033C111 /* ResticIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResticIntegrationTests.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		4023B13D3F1AA84FDA15C1B7 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9095749E315C736B88E47D59 /* DeltaCore in Frameworks */,
+				94C36C73CBAFBB503D39CE79 /* GRDB in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		613810024CCE8F91416148D1 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D9FA9D63A1F7A0E8FB50B7CF /* DeltaCore in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		64957B0D598C282DDE90B500 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9C0B85D88F5122E1BE31BB38 /* DeltaCore in Frameworks */,
+				A5AD5E1873CEC9AEE66D3B8C /* Sparkle in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		85940BC053A6C38E80A4D022 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				93AA657C2700E460B497B600 /* DeltaCore in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		0E72DBC3AC098C69DE8DDF68 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				C4BDEB8E9C4882295A7017D8 /* Delta */,
+				EB77DF2AC31E3A7B35F864FC /* DeltaAgent */,
+				3B2BACDFB8D3FE693ED836A9 /* DeltaSecretBridge */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		20F062A97391661C75C4DD94 /* DeltaCoreTests */ = {
+			isa = PBXGroup;
+			children = (
+				B10ED99C37CABF597A584C91 /* AppDirectoriesTests.swift */,
+				5A8390A42C8E8A373ADA3D68 /* BackupCoordinatorPolicyTests.swift */,
+				0AC7E62B0B40B2E457A5EF13 /* BackupExcludePatternParserTests.swift */,
+				2FA439C7D5363A04D7F1A12A /* BackupIssueTests.swift */,
+				087E559C37295F9E4361047A /* BackupProfileValidatorTests.swift */,
+				D3D4771174A3C1D3954A2208 /* BackupProgressEstimatorTests.swift */,
+				60662F8E292C6D0E19930606 /* BackupRepositoryValidatorTests.swift */,
+				B2D20B1B7700FF8516BD2AD6 /* BackupSourceAccessCheckerTests.swift */,
+				CA5F9026EDD0D3D67DDAD5A9 /* DashboardHealthEvaluatorTests.swift */,
+				A2473445B9D9A9D881B483BC /* DatabaseTests.swift */,
+				2385CFCBB16BD1494ACA33CF /* DeltaAgentInvocationTests.swift */,
+				DB51075B150C5939DB1710E6 /* DeltaAppPreferencesTests.swift */,
+				D0C2927B1805F99361D0CF8C /* DeltaSecretBridgeInvocationTests.swift */,
+				2F62B404376AE1D1BCDCC2C0 /* DiagnosticReportTests.swift */,
+				27C19FB33A107F678CEFAAF8 /* ExternalBackendAcceptanceContractTests.swift */,
+				19D887B1ACEDE2D6C09C8000 /* JobNotificationPolicyTests.swift */,
+				736F93E2BF229347BFCBE2F8 /* JobOutcomePresentationTests.swift */,
+				7346DAB2492303B2A5B3CE07 /* KeychainSecretStoreTests.swift */,
+				F16DA68894561686DEA8769C /* LaunchAgentRegistrationTests.swift */,
+				8C4A667E9E42243147C08811 /* LocalResticRepositoryStateTests.swift */,
+				2D46869C8CBD03EC85C534F3 /* MenuBarActionAvailabilityTests.swift */,
+				F39618B1197A8C91626F6FFF /* MenuBarStatusPresentationTests.swift */,
+				13B30181189C15B52C4319A1 /* MenuBarSurfaceContractTests.swift */,
+				3EEDDA234F5F66B29F47427B /* ModelDisplayNameTests.swift */,
+				87245FFEC494241E1D9B99E6 /* RepositoryAvailabilityCheckerTests.swift */,
+				BD662A2D16D0727151CA40FF /* RepositoryPasswordManagerTests.swift */,
+				31631FB1119CA423C2316D3D /* RepositorySecretAccessRepairerTests.swift */,
+				AFB74FA5A66EF2594ABA0131 /* ResticCommandTests.swift */,
+				FB6AC70C7ED86BC4D033C111 /* ResticIntegrationTests.swift */,
+				C78E6D327A9AF1BFC1D9D415 /* ResticRunnerTests.swift */,
+				32B059142DCC54DC33391574 /* RestorePointSelectionTests.swift */,
+				28211A66D1218CE1E78AC0EA /* ScheduleAndParserTests.swift */,
+				9665691705094DCCCCB0B6C5 /* SecurityScopedBookmarkStoreTests.swift */,
+				D6BF102EB1BD98E5D5657FFF /* SettingsSurfaceContractTests.swift */,
+			);
+			path = DeltaCoreTests;
+			sourceTree = "<group>";
+		};
+		2825B50CD12257B0FA1C8DDF = {
+			isa = PBXGroup;
+			children = (
+				2A380E46862CC615F0F450C3 /* Packages */,
+				B06D6152C710D88AA1901951 /* Packaging */,
+				611AC35EAF228A099DA49112 /* Resources */,
+				0E72DBC3AC098C69DE8DDF68 /* Sources */,
+				EBE9814B86A17A6C7D3D4216 /* Tests */,
+				510258A59E9BD2441DAB330A /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		2A380E46862CC615F0F450C3 /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				F2113C926A61F09E32502FA4 /* delta */,
+			);
+			name = Packages;
+			sourceTree = "<group>";
+		};
+		373913C5A6555C8E2D9260A7 /* AppIcon */ = {
+			isa = PBXGroup;
+			children = (
+				6997F645BACBEC9B5B9E0413 /* Delta.icns */,
+			);
+			path = AppIcon;
+			sourceTree = "<group>";
+		};
+		3B2BACDFB8D3FE693ED836A9 /* DeltaSecretBridge */ = {
+			isa = PBXGroup;
+			children = (
+				4A858D46FB140BF355087590 /* main.swift */,
+			);
+			path = DeltaSecretBridge;
+			sourceTree = "<group>";
+		};
+		510258A59E9BD2441DAB330A /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				4284CEB88D9D4AC95B4881C9 /* Delta.app */,
+				90C05D1A78563BC85C480E22 /* DeltaAgent */,
+				53841A1CBB1F03F83015D7D4 /* DeltaCoreTests.xctest */,
+				C187F0FAE587A5D82E7F5656 /* DeltaSecretBridge */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		611AC35EAF228A099DA49112 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				BF978C7761D75EFC2838CBFB /* PrivacyInfo.xcprivacy */,
+				373913C5A6555C8E2D9260A7 /* AppIcon */,
+				E1749EB5F9217FCF23823BE5 /* Tools */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		7750C0BB48BF17D11702D153 /* bin */ = {
+			isa = PBXGroup;
+			children = (
+				CDB65970E85BEF26A0DDCE11 /* rclone */,
+				94F7A5586AACBFE334A09F59 /* restic */,
+			);
+			path = bin;
+			sourceTree = "<group>";
+		};
+		B06D6152C710D88AA1901951 /* Packaging */ = {
+			isa = PBXGroup;
+			children = (
+				0ADB0DD0967BA62D3FC96293 /* com.delta.backup.agent.plist */,
+			);
+			path = Packaging;
+			sourceTree = "<group>";
+		};
+		C4BDEB8E9C4882295A7017D8 /* Delta */ = {
+			isa = PBXGroup;
+			children = (
+				3842119C6B1424E3BFCA0FE3 /* AcceptanceExternalLifecycleCommand.swift */,
+				BC0A24E43E6682CB42F5393F /* AcceptanceLocalLifecycleCommand.swift */,
+				B999257F396A0F64F0398EED /* AcceptanceMenuBarSurfaceCommand.swift */,
+				BE6A815EB59DE930FD35BD00 /* AcceptancePreferencesCommand.swift */,
+				FA64B4A668B87F7512220A9B /* AcceptanceRunControlCommand.swift */,
+				105B76879B8FC480030A19BE /* AcceptanceScheduledAgentCommand.swift */,
+				A8BB4195C935BC82AE2E2E32 /* ContentView.swift */,
+				408CAF3A34551DD8211A0E5D /* DeltaApp.swift */,
+				0C689DD8002FF144F0BBDFA0 /* DeltaAppModel.swift */,
+				7C8EBC5743918653A990E127 /* DeltaStatusItemController.swift */,
+				8D64AAF0246FEBF54B67CBDA /* MenuBarStatusView.swift */,
+				EF15AA707E58E0D6314C6448 /* SoftwareUpdateController.swift */,
+			);
+			path = Delta;
+			sourceTree = "<group>";
+		};
+		E1749EB5F9217FCF23823BE5 /* Tools */ = {
+			isa = PBXGroup;
+			children = (
+				7750C0BB48BF17D11702D153 /* bin */,
+			);
+			path = Tools;
+			sourceTree = "<group>";
+		};
+		EB77DF2AC31E3A7B35F864FC /* DeltaAgent */ = {
+			isa = PBXGroup;
+			children = (
+				21481C079AB6867C30A4F3FD /* main.swift */,
+			);
+			path = DeltaAgent;
+			sourceTree = "<group>";
+		};
+		EBE9814B86A17A6C7D3D4216 /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				20F062A97391661C75C4DD94 /* DeltaCoreTests */,
+			);
+			path = Tests;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		0E6A7F6501ADF3615A0814B3 /* DeltaCoreTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F145E8B54408A0E77F3F6F16 /* Build configuration list for PBXNativeTarget "DeltaCoreTests" */;
+			buildPhases = (
+				438689199E0504B745E41BF0 /* Sources */,
+				4023B13D3F1AA84FDA15C1B7 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = DeltaCoreTests;
+			packageProductDependencies = (
+				918C73C6E40AF62A197A38F2 /* DeltaCore */,
+				15A7EE11B4F68F429B02D4E5 /* GRDB */,
+			);
+			productName = DeltaCoreTests;
+			productReference = 53841A1CBB1F03F83015D7D4 /* DeltaCoreTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		7D412528A7F8A2AD1EEC8AD0 /* DeltaSecretBridge */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 4E3215DDD4F40A59EC8424B6 /* Build configuration list for PBXNativeTarget "DeltaSecretBridge" */;
+			buildPhases = (
+				8EC8CC4A00E1A816223BD0C4 /* Sources */,
+				85940BC053A6C38E80A4D022 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = DeltaSecretBridge;
+			packageProductDependencies = (
+				875302222B948F9EFF66A576 /* DeltaCore */,
+			);
+			productName = DeltaSecretBridge;
+			productReference = C187F0FAE587A5D82E7F5656 /* DeltaSecretBridge */;
+			productType = "com.apple.product-type.tool";
+		};
+		8A7F4FF3423E9FFEFC0ADF95 /* Delta */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 0422E35B2D52492446BFAF15 /* Build configuration list for PBXNativeTarget "Delta" */;
+			buildPhases = (
+				02D81FF805E096F0D382C5DC /* Build app icon */,
+				37BB759760A610121DD56856 /* Sources */,
+				ADFA8E94CE8B119F675D7D04 /* Resources */,
+				244BD7518ACCA23E79B5CF22 /* CopyFiles */,
+				85D30A7382F344B7165CA6F4 /* CopyFiles */,
+				64957B0D598C282DDE90B500 /* Frameworks */,
+				9A72168F974738C92F8D1A57 /* Embed Dependencies */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				BC58E4371C80411C28E74120 /* PBXTargetDependency */,
+				E83996600C429B062CB59054 /* PBXTargetDependency */,
+			);
+			name = Delta;
+			packageProductDependencies = (
+				B0A7C44860E1D7AFDB407D74 /* DeltaCore */,
+				AAD90650D816CFE15D833746 /* Sparkle */,
+			);
+			productName = Delta;
+			productReference = 4284CEB88D9D4AC95B4881C9 /* Delta.app */;
+			productType = "com.apple.product-type.application";
+		};
+		C4C1BF76E0B079D197966A16 /* DeltaAgent */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 83E076103FC36BF4DC5F05DC /* Build configuration list for PBXNativeTarget "DeltaAgent" */;
+			buildPhases = (
+				9E5CE1AE023BF933BCF7C458 /* Sources */,
+				613810024CCE8F91416148D1 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = DeltaAgent;
+			packageProductDependencies = (
+				7BDCDF2D53DC627A5FD4D8A1 /* DeltaCore */,
+			);
+			productName = DeltaAgent;
+			productReference = 90C05D1A78563BC85C480E22 /* DeltaAgent */;
+			productType = "com.apple.product-type.tool";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		8E818563DD40DA0B0CF5E3E0 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+				};
+			};
+			buildConfigurationList = 16C1D5A0792BF34B428898DD /* Build configuration list for PBXProject "Delta" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 2825B50CD12257B0FA1C8DDF;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				DE79CC692ED5C1E1BF44F11E /* XCRemoteSwiftPackageReference "GRDB.swift" */,
+				2267A7E02D10755137F964ED /* XCRemoteSwiftPackageReference "Sparkle" */,
+				34EA67168705654D1D5DD8E5 /* XCLocalSwiftPackageReference "." */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 510258A59E9BD2441DAB330A /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				8A7F4FF3423E9FFEFC0ADF95 /* Delta */,
+				C4C1BF76E0B079D197966A16 /* DeltaAgent */,
+				0E6A7F6501ADF3615A0814B3 /* DeltaCoreTests */,
+				7D412528A7F8A2AD1EEC8AD0 /* DeltaSecretBridge */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		ADFA8E94CE8B119F675D7D04 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				826BE6760F669CA08894D664 /* Delta.icns in Resources */,
+				65B9CD4B618F79AFEE926EFB /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		02D81FF805E096F0D382C5DC /* Build app icon */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Build app icon";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"$SRCROOT/Scripts/build-icon.sh\"";
+			showEnvVarsInLog = 0;
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		37BB759760A610121DD56856 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8B514413D4D6E93D14CB5A20 /* AcceptanceExternalLifecycleCommand.swift in Sources */,
+				D959DF644B5D3331BFB08057 /* AcceptanceLocalLifecycleCommand.swift in Sources */,
+				693D234D9E946657B9F130A6 /* AcceptanceMenuBarSurfaceCommand.swift in Sources */,
+				0ABD788A6172D098AA38F81D /* AcceptancePreferencesCommand.swift in Sources */,
+				2027C3FB1098F3492B00283A /* AcceptanceRunControlCommand.swift in Sources */,
+				1ED629821224952E3276E050 /* AcceptanceScheduledAgentCommand.swift in Sources */,
+				F3203DFD59DC7F4FFE02D71D /* ContentView.swift in Sources */,
+				C2E6FAD3D446EC722568209C /* DeltaApp.swift in Sources */,
+				5B70F7C869E45340A16F320C /* DeltaAppModel.swift in Sources */,
+				5CA7A8F074245167F537EC33 /* DeltaStatusItemController.swift in Sources */,
+				39FDF2E5C9CB29118E006EA5 /* MenuBarStatusView.swift in Sources */,
+				BB1F237EECF13DBF7BA3B2E9 /* SoftwareUpdateController.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		438689199E0504B745E41BF0 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FD49626B62BA9BCD2F8044A7 /* AppDirectoriesTests.swift in Sources */,
+				EB5B4083BB8AC105DB6993E7 /* BackupCoordinatorPolicyTests.swift in Sources */,
+				A75662335E4E43BBF9D94D6E /* BackupExcludePatternParserTests.swift in Sources */,
+				93FB219683BAD3F579598B93 /* BackupIssueTests.swift in Sources */,
+				F9EE161871FAC8D71CD58822 /* BackupProfileValidatorTests.swift in Sources */,
+				AE0B72E51C791D06EBEE26B3 /* BackupProgressEstimatorTests.swift in Sources */,
+				5E74A2864D611C95D4B16C53 /* BackupRepositoryValidatorTests.swift in Sources */,
+				AA07C1A4FA04DD7B0948A1E5 /* BackupSourceAccessCheckerTests.swift in Sources */,
+				D932DBDE6F71FAF49F884AE3 /* DashboardHealthEvaluatorTests.swift in Sources */,
+				9CC7D9A3105FC793C30D908F /* DatabaseTests.swift in Sources */,
+				2C1208B9F3521C0AFB39D194 /* DeltaAgentInvocationTests.swift in Sources */,
+				43ABEBB2D6173FC5C6C90757 /* DeltaAppPreferencesTests.swift in Sources */,
+				4962F97FD0FB6AC0CF6DCCD0 /* DeltaSecretBridgeInvocationTests.swift in Sources */,
+				D977E864445CEFDAC3002C52 /* DiagnosticReportTests.swift in Sources */,
+				18ACB2ECC45697909B9B2529 /* ExternalBackendAcceptanceContractTests.swift in Sources */,
+				2C7D0974CD35C41AA5095594 /* JobNotificationPolicyTests.swift in Sources */,
+				2B04F4FC01267432E7A14C57 /* JobOutcomePresentationTests.swift in Sources */,
+				3D2FF8C37FCA8C0076780DAD /* KeychainSecretStoreTests.swift in Sources */,
+				D606EFCA12C9B5F6EED023D9 /* LaunchAgentRegistrationTests.swift in Sources */,
+				621397CD4E56E214C4DDB87A /* LocalResticRepositoryStateTests.swift in Sources */,
+				718D7BA0F53FD16A248A29F6 /* MenuBarActionAvailabilityTests.swift in Sources */,
+				6647158F5EE693AC3F59E566 /* MenuBarStatusPresentationTests.swift in Sources */,
+				A16862EEE844387DE467AE1E /* MenuBarSurfaceContractTests.swift in Sources */,
+				99FA22EB79350F602FA9282A /* ModelDisplayNameTests.swift in Sources */,
+				88932C250CE8317D3B56613D /* RepositoryAvailabilityCheckerTests.swift in Sources */,
+				A58CA0BFC077F1A0A4929204 /* RepositoryPasswordManagerTests.swift in Sources */,
+				66092FAE699D90AE8BD1849D /* RepositorySecretAccessRepairerTests.swift in Sources */,
+				CF98F7E1409F4EC0AA417050 /* ResticCommandTests.swift in Sources */,
+				35BC803C15D7A9E52CE023D3 /* ResticIntegrationTests.swift in Sources */,
+				3121D73BF95E13F619702FE9 /* ResticRunnerTests.swift in Sources */,
+				B0A5501150894AA490522AAA /* RestorePointSelectionTests.swift in Sources */,
+				D8044B2C97B8EAEB75A3698E /* ScheduleAndParserTests.swift in Sources */,
+				097A404E4414515E28E764D6 /* SecurityScopedBookmarkStoreTests.swift in Sources */,
+				9E2C0447088C8FC630633F5F /* SettingsSurfaceContractTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8EC8CC4A00E1A816223BD0C4 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F8EABC77914D984C2C033FE8 /* main.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9E5CE1AE023BF933BCF7C458 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				66BB43D03ECF6E37BBB88024 /* main.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		BC58E4371C80411C28E74120 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = C4C1BF76E0B079D197966A16 /* DeltaAgent */;
+			targetProxy = 80D2076EB3061FE80A3A39B1 /* PBXContainerItemProxy */;
+		};
+		E83996600C429B062CB59054 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 7D412528A7F8A2AD1EEC8AD0 /* DeltaSecretBridge */;
+			targetProxy = 37FC0DBD789D9888B0A64730 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		176FF46FAB4FC6F2093C5A7C /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COMBINE_HIDPI_IMAGES = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.delta.DeltaSecretBridge;
+				PRODUCT_NAME = DeltaSecretBridge;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+			};
+			name = Debug;
+		};
+		2506E3F5DCAAEE7CBA9E646E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Packaging/Delta.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Packaging/Delta.app.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.delta.backup;
+				PRODUCT_NAME = Delta;
+				SDKROOT = macosx;
+				SKIP_INSTALL = NO;
+			};
+			name = Debug;
+		};
+		2AF6476B175D11F15D91EDCB /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Packaging/Delta.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Packaging/Delta.app.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.delta.backup;
+				PRODUCT_NAME = Delta;
+				SDKROOT = macosx;
+				SKIP_INSTALL = NO;
+			};
+			name = Release;
+		};
+		2F669BB80F144B5F5B23116F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.delta.backup.tests;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		43ADEF79E6827D20853D362D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.delta.backup.tests;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		6217E1E4A59970D3DF6AF5AA /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
+				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				STRIP_INSTALLED_PRODUCT = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		802D68DB61D84FA48CB868DF /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COMBINE_HIDPI_IMAGES = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.delta.DeltaAgent;
+				PRODUCT_NAME = DeltaAgent;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+			};
+			name = Release;
+		};
+		8180AD6BE9F551A88F55DBD0 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		A756CFF7E8511472D659C8F9 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COMBINE_HIDPI_IMAGES = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.delta.DeltaAgent;
+				PRODUCT_NAME = DeltaAgent;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+			};
+			name = Debug;
+		};
+		BD1468DC1F1D2AABD6E3045D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COMBINE_HIDPI_IMAGES = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.delta.DeltaSecretBridge;
+				PRODUCT_NAME = DeltaSecretBridge;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		0422E35B2D52492446BFAF15 /* Build configuration list for PBXNativeTarget "Delta" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				2506E3F5DCAAEE7CBA9E646E /* Debug */,
+				2AF6476B175D11F15D91EDCB /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		16C1D5A0792BF34B428898DD /* Build configuration list for PBXProject "Delta" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8180AD6BE9F551A88F55DBD0 /* Debug */,
+				6217E1E4A59970D3DF6AF5AA /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		4E3215DDD4F40A59EC8424B6 /* Build configuration list for PBXNativeTarget "DeltaSecretBridge" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				176FF46FAB4FC6F2093C5A7C /* Debug */,
+				BD1468DC1F1D2AABD6E3045D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		83E076103FC36BF4DC5F05DC /* Build configuration list for PBXNativeTarget "DeltaAgent" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A756CFF7E8511472D659C8F9 /* Debug */,
+				802D68DB61D84FA48CB868DF /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		F145E8B54408A0E77F3F6F16 /* Build configuration list for PBXNativeTarget "DeltaCoreTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				2F669BB80F144B5F5B23116F /* Debug */,
+				43ADEF79E6827D20853D362D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		34EA67168705654D1D5DD8E5 /* XCLocalSwiftPackageReference "." */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = .;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		2267A7E02D10755137F964ED /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = exactVersion;
+				version = 2.9.4;
+			};
+		};
+		DE79CC692ED5C1E1BF44F11E /* XCRemoteSwiftPackageReference "GRDB.swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/groue/GRDB.swift.git";
+			requirement = {
+				kind = exactVersion;
+				version = 7.11.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		15A7EE11B4F68F429B02D4E5 /* GRDB */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = DE79CC692ED5C1E1BF44F11E /* XCRemoteSwiftPackageReference "GRDB.swift" */;
+			productName = GRDB;
+		};
+		7BDCDF2D53DC627A5FD4D8A1 /* DeltaCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = DeltaCore;
+		};
+		875302222B948F9EFF66A576 /* DeltaCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = DeltaCore;
+		};
+		918C73C6E40AF62A197A38F2 /* DeltaCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = DeltaCore;
+		};
+		AAD90650D816CFE15D833746 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 2267A7E02D10755137F964ED /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
+		};
+		B0A7C44860E1D7AFDB407D74 /* DeltaCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = DeltaCore;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 8E818563DD40DA0B0CF5E3E0 /* Project object */;
+}

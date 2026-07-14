@@ -1,0 +1,167 @@
+name: Delta
+
+options:
+  bundleIdPrefix: com.delta
+  createIntermediateGroups: true
+  defaultConfig: Release
+  deploymentTarget:
+    macOS: "26.0"
+  transitivelyLinkDependencies: true
+
+configs:
+  Debug: debug
+  Release: release
+
+packages:
+  DeltaPackage:
+    path: .
+    group: Packages
+  GRDB:
+    url: https://github.com/groue/GRDB.swift.git
+    exactVersion: 7.11.1
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    exactVersion: 2.9.4
+
+settings:
+  base:
+    CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO
+    ENABLE_HARDENED_RUNTIME: YES
+    MACOSX_DEPLOYMENT_TARGET: "26.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    SWIFT_VERSION: "6.0"
+  configs:
+    Debug:
+      DEBUG_INFORMATION_FORMAT: dwarf
+    Release:
+      COPY_PHASE_STRIP: NO
+      DEAD_CODE_STRIPPING: YES
+      DEBUG_INFORMATION_FORMAT: dwarf-with-dsym
+      STRIP_INSTALLED_PRODUCT: YES
+      SWIFT_COMPILATION_MODE: wholemodule
+
+targets:
+  DeltaAgent:
+    type: tool
+    platform: macOS
+    sources:
+      - Sources/DeltaAgent
+    dependencies:
+      - package: DeltaPackage
+        product: DeltaCore
+    settings:
+      base:
+        PRODUCT_NAME: DeltaAgent
+        SKIP_INSTALL: YES
+
+  DeltaSecretBridge:
+    type: tool
+    platform: macOS
+    sources:
+      - Sources/DeltaSecretBridge
+    dependencies:
+      - package: DeltaPackage
+        product: DeltaCore
+    settings:
+      base:
+        PRODUCT_NAME: DeltaSecretBridge
+        SKIP_INSTALL: YES
+
+  Delta:
+    type: application
+    platform: macOS
+    sources:
+      - Sources/Delta
+      - path: Resources/PrivacyInfo.xcprivacy
+        buildPhase: resources
+      - path: Resources/AppIcon/Delta.icns
+        optional: true
+        buildPhase: resources
+      - path: Packaging/com.delta.backup.agent.plist
+        buildPhase:
+          copyFiles:
+            destination: wrapper
+            subpath: Contents/Library/LaunchAgents
+      - path: Resources/Tools/bin/restic
+        optional: true
+        attributes:
+          - CodeSignOnCopy
+        buildPhase:
+          copyFiles:
+            destination: executables
+      - path: Resources/Tools/bin/rclone
+        optional: true
+        attributes:
+          - CodeSignOnCopy
+        buildPhase:
+          copyFiles:
+            destination: executables
+    dependencies:
+      - package: DeltaPackage
+        product: DeltaCore
+      - target: DeltaAgent
+        embed: true
+        link: false
+        codeSign: true
+        copy:
+          destination: executables
+      - target: DeltaSecretBridge
+        embed: true
+        link: false
+        codeSign: true
+        copy:
+          destination: executables
+      - package: Sparkle
+        product: Sparkle
+    preBuildScripts:
+      - name: Build app icon
+        script: '"$SRCROOT/Scripts/build-icon.sh"'
+        basedOnDependencyAnalysis: false
+        showEnvVars: false
+    settings:
+      base:
+        CODE_SIGN_ENTITLEMENTS: Packaging/Delta.entitlements
+        CURRENT_PROJECT_VERSION: 1
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: Packaging/Delta.app.plist
+        LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/../Frameworks"
+        MARKETING_VERSION: 0.1.0
+        PRODUCT_BUNDLE_IDENTIFIER: com.delta.backup
+        PRODUCT_NAME: Delta
+        SKIP_INSTALL: NO
+
+  DeltaCoreTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - Tests/DeltaCoreTests
+    dependencies:
+      - package: DeltaPackage
+        product: DeltaCore
+      - package: GRDB
+        product: GRDB
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.delta.backup.tests
+
+schemes:
+  Delta:
+    build:
+      targets:
+        Delta: all
+        DeltaCoreTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      gatherCoverageData: false
+      targets:
+        - name: DeltaCoreTests
+          parallelizable: false
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release

@@ -14,7 +14,7 @@ Every push and pull request also runs `.github/workflows/ci.yml` on GitHub's mac
 
 The release gate refuses dirty git worktrees by default so the packaged app, acceptance evidence, and `dist/release-evidence/automated-gate-status` cannot be attributed to a commit that does not contain the built source. The status file records the approved app CDHash as well as the commit; doctor, release evidence, and final production verification reject stale or mismatched app bundles even when the commit matches. Set `DELTA_RELEASE_ALLOW_DIRTY=1` only for non-release local experiments.
 
-The automated gate must pass before any beta or production build is shipped. It verifies:
+The automated gate must pass before any release candidate or public build is shipped. It verifies:
 
 - Swift unit tests
 - pinned restic and rclone checksums
@@ -138,8 +138,8 @@ The doctor reports signing identity availability, automated-gate freshness, inst
 External distribution builds must be notarized after the automated gate passes:
 
 ```sh
-DELTA_CODESIGN_IDENTITY="Developer ID Application: Example" Scripts/verify-release.sh
-DELTA_NOTARY_KEYCHAIN_PROFILE="Delta Notary" Scripts/notarize-release.sh
+DELTA_CODESIGN_IDENTITY="Developer ID Application: Daniel Buskariol (BJCVJ5G7MJ)" Scripts/verify-release.sh
+DELTA_NOTARY_KEYCHAIN_PROFILE="Reccy Notary" Scripts/release.sh finalize
 ```
 
 `Scripts/notarize-release.sh` requires a Developer ID Application signature, submits the app archive with `xcrun notarytool`, waits for the result, saves the submission and notary logs under `dist/notarization`, staples the ticket, validates the stapled app with `xcrun stapler` and `spctl`, then regenerates the Sparkle archive and appcast from the stapled app.
@@ -159,7 +159,7 @@ Scripts/create-manual-acceptance-report.sh
 If `dist/local-acceptance/latest.md` exists, the generated manual report copies each row's local probe status into Evidence / Notes, appends `Manual evidence: TODO`, and leaves Result as `Not run`. Record each completed check with the recorder instead of hand-editing Markdown table syntax:
 
 ```sh
-Scripts/record-manual-acceptance-result.sh dist/manual-acceptance/latest.md settings_surface Passed "Manual evidence: opened Settings in /Applications/Delta.app 0.1 (1), confirmed General, Defaults, Updates, and Advanced grouping, plain Scheduled Backups language, status summary, Password Access repair, Sparkle controls, defaults, and diagnostics."
+Scripts/record-manual-acceptance-result.sh dist/manual-acceptance/latest.md settings_surface Passed "Manual evidence: opened Settings in /Applications/Delta.app 0.1.0 (1), confirmed General, Defaults, Updates, and Advanced grouping, plain Scheduled Backups language, status summary, Password Access repair, Sparkle controls, defaults, and diagnostics."
 Scripts/record-manual-acceptance-result.sh dist/manual-acceptance/latest.md s3_destination Blocked "Blocked pending dedicated S3-compatible acceptance bucket credentials."
 ```
 
@@ -171,7 +171,7 @@ Use `Scripts/manual-acceptance-status.sh` at any point to merge the current manu
 Scripts/manual-acceptance-status.sh
 ```
 
-The status report is informational; it never replaces the canonical report or loosens the release rule. The verifier rejects stale commit metadata, duplicate rows, stale required-evidence text, missing local-acceptance provenance, TODO/follow-up placeholders, and thin evidence such as `ok` or `done`. Verify the report before external beta distribution:
+The status report is informational; it never replaces the canonical report or loosens the release rule. The verifier rejects stale commit metadata, duplicate rows, stale required-evidence text, missing local-acceptance provenance, TODO/follow-up placeholders, and thin evidence such as `ok` or `done`. Verify the report before public distribution:
 
 ```sh
 Scripts/verify-manual-acceptance.sh
@@ -206,7 +206,7 @@ Use the local acceptance probe report as supporting evidence while filling this 
 
 ## Release Decision
 
-A build can move from local beta to external beta only when:
+A build can be published only when:
 
 - `Scripts/verify-release.sh` passes on a clean checkout.
 - The manual matrix has current passing evidence for the targeted macOS release.

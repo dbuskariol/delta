@@ -3921,7 +3921,7 @@ struct SettingsView: View {
     }
 
     private var appVersionStatusText: String {
-        appVersion == "Unknown" ? "Unknown" : "Beta \(appVersion)"
+        appVersion == "Unknown" ? "Unknown" : "Version \(appVersion)"
     }
 
     private var resticToolURL: URL {

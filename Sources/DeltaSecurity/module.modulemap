@@ -1,0 +1,4 @@
+module DeltaSecurity {
+    header "include/DeltaSecurity.h"
+    export *
+}
