@@ -1524,51 +1524,58 @@ struct ActivityView: View {
     @State private var selectedJobID: UUID?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            HStack(alignment: .top, spacing: 16) {
-                VStack(alignment: .leading, spacing: 5) {
-                    Text("Activity")
-                        .font(.system(size: 28, weight: .semibold, design: .rounded))
-                    Text("Run history, issues, and diagnostic output")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
+        GeometryReader { geometry in
+            VStack(alignment: .leading, spacing: 18) {
+                HStack(alignment: .top, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text("Activity")
+                            .font(.system(size: 28, weight: .semibold, design: .rounded))
+                        Text("Run history, issues, and diagnostic output")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 16)
+                    Picker("View", selection: $section) {
+                        ForEach(ActivitySection.allCases) { item in
+                            Text(item.title).tag(item)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.segmented)
+                    .frame(width: 210)
+                    Button {
+                        model.reload()
+                    } label: {
+                        Label("Refresh", systemImage: "arrow.clockwise")
+                    }
+                    .buttonStyle(.bordered)
                 }
-                Spacer()
-                Picker("View", selection: $section) {
-                    ForEach(ActivitySection.allCases) { item in
-                        Text(item.title).tag(item)
+
+                Group {
+                    switch section {
+                    case .jobs:
+                        activityWorkspace
+                    case .events:
+                        ActivityEventList(events: model.events)
                     }
                 }
-                .labelsHidden()
-                .pickerStyle(.segmented)
-                .frame(width: 210)
-                Button {
-                    model.reload()
-                } label: {
-                    Label("Refresh", systemImage: "arrow.clockwise")
-                }
-                .buttonStyle(.bordered)
+                .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+                .background(DeltaTheme.panel)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(DeltaTheme.border, lineWidth: 1)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 8))
             }
-
-            Group {
-                switch section {
-                case .jobs:
-                    activityWorkspace
-                case .events:
-                    ActivityEventList(events: model.events)
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(DeltaTheme.panel)
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(DeltaTheme.border, lineWidth: 1)
+            .padding(.horizontal, 24)
+            .padding(.vertical, 22)
+            .frame(
+                width: geometry.size.width,
+                height: geometry.size.height,
+                alignment: .topLeading
             )
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .clipped()
         }
-        .padding(.horizontal, 24)
-        .padding(.vertical, 22)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(DeltaTheme.background)
         .task {
             reconcileSelection()
@@ -1620,9 +1627,12 @@ struct ActivityView: View {
                     }
                     .listStyle(.plain)
                     .scrollContentBackground(.hidden)
+                    .frame(minHeight: 0, maxHeight: .infinity)
                 }
             }
             .frame(width: 300)
+            .frame(minHeight: 0, maxHeight: .infinity)
+            .clipped()
 
             Divider()
 
@@ -1633,6 +1643,8 @@ struct ActivityView: View {
                     repositoryName: repositoryName(for: selectedJob)
                 )
                 .id(selectedJob.id)
+                .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+                .clipped()
             } else {
                 ContentUnavailableView(
                     "Select a Run",
@@ -1642,6 +1654,8 @@ struct ActivityView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
+        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+        .clipped()
     }
 
     private var visibleJobs: [JobRun] {
@@ -1851,12 +1865,14 @@ private struct ActivityJobDetailView: View {
                     }
                     .listStyle(.plain)
                     .scrollContentBackground(.hidden)
+                    .frame(minHeight: 0, maxHeight: .infinity)
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
         }
         .padding(18)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: .topLeading)
+        .clipped()
         .task(id: loadIdentity) {
             await loadInitialPage()
         }
@@ -2002,6 +2018,7 @@ private struct ActivityEventList: View {
             }
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
+            .frame(minHeight: 0, maxHeight: .infinity)
         }
     }
 }
