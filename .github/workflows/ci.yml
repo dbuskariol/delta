@@ -2,8 +2,7 @@ name: CI
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request:
 
 permissions:
@@ -15,19 +14,22 @@ concurrency:
 
 jobs:
   verify:
-    name: Verify Delta
-    runs-on: macos-26
+    name: Verify Delta (${{ matrix.runner }})
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
-
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-26, macos-26-intel]
     steps:
       - name: Check out
-        uses: actions/checkout@v4
-
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
       - name: Show toolchain
         run: |
           sw_vers
           xcodebuild -version
           swift --version
-
-      - name: Run CI gate
+      - name: Run verification gate
         run: Scripts/verify-ci.sh

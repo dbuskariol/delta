@@ -104,9 +104,24 @@ fi
 /usr/bin/codesign --verify --strict --deep --verbose=2 "$ROOT_DIR/dist/Delta.app"
 "$ROOT_DIR/Scripts/verify-external-acceptance-evidence-self-test.sh" "$ROOT_DIR/dist/Delta.app"
 
-DELTA_SKIP_BUILD=1 "$ROOT_DIR/Scripts/package-update.sh"
-"$ROOT_DIR/Scripts/generate-appcast.sh"
-DELTA_ALLOW_ADHOC_UPDATE_VERIFICATION=1 \
-  "$ROOT_DIR/Scripts/verify-sparkle-update-artifacts.sh" "$ROOT_DIR/dist/Delta.app" "$ROOT_DIR/dist/updates"
+INFO="$ROOT_DIR/dist/Delta.app/Contents/Info.plist"
+[[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$INFO")" == "com.delta.backup" ]]
+[[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$INFO")" == "0.1.0" ]]
+[[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$INFO")" =~ ^[1-9][0-9]*$ ]]
+[[ "$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "$INFO")" == "26.0" ]]
+[[ "$(/usr/libexec/PlistBuddy -c 'Print :SURequireSignedFeed' "$INFO")" == "true" ]]
+[[ "$(/usr/libexec/PlistBuddy -c 'Print :SUVerifyUpdateBeforeExtraction' "$INFO")" == "true" ]]
+[[ -f "$ROOT_DIR/dist/Delta.app/Contents/Resources/PrivacyInfo.xcprivacy" ]]
+for executable in Delta DeltaAgent DeltaSecretBridge restic rclone; do
+  [[ -x "$ROOT_DIR/dist/Delta.app/Contents/MacOS/$executable" ]]
+done
+[[ -x "$ROOT_DIR/dist/Delta.app/Contents/Frameworks/Sparkle.framework/Versions/B/Sparkle" ]]
+
+# Shipping packagers reject this ad-hoc app; CI verifies that the boundary is
+# fail-closed rather than weakening release validation for convenience.
+if DELTA_SKIP_BUILD=1 "$ROOT_DIR/Scripts/package-update.sh" >/dev/null 2>&1; then
+  printf "Production packaging unexpectedly accepted an ad-hoc CI app.\n" >&2
+  exit 1
+fi
 
 printf "CI verification passed.\n"

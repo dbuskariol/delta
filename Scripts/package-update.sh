@@ -2,43 +2,36 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$ROOT_DIR/Scripts/lib/delta-release.sh"
+
 APP="$ROOT_DIR/dist/Delta.app"
 UPDATES_DIR="$ROOT_DIR/dist/updates"
+NOTES_SOURCE="${DELTA_RELEASE_NOTES_FILE:-$ROOT_DIR/Documentation/RELEASE_NOTES.md}"
 
-if [[ "${DELTA_SKIP_BUILD:-0}" == "1" ]]; then
-  if [[ ! -d "$APP" ]]; then
-    printf "DELTA_SKIP_BUILD=1 was set, but %s does not exist.\n" "$APP" >&2
-    exit 1
-  fi
-  /usr/bin/codesign --verify --strict --deep --verbose=2 "$APP"
-else
-  "$ROOT_DIR/Scripts/build-app.sh"
+if [[ "${DELTA_SKIP_BUILD:-0}" != "1" ]]; then
+  "$ROOT_DIR/Scripts/build-release.sh"
 fi
 
-SHORT_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist")"
-BUILD_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP/Contents/Info.plist")"
-ARCHIVE="$UPDATES_DIR/Delta-$SHORT_VERSION-$BUILD_VERSION.zip"
+[[ -d "$APP" ]] || delta_fail "app bundle not found: $APP"
+[[ -f "$NOTES_SOURCE" ]] || delta_fail "release notes not found: $NOTES_SOURCE"
+delta_assert_release_app "$APP" "$DELTA_EXPECTED_TEAM_ID"
+if [[ "${DELTA_ALLOW_UNNOTARIZED_PACKAGE:-0}" != "1" ]]; then
+  delta_assert_notarized_app "$APP"
+fi
 
-mkdir -p "$UPDATES_DIR"
-find "$UPDATES_DIR" -maxdepth 1 -type f \
-  \( -name "Delta-*-$BUILD_VERSION.zip" -o -name "Delta-*-$BUILD_VERSION.md" \) \
-  ! -name "Delta-$SHORT_VERSION-$BUILD_VERSION.zip" \
-  ! -name "Delta-$SHORT_VERSION-$BUILD_VERSION.md" \
-  -delete
-rm -f "$ARCHIVE" "${ARCHIVE%.zip}.md"
+SHORT_VERSION="$(delta_plist_value CFBundleShortVersionString "$APP/Contents/Info.plist")"
+BUILD_VERSION="$(delta_plist_value CFBundleVersion "$APP/Contents/Info.plist")"
+BASE_NAME="Delta-$SHORT_VERSION-$BUILD_VERSION"
+ARCHIVE="$UPDATES_DIR/$BASE_NAME.zip"
+NOTES="$UPDATES_DIR/$BASE_NAME.md"
 
-(cd "$ROOT_DIR/dist" && /usr/bin/ditto -c -k --sequesterRsrc --keepParent "Delta.app" "$ARCHIVE")
+[[ "$(/usr/bin/sed -n '1p' "$NOTES_SOURCE")" == "# Delta $SHORT_VERSION" ]] \
+  || delta_fail "release notes do not match Delta $SHORT_VERSION"
 
-cat > "${ARCHIVE%.zip}.md" <<EOF
-# Delta $SHORT_VERSION Beta
+/bin/mkdir -p "$UPDATES_DIR"
+/bin/rm -f "$ARCHIVE" "$NOTES"
+/usr/bin/ditto -c -k --sequesterRsrc --keepParent "$APP" "$ARCHIVE"
+/bin/cp "$NOTES_SOURCE" "$NOTES"
+/usr/bin/unzip -tqq "$ARCHIVE" || delta_fail 'the generated update archive is unreadable'
 
-- Encrypted backup destinations
-- Scheduled Backups for unattended runs
-- Local drives, mounted network drives, and cloud destinations
-- Full and selected-path restore
-- Saved per-job backup and restore logs
-- Power-aware scheduling and retention maintenance
-- Sparkle automatic update support
-EOF
-
-printf "Packaged %s\n" "$ARCHIVE"
+delta_note "Packaged $ARCHIVE"

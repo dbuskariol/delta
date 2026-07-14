@@ -2,120 +2,47 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-CONFIGURATION="${CONFIGURATION:-release}"
-APP_NAME="Delta"
-APP_BUNDLE="$ROOT_DIR/dist/$APP_NAME.app"
-CONTENTS="$APP_BUNDLE/Contents"
-MACOS="$CONTENTS/MacOS"
-RESOURCES="$CONTENTS/Resources"
-FRAMEWORKS="$CONTENTS/Frameworks"
-LAUNCH_AGENTS="$CONTENTS/Library/LaunchAgents"
-TOOLS_DIR="$ROOT_DIR/Resources/Tools/bin"
-SIGN_IDENTITY="${DELTA_CODESIGN_IDENTITY:-}"
-APP_ENTITLEMENTS="$ROOT_DIR/dist/Delta.app.entitlements"
-TOOL_ENTITLEMENTS="$ROOT_DIR/dist/Delta.tool.entitlements"
+source "$ROOT_DIR/Scripts/lib/delta-release.sh"
 
-if [[ -z "$SIGN_IDENTITY" ]]; then
-  SIGN_IDENTITY="$(/usr/bin/security find-identity -v -p codesigning 2>/dev/null \
-    | /usr/bin/awk -F\" '/Developer ID Application|Apple Development/ { print $2; exit }')"
+SIGNING_IDENTITY="${DELTA_CODESIGN_IDENTITY:-}"
+if [[ -z "$SIGNING_IDENTITY" ]]; then
+  "$ROOT_DIR/Scripts/build-release.sh"
+  exit 0
+fi
+if [[ "$SIGNING_IDENTITY" != "-" ]]; then
+  "$ROOT_DIR/Scripts/build-release.sh"
+  exit 0
 fi
 
-if [[ ! -x "$TOOLS_DIR/restic" || ! -x "$TOOLS_DIR/rclone" ]]; then
-  "$ROOT_DIR/Scripts/bootstrap-tools.sh"
-fi
+# Certificate-free CI uses the real Xcode target graph and an ad-hoc signature.
+# It is deliberately incapable of producing a publishable artifact.
+DERIVED_DATA="${DELTA_DERIVED_DATA:-$(delta_default_derived_data CI)}"
+OUTPUT_APP="$ROOT_DIR/dist/Delta.app"
+HOST_ARCH="$(/usr/bin/uname -m)"
+
+"$ROOT_DIR/Scripts/bootstrap-tools.sh"
 "$ROOT_DIR/Scripts/verify-tools.sh"
 "$ROOT_DIR/Scripts/build-icon.sh"
 
-/usr/bin/swift build -c "$CONFIGURATION" --product Delta
-/usr/bin/swift build -c "$CONFIGURATION" --product DeltaAgent
-/usr/bin/swift build -c "$CONFIGURATION" --product DeltaSecretBridge
-SWIFT_BUILD_DIR="$(/usr/bin/swift build -c "$CONFIGURATION" --show-bin-path)"
+/usr/bin/xcodebuild \
+  -quiet \
+  -project "$ROOT_DIR/Delta.xcodeproj" \
+  -scheme Delta \
+  -configuration Release \
+  -destination "platform=macOS,arch=$HOST_ARCH" \
+  -derivedDataPath "$DERIVED_DATA" \
+  ONLY_ACTIVE_ARCH=YES \
+  CODE_SIGN_STYLE=Manual \
+  CODE_SIGN_IDENTITY=- \
+  DEVELOPMENT_TEAM= \
+  build
 
-rm -rf "$APP_BUNDLE"
-mkdir -p "$MACOS" "$RESOURCES/Tools" "$FRAMEWORKS" "$LAUNCH_AGENTS"
+BUILT_APP="$DERIVED_DATA/Build/Products/Release/Delta.app"
+[[ -d "$BUILT_APP" ]] || delta_fail "Xcode did not produce $BUILT_APP"
+/bin/rm -rf "$OUTPUT_APP"
+/bin/mkdir -p "$(dirname "$OUTPUT_APP")"
+/usr/bin/ditto "$BUILT_APP" "$OUTPUT_APP"
+/usr/bin/codesign --verify --strict --deep --verbose=2 "$OUTPUT_APP" \
+  || delta_fail 'the ad-hoc CI app failed strict signature verification'
 
-/bin/cp "$SWIFT_BUILD_DIR/Delta" "$MACOS/Delta"
-/bin/cp "$SWIFT_BUILD_DIR/DeltaAgent" "$MACOS/DeltaAgent"
-/bin/cp "$SWIFT_BUILD_DIR/DeltaSecretBridge" "$MACOS/DeltaSecretBridge"
-/bin/cp "$TOOLS_DIR/restic" "$MACOS/restic"
-/bin/cp "$TOOLS_DIR/rclone" "$MACOS/rclone"
-/bin/cp "$ROOT_DIR/Resources/AppIcon/Delta.icns" "$RESOURCES/Delta.icns"
-/bin/cp "$ROOT_DIR/Packaging/Delta.app.plist" "$CONTENTS/Info.plist"
-/bin/cp "$ROOT_DIR/Packaging/com.delta.backup.agent.plist" "$LAUNCH_AGENTS/com.delta.backup.agent.plist"
-/bin/echo -n "APPL????" > "$CONTENTS/PkgInfo"
-
-SPARKLE_FRAMEWORK_SOURCE="$SWIFT_BUILD_DIR/Sparkle.framework"
-if [[ ! -d "$SPARKLE_FRAMEWORK_SOURCE" ]]; then
-  SPARKLE_FRAMEWORK_SOURCE="$(find "$ROOT_DIR/.build/artifacts" -path '*/Sparkle.framework' -type d | head -n 1)"
-fi
-if [[ -z "$SPARKLE_FRAMEWORK_SOURCE" || ! -d "$SPARKLE_FRAMEWORK_SOURCE" ]]; then
-  printf "Sparkle.framework was not found. Run swift build --product Delta first.\n" >&2
-  exit 1
-fi
-/usr/bin/ditto "$SPARKLE_FRAMEWORK_SOURCE" "$FRAMEWORKS/Sparkle.framework"
-
-/bin/chmod 755 "$MACOS/Delta" "$MACOS/DeltaAgent" "$MACOS/DeltaSecretBridge" "$MACOS/restic" "$MACOS/rclone"
-
-if ! /usr/bin/otool -l "$MACOS/Delta" | /usr/bin/grep -q "@executable_path/../Frameworks"; then
-  /usr/bin/install_name_tool -add_rpath "@executable_path/../Frameworks" "$MACOS/Delta"
-fi
-
-sign_sparkle_framework() {
-  local identity="$1"
-  local timestamp_flag="${2:-}"
-  local sparkle="$FRAMEWORKS/Sparkle.framework"
-  local version_dir="$sparkle/Versions/B"
-
-  if [[ -d "$version_dir/XPCServices/Installer.xpc" ]]; then
-    /usr/bin/codesign --force --options runtime ${timestamp_flag:+$timestamp_flag} --sign "$identity" "$version_dir/XPCServices/Installer.xpc"
-  fi
-  if [[ -d "$version_dir/XPCServices/Downloader.xpc" ]]; then
-    /usr/bin/codesign --force --options runtime ${timestamp_flag:+$timestamp_flag} --preserve-metadata=entitlements --sign "$identity" "$version_dir/XPCServices/Downloader.xpc"
-  fi
-  if [[ -x "$version_dir/Autoupdate" ]]; then
-    /usr/bin/codesign --force --options runtime ${timestamp_flag:+$timestamp_flag} --sign "$identity" "$version_dir/Autoupdate"
-  fi
-  if [[ -d "$version_dir/Updater.app" ]]; then
-    /usr/bin/codesign --force --options runtime ${timestamp_flag:+$timestamp_flag} --sign "$identity" "$version_dir/Updater.app"
-  fi
-  /usr/bin/codesign --force --options runtime ${timestamp_flag:+$timestamp_flag} --sign "$identity" "$sparkle"
-}
-
-write_entitlements() {
-  local path="$1"
-  {
-    printf '%s\n' '<?xml version="1.0" encoding="UTF-8"?>'
-    printf '%s\n' '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">'
-    printf '%s\n' '<plist version="1.0">'
-    printf '%s\n' '<dict>'
-    printf '%s\n' '</dict>'
-    printf '%s\n' '</plist>'
-  } > "$path"
-}
-
-if [[ -n "$SIGN_IDENTITY" ]]; then
-  timestamp_flag=""
-  if [[ "$SIGN_IDENTITY" == Developer\ ID\ Application:* ]]; then
-    timestamp_flag="--timestamp"
-  fi
-  printf "Signing with %s\n" "$SIGN_IDENTITY"
-  write_entitlements "$APP_ENTITLEMENTS"
-  write_entitlements "$TOOL_ENTITLEMENTS"
-  sign_sparkle_framework "$SIGN_IDENTITY" "$timestamp_flag"
-  /usr/bin/codesign --force --options runtime ${timestamp_flag:+$timestamp_flag} --entitlements "$TOOL_ENTITLEMENTS" --sign "$SIGN_IDENTITY" "$MACOS/restic"
-  /usr/bin/codesign --force --options runtime ${timestamp_flag:+$timestamp_flag} --entitlements "$TOOL_ENTITLEMENTS" --sign "$SIGN_IDENTITY" "$MACOS/rclone"
-  /usr/bin/codesign --force --options runtime ${timestamp_flag:+$timestamp_flag} --entitlements "$APP_ENTITLEMENTS" --sign "$SIGN_IDENTITY" "$MACOS/DeltaSecretBridge"
-  /usr/bin/codesign --force --options runtime ${timestamp_flag:+$timestamp_flag} --entitlements "$APP_ENTITLEMENTS" --sign "$SIGN_IDENTITY" "$MACOS/DeltaAgent"
-  /usr/bin/codesign --force --options runtime ${timestamp_flag:+$timestamp_flag} --entitlements "$APP_ENTITLEMENTS" --sign "$SIGN_IDENTITY" "$APP_BUNDLE"
-  /usr/bin/codesign --verify --strict --deep --verbose=2 "$APP_BUNDLE"
-else
-  printf "Signing ad-hoc. Set DELTA_CODESIGN_IDENTITY or install an Apple Development/Developer ID certificate for stable macOS privacy permissions.\n" >&2
-  sign_sparkle_framework "-"
-  /usr/bin/codesign --force --sign - "$MACOS/restic"
-  /usr/bin/codesign --force --sign - "$MACOS/rclone"
-  /usr/bin/codesign --force --sign - "$MACOS/DeltaSecretBridge"
-  /usr/bin/codesign --force --sign - "$MACOS/DeltaAgent"
-  /usr/bin/codesign --force --sign - "$APP_BUNDLE"
-fi
-
-printf "Built %s\n" "$APP_BUNDLE"
+delta_note "Built certificate-free CI app at $OUTPUT_APP"

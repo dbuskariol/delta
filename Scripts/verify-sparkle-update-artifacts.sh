@@ -44,6 +44,7 @@ BUILD_VERSION="$(plist_value CFBundleVersion "$INFO_PLIST")"
 FEED_URL="$(plist_value SUFeedURL "$INFO_PLIST")"
 PUBLIC_KEY="$(plist_value SUPublicEDKey "$INFO_PLIST")"
 VERIFY_BEFORE_EXTRACTION="$(plist_value SUVerifyUpdateBeforeExtraction "$INFO_PLIST")"
+REQUIRE_SIGNED_FEED="$(plist_value SURequireSignedFeed "$INFO_PLIST")"
 AUTOMATIC_CHECKS="$(plist_value SUEnableAutomaticChecks "$INFO_PLIST")"
 
 [[ "$BUNDLE_ID" == "com.delta.backup" ]] || fail "unexpected bundle identifier '$BUNDLE_ID'"
@@ -53,6 +54,7 @@ AUTOMATIC_CHECKS="$(plist_value SUEnableAutomaticChecks "$INFO_PLIST")"
 [[ -n "$PUBLIC_KEY" && "$PUBLIC_KEY" != *"TODO"* ]] || fail "missing Sparkle public EdDSA key"
 [[ "$PUBLIC_KEY" =~ ^[A-Za-z0-9+/=]+$ ]] || fail "Sparkle public EdDSA key is not base64"
 [[ "$VERIFY_BEFORE_EXTRACTION" == "true" ]] || fail "SUVerifyUpdateBeforeExtraction must be true"
+[[ "$REQUIRE_SIGNED_FEED" == "true" ]] || fail "SURequireSignedFeed must be true"
 [[ "$AUTOMATIC_CHECKS" == "true" ]] || fail "SUEnableAutomaticChecks must be true"
 
 ARCHIVE_NAME="Delta-$SHORT_VERSION-$BUILD_VERSION.zip"
@@ -62,11 +64,8 @@ RELEASE_NOTES="$UPDATES_DIR/$RELEASE_NOTES_NAME"
 require_file "$ARCHIVE"
 require_file "$RELEASE_NOTES"
 
-if ! /usr/bin/grep -Fq "# Delta $SHORT_VERSION Beta" "$RELEASE_NOTES"; then
+if [[ "$(/usr/bin/sed -n '1p' "$RELEASE_NOTES")" != "# Delta $SHORT_VERSION" ]]; then
   fail "release notes $RELEASE_NOTES_NAME do not describe Delta $SHORT_VERSION"
-fi
-if ! /usr/bin/grep -Fq "Sparkle automatic update support" "$RELEASE_NOTES"; then
-  fail "release notes $RELEASE_NOTES_NAME do not include automatic update support"
 fi
 
 ITEM_COUNT="$(/usr/bin/xmllint --xpath 'count(/*[local-name()="rss"]/*[local-name()="channel"]/*[local-name()="item"])' "$APPCAST" 2>/dev/null || true)"

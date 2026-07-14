@@ -17,7 +17,7 @@ Result must be exactly one of:
   Not run
 
 Examples:
-  Scripts/record-manual-acceptance-result.sh dist/manual-acceptance/latest.md settings_surface Passed "Manual evidence: opened Settings in /Applications/Delta.app 0.1 (1), confirmed grouped General/Defaults/Updates/Advanced controls, plain Scheduled Backups language, Password Access repair, update controls, defaults, and diagnostics."
+  Scripts/record-manual-acceptance-result.sh dist/manual-acceptance/latest.md settings_surface Passed "Manual evidence: opened Settings in /Applications/Delta.app 0.1.0 (1), confirmed grouped General/Defaults/Updates/Advanced controls, plain Scheduled Backups language, Password Access repair, update controls, defaults, and diagnostics."
   Scripts/record-manual-acceptance-result.sh dist/manual-acceptance/latest.md s3_destination Blocked "Blocked pending dedicated S3-compatible acceptance bucket credentials."
 EOF
 }

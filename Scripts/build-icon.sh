@@ -5,7 +5,6 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SOURCE="$ROOT_DIR/Resources/AppIcon/DeltaIcon.svg"
 ICONSET="$ROOT_DIR/.build/Delta.iconset"
 OUTPUT="$ROOT_DIR/Resources/AppIcon/Delta.icns"
-MAGICK="${MAGICK:-$(command -v magick)}"
 
 rm -rf "$ICONSET"
 mkdir -p "$ICONSET"
@@ -18,7 +17,12 @@ render_icon() {
   if [[ "$scale" -eq 2 ]]; then
     suffix="@2x"
   fi
-  "$MAGICK" -background none "$SOURCE" -resize "${pixels}x${pixels}" "$ICONSET/icon_${size}x${size}${suffix}.png"
+  /usr/bin/sips \
+    -s format png \
+    --resampleHeightWidth "$pixels" "$pixels" \
+    "$SOURCE" \
+    --out "$ICONSET/icon_${size}x${size}${suffix}.png" \
+    >/dev/null
 }
 
 render_icon 16 1
