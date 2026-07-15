@@ -21,6 +21,8 @@ fi
 
 delta_assert_clean_worktree "$ROOT_DIR"
 IFS=$'\t' read -r VERSION BUILD < <(delta_assert_release_metadata "$ROOT_DIR")
+export DELTA_EXPECTED_RELEASE_VERSION="$VERSION"
+export DELTA_EXPECTED_RELEASE_BUILD="$BUILD"
 delta_note "Preparing Delta $VERSION ($BUILD) in $MODE mode"
 
 /bin/rm -rf "$ROOT_DIR/dist"

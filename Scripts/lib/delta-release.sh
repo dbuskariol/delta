@@ -161,6 +161,8 @@ delta_assert_release_metadata() {
 delta_assert_release_app() {
   local app="$1"
   local expected_team="${2:-}"
+  local expected_version="${DELTA_EXPECTED_RELEASE_VERSION:-}"
+  local expected_build="${DELTA_EXPECTED_RELEASE_BUILD:-}"
   local info executable bundle_id minimum_system version build architectures team
 
   [[ -d "$app" ]] || delta_fail "app bundle not found: $app"
@@ -182,6 +184,12 @@ delta_assert_release_app() {
     || delta_fail "invalid app version: ${version:-missing}"
   [[ "$build" =~ ^[1-9][0-9]*$ ]] \
     || delta_fail "invalid app build: ${build:-missing}"
+  if [[ -n "$expected_version" && "$version" != "$expected_version" ]]; then
+    delta_fail "app version $version does not match release version $expected_version"
+  fi
+  if [[ -n "$expected_build" && "$build" != "$expected_build" ]]; then
+    delta_fail "app build $build does not match release build $expected_build"
+  fi
   [[ -x "$executable" ]] || delta_fail "main executable is missing: $executable"
 
   /usr/bin/codesign --verify --strict --deep --verbose=2 "$app" \

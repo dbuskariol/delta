@@ -105,6 +105,9 @@ fi
 "$ROOT_DIR/Scripts/verify-external-acceptance-evidence-self-test.sh" "$ROOT_DIR/dist/Delta.app"
 
 INFO="$ROOT_DIR/dist/Delta.app/Contents/Info.plist"
+SOURCE_INFO="$ROOT_DIR/Packaging/Delta.app.plist"
+[[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$SOURCE_INFO")" == '$(MARKETING_VERSION)' ]]
+[[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$SOURCE_INFO")" == '$(CURRENT_PROJECT_VERSION)' ]]
 [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$INFO")" == "com.delta.backup" ]]
 [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$INFO")" == "0.2.0" ]]
 [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$INFO")" =~ ^[1-9][0-9]*$ ]]

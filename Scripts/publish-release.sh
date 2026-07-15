@@ -7,6 +7,8 @@ source "$ROOT_DIR/Scripts/lib/delta-release.sh"
 delta_assert_clean_worktree "$ROOT_DIR"
 export DELTA_REQUIRE_RELEASE_TAG=1
 IFS=$'\t' read -r VERSION BUILD < <(delta_assert_release_metadata "$ROOT_DIR")
+export DELTA_EXPECTED_RELEASE_VERSION="$VERSION"
+export DELTA_EXPECTED_RELEASE_BUILD="$BUILD"
 TAG="v$VERSION"
 COMMIT="$(/usr/bin/git -C "$ROOT_DIR" rev-parse HEAD)"
 UPDATES_DIR="$ROOT_DIR/dist/updates"
