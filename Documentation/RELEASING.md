@@ -34,7 +34,7 @@ Rehearsal mode builds and validates the complete artifact graph but does not sub
 Finalization is allowed only from the clean commit pointed to by the annotated `v<version>` tag. The tagger must be `dbuskariol <32349796+dbuskariol@users.noreply.github.com>`.
 
 ```sh
-git tag -a v0.1.0 -m "Delta 0.1.0"
+git tag -a v0.2.0 -m "Delta 0.2.0"
 
 DELTA_CODESIGN_IDENTITY="Developer ID Application: Daniel Buskariol (BJCVJ5G7MJ)" \
 DELTA_DEVELOPMENT_TEAM="BJCVJ5G7MJ" \

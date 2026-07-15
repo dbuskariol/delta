@@ -1,12 +1,11 @@
-# Delta 0.1.0
+# Delta 0.2.0
 
-Delta's first public release provides a native macOS interface for encrypted restic backups:
+Delta 0.2.0 refreshes the app's native macOS Settings experience without changing backup, restore, scheduling, or storage behavior:
 
-- Encrypted, incremental backups to local, mounted, SSH, object-storage, REST, rclone, and advanced restic destinations.
-- Folder and full-volume source modes with scheduling, power policy, bandwidth limits, retention, pruning, and repository checks.
-- Restore-point browsing, selected-item and full restores, previews, overwrite policy, and optional verification.
-- Durable activity history, live progress, structured issue review, notifications, diagnostics, and menu-bar controls.
-- Keychain-backed secrets, transactional destination-password rotation, noninteractive scheduled reads, and redacted logs.
-- Signed background scheduling and EdDSA-signed Sparkle updates.
+- Rebuilds every Settings category with compact native cards, inset separators, icon-led rows, and consistently aligned controls.
+- Adds a dedicated Permissions page for Full Disk Access, notifications, scheduled-backup approval, and saved-password readiness.
+- Uses native popup menus for Settings choices and keeps descriptions readable beside switches and actions at every supported window size.
+- Pins Settings to the bottom of the sidebar and removes the redundant readiness footer.
+- Strengthens certificate-free CI with an embedded-framework launch check while keeping production signing and release behavior unchanged.
 
-Requires macOS 26 or later. Install from the notarized DMG for drag-to-Applications setup; the signed/notarized ZIP is provided for update delivery and manual installation.
+Requires macOS 26 or later. Install from the notarized DMG for drag-to-Applications setup; the signed/notarized ZIP is provided for Sparkle updates and manual installation.

@@ -59,7 +59,7 @@ Read [SECURITY.md](SECURITY.md) for the trust model, secret handling, diagnostic
 
 The optional menu-bar item reflects ready, running, paused, blocked, and attention states. It provides Back Up Now, Run Due Backups, Pause, Resume, Stop, Activity, Updates, and main-window access without requiring the app window to remain open.
 
-Delta follows standard macOS keyboard navigation and menu behavior. Version 0.1.0 does not install global hotkeys or require Accessibility permission.
+Delta follows standard macOS keyboard navigation and menu behavior. It does not install global hotkeys or require Accessibility permission.
 
 ## Architecture
 
