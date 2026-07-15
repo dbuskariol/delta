@@ -7,16 +7,21 @@ struct ContentView: View {
     var body: some View {
         NavigationSplitView {
             VStack(spacing: 0) {
-                List(DeltaAppModel.Section.allCases, selection: $model.selectedSection) { section in
-                    Label(section.rawValue, systemImage: section.symbol)
-                        .font(.system(size: 13, weight: .medium))
-                        .tag(section)
-                        .padding(.vertical, 2)
+                VStack(spacing: 3) {
+                    ForEach(primarySections) { section in
+                        sidebarButton(section)
+                    }
                 }
-                .scrollContentBackground(.hidden)
+                .padding(.horizontal, 9)
+                .padding(.top, 8)
 
-                SidebarStatusView(isWorking: model.isWorking)
-                }
+                Spacer(minLength: 12)
+
+                Divider()
+                sidebarButton(.settings)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 9)
+            }
             .navigationSplitViewColumnWidth(min: 220, ideal: 248, max: 280)
         } detail: {
             switch model.selectedSection {
@@ -59,6 +64,36 @@ struct ContentView: View {
                 }
             }
         )
+    }
+
+    private var primarySections: [DeltaAppModel.Section] {
+        DeltaAppModel.Section.allCases.filter { $0 != .settings }
+    }
+
+    private func sidebarButton(_ section: DeltaAppModel.Section) -> some View {
+        let isSelected = model.selectedSection == section
+        return Button {
+            model.selectedSection = section
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: section.symbol)
+                    .frame(width: 17)
+                Text(section.rawValue)
+                    .lineLimit(1)
+                Spacer(minLength: 4)
+            }
+            .font(.body)
+            .foregroundStyle(isSelected ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
+            .padding(.horizontal, 10)
+            .frame(maxWidth: .infinity, minHeight: 32, alignment: .leading)
+            .background(
+                isSelected ? Color.accentColor : .clear,
+                in: RoundedRectangle(cornerRadius: 7, style: .continuous)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 
@@ -6233,21 +6268,6 @@ struct EmptyStateView: View {
             }
             .frame(maxWidth: .infinity, minHeight: 170)
         }
-    }
-}
-
-struct SidebarStatusView: View {
-    var isWorking: Bool
-
-    var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: isWorking ? "arrow.triangle.2.circlepath" : "checkmark.seal")
-            Text(isWorking ? "Running" : "Ready")
-                .font(.caption)
-            Spacer()
-        }
-        .padding(12)
-        .foregroundStyle(.secondary)
     }
 }
 
