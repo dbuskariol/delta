@@ -5,7 +5,7 @@ final class SettingsSurfaceContractTests: XCTestCase {
     func testSettingsSurfaceContractCoversRequiredCategoriesAndSummary() {
         XCTAssertEqual(
             SettingsSurfaceContract.categoryTitles,
-            ["General", "Defaults", "Updates", "Advanced"]
+            ["General", "Permissions", "Defaults", "Updates", "Advanced"]
         )
         XCTAssertEqual(
             SettingsSurfaceContract.statusSummaryTitles,
@@ -15,8 +15,7 @@ final class SettingsSurfaceContractTests: XCTestCase {
 
     func testSettingsSurfaceContractCoversProductionReadinessControls() {
         XCTAssertTrue(SettingsSurfaceContract.cardTitles.contains("Scheduled Backups"))
-        XCTAssertTrue(SettingsSurfaceContract.cardTitles.contains("Password Access"))
-        XCTAssertTrue(SettingsSurfaceContract.cardTitles.contains("Full Disk Access"))
+        XCTAssertTrue(SettingsSurfaceContract.cardTitles.contains("System Access"))
         XCTAssertTrue(SettingsSurfaceContract.cardTitles.contains("Power & Reliability"))
         XCTAssertTrue(SettingsSurfaceContract.cardTitles.contains("Automatic Updates"))
         XCTAssertTrue(SettingsSurfaceContract.cardTitles.contains("Diagnostics"))
