@@ -2,12 +2,14 @@ import Foundation
 
 public enum SettingsSurfaceContract {
     public static let categoryGeneral = "General"
+    public static let categoryPermissions = "Permissions"
     public static let categoryDefaults = "Defaults"
     public static let categoryUpdates = "Updates"
     public static let categoryAdvanced = "Advanced"
 
     public static let categoryTitles = [
         categoryGeneral,
+        categoryPermissions,
         categoryDefaults,
         categoryUpdates,
         categoryAdvanced
@@ -24,17 +26,12 @@ public enum SettingsSurfaceContract {
     ]
 
     public static let sectionTitles = [
-        "Scheduled Backups",
-        "App Behavior",
-        "Backup & Restore Defaults",
-        "Updates",
-        "Support"
+        "App Behavior"
     ]
 
     public static let cardTitles = [
         "Scheduled Backups",
-        "Password Access",
-        "Full Disk Access",
+        "System Access",
         "Power & Reliability",
         "Menu Bar & Login",
         "Notifications",
@@ -86,14 +83,13 @@ public enum SettingsSurfaceContract {
         "How Scheduled Backups Work",
         "Refresh",
         "Repair Password Access",
-        "Open Privacy Settings",
+        "Review Permissions",
+        "Allow Notifications",
+        "System Settings",
         "Show Delta",
-        "Recheck",
         "Open Login Items",
         "Refresh Status",
         "Send Test Alert",
-        "Request Permission",
-        "Open Notifications",
         "Restore Recommended",
         "Open Dashboard",
         "Manage Profiles",
@@ -151,6 +147,7 @@ public enum SettingsSurfaceContract {
     public static func validationFailures() -> [String] {
         var failures: [String] = []
         require(categoryTitles, contains: categoryGeneral, in: "categories", failures: &failures)
+        require(categoryTitles, contains: categoryPermissions, in: "categories", failures: &failures)
         require(categoryTitles, contains: categoryDefaults, in: "categories", failures: &failures)
         require(categoryTitles, contains: categoryUpdates, in: "categories", failures: &failures)
         require(categoryTitles, contains: categoryAdvanced, in: "categories", failures: &failures)
@@ -162,8 +159,7 @@ public enum SettingsSurfaceContract {
         require(statusSummaryTitles, contains: "Status Menu", in: "status summary", failures: &failures)
         require(statusSummaryTitles, contains: "Backup Tools", in: "status summary", failures: &failures)
         require(cardTitles, contains: "Scheduled Backups", in: "cards", failures: &failures)
-        require(cardTitles, contains: "Password Access", in: "cards", failures: &failures)
-        require(cardTitles, contains: "Full Disk Access", in: "cards", failures: &failures)
+        require(cardTitles, contains: "System Access", in: "cards", failures: &failures)
         require(cardTitles, contains: "Power & Reliability", in: "cards", failures: &failures)
         require(cardTitles, contains: "Automatic Updates", in: "cards", failures: &failures)
         require(cardTitles, contains: "Diagnostics", in: "cards", failures: &failures)

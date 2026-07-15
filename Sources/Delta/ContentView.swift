@@ -7,16 +7,21 @@ struct ContentView: View {
     var body: some View {
         NavigationSplitView {
             VStack(spacing: 0) {
-                List(DeltaAppModel.Section.allCases, selection: $model.selectedSection) { section in
-                    Label(section.rawValue, systemImage: section.symbol)
-                        .font(.system(size: 13, weight: .medium))
-                        .tag(section)
-                        .padding(.vertical, 2)
+                VStack(spacing: 3) {
+                    ForEach(primarySections) { section in
+                        sidebarButton(section)
+                    }
                 }
-                .scrollContentBackground(.hidden)
+                .padding(.horizontal, 9)
+                .padding(.top, 8)
 
-                SidebarStatusView(isWorking: model.isWorking)
-                }
+                Spacer(minLength: 12)
+
+                Divider()
+                sidebarButton(.settings)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 9)
+            }
             .navigationSplitViewColumnWidth(min: 220, ideal: 248, max: 280)
         } detail: {
             switch model.selectedSection {
@@ -59,6 +64,36 @@ struct ContentView: View {
                 }
             }
         )
+    }
+
+    private var primarySections: [DeltaAppModel.Section] {
+        DeltaAppModel.Section.allCases.filter { $0 != .settings }
+    }
+
+    private func sidebarButton(_ section: DeltaAppModel.Section) -> some View {
+        let isSelected = model.selectedSection == section
+        return Button {
+            model.selectedSection = section
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: section.symbol)
+                    .frame(width: 17)
+                Text(section.rawValue)
+                    .lineLimit(1)
+                Spacer(minLength: 4)
+            }
+            .font(.body)
+            .foregroundStyle(isSelected ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
+            .padding(.horizontal, 10)
+            .frame(maxWidth: .infinity, minHeight: 32, alignment: .leading)
+            .background(
+                isSelected ? Color.accentColor : .clear,
+                in: RoundedRectangle(cornerRadius: 7, style: .continuous)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 
@@ -2413,7 +2448,8 @@ private extension JobOutcomePresentation {
 
 struct SettingsView: View {
     private enum SettingsCategory: CaseIterable, Hashable, Identifiable {
-        case essentials
+        case general
+        case permissions
         case defaults
         case updates
         case support
@@ -2422,8 +2458,10 @@ struct SettingsView: View {
 
         var title: String {
             switch self {
-            case .essentials:
+            case .general:
                 return SettingsSurfaceContract.categoryGeneral
+            case .permissions:
+                return SettingsSurfaceContract.categoryPermissions
             case .defaults:
                 return SettingsSurfaceContract.categoryDefaults
             case .updates:
@@ -2435,8 +2473,10 @@ struct SettingsView: View {
 
         var symbol: String {
             switch self {
-            case .essentials:
-                return "checkmark.seal"
+            case .general:
+                return "gearshape"
+            case .permissions:
+                return "lock.shield"
             case .defaults:
                 return "slider.horizontal.3"
             case .updates:
@@ -2448,21 +2488,24 @@ struct SettingsView: View {
 
         var subtitle: String {
             switch self {
-            case .essentials:
-                return "Access, schedules, alerts"
+            case .general:
+                return "Choose how Delta runs scheduled work and behaves on this Mac."
+            case .permissions:
+                return "Review the macOS access used for unattended and protected backups."
             case .defaults:
-                return "Backup and restore behavior"
+                return "Set sensible defaults for new backups and restores."
             case .updates:
-                return "Signed release checks"
+                return "Keep Delta current through signed, verified updates."
             case .support:
-                return "Diagnostics and local files"
+                return "Inspect diagnostics and local support files."
             }
         }
     }
 
+    @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var model: DeltaAppModel
     @EnvironmentObject private var softwareUpdateController: SoftwareUpdateController
-    @State private var settingsCategory: SettingsCategory = .essentials
+    @State private var settingsCategory: SettingsCategory = .general
     @State private var showsScheduledBackupsDetails = false
     @AppStorage(
         DeltaAppPreferenceKeys.updateCheckIntervalSeconds,
@@ -2613,927 +2656,820 @@ struct SettingsView: View {
     @State private var notificationAuthorizationState: DeltaNotificationAuthorizationState = .notDetermined
 
     var body: some View {
-        PageScaffold(
-            title: "Settings",
-            subtitle: "Scheduling, access, alerts, updates, and safe defaults",
-            actions: {
-                Button {
-                    model.reload()
-                    model.refreshSystemState(force: true)
-                } label: {
-                    Label("Refresh", systemImage: "arrow.clockwise")
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-            }
-        ) {
-            if let persistentStoreErrorMessage = model.persistentStoreErrorMessage {
-                SettingsCard(
-                    symbol: "externaldrive.badge.exclamationmark",
-                    title: "Local App Data",
-                    subtitle: "Delta cannot open its local database.",
-                    statusText: "Blocked",
-                    statusColor: .red
-                ) {
-                    Text(persistentStoreErrorMessage)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Button {
-                        model.reload()
-                    } label: {
-                        Label("Retry", systemImage: "arrow.clockwise")
-                    }
-                }
-            }
+        VStack(spacing: 0) {
+            settingsNavigation
+            Divider()
 
-            SettingsHealthBanner(
-                symbol: settingsOverviewSymbol,
-                title: settingsOverviewTitle,
-                detail: settingsOverviewDetail,
-                statusText: settingsOverviewStatusText,
-                statusColor: settingsOverviewStatusColor
-            )
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 20) {
+                    settingsPageHeader
 
-            settingsCategorySelector
-
-            if settingsCategory == .essentials {
-                SettingsSectionLabel(
-                    title: "Scheduled Backups",
-                    subtitle: "Automatic runs, macOS approval, and unattended backup readiness."
-                )
-
-                SettingsCard(
-                    symbol: "clock.badge.checkmark",
-                    title: "Scheduled Backups",
-                    subtitle: "Run due backup profiles after sign-in, even when the main window is closed.",
-                    statusText: model.scheduledBackupServiceError == nil ? backgroundBackupsPresentation.statusText : "Needs Repair",
-                    statusColor: backgroundBackupsStatusColor
-                ) {
-                    SettingsDescription(
-                        text: "This is Delta's automatic backup runner. macOS approves it in Login Items, then Delta checks each profile's schedule, destination, power policy, saved password access, and destination lock before starting work."
-                    )
-
-                    SettingsControlRow(
-                        title: "Allow scheduled backups",
-                        detail: backgroundBackupsPresentation.controlDetail
-                    ) {
-                        Toggle("", isOn: backgroundBackupsBinding)
-                            .labelsHidden()
-                            .toggleStyle(.switch)
-                    }
-
-                    SettingsControlRow(
-                        title: "Pause automatic runs",
-                        detail: "Temporarily stop hourly, daily, weekly, monthly, and custom due runs without editing profiles or removing macOS approval."
-                    ) {
-                        Toggle("", isOn: $pausesScheduledBackups)
-                            .labelsHidden()
-                            .toggleStyle(.switch)
-                    }
-
-                    SettingsFactGrid(items: [
-                        SettingsFact(title: "Scheduled profiles", value: "\(scheduledProfileCount)"),
-                        SettingsFact(title: "Automatic runs", value: pausesScheduledBackups ? "Paused" : "Enabled"),
-                        SettingsFact(title: "macOS approval", value: backgroundBackupsPresentation.approvalText),
-                        SettingsFact(title: "Saved passwords", value: backgroundSecretAccessSummary.displayName),
-                        SettingsFact(title: "Policy checks", value: "Before every run"),
-                        SettingsFact(title: "Runs as", value: "Your user")
-                    ])
-
-                    if let scheduledBackupServiceError = model.scheduledBackupServiceError {
-                        SettingsNotice(
-                            symbol: "exclamationmark.triangle",
-                            title: "Automatic backup service needs repair",
-                            text: scheduledBackupServiceError,
-                            color: .red
-                        )
-                    } else if backgroundBackupsPresentation.needsAttention {
-                        SettingsNotice(
-                            symbol: "person.crop.circle.badge.exclamationmark",
-                            title: backgroundBackupsPresentation.attentionTitle ?? "Scheduled backups need attention",
-                            text: backgroundBackupsPresentation.attentionText ?? "Review Scheduled Backups before relying on scheduled runs.",
-                            color: .orange
-                        )
-                    }
-
-                    if backgroundSecretAccessSummary.needsRepair {
-                        SettingsNotice(
-                            symbol: "key.horizontal",
-                            title: "Password access needs repair",
-                            text: "\(backgroundSecretAccessSummary.detail) Repair access so scheduled backups can read saved destination passwords without Keychain prompts.",
-                            color: .orange
-                        )
-                    }
-
-                    if scheduledProfileCount == 0 && !backgroundBackupsPresentation.needsAttention && !backgroundSecretAccessSummary.needsRepair {
-                        SettingsNotice(
-                            symbol: "calendar.badge.plus",
-                            title: "No scheduled profiles",
-                            text: "Create an hourly, daily, weekly, monthly, or custom scheduled backup profile before automatic scheduled backups are needed.",
-                            color: .secondary
-                        )
-                    }
-
-                    SettingsDisclosure(
-                        title: "How Scheduled Backups Work",
-                        symbol: "questionmark.circle",
-                        isExpanded: $showsScheduledBackupsDetails
-                    ) {
-                        SettingsDescription(text: BackgroundBackupServicePresentation.purposeText)
-                        SettingsCapabilityList(items: [
-                            SettingsCapability(symbol: "checkmark.seal", title: "Approved by macOS", detail: "macOS approves Delta's scheduled-backup service in Login Items before unattended runs are allowed."),
-                            SettingsCapability(symbol: "moon.zzz", title: "Runs while Delta is closed", detail: "Scheduled profiles can run after sign-in without keeping the main window open."),
-                            SettingsCapability(symbol: "person.crop.circle", title: "No admin privileges", detail: "The service runs as your user account with the same file permissions granted to Delta."),
-                            SettingsCapability(symbol: "bolt.badge.checkmark", title: "Checks policy first", detail: "Battery, Low Power Mode, speed limits, destination availability, and locking are checked before work starts.")
-                        ])
-                    }
-
-                    SettingsActionBar {
-                        Button {
-                            model.runDueBackups()
-                        } label: {
-                            Label("Run Due Now", systemImage: "play.fill")
-                        }
-                        .disabled(model.profiles.isEmpty || model.isWorking || pausesScheduledBackups || !model.isPersistentStoreAvailable)
-                        .deltaTooltip(pausesScheduledBackups ? "Automatic scheduled runs are paused. Resume them here or run a manual profile backup." : "Run every backup profile that is currently due using the same rules as automatic scheduled runs.")
-                        Button {
-                            model.openLoginItemsSettings()
-                        } label: {
-                            Label("Review Login Items", systemImage: "gearshape")
-                        }
-                        .deltaTooltip("Open macOS Login Items to approve or inspect Delta scheduled backups.")
-                        Button {
-                            model.reload()
-                            model.refreshSystemState(force: true)
-                        } label: {
-                            Label("Refresh", systemImage: "arrow.clockwise")
-                        }
-                        .deltaTooltip("Recheck scheduled backup and system access status.")
-                        Button {
-                            model.selectedSection = .activity
-                        } label: {
-                            Label("Open Activity", systemImage: "waveform.path.ecg")
-                        }
-                        .deltaTooltip("Review recent scheduled runs, live logs, and saved job output.")
-                        Button {
-                            model.repairBackgroundSecretAccess()
-                        } label: {
-                            Label("Repair Password Access", systemImage: "key")
-                        }
-                        .disabled(model.repositories.isEmpty || model.isWorking || !model.isPersistentStoreAvailable)
-                        .deltaTooltip("Refresh saved destination passwords so scheduled backups can read them without interactive Keychain prompts.")
-                    }
-                }
-
-                SettingsCard(
-                    symbol: "key.horizontal",
-                    title: "Password Access",
-                    subtitle: "Verify scheduled backups can read saved destination passwords without prompts.",
-                    statusText: backgroundSecretAccessSummary.displayName,
-                    statusColor: backgroundSecretAccessStatusColor
-                ) {
-                    SettingsDescription(
-                        text: "Scheduled backups must be able to read saved destination passwords and backend credentials without showing a Keychain prompt. Delta checks that access here so unattended work fails closed before backup data is scanned."
-                    )
-
-                    SettingsFactGrid(items: [
-                        SettingsFact(title: "Destinations", value: "\(model.repositories.count)"),
-                        SettingsFact(title: "Saved secrets", value: "\(backgroundSecretAccessSummary.checkedSecretCount)"),
-                        SettingsFact(title: "Background use", value: backgroundSecretAccessSummary.displayName)
-                    ])
-
-                    if backgroundSecretAccessSummary.needsRepair {
-                        SettingsNotice(
-                            symbol: "key.horizontal.fill",
-                            title: "Repair required",
-                            text: "\(backgroundSecretAccessSummary.detail) Run Repair Password Access before relying on scheduled backups.",
-                            color: .orange
-                        )
-                    } else if backgroundSecretAccessSummary.state == .unchecked {
-                        SettingsNotice(
-                            symbol: "questionmark.circle",
-                            title: "Access not checked yet",
-                            text: "Refresh status after saving a destination so Delta can confirm Password Access for scheduled backups.",
-                            color: .secondary
-                        )
-                    }
-
-                    SettingsActionBar {
-                        Button {
-                            model.repairBackgroundSecretAccess()
-                        } label: {
-                            Label("Repair Password Access", systemImage: "key")
-                        }
-                        .disabled(model.repositories.isEmpty || model.isWorking || !model.isPersistentStoreAvailable)
-                        .deltaTooltip("Refresh saved destination passwords so scheduled backups can read them without interactive Keychain prompts.")
-
-                        Button {
-                            model.reload()
-                        } label: {
-                            Label("Refresh Status", systemImage: "arrow.clockwise")
-                        }
-                        .deltaTooltip("Recheck whether saved passwords are ready for scheduled backups.")
-                    }
-                }
-
-                SettingsCard(
-                symbol: "lock.shield",
-                title: "Full Disk Access",
-                subtitle: "Allow Delta to read protected folders during full-volume and user-folder backups.",
-                statusText: fullDiskAccessStatusText,
-                statusColor: model.fullDiskAccessStatus.hasLikelyFullDiskAccess ? .green : .orange
-            ) {
-                SettingsDescription(
-                    text: fullDiskAccessDescription
-                )
-
-                SettingsFactGrid(items: [
-                    SettingsFact(title: "Protected folders", value: model.fullDiskAccessStatus.hasLikelyFullDiskAccess ? "Readable" : "Blocked"),
-                    SettingsFact(title: "Approval", value: "Manual in macOS"),
-                    SettingsFact(title: "Best install path", value: "/Applications")
-                ])
-
-                SettingsDescription(
-                    text: "For development builds, keep Delta installed in /Applications with the same signing identity. macOS ties privacy approval to the signed app identity, so changing that identity can require approval again."
-                )
-
-                SettingsActionBar {
-                    Button {
-                        model.openFullDiskAccessSettings()
-                    } label: {
-                        Label("Open Privacy Settings", systemImage: "arrow.up.forward.app")
-                    }
-                    .deltaTooltip("Open Full Disk Access in macOS Privacy & Security.")
-                    Button {
-                        model.revealInstalledAppInFinder()
-                    } label: {
-                        Label("Show Delta", systemImage: "folder")
-                    }
-                    .deltaTooltip("Show the installed Delta app that should be added to Full Disk Access.")
-                    Button {
-                        model.reload()
-                    } label: {
-                        Label("Recheck", systemImage: "arrow.clockwise")
-                    }
-                    .deltaTooltip("Recheck whether protected folders are readable.")
-                }
-            }
-
-                SettingsCard(
-                symbol: "powerplug",
-                title: "Power & Reliability",
-                subtitle: "Reduce the chance of long-running work being interrupted by idle sleep.",
-                statusText: preventsIdleSleepDuringJobs ? "Protected" : "Off",
-                statusColor: preventsIdleSleepDuringJobs ? .green : .secondary
-            ) {
-                SettingsControlRow(
-                    title: "Keep Mac awake during backup work",
-                    detail: "Prevent idle sleep while Delta is actively preparing, backing up, restoring, checking, or cleaning up a destination."
-                ) {
-                    Toggle("", isOn: $preventsIdleSleepDuringJobs)
-                        .labelsHidden()
-                        .toggleStyle(.switch)
-                }
-
-                SettingsFactGrid(items: [
-                    SettingsFact(title: "Applies to", value: "Active jobs"),
-                    SettingsFact(title: "Sleep type", value: "Idle sleep"),
-                    SettingsFact(title: "Scheduling", value: "Policy honored")
-                ])
-
-                SettingsDescription(
-                    text: "This does not override battery or Low Power Mode scheduling rules. It only keeps an already-started job from being paused because the Mac went idle."
-                )
-            }
-
-                SettingsSectionLabel(
-                    title: "App Behavior",
-                    subtitle: "Controls for Delta's menu bar, sign-in behavior, and macOS alerts."
-                )
-
-                SettingsCard(
-                    symbol: "menubar.rectangle",
-                    title: "Menu Bar & Login",
-                    subtitle: "Keep Delta's quick actions visible and optionally open the app at sign-in.",
-                    statusText: menuBarAndLoginStatusText,
-                    statusColor: menuBarAndLoginStatusColor
-                ) {
-                SettingsControlRow(
-                    title: "Status menu",
-                    detail: "Keep Back Up Now, Run Due Backups, Pause, Stop, last backup status, activity, and update checks available outside the main window."
-                ) {
-                    Toggle("", isOn: $showsMenuBarExtra)
-                        .labelsHidden()
-                        .toggleStyle(.switch)
-                }
-
-                SettingsControlRow(
-                    title: "Start Delta at login",
-                    detail: "Open the Delta app after you sign in so the menu bar controls and dashboard are immediately available."
-                ) {
-                    Toggle("", isOn: appLoginItemBinding)
-                        .labelsHidden()
-                        .toggleStyle(.switch)
-                }
-
-                SettingsFactGrid(items: [
-                    SettingsFact(title: "Menu bar", value: showsMenuBarExtra ? "Shown" : "Hidden"),
-                    SettingsFact(title: "Start at login", value: appLoginItemStatusText),
-                    SettingsFact(title: "Scheduled runs", value: "Separate")
-                ])
-
-                SettingsDescription(
-                    text: "Start at login opens Delta for convenience. Scheduled Backups above are what actually run due profiles when the main window is closed."
-                )
-
-                if model.appLoginItemStatus == .requiresApproval {
-                    SettingsNotice(
-                        symbol: "person.crop.circle.badge.exclamationmark",
-                        title: "Login Items approval required",
-                        text: "macOS may ask you to approve Delta before it can open automatically at sign-in.",
-                        color: .orange
-                    )
-                }
-
-                SettingsActionBar {
-                    Button {
-                        model.openLoginItemsSettings()
-                    } label: {
-                        Label("Open Login Items", systemImage: "gearshape")
-                    }
-                    .deltaTooltip("Open macOS Login Items to approve or inspect Delta startup.")
-                    Button {
-                        model.reload()
-                    } label: {
-                        Label("Refresh Status", systemImage: "arrow.clockwise")
-                    }
-                    .deltaTooltip("Recheck Delta's menu bar and login status.")
-                }
-            }
-
-                SettingsCard(
-                symbol: "bell.badge",
-                title: "Notifications",
-                subtitle: "Show macOS alerts when backup work needs attention.",
-                statusText: notificationStatusText,
-                statusColor: notificationStatusColor
-            ) {
-                SettingsControlRow(
-                    title: "Job alerts",
-                    detail: "Notify when a backup, restore, destination check, or cleanup fails or finishes with warnings."
-                ) {
-                    Toggle("", isOn: $sendsJobNotifications)
-                        .labelsHidden()
-                        .toggleStyle(.switch)
-                        .onChange(of: sendsJobNotifications) { _, enabled in
-                            if enabled {
-                                requestNotificationPermission()
-                            } else {
-                                sendsSuccessfulBackupNotifications = false
+                    if let persistentStoreErrorMessage = model.persistentStoreErrorMessage {
+                        SettingsCard(title: "Local App Data") {
+                            Text(persistentStoreErrorMessage)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Button {
+                                model.reload()
+                            } label: {
+                                Label("Retry", systemImage: "arrow.clockwise")
                             }
                         }
-                }
-
-                SettingsControlRow(
-                    title: "Success summaries",
-                    detail: "Also notify when a backup finishes successfully with its new, changed, and checked file summary."
-                ) {
-                    Toggle("", isOn: $sendsSuccessfulBackupNotifications)
-                        .labelsHidden()
-                        .toggleStyle(.switch)
-                        .disabled(!sendsJobNotifications)
-                }
-
-                SettingsFactGrid(items: [
-                    SettingsFact(title: "macOS permission", value: notificationAuthorizationState.displayName),
-                    SettingsFact(title: "Failure alerts", value: sendsJobNotifications ? "On" : "Off"),
-                    SettingsFact(title: "Success alerts", value: sendsSuccessfulBackupNotifications ? "On" : "Off"),
-                    SettingsFact(title: "Test alert", value: notificationTestAlertStatusText)
-                ])
-
-                SettingsActionBar {
-                    Button {
-                        sendTestNotification()
-                    } label: {
-                        Label("Send Test Alert", systemImage: "bell.and.waves.left.and.right")
                     }
-                    .disabled(!canSendTestNotification)
-                    .deltaTooltip(notificationTestAlertTooltip)
 
-                    Button {
-                        requestNotificationPermission()
-                    } label: {
-                        Label("Request Permission", systemImage: "bell.badge")
-                    }
-                    .disabled(notificationAuthorizationState.canDeliver)
-                    .deltaTooltip("Ask macOS for permission to show Delta backup alerts.")
+                    if settingsCategory == .general {
+                        SettingsCard(title: "Scheduled Backups") {
+                            SettingsControlRow(
+                                title: "Allow scheduled backups",
+                                detail: backgroundBackupsPresentation.controlDetail
+                            ) {
+                                Toggle("", isOn: backgroundBackupsBinding)
+                                    .labelsHidden()
+                                    .toggleStyle(.switch)
+                            }
 
-                    Button {
-                        model.openNotificationSettings()
-                    } label: {
-                        Label("Open Notifications", systemImage: "gearshape")
-                    }
-                    .deltaTooltip("Open macOS Notifications settings for Delta.")
+                            SettingsDivider()
 
-                    Button {
-                        refreshNotificationAuthorization()
-                    } label: {
-                        Label("Refresh Status", systemImage: "arrow.clockwise")
-                    }
-                    .deltaTooltip("Recheck macOS notification permission.")
-                }
-            }
-            }
+                            SettingsControlRow(
+                                title: "Pause automatic runs",
+                                detail:
+                                    "Temporarily stop hourly, daily, weekly, monthly, and custom due runs without editing profiles or removing macOS approval."
+                            ) {
+                                Toggle("", isOn: $pausesScheduledBackups)
+                                    .labelsHidden()
+                                    .toggleStyle(.switch)
+                            }
 
-            if settingsCategory == .defaults {
-                SettingsSectionLabel(
-                    title: "Backup & Restore Defaults",
-                    subtitle: "Recommended defaults for newly created profiles and restore jobs."
-                )
+                            if let scheduledBackupServiceError = model.scheduledBackupServiceError {
+                                SettingsNotice(
+                                    symbol: "exclamationmark.triangle",
+                                    title: "Automatic backup service needs repair",
+                                    text: scheduledBackupServiceError,
+                                    color: .red
+                                )
+                            } else if backgroundBackupsPresentation.needsAttention {
+                                SettingsNotice(
+                                    symbol: "person.crop.circle.badge.exclamationmark",
+                                    title: backgroundBackupsPresentation.attentionTitle ?? "Scheduled backups need attention",
+                                    text: backgroundBackupsPresentation.attentionText ?? "Review Scheduled Backups before relying on scheduled runs.",
+                                    color: .orange
+                                )
+                            }
 
-                SettingsCard(
-                    symbol: "heart.text.square",
-                    title: "Health Monitoring",
-                    subtitle: "Dashboard attention thresholds for missed backups and destination integrity checks.",
-                    statusText: healthMonitoringStatusText,
-                    statusColor: healthMonitoringStatusColor
-                ) {
-                SettingsControlRow(
-                    title: "Backup freshness",
-                    detail: "Show dashboard attention when a scheduled profile has no completed backup or its last completed backup is older than this."
-                ) {
-                    Picker("", selection: $backupFreshnessWarningHours) {
-                        ForEach(BackupFreshnessWarningThreshold.allCases) { threshold in
-                            Text(threshold.title).tag(threshold.rawValue)
-                        }
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.segmented)
-                    .frame(width: settingsControlRowControlWidth, alignment: .leading)
-                    .onChange(of: backupFreshnessWarningHours) { _, _ in
-                        normalizeHealthMonitoring()
-                    }
-                }
+                            if backgroundSecretAccessSummary.needsRepair {
+                                SettingsNotice(
+                                    symbol: "key.horizontal",
+                                    title: "Password access needs repair",
+                                    text:
+                                        "\(backgroundSecretAccessSummary.detail) Repair access so scheduled backups can read saved destination passwords without Keychain prompts.",
+                                    color: .orange
+                                )
+                            }
 
-                SettingsControlRow(
-                    title: "Destination checks",
-                    detail: "Show dashboard attention when a destination has never been checked, is unavailable locally, or its last check is older than this."
-                ) {
-                    Picker("", selection: $destinationVerificationWarningHours) {
-                        ForEach(DestinationVerificationWarningThreshold.allCases) { threshold in
-                            Text(threshold.title).tag(threshold.rawValue)
-                        }
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.segmented)
-                    .frame(width: settingsControlRowControlWidth, alignment: .leading)
-                    .onChange(of: destinationVerificationWarningHours) { _, _ in
-                        normalizeHealthMonitoring()
-                    }
-                }
+                            if scheduledProfileCount == 0 && !backgroundBackupsPresentation.needsAttention && !backgroundSecretAccessSummary.needsRepair {
+                                SettingsNotice(
+                                    symbol: "calendar.badge.plus",
+                                    title: "No scheduled profiles",
+                                    text:
+                                        "Create an hourly, daily, weekly, monthly, or custom scheduled backup profile before automatic scheduled backups are needed.",
+                                    color: .secondary
+                                )
+                            }
 
-                SettingsControlRow(
-                    title: "Destination free space",
-                    detail: "Show dashboard attention when a local or mounted destination has less available space than this. Remote cloud destinations are skipped."
-                ) {
-                    Picker("", selection: $destinationFreeSpaceWarningGiB) {
-                        ForEach(DestinationFreeSpaceWarningThreshold.allCases) { threshold in
-                            Text(threshold.title).tag(threshold.rawValue)
-                        }
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.segmented)
-                    .frame(width: settingsControlRowControlWidth, alignment: .leading)
-                    .onChange(of: destinationFreeSpaceWarningGiB) { _, _ in
-                        normalizeHealthMonitoring()
-                    }
-                }
+                            SettingsDivider()
 
-                SettingsActionBar {
-                    Button {
-                        resetHealthMonitoringDefaults()
-                    } label: {
-                        Label("Restore Recommended", systemImage: "arrow.counterclockwise")
-                    }
-                    Button {
-                        model.selectedSection = .dashboard
-                    } label: {
-                        Label("Open Dashboard", systemImage: "rectangle.grid.2x2")
-                    }
-                }
-            }
+                            SettingsDisclosure(
+                                title: "How Scheduled Backups Work",
+                                symbol: "questionmark.circle",
+                                isExpanded: $showsScheduledBackupsDetails
+                            ) {
+                                SettingsDescription(text: BackgroundBackupServicePresentation.purposeText)
+                                SettingsCapabilityList(items: [
+                                    SettingsCapability(
+                                        symbol: "checkmark.seal", title: "Approved by macOS",
+                                        detail: "macOS approves Delta's scheduled-backup service in Login Items before unattended runs are allowed."),
+                                    SettingsCapability(
+                                        symbol: "moon.zzz", title: "Runs while Delta is closed",
+                                        detail: "Scheduled profiles can run after sign-in without keeping the main window open."),
+                                    SettingsCapability(
+                                        symbol: "person.crop.circle", title: "No admin privileges",
+                                        detail: "The service runs as your user account with the same file permissions granted to Delta."),
+                                    SettingsCapability(
+                                        symbol: "bolt.badge.checkmark", title: "Checks policy first",
+                                        detail: "Battery, Low Power Mode, speed limits, destination availability, and locking are checked before work starts.")
+                                ])
+                            }
 
-                SettingsCard(
-                symbol: "slider.horizontal.3",
-                title: "New Backup Defaults",
-                subtitle: "Defaults applied when creating a profile. Existing profiles keep their own settings.",
-                statusText: backupDefaultsStatusText,
-                statusColor: backupDefaultsStatusColor
-            ) {
-                SettingsControlRow(
-                    title: "Schedule new profiles",
-                    detail: "Create new backup profiles with scheduled runs enabled by default."
-                ) {
-                    Toggle("", isOn: $defaultProfileScheduleEnabled)
-                        .labelsHidden()
-                        .toggleStyle(.switch)
-                }
+                            SettingsDivider()
 
-                SettingsControlRow(
-                    title: "Default schedule",
-                    detail: "Initial cadence for newly-created profiles. Each profile can still be changed before saving."
-                ) {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Picker("", selection: $defaultProfileScheduleKindRawValue) {
-                            ForEach(ScheduleEditorKind.allCases) { kind in
-                                Text(kind.displayName).tag(kind.rawValue)
+                            SettingsActionRow(
+                                title: "Run due backups",
+                                detail: "Start every profile that is currently due using the same rules as scheduled runs.",
+                                systemImage: "play.fill"
+                            ) {
+                                Button("Run Due Now") {
+                                    model.runDueBackups()
+                                }
+                                .disabled(model.profiles.isEmpty || model.isWorking || pausesScheduledBackups || !model.isPersistentStoreAvailable)
+                                .deltaTooltip(
+                                    pausesScheduledBackups
+                                        ? "Automatic scheduled runs are paused. Resume them here or run a manual profile backup."
+                                        : "Run every backup profile that is currently due using the same rules as automatic scheduled runs.")
+                            }
+
+                            SettingsDivider()
+
+                            SettingsActionRow(
+                                title: "Scheduled backup access",
+                                detail: "Review Login Items approval and saved-password access for unattended runs.",
+                                systemImage: "lock.shield"
+                            ) {
+                                Button("Review Permissions") {
+                                    settingsCategory = .permissions
+                                }
+                                .deltaTooltip("Review every macOS permission and unattended-access check in one place.")
                             }
                         }
-                        .labelsHidden()
-                        .pickerStyle(.segmented)
-                        .frame(width: settingsControlRowControlWidth, alignment: .leading)
-                        .onChange(of: defaultProfileScheduleKindRawValue) { _, _ in
-                            normalizeBackupDefaults()
+
+                        SettingsCard(title: "Power & Reliability") {
+                            SettingsControlRow(
+                                title: "Keep Mac awake during backup work",
+                                detail: "Prevent idle sleep while Delta is actively preparing, backing up, restoring, checking, or cleaning up a destination."
+                            ) {
+                                Toggle("", isOn: $preventsIdleSleepDuringJobs)
+                                    .labelsHidden()
+                                    .toggleStyle(.switch)
+                            }
                         }
 
-                        defaultScheduleControls
-                    }
-                    .disabled(!defaultProfileScheduleEnabled)
-                }
+                        SettingsCard(title: "Menu Bar & Login") {
+                            SettingsControlRow(
+                                title: "Status menu",
+                                detail:
+                                    "Keep Back Up Now, Run Due Backups, Pause, Stop, last backup status, activity, and update checks available outside the main window."
+                            ) {
+                                Toggle("", isOn: $showsMenuBarExtra)
+                                    .labelsHidden()
+                                    .toggleStyle(.switch)
+                            }
 
-                SettingsControlRow(
-                    title: "Catch up missed runs",
-                    detail: "Run one backup after a scheduled time was missed because the Mac was asleep, offline, or the destination was unavailable."
-                ) {
-                    Toggle("", isOn: $defaultProfileCatchUpMissedRuns)
-                        .labelsHidden()
-                        .toggleStyle(.switch)
-                }
+                            SettingsDivider()
 
-                SettingsControlRow(
-                    title: "Run on battery",
-                    detail: "Allow scheduled backups when the Mac is not connected to power."
-                ) {
-                    Toggle("", isOn: $defaultProfileRunOnBattery)
-                        .labelsHidden()
-                        .toggleStyle(.switch)
-                }
+                            SettingsControlRow(
+                                title: "Start Delta at login",
+                                detail: "Open the Delta app after you sign in so the menu bar controls and dashboard are immediately available."
+                            ) {
+                                Toggle("", isOn: appLoginItemBinding)
+                                    .labelsHidden()
+                                    .toggleStyle(.switch)
+                            }
 
-                SettingsControlRow(
-                    title: "Run in Low Power Mode",
-                    detail: "Allow scheduled backups even when macOS is conserving power."
-                ) {
-                    Toggle("", isOn: $defaultProfileRunInLowPowerMode)
-                        .labelsHidden()
-                        .toggleStyle(.switch)
-                }
-            }
+                            if model.appLoginItemStatus == .requiresApproval {
+                                SettingsNotice(
+                                    symbol: "person.crop.circle.badge.exclamationmark",
+                                    title: "Login Items approval required",
+                                    text: "macOS may ask you to approve Delta before it can open automatically at sign-in.",
+                                    color: .orange
+                                )
+                            }
 
-                SettingsCard(
-                    symbol: "clock.arrow.circlepath",
-                    title: "Retention & Cleanup Defaults",
-                    subtitle: "Storage, verification, and history defaults for newly-created profiles."
-                ) {
+                            SettingsDivider()
 
-                SettingsControlRow(
-                    title: "Free space after cleanup",
-                    detail: "After old restore points are forgotten, remove unreferenced backup data from the destination."
-                ) {
-                    Toggle("", isOn: $defaultProfilePruneAfterForget)
-                        .labelsHidden()
-                        .toggleStyle(.switch)
-                }
+                            SettingsActionRow(
+                                title: "Login Items",
+                                detail: "Review Delta's sign-in approval in macOS System Settings.",
+                                systemImage: "gearshape"
+                            ) {
+                                HStack(spacing: 8) {
+                                    Button("System Settings") {
+                                        model.openLoginItemsSettings()
+                                    }
+                                    .deltaTooltip("Open macOS Login Items to approve or inspect Delta startup.")
+                                    Button("Refresh") {
+                                        model.reload()
+                                    }
+                                    .deltaTooltip("Recheck Delta's menu bar and login status.")
+                                }
+                            }
+                        }
 
-                SettingsControlRow(
-                    title: "Verify after cleanup",
-                    detail: "Run a destination check after cleanup to confirm backup data is still readable."
-                ) {
-                    Toggle("", isOn: $defaultProfileCheckAfterPrune)
-                        .labelsHidden()
-                        .toggleStyle(.switch)
-                }
+                        SettingsCard(title: "Notifications") {
+                            SettingsControlRow(
+                                title: "Job alerts",
+                                detail: "Notify when a backup, restore, destination check, or cleanup fails or finishes with warnings."
+                            ) {
+                                Toggle("", isOn: $sendsJobNotifications)
+                                    .labelsHidden()
+                                    .toggleStyle(.switch)
+                                    .onChange(of: sendsJobNotifications) { _, enabled in
+                                        if enabled {
+                                            requestNotificationPermission()
+                                        } else {
+                                            sendsSuccessfulBackupNotifications = false
+                                        }
+                                    }
+                            }
 
-                SettingsControlRow(
-                    title: "Default speed limits",
-                    detail: "Optional upload and download caps for new profiles. Leave blank for unlimited."
-                ) {
-                    HStack(spacing: 8) {
-                        TextField("Upload KiB/s", text: defaultUploadLimitBinding)
-                            .textFieldStyle(.roundedBorder)
-                            .frame(maxWidth: .infinity)
-                        TextField("Download KiB/s", text: defaultDownloadLimitBinding)
-                            .textFieldStyle(.roundedBorder)
-                            .frame(maxWidth: .infinity)
-                    }
-                    .frame(width: settingsControlRowControlWidth, alignment: .leading)
-                }
+                            SettingsDivider()
 
-                SettingsControlRow(
-                    title: "Default retention",
-                    detail: "How many restore points new profiles keep before scheduled cleanup removes older ones."
-                ) {
-                    LazyVGrid(columns: settingsCounterColumns, alignment: .leading, spacing: 10) {
-                        Stepper("Hourly \(defaultProfileKeepHourly)", value: $defaultProfileKeepHourly, in: 0...168)
-                        Stepper("Daily \(defaultProfileKeepDaily)", value: $defaultProfileKeepDaily, in: 0...365)
-                        Stepper("Weekly \(defaultProfileKeepWeekly)", value: $defaultProfileKeepWeekly, in: 0...260)
-                        Stepper("Monthly \(defaultProfileKeepMonthly)", value: $defaultProfileKeepMonthly, in: 0...120)
-                        Stepper("Yearly \(defaultProfileKeepYearly)", value: $defaultProfileKeepYearly, in: 0...50)
-                    }
-                    .frame(width: settingsControlRowControlWidth, alignment: .leading)
-                }
+                            SettingsControlRow(
+                                title: "Success summaries",
+                                detail: "Also notify when a backup finishes successfully with its new, changed, and checked file summary."
+                            ) {
+                                Toggle("", isOn: $sendsSuccessfulBackupNotifications)
+                                    .labelsHidden()
+                                    .toggleStyle(.switch)
+                                    .disabled(!sendsJobNotifications)
+                            }
 
-                SettingsControlRow(
-                    title: "Automatic cleanup",
-                    detail: "Create new profiles with scheduled cleanup for old restore points."
-                ) {
-                    Toggle("", isOn: $defaultProfileMaintenanceEnabled)
-                        .labelsHidden()
-                        .toggleStyle(.switch)
-                }
+                            SettingsDivider()
 
-                SettingsControlRow(
-                    title: "Cleanup cadence",
-                    detail: "How often new profiles should free unneeded data and run post-cleanup checks."
-                ) {
-                    LazyVGrid(columns: settingsCounterColumns, alignment: .leading, spacing: 10) {
-                        Stepper("Every \(defaultProfileMaintenanceIntervalDays)d", value: $defaultProfileMaintenanceIntervalDays, in: 1...90)
-                        Stepper("Hour \(defaultProfileMaintenanceHour)", value: $defaultProfileMaintenanceHour, in: 0...23)
-                        Stepper("Minute \(defaultProfileMaintenanceMinute)", value: $defaultProfileMaintenanceMinute, in: 0...59)
-                    }
-                    .frame(width: settingsControlRowControlWidth, alignment: .leading)
-                    .disabled(!defaultProfileMaintenanceEnabled)
-                }
+                            SettingsActionRow(
+                                title: "Notification access",
+                                detail: "macOS permission: \(notificationAuthorizationState.displayName).",
+                                systemImage: "bell.and.waves.left.and.right"
+                            ) {
+                                HStack(spacing: 8) {
+                                    Button("Send Test") {
+                                        sendTestNotification()
+                                    }
+                                    .disabled(!canSendTestNotification)
+                                    .deltaTooltip(notificationTestAlertTooltip)
 
-                SettingsActionBar {
-                    Button {
-                        resetBackupDefaults()
-                    } label: {
-                        Label("Restore Recommended", systemImage: "arrow.counterclockwise")
-                    }
-                    Button {
-                        model.selectedSection = .backups
-                    } label: {
-                        Label("Manage Profiles", systemImage: "externaldrive.badge.plus")
-                    }
-                    Button {
-                        model.selectedSection = .destinations
-                    } label: {
-                        Label("Manage Destinations", systemImage: "externaldrive.connected.to.line.below")
-                    }
-                }
-            }
-
-                SettingsCard(
-                symbol: "arrow.uturn.backward.circle",
-                title: "Restore Defaults",
-                subtitle: "Safety defaults used when the Restore page opens.",
-                statusText: restoreDefaultsStatusText,
-                statusColor: restoreDefaultsStatusColor
-            ) {
-                SettingsControlRow(
-                    title: "Preview first",
-                    detail: "Open restores as a preview so Delta shows what would happen before writing files."
-                ) {
-                    Toggle("", isOn: $previewsRestoresByDefault)
-                        .labelsHidden()
-                        .toggleStyle(.switch)
-                }
-
-                SettingsControlRow(
-                    title: "Verify files",
-                    detail: "Ask the backup engine to verify restored file content after writes complete."
-                ) {
-                    Toggle("", isOn: $verifiesRestoresByDefault)
-                        .labelsHidden()
-                        .toggleStyle(.switch)
-                }
-
-                SettingsControlRow(
-                    title: "Existing files",
-                    detail: "Default overwrite policy for files that already exist at the restore destination."
-                ) {
-                    Picker("", selection: $defaultRestoreConflictPolicyRawValue) {
-                        ForEach(RestoreConflictPolicy.allCases, id: \.self) { policy in
-                            Text(policy.displayName).tag(policy.rawValue)
+                                    Button("Review Permissions") {
+                                        settingsCategory = .permissions
+                                    }
+                                    .deltaTooltip("Review notification access alongside Delta's other macOS permissions.")
+                                }
+                            }
                         }
                     }
-                    .labelsHidden()
-                    .frame(width: settingsControlRowControlWidth, alignment: .leading)
-                    .onChange(of: defaultRestoreConflictPolicyRawValue) { _, _ in
-                        normalizeRestorePreferences()
-                    }
-                }
 
-                SettingsDescription(
-                    text: "These defaults keep restores conservative without hiding control. Each restore can still be changed before previewing or running it."
-                )
+                    if settingsCategory == .permissions {
+                        SettingsCard(title: "System Access") {
+                            SettingsPermissionRow(
+                                title: "Full Disk Access",
+                                detail: fullDiskAccessDescription,
+                                systemImage: "externaldrive.badge.person.crop",
+                                status: fullDiskAccessPermissionPresentation
+                            ) {
+                                fullDiskAccessPermissionActions
+                            }
 
-                SettingsActionBar {
-                    Button {
-                        resetRestoreDefaults()
-                    } label: {
-                        Label("Restore Recommended", systemImage: "arrow.counterclockwise")
-                    }
-                }
-            }
-            }
+                            SettingsDivider()
 
-            if settingsCategory == .updates {
-                SettingsSectionLabel(
-                    title: "Updates",
-                    subtitle: "Signed update checks and install behavior."
-                )
+                            SettingsPermissionRow(
+                                title: "Notifications",
+                                detail:
+                                    "Only required when job alerts are enabled. Delta uses notifications for backup results and warnings, never advertising.",
+                                systemImage: "bell.badge",
+                                status: notificationPermissionPresentation
+                            ) {
+                                notificationPermissionActions
+                            }
 
-                SettingsCard(
-                    symbol: "arrow.down.circle",
-                    title: "Automatic Updates",
-                    subtitle: "Check for signed Delta releases using Sparkle.",
-                    statusText: automaticUpdatesStatusText,
-                    statusColor: automaticUpdatesStatusColor
-                ) {
-                SettingsControlRow(
-                    title: "Automatic checks",
-                    detail: "Delta verifies signed update packages before installing them."
-                ) {
-                    Toggle("", isOn: $automaticallyChecksForUpdates)
-                        .labelsHidden()
-                        .toggleStyle(.switch)
-                        .onChange(of: automaticallyChecksForUpdates) { _, _ in
-                            applyUpdatePreferences()
+                            SettingsDivider()
+
+                            SettingsPermissionRow(
+                                title: "Scheduled Backups",
+                                detail: "macOS approves Delta in Login Items before scheduled profiles can run while the main window is closed.",
+                                systemImage: "clock.badge.checkmark",
+                                status: scheduledBackupsPermissionPresentation
+                            ) {
+                                scheduledBackupsPermissionActions
+                            }
+
+                            SettingsDivider()
+
+                            SettingsPermissionRow(
+                                title: "Saved Passwords",
+                                detail: backgroundSecretAccessSummary.detail,
+                                systemImage: "key.horizontal",
+                                status: passwordAccessPermissionPresentation
+                            ) {
+                                passwordAccessPermissionActions
+                            }
                         }
-                }
 
-                SettingsControlRow(
-                    title: "Check interval",
-                    detail: "How often Delta asks Sparkle to check for a newer build."
-                ) {
-                    Picker("", selection: $updateCheckIntervalSeconds) {
-                        ForEach(AppUpdateCheckInterval.allCases) { interval in
-                            Text(interval.title).tag(interval.rawValue)
+                        SettingsPermissionNote(
+                            title: "Access stays under your control",
+                            detail:
+                                "Delta requests only the access needed by features you enable. Full Disk Access is granted in macOS System Settings, notifications can be allowed on demand, and saved passwords remain in your Keychain.",
+                            systemImage: "hand.raised"
+                        )
+                    }
+
+                    if settingsCategory == .defaults {
+                        SettingsCard(title: "Health Monitoring") {
+                            SettingsControlRow(
+                                title: "Backup freshness",
+                                detail:
+                                    "Show dashboard attention when a scheduled profile has no completed backup or its last completed backup is older than this."
+                            ) {
+                                Picker("", selection: $backupFreshnessWarningHours) {
+                                    ForEach(BackupFreshnessWarningThreshold.allCases) { threshold in
+                                        Text(threshold.title).tag(threshold.rawValue)
+                                    }
+                                }
+                                .labelsHidden()
+                                .pickerStyle(.menu)
+                                .frame(width: 120)
+                                .onChange(of: backupFreshnessWarningHours) { _, _ in
+                                    normalizeHealthMonitoring()
+                                }
+                            }
+
+                            SettingsDivider()
+
+                            SettingsControlRow(
+                                title: "Destination checks",
+                                detail:
+                                    "Show dashboard attention when a destination has never been checked, is unavailable locally, or its last check is older than this."
+                            ) {
+                                Picker("", selection: $destinationVerificationWarningHours) {
+                                    ForEach(DestinationVerificationWarningThreshold.allCases) { threshold in
+                                        Text(threshold.title).tag(threshold.rawValue)
+                                    }
+                                }
+                                .labelsHidden()
+                                .pickerStyle(.menu)
+                                .frame(width: 120)
+                                .onChange(of: destinationVerificationWarningHours) { _, _ in
+                                    normalizeHealthMonitoring()
+                                }
+                            }
+
+                            SettingsDivider()
+
+                            SettingsControlRow(
+                                title: "Destination free space",
+                                detail:
+                                    "Show dashboard attention when a local or mounted destination has less available space than this. Remote cloud destinations are skipped."
+                            ) {
+                                Picker("", selection: $destinationFreeSpaceWarningGiB) {
+                                    ForEach(DestinationFreeSpaceWarningThreshold.allCases) { threshold in
+                                        Text(threshold.title).tag(threshold.rawValue)
+                                    }
+                                }
+                                .labelsHidden()
+                                .pickerStyle(.menu)
+                                .frame(width: 120)
+                                .onChange(of: destinationFreeSpaceWarningGiB) { _, _ in
+                                    normalizeHealthMonitoring()
+                                }
+                            }
+
+                            SettingsDivider()
+
+                            SettingsActionRow(
+                                title: "Monitoring defaults",
+                                detail: "Restore Delta's recommended thresholds or review current backup health.",
+                                systemImage: "arrow.counterclockwise"
+                            ) {
+                                HStack(spacing: 8) {
+                                    Button("Restore") {
+                                        resetHealthMonitoringDefaults()
+                                    }
+                                    Button("Open Dashboard") {
+                                        model.selectedSection = .dashboard
+                                    }
+                                }
+                            }
+                        }
+
+                        SettingsCard(title: "New Backup Defaults") {
+                            SettingsControlRow(
+                                title: "Schedule new profiles",
+                                detail: "Create new backup profiles with scheduled runs enabled by default."
+                            ) {
+                                Toggle("", isOn: $defaultProfileScheduleEnabled)
+                                    .labelsHidden()
+                                    .toggleStyle(.switch)
+                            }
+
+                            SettingsDivider()
+
+                            SettingsControlRow(
+                                title: "Default schedule",
+                                detail: "Initial cadence for newly-created profiles. Each profile can still be changed before saving."
+                            ) {
+                                VStack(alignment: .trailing, spacing: 10) {
+                                    Picker("", selection: $defaultProfileScheduleKindRawValue) {
+                                        ForEach(ScheduleEditorKind.allCases) { kind in
+                                            Text(kind.displayName).tag(kind.rawValue)
+                                        }
+                                    }
+                                    .labelsHidden()
+                                    .pickerStyle(.menu)
+                                    .frame(width: 120)
+                                    .onChange(of: defaultProfileScheduleKindRawValue) { _, _ in
+                                        normalizeBackupDefaults()
+                                    }
+
+                                    defaultScheduleControls
+                                }
+                                .disabled(!defaultProfileScheduleEnabled)
+                            }
+
+                            SettingsDivider()
+
+                            SettingsControlRow(
+                                title: "Catch up missed runs",
+                                detail:
+                                    "Run one backup after a scheduled time was missed because the Mac was asleep, offline, or the destination was unavailable."
+                            ) {
+                                Toggle("", isOn: $defaultProfileCatchUpMissedRuns)
+                                    .labelsHidden()
+                                    .toggleStyle(.switch)
+                            }
+
+                            SettingsDivider()
+
+                            SettingsControlRow(
+                                title: "Run on battery",
+                                detail: "Allow scheduled backups when the Mac is not connected to power."
+                            ) {
+                                Toggle("", isOn: $defaultProfileRunOnBattery)
+                                    .labelsHidden()
+                                    .toggleStyle(.switch)
+                            }
+
+                            SettingsDivider()
+
+                            SettingsControlRow(
+                                title: "Run in Low Power Mode",
+                                detail: "Allow scheduled backups even when macOS is conserving power."
+                            ) {
+                                Toggle("", isOn: $defaultProfileRunInLowPowerMode)
+                                    .labelsHidden()
+                                    .toggleStyle(.switch)
+                            }
+                        }
+
+                        SettingsCard(title: "Retention & Cleanup Defaults") {
+
+                            SettingsControlRow(
+                                title: "Free space after cleanup",
+                                detail: "After old restore points are forgotten, remove unreferenced backup data from the destination."
+                            ) {
+                                Toggle("", isOn: $defaultProfilePruneAfterForget)
+                                    .labelsHidden()
+                                    .toggleStyle(.switch)
+                            }
+
+                            SettingsDivider()
+
+                            SettingsControlRow(
+                                title: "Verify after cleanup",
+                                detail: "Run a destination check after cleanup to confirm backup data is still readable."
+                            ) {
+                                Toggle("", isOn: $defaultProfileCheckAfterPrune)
+                                    .labelsHidden()
+                                    .toggleStyle(.switch)
+                            }
+
+                            SettingsDivider()
+
+                            SettingsControlRow(
+                                title: "Default speed limits",
+                                detail: "Optional upload and download caps for new profiles. Leave blank for unlimited."
+                            ) {
+                                HStack(spacing: 8) {
+                                    TextField("Upload KiB/s", text: defaultUploadLimitBinding)
+                                        .textFieldStyle(.roundedBorder)
+                                        .frame(maxWidth: .infinity)
+                                    TextField("Download KiB/s", text: defaultDownloadLimitBinding)
+                                        .textFieldStyle(.roundedBorder)
+                                        .frame(maxWidth: .infinity)
+                                }
+                                .frame(width: settingsControlRowControlWidth, alignment: .trailing)
+                            }
+
+                            SettingsDivider()
+
+                            SettingsControlRow(
+                                title: "Default retention",
+                                detail: "How many restore points new profiles keep before scheduled cleanup removes older ones."
+                            ) {
+                                LazyVGrid(columns: settingsCounterColumns, alignment: .leading, spacing: 10) {
+                                    Stepper("Hourly \(defaultProfileKeepHourly)", value: $defaultProfileKeepHourly, in: 0...168)
+                                    Stepper("Daily \(defaultProfileKeepDaily)", value: $defaultProfileKeepDaily, in: 0...365)
+                                    Stepper("Weekly \(defaultProfileKeepWeekly)", value: $defaultProfileKeepWeekly, in: 0...260)
+                                    Stepper("Monthly \(defaultProfileKeepMonthly)", value: $defaultProfileKeepMonthly, in: 0...120)
+                                    Stepper("Yearly \(defaultProfileKeepYearly)", value: $defaultProfileKeepYearly, in: 0...50)
+                                }
+                                .frame(width: settingsControlRowControlWidth, alignment: .trailing)
+                            }
+
+                            SettingsDivider()
+
+                            SettingsControlRow(
+                                title: "Automatic cleanup",
+                                detail: "Create new profiles with scheduled cleanup for old restore points."
+                            ) {
+                                Toggle("", isOn: $defaultProfileMaintenanceEnabled)
+                                    .labelsHidden()
+                                    .toggleStyle(.switch)
+                            }
+
+                            SettingsDivider()
+
+                            SettingsControlRow(
+                                title: "Cleanup cadence",
+                                detail: "How often new profiles should free unneeded data and run post-cleanup checks."
+                            ) {
+                                LazyVGrid(columns: settingsCounterColumns, alignment: .leading, spacing: 10) {
+                                    Stepper("Every \(defaultProfileMaintenanceIntervalDays)d", value: $defaultProfileMaintenanceIntervalDays, in: 1...90)
+                                    Stepper("Hour \(defaultProfileMaintenanceHour)", value: $defaultProfileMaintenanceHour, in: 0...23)
+                                    Stepper("Minute \(defaultProfileMaintenanceMinute)", value: $defaultProfileMaintenanceMinute, in: 0...59)
+                                }
+                                .frame(width: settingsControlRowControlWidth, alignment: .trailing)
+                                .disabled(!defaultProfileMaintenanceEnabled)
+                            }
+
+                            SettingsDivider()
+
+                            SettingsActionRow(
+                                title: "Backup defaults",
+                                detail: "Restore recommended values or manage the profiles and destinations that use them.",
+                                systemImage: "arrow.counterclockwise"
+                            ) {
+                                HStack(spacing: 8) {
+                                    Button("Restore") {
+                                        resetBackupDefaults()
+                                    }
+                                    Button("Profiles") {
+                                        model.selectedSection = .backups
+                                    }
+                                    Button("Destinations") {
+                                        model.selectedSection = .destinations
+                                    }
+                                }
+                            }
+                        }
+
+                        SettingsCard(title: "Restore Defaults") {
+                            SettingsControlRow(
+                                title: "Preview first",
+                                detail: "Open restores as a preview so Delta shows what would happen before writing files."
+                            ) {
+                                Toggle("", isOn: $previewsRestoresByDefault)
+                                    .labelsHidden()
+                                    .toggleStyle(.switch)
+                            }
+
+                            SettingsDivider()
+
+                            SettingsControlRow(
+                                title: "Verify files",
+                                detail: "Ask the backup engine to verify restored file content after writes complete."
+                            ) {
+                                Toggle("", isOn: $verifiesRestoresByDefault)
+                                    .labelsHidden()
+                                    .toggleStyle(.switch)
+                            }
+
+                            SettingsDivider()
+
+                            SettingsControlRow(
+                                title: "Existing files",
+                                detail: "Default overwrite policy for files that already exist at the restore destination."
+                            ) {
+                                Picker("", selection: $defaultRestoreConflictPolicyRawValue) {
+                                    ForEach(RestoreConflictPolicy.allCases, id: \.self) { policy in
+                                        Text(policy.displayName).tag(policy.rawValue)
+                                    }
+                                }
+                                .labelsHidden()
+                                .pickerStyle(.menu)
+                                .frame(width: 180)
+                                .onChange(of: defaultRestoreConflictPolicyRawValue) { _, _ in
+                                    normalizeRestorePreferences()
+                                }
+                            }
+
+                            SettingsDivider()
+
+                            SettingsActionRow(
+                                title: "Restore defaults",
+                                detail: "Restore Delta's conservative recommended values.",
+                                systemImage: "arrow.counterclockwise"
+                            ) {
+                                Button("Restore") {
+                                    resetRestoreDefaults()
+                                }
+                            }
                         }
                     }
-                    .labelsHidden()
-                    .pickerStyle(.segmented)
-                    .frame(width: settingsControlRowControlWidth, alignment: .leading)
-                    .disabled(!automaticallyChecksForUpdates)
-                    .onChange(of: updateCheckIntervalSeconds) { _, _ in
-                        applyUpdatePreferences()
-                    }
-                }
 
-                SettingsControlRow(
-                    title: "Download in background",
-                    detail: "Let Sparkle download signed updates after it finds them, then prompt before replacing Delta."
-                ) {
-                    Toggle("", isOn: $automaticallyDownloadsUpdates)
-                        .labelsHidden()
-                        .toggleStyle(.switch)
-                        .disabled(!automaticallyChecksForUpdates || !softwareUpdateController.allowsAutomaticUpdates)
-                        .onChange(of: automaticallyDownloadsUpdates) { _, _ in
-                            applyUpdatePreferences()
+                    if settingsCategory == .updates {
+                        SettingsCard(title: "Automatic Updates") {
+                            SettingsControlRow(
+                                title: "Automatically check for updates",
+                                detail: "Securely check the signed Delta release feed in the background."
+                            ) {
+                                Toggle("", isOn: $automaticallyChecksForUpdates)
+                                    .labelsHidden()
+                                    .toggleStyle(.switch)
+                                    .onChange(of: automaticallyChecksForUpdates) { _, _ in
+                                        applyUpdatePreferences()
+                                    }
+                            }
+
+                            if automaticallyChecksForUpdates {
+                                SettingsDivider()
+
+                                SettingsValueRow(
+                                    title: "Check frequency",
+                                    detail: "How often Delta checks the signed update feed.",
+                                    systemImage: "calendar.badge.clock"
+                                ) {
+                                    Picker("Frequency", selection: $updateCheckIntervalSeconds) {
+                                        ForEach(AppUpdateCheckInterval.allCases) { interval in
+                                            Text(interval.title).tag(interval.rawValue)
+                                        }
+                                    }
+                                    .labelsHidden()
+                                    .pickerStyle(.menu)
+                                    .frame(width: 110)
+                                    .onChange(of: updateCheckIntervalSeconds) { _, _ in
+                                        applyUpdatePreferences()
+                                    }
+                                }
+
+                                if softwareUpdateController.allowsAutomaticUpdates {
+                                    SettingsDivider()
+
+                                    SettingsControlRow(
+                                        title: "Download updates automatically",
+                                        detail: "Prepare verified updates so they are ready when you quit Delta."
+                                    ) {
+                                        Toggle("", isOn: $automaticallyDownloadsUpdates)
+                                            .labelsHidden()
+                                            .toggleStyle(.switch)
+                                            .onChange(of: automaticallyDownloadsUpdates) { _, _ in
+                                                applyUpdatePreferences()
+                                            }
+                                    }
+                                }
+                            }
                         }
-                }
 
-                SettingsActionBar {
-                    Button {
-                        softwareUpdateController.checkForUpdates()
-                    } label: {
-                        Label("Check Now", systemImage: "arrow.clockwise")
-                    }
-                    .disabled(!softwareUpdateController.canCheckForUpdates)
-                }
-            }
-            }
-
-            if settingsCategory == .support {
-                SettingsSectionLabel(
-                    title: "Support",
-                    subtitle: "Diagnostics and local files for troubleshooting without exposing secrets."
-                )
-
-                SettingsCard(
-                    symbol: "info.circle",
-                    title: "About Delta",
-                    subtitle: "Build and local state used when troubleshooting.",
-                    statusText: appVersionStatusText,
-                    statusColor: .blue
-                ) {
-                SettingsFactGrid(items: [
-                    SettingsFact(title: "Version", value: appVersion),
-                    SettingsFact(title: "Build", value: buildVersion),
-                    SettingsFact(title: "Bundle ID", value: bundleIdentifier),
-                    SettingsFact(title: "Profiles", value: "\(model.profiles.count)"),
-                    SettingsFact(title: "Destinations", value: "\(model.repositories.count)"),
-                    SettingsFact(title: "Restore points", value: "\(model.snapshots.count)")
-                ])
-
-                SettingsDescription(
-                    text: "Install and update Delta from the signed app in /Applications to keep macOS privacy approvals stable across builds."
-                )
-            }
-
-                SettingsCard(
-                symbol: "externaldrive.badge.checkmark",
-                title: "Backup Tools",
-                subtitle: "Bundled engines Delta uses for encrypted backups and remote destinations.",
-                statusText: backupToolStatusText,
-                statusColor: backupToolStatusColor
-            ) {
-                SettingsFactGrid(items: [
-                    SettingsFact(title: "Backup engine", value: isResticExecutableAvailable ? "Ready" : "Missing"),
-                    SettingsFact(title: "Remote tool", value: isRcloneExecutableAvailable ? "Ready" : "Missing"),
-                    SettingsFact(title: "Install mode", value: "Bundled")
-                ])
-
-                SettingsDescription(
-                    text: "Delta uses its bundled, signed backup tools so scheduled jobs and restores run with the same tested binaries as the app."
-                )
-
-                SettingsActionBar {
-                    Button {
-                        model.revealBackupToolsFolder()
-                    } label: {
-                        Label("Show Tools", systemImage: "folder")
-                    }
-                    .deltaTooltip("Show Delta's bundled backup engine and remote-destination tool in Finder.")
-                }
-            }
-
-                SettingsCard(
-                symbol: "folder.badge.gearshape",
-                title: "Support Files",
-                subtitle: "Open local data and logs used for troubleshooting."
-            ) {
-                ActionLine(
-                    description: "Database, locks, background control state, and support files.",
-                    buttonTitle: "Show App Data",
-                    symbol: "folder",
-                    action: model.revealApplicationSupportFolder
-                )
-                ActionLine(
-                    description: "Saved backup, restore, check, and prune output.",
-                    buttonTitle: "Show Logs",
-                    symbol: "doc.text.magnifyingglass",
-                    action: model.revealLogFolder
-                )
-            }
-
-                SettingsCard(
-                symbol: "stethoscope",
-                title: "Diagnostics",
-                subtitle: "Control troubleshooting output and generate support information without secrets."
-            ) {
-                SettingsControlRow(
-                    title: "History retention",
-                    detail: "Automatically remove old job summaries, saved output, restore requests, and events. Backup data and restore points are not affected."
-                ) {
-                    Picker("", selection: $operationalHistoryRetentionDays) {
-                        ForEach(OperationalHistoryRetention.allCases) { retention in
-                            Text(retention.title).tag(retention.rawValue)
+                        SettingsCard(title: "Delta") {
+                            SettingsActionRow(
+                                title: "Delta \(appVersion) (\(buildVersion))",
+                                detail: "Updates are signed and verified by Sparkle before installation.",
+                                systemImage: "app.badge.checkmark"
+                            ) {
+                                Button("Check Now") {
+                                    softwareUpdateController.checkForUpdates()
+                                }
+                                .disabled(!softwareUpdateController.canCheckForUpdates)
+                            }
                         }
                     }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
-                    .frame(width: 180)
-                    .onChange(of: operationalHistoryRetentionDays) { _, _ in
-                        normalizeOperationalHistoryRetention()
+
+                    if settingsCategory == .support {
+                        SettingsCard(title: "Delta") {
+                            SettingsValueRow(
+                                title: "Delta \(appVersion) (\(buildVersion))",
+                                detail: "Install and update the signed app in Applications to keep macOS privacy approvals stable.",
+                                systemImage: "app.badge.checkmark"
+                            ) {
+                                Text(bundleIdentifier)
+                                    .font(.callout.monospaced())
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            SettingsDivider()
+
+                            SettingsValueRow(
+                                title: "Local library",
+                                detail: "\(model.profiles.count) profiles, \(model.repositories.count) destinations, and \(model.snapshots.count) restore points.",
+                                systemImage: "externaldrive.badge.icloud"
+                            ) {
+                                EmptyView()
+                            }
+                        }
+
+                        SettingsCard(title: "Backup Tools") {
+                            SettingsValueRow(
+                                title: "Backup engine",
+                                detail: "restic creates, checks, and restores Delta's encrypted backup data.",
+                                systemImage: "externaldrive.badge.checkmark"
+                            ) {
+                                SettingsStatusLabel(isReady: isResticExecutableAvailable)
+                            }
+
+                            SettingsDivider()
+
+                            SettingsValueRow(
+                                title: "Remote destinations",
+                                detail: "rclone connects Delta to supported remote storage providers.",
+                                systemImage: "network"
+                            ) {
+                                SettingsStatusLabel(isReady: isRcloneExecutableAvailable)
+                            }
+
+                            SettingsDivider()
+
+                            SettingsActionRow(
+                                title: "Bundled tools",
+                                detail: "Delta ships the tested binaries used by manual and scheduled jobs.",
+                                systemImage: "shippingbox"
+                            ) {
+                                Button("Show Tools") {
+                                    model.revealBackupToolsFolder()
+                                }
+                                .deltaTooltip("Show Delta's bundled backup engine and remote-destination tool in Finder.")
+                            }
+                        }
+
+                        SettingsCard(title: "Support Files") {
+                            SettingsActionRow(
+                                title: "Application data",
+                                detail: "Database, locks, background control state, and support files.",
+                                systemImage: "folder"
+                            ) {
+                                Button("Show App Data", action: model.revealApplicationSupportFolder)
+                            }
+
+                            SettingsDivider()
+
+                            SettingsActionRow(
+                                title: "Job logs",
+                                detail: "Saved backup, restore, check, and cleanup output.",
+                                systemImage: "doc.text.magnifyingglass"
+                            ) {
+                                Button("Show Logs", action: model.revealLogFolder)
+                            }
+                        }
+
+                        SettingsCard(title: "Diagnostics") {
+                            SettingsControlRow(
+                                title: "History retention",
+                                detail:
+                                    "Automatically remove old job summaries, saved output, restore requests, and events. Backup data and restore points are not affected."
+                            ) {
+                                Picker("", selection: $operationalHistoryRetentionDays) {
+                                    ForEach(OperationalHistoryRetention.allCases) { retention in
+                                        Text(retention.title).tag(retention.rawValue)
+                                    }
+                                }
+                                .labelsHidden()
+                                .pickerStyle(.menu)
+                                .frame(width: 180)
+                                .onChange(of: operationalHistoryRetentionDays) { _, _ in
+                                    normalizeOperationalHistoryRetention()
+                                }
+                            }
+
+                            SettingsDivider()
+
+                            SettingsActionRow(
+                                title: "Copy diagnostic report",
+                                detail: "Copy sanitized app, scheduled-backup, destination, profile, and recent job state.",
+                                systemImage: "doc.on.doc"
+                            ) {
+                                Button("Copy Report", action: model.copyDiagnosticReport)
+                            }
+
+                            SettingsDivider()
+
+                            SettingsActionRow(
+                                title: "Export diagnostic report",
+                                detail: "Save the same sanitized report as a Markdown file.",
+                                systemImage: "square.and.arrow.down"
+                            ) {
+                                Button("Export Report", action: model.exportDiagnosticReport)
+                            }
+
+                            SettingsDivider()
+
+                            SettingsActionRow(
+                                title: "Clean up saved history",
+                                detail: "Apply the selected retention policy now. Backup data and restore points are unaffected.",
+                                systemImage: "trash"
+                            ) {
+                                Button("Clean Up Now") {
+                                    normalizeOperationalHistoryRetention()
+                                    model.pruneOperationalHistoryNow()
+                                }
+                                .disabled(model.isWorking || !model.isPersistentStoreAvailable)
+                                .deltaTooltip("Apply the selected activity history retention policy now.")
+                            }
+                        }
                     }
                 }
-
-                SettingsFactGrid(items: [
-                    SettingsFact(title: "Activity view", value: "Paged on demand"),
-                    SettingsFact(title: "Saved history", value: operationalHistoryRetention.summaryText),
-                    SettingsFact(title: "Backup data", value: "Unaffected")
-                ])
-
-                ActionLine(
-                    description: "Copy a sanitized report with app, scheduled-backup, destination, profile, and recent job state.",
-                    buttonTitle: "Copy Report",
-                    symbol: "doc.on.doc",
-                    action: model.copyDiagnosticReport
-                )
-                ActionLine(
-                    description: "Save the same report as a Markdown file.",
-                    buttonTitle: "Export Report",
-                    symbol: "square.and.arrow.down",
-                    action: model.exportDiagnosticReport
-                )
-
-                SettingsActionBar {
-                    Button {
-                        normalizeOperationalHistoryRetention()
-                        model.pruneOperationalHistoryNow()
-                    } label: {
-                        Label("Clean Up Now", systemImage: "trash")
-                    }
-                    .disabled(model.isWorking || !model.isPersistentStoreAvailable)
-                    .deltaTooltip("Apply the selected activity history retention policy now.")
-                }
-            }
+                .padding(28)
+                .frame(maxWidth: 820, alignment: .leading)
+                .frame(maxWidth: .infinity, alignment: .top)
             }
         }
+        .background(Color(nsColor: .windowBackgroundColor))
+        .navigationTitle("Settings")
         .onAppear {
-            model.refreshSystemState(force: true)
+            refreshSettingsStatus()
             automaticallyChecksForUpdates = softwareUpdateController.automaticallyChecksForUpdates
             automaticallyDownloadsUpdates = softwareUpdateController.automaticallyDownloadsUpdates
             normalizeOperationalHistoryRetention()
@@ -3541,7 +3477,10 @@ struct SettingsView: View {
             normalizeBackupDefaults()
             normalizeRestorePreferences()
             applyUpdatePreferences()
-            refreshNotificationAuthorization()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active else { return }
+            refreshSettingsStatus()
         }
     }
 
@@ -3549,23 +3488,45 @@ struct SettingsView: View {
         model.profiles.filter { $0.schedule.isEnabled }.count
     }
 
-    private var settingsCategorySelector: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Picker("Settings category", selection: $settingsCategory) {
-                ForEach(SettingsCategory.allCases) { category in
+    private var settingsNavigation: some View {
+        HStack(spacing: 6) {
+            ForEach(SettingsCategory.allCases) { category in
+                Button {
+                    settingsCategory = category
+                } label: {
                     Label(category.title, systemImage: category.symbol)
-                        .tag(category)
+                        .font(.callout.weight(.medium))
+                        .padding(.horizontal, 11)
+                        .frame(height: 32)
+                        .background(
+                            settingsCategory == category
+                                ? Color.accentColor.opacity(0.16)
+                                : Color.clear,
+                            in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        )
                 }
+                .buttonStyle(.plain)
+                .foregroundStyle(settingsCategory == category ? .primary : .secondary)
+                .deltaTooltip(category.title)
             }
-            .labelsHidden()
-            .pickerStyle(.segmented)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 22)
+        .frame(height: 52)
+        .background(.bar)
+    }
 
+    private var settingsPageHeader: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(settingsCategory.title)
+                .font(.largeTitle.weight(.bold))
             Text(settingsCategory.subtitle)
-                .font(.caption)
+                .font(.title3)
                 .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.bottom, 2)
     }
 
     private var backgroundSecretAccessSummary: BackgroundSecretAccessSummary {
@@ -3573,19 +3534,6 @@ struct SettingsView: View {
             reports: model.backgroundSecretAccessReports,
             destinationCount: model.repositories.count
         )
-    }
-
-    private var backgroundSecretAccessStatusColor: Color {
-        switch backgroundSecretAccessSummary.state {
-        case .ready:
-            return .green
-        case .needsRepair:
-            return .orange
-        case .unchecked:
-            return .secondary
-        case .noDestinations:
-            return .secondary
-        }
     }
 
     private var backgroundBackupsPresentation: BackgroundBackupServicePresentation {
@@ -3596,114 +3544,117 @@ struct SettingsView: View {
         )
     }
 
-    private var settingsOverviewTitle: String {
-        if !model.isPersistentStoreAvailable {
-            return "Local app data needs attention"
+    private var fullDiskAccessPermissionPresentation: SettingsPermissionPresentation {
+        model.fullDiskAccessStatus.hasLikelyFullDiskAccess ? .ready : .notAllowed
+    }
+
+    private var notificationPermissionPresentation: SettingsPermissionPresentation {
+        switch notificationAuthorizationState {
+        case .authorized:
+            return .ready
+        case .provisional:
+            return .quiet
+        case .ephemeral:
+            return .temporary
+        case .notDetermined:
+            return .notRequested
+        case .denied:
+            return .notAllowed
+        case .unknown:
+            return .checkAgain
         }
-        if backupToolStatusText != "Ready" {
-            return "Backup tools need attention"
-        }
-        if !model.fullDiskAccessStatus.hasLikelyFullDiskAccess {
-            return "System access needs attention"
-        }
-        if backgroundSecretAccessSummary.needsRepair {
-            return "Password access needs repair"
-        }
+    }
+
+    private var scheduledBackupsPermissionPresentation: SettingsPermissionPresentation {
         if model.scheduledBackupServiceError != nil {
-            return "Scheduled backups need repair"
+            return .needsAttention
         }
-        if pausesScheduledBackups && scheduledProfileCount > 0 {
-            return "Scheduled backups are paused"
+        switch backgroundBackupsPresentation.severity {
+        case .ready:
+            return .ready
+        case .inactive:
+            return .notNeeded
+        case .attention, .blocked:
+            return .needsAttention
         }
-        if backgroundBackupsPresentation.needsAttention {
-            return "Scheduled backups need attention"
-        }
-        if sendsJobNotifications && !notificationAuthorizationState.canDeliver {
-            return "Notifications need permission"
-        }
-        return "Delta is ready"
     }
 
-    private var settingsOverviewSymbol: String {
-        if !model.isPersistentStoreAvailable || backupToolStatusText != "Ready" {
-            return "xmark.octagon"
+    private var passwordAccessPermissionPresentation: SettingsPermissionPresentation {
+        switch backgroundSecretAccessSummary.state {
+        case .ready:
+            return .ready
+        case .needsRepair:
+            return .needsAttention
+        case .unchecked:
+            return .checkAgain
+        case .noDestinations:
+            return .notNeeded
         }
-        if settingsOverviewNeedsReview {
-            return "exclamationmark.triangle"
-        }
-        return "checkmark.seal"
     }
 
-    private var settingsOverviewDetail: String {
-        if !model.isPersistentStoreAvailable {
-            return "Delta cannot use its local database until app data opens successfully."
-        }
-        if backupToolStatusText != "Ready" {
-            return backupToolStatusDetail
-        }
+    @ViewBuilder
+    private var fullDiskAccessPermissionActions: some View {
         if !model.fullDiskAccessStatus.hasLikelyFullDiskAccess {
-            return fullDiskAccessDescription
+            Button("Show Delta") {
+                model.revealInstalledAppInFinder()
+            }
+            Button("System Settings") {
+                model.openFullDiskAccessSettings()
+            }
+            .buttonStyle(.borderedProminent)
         }
-        if backgroundSecretAccessSummary.needsRepair {
-            return "\(backgroundSecretAccessSummary.detail) Repair access before relying on unattended scheduled backups."
-        }
-        if let scheduledBackupServiceError = model.scheduledBackupServiceError {
-            return scheduledBackupServiceError
-        }
-        if pausesScheduledBackups && scheduledProfileCount > 0 {
-            return "Automatic scheduled runs are paused. Manual Back Up Now actions still work for individual profiles."
-        }
-        if let attentionText = backgroundBackupsPresentation.attentionText {
-            return attentionText
-        }
-        if sendsJobNotifications && !notificationAuthorizationState.canDeliver {
-            return "macOS notification permission is required before Delta can send backup alerts."
-        }
-        return "System access, scheduled backups, update checks, notifications, and bundled backup tools are summarized here."
     }
 
-    private var settingsOverviewStatusText: String {
-        settingsOverviewNeedsReview ? "Review" : "Ready"
+    @ViewBuilder
+    private var notificationPermissionActions: some View {
+        switch notificationAuthorizationState {
+        case .notDetermined:
+            Button("Allow Notifications") {
+                requestNotificationPermission()
+            }
+            .buttonStyle(.borderedProminent)
+        case .denied:
+            Button("System Settings") {
+                model.openNotificationSettings()
+            }
+        case .unknown:
+            Button("Check Again") {
+                refreshNotificationAuthorization()
+            }
+        case .authorized, .provisional, .ephemeral:
+            EmptyView()
+        }
     }
 
-    private var settingsOverviewStatusColor: Color {
-        if !model.isPersistentStoreAvailable
-            || backupToolStatusText != "Ready"
-            || model.scheduledBackupServiceError != nil {
-            return .red
+    @ViewBuilder
+    private var scheduledBackupsPermissionActions: some View {
+        if scheduledBackupsPermissionPresentation == .needsAttention {
+            Button("Review Login Items") {
+                model.openLoginItemsSettings()
+            }
         }
-        if !model.fullDiskAccessStatus.hasLikelyFullDiskAccess
-            || backgroundSecretAccessSummary.needsRepair
-            || model.scheduledBackupServiceError != nil
-            || (pausesScheduledBackups && scheduledProfileCount > 0)
-            || backgroundBackupsPresentation.needsAttention
-            || (sendsJobNotifications && !notificationAuthorizationState.canDeliver) {
-            return .orange
-        }
-        return .green
     }
 
-    private var settingsOverviewNeedsReview: Bool {
-        !model.isPersistentStoreAvailable
-            || backupToolStatusText != "Ready"
-            || !model.fullDiskAccessStatus.hasLikelyFullDiskAccess
-            || backgroundSecretAccessSummary.needsRepair
-            || model.scheduledBackupServiceError != nil
-            || (pausesScheduledBackups && scheduledProfileCount > 0)
-            || backgroundBackupsPresentation.needsAttention
-            || (sendsJobNotifications && !notificationAuthorizationState.canDeliver)
+    @ViewBuilder
+    private var passwordAccessPermissionActions: some View {
+        switch backgroundSecretAccessSummary.state {
+        case .needsRepair:
+            Button("Repair Password Access") {
+                model.repairBackgroundSecretAccess()
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(model.isWorking || !model.isPersistentStoreAvailable)
+        case .unchecked:
+            Button("Check Again") {
+                model.reload()
+            }
+        case .ready, .noDestinations:
+            EmptyView()
+        }
     }
 
     private var operationalHistoryRetention: OperationalHistoryRetention {
         OperationalHistoryRetention.normalized(operationalHistoryRetentionDays)
-    }
-
-    private var fullDiskAccessStatusText: String {
-        model.fullDiskAccessStatus.hasLikelyFullDiskAccess ? "Ready" : "Needs Access"
-    }
-
-    private var fullDiskAccessStatusColor: Color {
-        model.fullDiskAccessStatus.hasLikelyFullDiskAccess ? .green : .orange
     }
 
     private var fullDiskAccessDescription: String {
@@ -3712,85 +3663,8 @@ struct SettingsView: View {
             : "Protected locations are not readable yet. Open Privacy & Security, add Delta with the + button if needed, then recheck access."
     }
 
-    private var appLoginItemStatusText: String {
-        switch model.appLoginItemStatus {
-        case .enabled:
-            return "On"
-        case .requiresApproval:
-            return "Needs Approval"
-        case .notRegistered:
-            return "Off"
-        case .notFound:
-            return "Missing App"
-        case .unavailable:
-            return "Unavailable"
-        case .unknown:
-            return "Unknown"
-        }
-    }
-
-    private var menuBarAndLoginStatusText: String {
-        if model.appLoginItemStatus == .requiresApproval {
-            return "Needs Approval"
-        }
-        if showsMenuBarExtra && model.appLoginItemStatus == .enabled {
-            return "On"
-        }
-        if showsMenuBarExtra {
-            return "Menu Shown"
-        }
-        if model.appLoginItemStatus == .enabled {
-            return "Starts at Login"
-        }
-        return "Off"
-    }
-
-    private var menuBarAndLoginStatusColor: Color {
-        switch model.appLoginItemStatus {
-        case .requiresApproval:
-            return .orange
-        case .notFound, .unknown:
-            return .red
-        case .enabled:
-            return .green
-        case .notRegistered, .unavailable:
-            return showsMenuBarExtra ? .green : .secondary
-        }
-    }
-
-    private var notificationStatusText: String {
-        guard sendsJobNotifications else {
-            return "Off"
-        }
-        return notificationAuthorizationState.canDeliver ? "On" : "Needs Permission"
-    }
-
-    private var notificationStatusColor: Color {
-        guard sendsJobNotifications else {
-            return .secondary
-        }
-        switch notificationAuthorizationState {
-        case .authorized, .provisional, .ephemeral:
-            return .green
-        case .notDetermined:
-            return .orange
-        case .denied, .unknown:
-            return .red
-        }
-    }
-
     private var canSendTestNotification: Bool {
         sendsJobNotifications && notificationAuthorizationState.canDeliver
-    }
-
-    private var notificationTestAlertStatusText: String {
-        if !sendsJobNotifications {
-            return "Enable alerts"
-        }
-        if !notificationAuthorizationState.canDeliver {
-            return "Needs Permission"
-        }
-        return "Ready"
     }
 
     private var notificationTestAlertTooltip: String {
@@ -3801,45 +3675,6 @@ struct SettingsView: View {
             return "Allow Delta in macOS Notifications settings before sending a test alert."
         }
         return "Send a macOS notification now to confirm Delta alerts are working."
-    }
-
-    private var automaticUpdatesStatusText: String {
-        guard automaticallyChecksForUpdates else {
-            return "Off"
-        }
-        return automaticallyDownloadsUpdates ? "Auto Download" : "Checks On"
-    }
-
-    private var automaticUpdatesStatusColor: Color {
-        automaticallyChecksForUpdates ? .green : .secondary
-    }
-
-    private var automaticUpdatesSummaryDetail: String {
-        guard automaticallyChecksForUpdates else {
-            return "Manual checks only"
-        }
-        let interval = AppUpdateCheckInterval.normalized(updateCheckIntervalSeconds).summaryText
-        return automaticallyDownloadsUpdates ? "\(interval), downloads ready" : interval
-    }
-
-    private var restoreDefaultsStatusText: String {
-        previewsRestoresByDefault && verifiesRestoresByDefault ? "Conservative" : "Custom"
-    }
-
-    private var restoreDefaultsStatusColor: Color {
-        previewsRestoresByDefault && verifiesRestoresByDefault ? .green : .orange
-    }
-
-    private var healthMonitoringStatusText: String {
-        backupFreshnessThreshold == .threeDays
-            && destinationVerificationThreshold == .thirtyDays
-            && destinationFreeSpaceThreshold == .fiftyGiB
-            ? "Recommended"
-            : "Custom"
-    }
-
-    private var healthMonitoringStatusColor: Color {
-        healthMonitoringStatusText == "Recommended" ? .green : .orange
     }
 
     @ViewBuilder
@@ -3876,38 +3711,6 @@ struct SettingsView: View {
         ScheduleEditorKind(rawValue: defaultProfileScheduleKindRawValue) ?? .daily
     }
 
-    private var backupDefaultsStatusText: String {
-        !defaultProfileScheduleEnabled
-            || defaultProfileScheduleKind != .daily
-            || defaultProfileScheduleHour != 20
-            || defaultProfileScheduleMinute != 0
-            || defaultProfileScheduleWeekday != 2
-            || defaultProfileScheduleDay != 1
-            || defaultProfileScheduleIntervalMinutes != 120
-            || !defaultProfileCatchUpMissedRuns
-            || !defaultProfileRunOnBattery
-            || defaultProfileRunInLowPowerMode
-            || !defaultProfilePruneAfterForget
-            || !defaultProfileCheckAfterPrune
-            || defaultProfileUploadLimitKiB > 0
-            || defaultProfileDownloadLimitKiB > 0
-            || defaultProfileKeepHourly != 24
-            || defaultProfileKeepDaily != 30
-            || defaultProfileKeepWeekly != 12
-            || defaultProfileKeepMonthly != 12
-            || defaultProfileKeepYearly != 0
-            || !defaultProfileMaintenanceEnabled
-            || defaultProfileMaintenanceIntervalDays != 7
-            || defaultProfileMaintenanceHour != 2
-            || defaultProfileMaintenanceMinute != 0
-            ? "Custom"
-            : "Recommended"
-    }
-
-    private var backupDefaultsStatusColor: Color {
-        backupDefaultsStatusText == "Recommended" ? .green : .orange
-    }
-
     private var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
     }
@@ -3918,10 +3721,6 @@ struct SettingsView: View {
 
     private var bundleIdentifier: String {
         Bundle.main.bundleIdentifier ?? "Unknown"
-    }
-
-    private var appVersionStatusText: String {
-        appVersion == "Unknown" ? "Unknown" : "Version \(appVersion)"
     }
 
     private var resticToolURL: URL {
@@ -3938,27 +3737,6 @@ struct SettingsView: View {
 
     private var isRcloneExecutableAvailable: Bool {
         FileManager.default.isExecutableFile(atPath: rcloneToolURL.path)
-    }
-
-    private var backupToolStatusText: String {
-        isResticExecutableAvailable && isRcloneExecutableAvailable ? "Ready" : "Missing"
-    }
-
-    private var backupToolStatusColor: Color {
-        backupToolStatusText == "Ready" ? .green : .red
-    }
-
-    private var backupToolStatusDetail: String {
-        if isResticExecutableAvailable && isRcloneExecutableAvailable {
-            return "Bundled engines available"
-        }
-        if isResticExecutableAvailable {
-            return "Remote destination tool missing"
-        }
-        if isRcloneExecutableAvailable {
-            return "Backup engine missing"
-        }
-        return "Backup engines missing"
     }
 
     private var defaultUploadLimitBinding: Binding<String> {
@@ -4091,6 +3869,11 @@ struct SettingsView: View {
         }
     }
 
+    private func refreshSettingsStatus() {
+        model.refreshSystemState(force: true)
+        refreshNotificationAuthorization()
+    }
+
     private func requestNotificationPermission() {
         Task {
             let state = await DeltaUserNotifier.requestAuthorization()
@@ -4137,22 +3920,6 @@ struct SettingsView: View {
 
     private func twoDigit(_ value: Int) -> String {
         String(format: "%02d", value)
-    }
-
-    private var backgroundBackupsStatusColor: Color {
-        if model.scheduledBackupServiceError != nil {
-            return .red
-        }
-        switch backgroundBackupsPresentation.severity {
-        case .ready:
-            return .green
-        case .inactive:
-            return .secondary
-        case .attention:
-            return .orange
-        case .blocked:
-            return .red
-        }
     }
 
     private var backgroundBackupsBinding: Binding<Bool> {
@@ -5823,97 +5590,32 @@ struct SurfaceSection<Content: View>: View {
     }
 }
 
-struct SettingsHealthBanner: View {
-    var symbol: String
-    var title: String
-    var detail: String
-    var statusText: String
-    var statusColor: Color
-
-    var body: some View {
-        Card {
-            HStack(alignment: .top, spacing: 14) {
-                StatusIcon(symbol: symbol, color: statusColor)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(title)
-                        .font(.headline)
-                    Text(detail)
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                StateBadge(text: statusText, color: statusColor)
-                    .lineLimit(1)
-            }
-        }
-    }
-}
-
 struct SettingsCard<Content: View>: View {
-    var symbol: String
     var title: String
-    var subtitle: String?
-    var statusText: String?
-    var statusColor: Color
     @ViewBuilder var content: Content
 
     init(
-        symbol: String,
         title: String,
-        subtitle: String? = nil,
-        statusText: String? = nil,
-        statusColor: Color = .secondary,
         @ViewBuilder content: () -> Content
     ) {
-        self.symbol = symbol
         self.title = title
-        self.subtitle = subtitle
-        self.statusText = statusText
-        self.statusColor = statusColor
         self.content = content()
     }
 
     var body: some View {
-        Card {
-            HStack(alignment: .top, spacing: 14) {
-                StatusIcon(symbol: symbol, color: statusText == nil ? .blue : statusColor)
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack(alignment: .top, spacing: 12) {
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(title)
-                                .font(.headline)
-                            if let subtitle {
-                                Text(subtitle)
-                                    .font(.callout)
-                                    .foregroundStyle(.secondary)
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-
-                        if let statusText {
-                            StateBadge(text: statusText, color: statusColor)
-                                .lineLimit(1)
-                                .layoutPriority(1)
-                        }
-                    }
-
-                    VStack(alignment: .leading, spacing: 12) {
-                        content
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
+        VStack(alignment: .leading, spacing: 14) {
+            Text(title)
+                .font(.headline)
+            content
         }
+        .padding(20)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Color(nsColor: .separatorColor).opacity(0.45), lineWidth: 0.5)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
-}
-
-struct SettingsFact: Identifiable {
-    var id: String { title }
-    var title: String
-    var value: String
 }
 
 struct SettingsCapability: Identifiable {
@@ -5921,24 +5623,6 @@ struct SettingsCapability: Identifiable {
     var symbol: String
     var title: String
     var detail: String
-}
-
-struct SettingsSectionLabel: View {
-    var title: String
-    var subtitle: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(title)
-                .font(.subheadline.weight(.semibold))
-            Text(subtitle)
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(.top, 4)
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
 }
 
 struct SettingsCapabilityList: View {
@@ -5974,40 +5658,7 @@ struct SettingsCapabilityList: View {
     }
 }
 
-struct SettingsFactGrid: View {
-    var items: [SettingsFact]
-
-    var body: some View {
-        LazyVGrid(columns: columns, spacing: 8) {
-            ForEach(items) { item in
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(item.title)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Text(item.value)
-                        .font(.caption.weight(.semibold))
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                }
-                .padding(.vertical, 8)
-                .padding(.horizontal, 10)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(DeltaTheme.badge.opacity(0.65))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-            }
-        }
-    }
-
-    private var columns: [GridItem] {
-        [
-            GridItem(.adaptive(minimum: 150), spacing: 8)
-        ]
-    }
-}
-
-private let settingsControlRowLabelWidth: CGFloat = 250
-private let settingsControlRowControlWidth: CGFloat = 440
-private let settingsControlRowSpacing: CGFloat = 24
+private let settingsControlRowControlWidth: CGFloat = 340
 private let settingsCounterColumns = [
     GridItem(.flexible(), spacing: 12, alignment: .leading),
     GridItem(.flexible(), spacing: 12, alignment: .leading),
@@ -6020,71 +5671,226 @@ struct SettingsControlRow<Control: View>: View {
     @ViewBuilder var control: Control
 
     var body: some View {
-        ViewThatFits(in: .horizontal) {
-            horizontalLayout
-            stackedLayout
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private var horizontalLayout: some View {
-        HStack(alignment: .top, spacing: settingsControlRowSpacing) {
-            label
-                .frame(width: settingsControlRowLabelWidth, alignment: .leading)
-
-            controlColumn
-        }
-        .frame(
-            minWidth: settingsControlRowLabelWidth + settingsControlRowSpacing + settingsControlRowControlWidth,
-            maxWidth: .infinity,
-            alignment: .leading
-        )
-    }
-
-    private var stackedLayout: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            label
-            controlColumn
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private var controlColumn: some View {
-        ZStack(alignment: .topLeading) {
+        SettingsValueRow(
+            title: title,
+            detail: detail,
+            systemImage: SettingsControlSymbol.symbol(for: title)
+        ) {
             control
-        }
-        .frame(width: settingsControlRowControlWidth, alignment: .topLeading)
-    }
-
-    private var label: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(title)
-                .font(.subheadline.weight(.semibold))
-                .lineLimit(2)
-            Text(detail)
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
         }
     }
 }
 
-struct SettingsActionBar<Content: View>: View {
-    @ViewBuilder var content: Content
+private struct SettingsRowDescription: View {
+    var title: String
+    var detail: String
+    var systemImage: String
 
     var body: some View {
-        LazyVGrid(columns: columns, alignment: .leading, spacing: 8) {
-            content
+        HStack(spacing: 14) {
+            Image(systemName: systemImage)
+                .font(.title3)
+                .foregroundStyle(.tint)
+                .frame(width: 28)
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.headline)
+                Text(detail)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .layoutPriority(1)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .buttonStyle(.bordered)
-        .controlSize(.small)
+    }
+}
+
+private struct SettingsValueRow<Control: View>: View {
+    var title: String
+    var detail: String
+    var systemImage: String
+    @ViewBuilder var control: Control
+
+    var body: some View {
+        HStack(spacing: 14) {
+            SettingsRowDescription(title: title, detail: detail, systemImage: systemImage)
+            control
+                .fixedSize(horizontal: true, vertical: false)
+        }
+    }
+}
+
+private struct SettingsActionRow<Control: View>: View {
+    var title: String
+    var detail: String
+    var systemImage: String
+    @ViewBuilder var control: Control
+
+    var body: some View {
+        SettingsValueRow(title: title, detail: detail, systemImage: systemImage) {
+            control
+        }
+    }
+}
+
+private struct SettingsStatusLabel: View {
+    var isReady: Bool
+
+    var body: some View {
+        Label(isReady ? "Ready" : "Missing", systemImage: isReady ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
+            .font(.callout.weight(.medium))
+            .foregroundStyle(isReady ? .green : .orange)
+            .fixedSize()
+    }
+}
+
+private enum SettingsControlSymbol {
+    static func symbol(for title: String) -> String {
+        switch title {
+        case "Allow scheduled backups": "clock.badge.checkmark"
+        case "Pause automatic runs": "pause.circle"
+        case "Keep Mac awake during backup work": "powerplug"
+        case "Status menu": "menubar.rectangle"
+        case "Start Delta at login": "power"
+        case "Job alerts": "exclamationmark.bubble"
+        case "Success summaries": "checkmark.bubble"
+        case "Backup freshness": "clock.badge.exclamationmark"
+        case "Destination checks": "externaldrive.badge.checkmark"
+        case "Destination free space": "internaldrive"
+        case "Schedule new profiles": "calendar.badge.plus"
+        case "Default schedule": "calendar"
+        case "Catch up missed runs": "arrow.clockwise"
+        case "Run on battery": "battery.100percent"
+        case "Run in Low Power Mode": "leaf"
+        case "Free space after cleanup": "externaldrive.badge.minus"
+        case "Verify after cleanup": "checkmark.shield"
+        case "Default speed limits": "speedometer"
+        case "Default retention": "archivebox"
+        case "Automatic cleanup": "trash.slash"
+        case "Cleanup cadence": "calendar.badge.clock"
+        case "Preview first": "eye"
+        case "Verify files": "checkmark.shield"
+        case "Existing files": "doc.on.doc"
+        case "Automatic checks", "Automatically check for updates": "arrow.triangle.2.circlepath"
+        case "Check interval", "Check frequency": "calendar.badge.clock"
+        case "Download in background", "Download updates automatically": "arrow.down.circle"
+        case "History retention": "clock.arrow.circlepath"
+        default: "slider.horizontal.3"
+        }
+    }
+}
+
+enum SettingsPermissionPresentation: Equatable {
+    case ready
+    case notRequested
+    case notAllowed
+    case needsAttention
+    case notNeeded
+    case checkAgain
+    case quiet
+    case temporary
+
+    var title: String {
+        switch self {
+        case .ready: "Allowed"
+        case .notRequested: "Not Requested"
+        case .notAllowed: "Not Allowed"
+        case .needsAttention: "Needs Attention"
+        case .notNeeded: "Not Needed"
+        case .checkAgain: "Check Again"
+        case .quiet: "Quietly Allowed"
+        case .temporary: "Temporarily Allowed"
+        }
     }
 
-    private var columns: [GridItem] {
-        [
-            GridItem(.adaptive(minimum: 150), spacing: 8, alignment: .leading)
-        ]
+    var systemImage: String {
+        switch self {
+        case .ready, .quiet, .temporary: "checkmark.circle.fill"
+        case .notNeeded: "minus.circle.fill"
+        case .notRequested, .checkAgain: "questionmark.circle.fill"
+        case .notAllowed, .needsAttention: "exclamationmark.triangle.fill"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .ready: .green
+        case .quiet, .temporary: .blue
+        case .notNeeded, .notRequested, .checkAgain: .secondary
+        case .notAllowed, .needsAttention: .orange
+        }
+    }
+}
+
+struct SettingsPermissionRow<Actions: View>: View {
+    var title: String
+    var detail: String
+    var systemImage: String
+    var status: SettingsPermissionPresentation
+    @ViewBuilder var actions: Actions
+
+    var body: some View {
+        HStack(spacing: 14) {
+            HStack(spacing: 12) {
+                SettingsRowDescription(title: title, detail: detail, systemImage: systemImage)
+                statusLabel
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("\(title), \(status.title)")
+            .accessibilityHint(detail)
+            actionGroup
+        }
+    }
+
+    private var statusLabel: some View {
+        Label(status.title, systemImage: status.systemImage)
+            .font(.callout.weight(.medium))
+            .foregroundStyle(status.color)
+            .fixedSize()
+    }
+
+    private var actionGroup: some View {
+        HStack(spacing: 8) {
+            actions
+        }
+        .fixedSize(horizontal: true, vertical: false)
+    }
+}
+
+struct SettingsPermissionNote: View {
+    var title: String
+    var detail: String
+    var systemImage: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: systemImage)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(.secondary)
+                .frame(width: 22, height: 22)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                Text(detail)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+}
+
+struct SettingsDivider: View {
+    var body: some View {
+        Divider()
+            .padding(.leading, 42)
     }
 }
 
@@ -6465,21 +6271,6 @@ struct EmptyStateView: View {
     }
 }
 
-struct SidebarStatusView: View {
-    var isWorking: Bool
-
-    var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: isWorking ? "arrow.triangle.2.circlepath" : "checkmark.seal")
-            Text(isWorking ? "Running" : "Ready")
-                .font(.caption)
-            Spacer()
-        }
-        .padding(12)
-        .foregroundStyle(.secondary)
-    }
-}
-
 struct StatusIcon: View {
     var symbol: String
     var color: Color
@@ -6617,30 +6408,6 @@ struct InlineWarning: View {
         .padding(12)
         .background(.orange.opacity(0.12))
         .clipShape(RoundedRectangle(cornerRadius: 8))
-    }
-}
-
-struct ActionLine: View {
-    var description: String
-    var buttonTitle: String
-    var symbol: String
-    var action: () -> Void
-
-    var body: some View {
-        HStack(alignment: .center, spacing: 16) {
-            Text(description)
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .lineLimit(3)
-                .fixedSize(horizontal: false, vertical: true)
-            Spacer()
-            Button(action: action) {
-                Label(buttonTitle, systemImage: symbol)
-            }
-            .controlSize(.small)
-        }
-        .buttonStyle(.bordered)
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
