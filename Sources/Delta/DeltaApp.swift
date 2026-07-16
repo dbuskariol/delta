@@ -173,7 +173,7 @@ struct DeltaApp: App {
                 name: "Diagnostics AWS_SECRET_ACCESS_KEY=\(secret)",
                 sourceMode: .customFolders,
                 sources: [
-                    BackupSource(path: "/tmp/delta-diagnostics")
+                    BackupSource(path: "/Users/private-user/Documents")
                 ],
                 repositoryID: repositoryID,
                 schedule: BackupSchedule(kind: .hourly(minute: 0), isEnabled: true),
@@ -189,12 +189,12 @@ struct DeltaApp: App {
                 startedAt: Date(timeIntervalSince1970: 40),
                 finishedAt: Date(timeIntervalSince1970: 50),
                 exitCode: 1,
-                message: "Backup failed for rest:https://user:\(secret)@example.com/repo with AWS_SECRET_ACCESS_KEY=\(secret)"
+                message: "Backup failed for rest:https://user:\(secret)@example.com/repo with AWS_SECRET_ACCESS_KEY=\(secret); could not read /Users/private-user/Documents/file.txt"
             )
             let snapshot = ResticSnapshot(
                 id: "diagnostic-snapshot",
                 time: Date(timeIntervalSince1970: 60),
-                paths: ["/tmp/delta-diagnostics"],
+                paths: ["/Users/private-user/Documents"],
                 tags: ["delta", "profile:\(profileID.uuidString)"]
             )
             let secretStore = KeychainSecretStore()

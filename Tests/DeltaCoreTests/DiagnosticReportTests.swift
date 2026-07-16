@@ -63,6 +63,10 @@ final class DiagnosticReportTests: XCTestCase {
         XCTAssertTrue(report.contains("- Destination Verification: Warn after 30 days"))
         XCTAssertTrue(report.contains("- Destination Free Space: Warn below 50 GB"))
         XCTAssertTrue(report.contains("- Restore Defaults: Preview first, verify files, Replace changed"))
+        XCTAssertTrue(report.contains("- Application Support: ~/Library/Application Support/Delta"))
+        XCTAssertTrue(report.contains("- Database: ~/Library/Application Support/Delta/Delta.sqlite"))
+        XCTAssertTrue(report.contains("- Logs: ~/Library/Application Support/Delta/Logs"))
+        XCTAssertFalse(report.contains("/Users/me"))
         XCTAssertTrue(report.contains("- restic: executable at /Applications/Delta.app/Contents/MacOS/restic"))
         XCTAssertTrue(report.contains("- rclone: missing at /Applications/Delta.app/Contents/MacOS/rclone"))
         XCTAssertTrue(report.contains("- Primary: Local or mounted drive; verified 1970-01-01T00:00:10Z"))
@@ -167,6 +171,72 @@ final class DiagnosticReportTests: XCTestCase {
         XCTAssertFalse(report.contains("super-secret"))
         XCTAssertTrue(report.contains("rest:https://<redacted>@example.com/repo"))
         XCTAssertTrue(report.contains("AWS_SECRET_ACCESS_KEY=<redacted>"))
+    }
+
+    func testDiagnosticReportRedactsPersonalHomePathsAcrossEverySection() {
+        let snapshot = DiagnosticReportSnapshot(
+            generatedAt: Date(timeIntervalSince1970: 0),
+            appVersion: "0.1",
+            buildVersion: "1",
+            bundleIdentifier: "com.delta.backup",
+            bundlePath: "/Users/private-user/Applications/Delta.app",
+            executablePath: "/Users/private-user/Applications/Delta.app/Contents/MacOS/Delta",
+            applicationSupportPath: "/Users/private-user/Library/Application Support/Delta",
+            databasePath: "/Users/private-user/Library/Application Support/Delta/Delta.sqlite",
+            logPath: "/Users/private-user/Library/Application Support/Delta/Logs",
+            fullDiskAccessStatus: "Ready",
+            backgroundBackupsStatus: "Ready",
+            appLoginItemStatus: "Ready",
+            notificationStatus: "Disabled",
+            menuBarStatus: "Shown",
+            idleSleepProtectionStatus: "Enabled",
+            operationalHistoryRetentionStatus: "Keep 90 days",
+            backupFreshnessStatus: "Warn after 3 days",
+            destinationVerificationStatus: "Warn after 30 days",
+            destinationFreeSpaceStatus: "Warn below 50 GB",
+            restoreDefaultsStatus: "Preview first, verify files, Replace changed",
+            activeOperation: "Backup: /Users/private-user/Documents",
+            profileCount: 1,
+            destinationCount: 1,
+            restorePointCount: 0,
+            recentJobCount: 1,
+            tools: [
+                DiagnosticToolSummary(
+                    name: "restic",
+                    path: "/Users/private-user/Applications/Delta.app/Contents/MacOS/restic",
+                    isExecutable: true
+                )
+            ],
+            destinations: [
+                DiagnosticDestinationSummary(name: "/Users/private-user/Backup", kind: "Local or mounted drive")
+            ],
+            profiles: [
+                DiagnosticProfileSummary(
+                    name: "/Users/private-user/Documents",
+                    sourceMode: "Custom folders",
+                    sourceCount: 1,
+                    scheduleEnabled: false,
+                    customExcludeCount: 0
+                )
+            ],
+            recentJobs: [
+                DiagnosticJobSummary(
+                    kind: "Backup",
+                    status: "Failed",
+                    startedAt: Date(timeIntervalSince1970: 20),
+                    exitCode: 1,
+                    message: "Could not read /Users/private-user/Documents/file.txt"
+                )
+            ]
+        )
+
+        let report = DiagnosticReportBuilder().makeReport(snapshot: snapshot)
+
+        XCTAssertFalse(report.contains("private-user"))
+        XCTAssertFalse(report.contains("/Users/private-user"))
+        XCTAssertTrue(report.contains("~/Applications/Delta.app"))
+        XCTAssertTrue(report.contains("~/Library/Application Support/Delta"))
+        XCTAssertTrue(report.contains("~/Documents/file.txt"))
     }
 
     func testDiagnosticReportSummarizesRawResticJSONJobMessages() {

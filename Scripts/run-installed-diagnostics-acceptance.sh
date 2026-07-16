@@ -52,7 +52,7 @@ cat >"$OUTPUT" <<EOF
 - Build: $(plist_value CFBundleVersion)
 - Git Commit: $(/usr/bin/git -C "$ROOT_DIR" rev-parse --short HEAD 2>/dev/null || printf "unknown")
 
-This seeds isolated Application Support data through the installed Delta app, exports the installed app's diagnostic report, and verifies backup destination secrets and backend credential values are redacted.
+This seeds isolated Application Support data through the installed Delta app, exports the installed app's diagnostic report, and verifies backup destination secrets, backend credential values, and personal home-directory names are redacted.
 
 EOF
 
@@ -83,6 +83,7 @@ required_patterns=(
   "- Recent Jobs: 1"
   "rest:https://<redacted>@example.com/repo"
   "AWS_SECRET_ACCESS_KEY=<redacted>"
+  "~/Documents/file.txt"
 )
 
 for pattern in "${required_patterns[@]}"; do
@@ -111,6 +112,18 @@ if /usr/bin/grep -Fq -- "$SECRET" "$REPORT_FILE"; then
   exit 1
 fi
 
+if /usr/bin/grep -Fq -- "private-user" "$REPORT_FILE"; then
+  {
+    printf "## Personal Home Path Redaction Failed\n\n"
+    printf "The diagnostic report contained the seeded local account name.\n\n"
+    printf '```text\n'
+    /bin/cat "$REPORT_FILE"
+    printf '```\n'
+  } >>"$OUTPUT"
+  printf "Installed diagnostics acceptance failed. See %s\n" "$OUTPUT" >&2
+  exit 1
+fi
+
 cat >>"$OUTPUT" <<EOF
 ## Result
 
@@ -123,6 +136,7 @@ Installed diagnostics acceptance passed.
 - Seeded destination URL credential redacted: Yes
 - Seeded backend credential value redacted: Yes
 - Seeded secret value absent from report: Yes
+- Seeded personal home-directory name absent from report: Yes
 
 ## Seed Output
 

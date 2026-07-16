@@ -236,7 +236,7 @@ public struct DiagnosticReportBuilder: Sendable {
             return "- \(timestamp(job.startedAt)): \(job.kind) \(job.status)\(exitCode)\(message)"
         }
 
-        return lines.joined(separator: "\n") + "\n"
+        return privacySafeReport(lines.joined(separator: "\n") + "\n")
     }
 
     private func listOrEmpty<T>(_ values: [T], render: (T) -> String) -> [String] {
@@ -262,5 +262,20 @@ public struct DiagnosticReportBuilder: Sendable {
             return collapsed
         }
         return String(collapsed.prefix(limit)) + "..."
+    }
+
+    private func privacySafeReport(_ report: String) -> String {
+        let secretRedacted = SensitiveLogRedactor.redact(report)
+        guard let expression = try? NSRegularExpression(
+            pattern: #"/Users/(?!Shared(?:/|\b)|Guest(?:/|\b))[^/\s]+"#
+        ) else {
+            return secretRedacted
+        }
+        let range = NSRange(secretRedacted.startIndex..<secretRedacted.endIndex, in: secretRedacted)
+        return expression.stringByReplacingMatches(
+            in: secretRedacted,
+            range: range,
+            withTemplate: "~"
+        )
     }
 }

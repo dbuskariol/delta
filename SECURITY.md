@@ -16,7 +16,7 @@ Please use [GitHub's private vulnerability reporting](https://github.com/dbuskar
 - Passwords are supplied through a signed password command or short-lived standard input, not process arguments, ambient environment variables, logs, or temporary files.
 - Remote-provider processes receive only the environment variables required by the configured backend.
 - A local per-destination lock and restic's repository lock prevent unsafe overlapping operations.
-- Diagnostics redact saved credential values, embedded URL credentials, and known secret-bearing environment fields.
+- Diagnostics redact saved credential values, embedded URL credentials, known secret-bearing environment fields, and personal home-directory names.
 
 Delta does not provide server-side account recovery. A lost user-managed restic password may make the repository permanently unreadable.
 

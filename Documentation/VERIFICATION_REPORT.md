@@ -4,15 +4,15 @@ Date: 17 July 2026
 
 Host: macOS 26.5.2 (25F84)
 
-Candidate: Delta 0.3.0 (3)
+Candidate: Delta 0.3.0 (4)
 
-Status: release verification in progress
+Status: exact-candidate verification contract
 
 ## Outcome
 
-Delta's source, deterministic acceptance harnesses, Developer ID build, stable installer, notarization flow, Sparkle packaging, privacy controls, and production-readiness checks have all been exercised successfully during this release cycle. The last exact signed candidate passed the complete automated gate and Apple notarization, but it still used the already-published `0.2.0` (2) identity. That version collision invalidated it as the next public release.
+Delta's source, deterministic acceptance harnesses, Developer ID build, stable installer, notarization flow, Sparkle packaging, privacy controls, and production-readiness checks are covered by the release contract below. The source identifies the next candidate as `0.3.0` (4).
 
-The source now identifies the next candidate as `0.3.0` (3). A release must not be merged, tagged, or published until the complete exact-commit gate, separate app and DMG notarization, stapling, Gatekeeper checks, signed-update installation, manual acceptance matrix, and required genuine external-provider evidence have been repeated for this version. Generated evidence under `dist/` is authoritative for the commit, installed path, CDHash, notarization IDs, artifact hashes, and acceptance results; this tracked report deliberately does not duplicate volatile identity values.
+A release must not be merged, tagged, or published until the complete exact-commit gate, separate app and DMG notarization, stapling, Gatekeeper checks, signed-update installation, manual acceptance matrix, and required genuine external-provider evidence have all passed for this version. Generated evidence under `dist/` is authoritative for the commit, installed path, CDHash, notarization IDs, artifact hashes, command results, and acceptance status; this tracked report deliberately does not duplicate volatile identity values or claim that an unverified source commit has passed.
 
 ## Implemented and reviewed changes
 
@@ -62,11 +62,9 @@ Finalization requires separate accepted Apple submissions for the app archive an
 
 `Scripts/doctor-production-readiness.sh` and `Scripts/verify-production-readiness.sh` remain fail closed until those artifacts, the complete manual matrix, and genuine external-provider evidence agree. `Scripts/publish-release.sh` must then stage a draft, download and reverify the six public assets in a fresh directory, and only publish when every check still passes.
 
-## Current release blockers
+## Required release handoff
 
-1. Rebuild, install, and repeat all exact-commit automated, signing, Apple notarization, stapling, Gatekeeper, and evidence checks for `0.3.0` (3).
+1. Build, install, and complete all exact-commit automated, signing, Apple notarization, stapling, Gatekeeper, and evidence checks for `0.3.0` (4).
 2. Complete every row of the exact-candidate manual acceptance matrix, including a real signed Sparkle upgrade and system-delivered notifications.
 3. Provide and exercise genuine external mounted SMB or NFS, non-local SFTP, and non-local S3-compatible fixtures, plus any additional backend families intended for this release.
 4. Obtain a fully passing production-readiness result before merging, tagging `v0.3.0`, or publishing.
-
-No `v0.3.0` tag or public release has been created.

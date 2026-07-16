@@ -171,7 +171,7 @@ Use **Settings → Updates** or **Updates** in the menu-bar panel. Delta checks 
 - **Saved Passwords needs repair:** use Settings → Permissions to review access and rewrite the Keychain access list for the currently signed Delta app.
 - **A destination is unavailable or locked:** reconnect it, verify credentials, and ensure another restic client is not operating on the same repository.
 - **An update is unavailable:** use Check Now, confirm network access to GitHub Releases, or install the notarized DMG manually.
-- **Support needs evidence:** copy or export the sanitized diagnostic report from Settings. Known secrets and credential-bearing URLs are redacted.
+- **Support needs evidence:** copy or export the sanitized diagnostic report from Settings. Known secrets, credential-bearing URLs, and personal home-directory names are redacted.
 
 ## Documentation
 
