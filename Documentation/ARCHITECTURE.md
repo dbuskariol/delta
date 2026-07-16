@@ -21,7 +21,7 @@ The main app and agent share `DeltaCore`; there is no network service, privilege
 3. Destination passwords and provider credentials are stored as generic-password items in the login Keychain.
 4. Before work begins, Delta validates the profile, resolves source bookmarks, checks destination availability, and acquires a cross-process destination lock.
 5. `ResticCommandBuilder` constructs a command and a curated environment. Passwords are supplied through a signed password command or short-lived standard input.
-6. `ResticRunner` streams stdout/stderr, maps exit states, redacts sensitive values, and persists bounded operational history.
+6. `ResticRunner` streams UTF-8-safe stdout/stderr, maps exit states, redacts sensitive values, applies command-specific bounded capture, and persists bounded operational history. Complete structured responses fail closed if their parsing limit is exceeded; long-running operational commands retain their final output tail.
 7. Successful backup or cleanup work refreshes the authoritative restore-point cache from restic.
 
 ## Persistence

@@ -3,6 +3,7 @@ import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject private var model: DeltaAppModel
+    @State private var isPresentingDestinationSheet = false
 
     var body: some View {
         NavigationSplitView {
@@ -26,13 +27,13 @@ struct ContentView: View {
         } detail: {
             switch model.selectedSection {
             case .dashboard:
-                DashboardView()
+                DashboardView(onAddDestination: presentDestinationEditor)
             case .backups:
-                BackupsView()
+                BackupsView(onAddDestination: presentDestinationEditor)
             case .destinations:
-                DestinationsView()
+                DestinationsView(isPresentingDestinationSheet: $isPresentingDestinationSheet)
             case .restore:
-                RestoreView()
+                RestoreView(onAddDestination: presentDestinationEditor)
             case .activity:
                 ActivityView()
             case .settings:
@@ -95,10 +96,16 @@ struct ContentView: View {
         .buttonStyle(.plain)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
+
+    private func presentDestinationEditor() {
+        model.selectedSection = .destinations
+        isPresentingDestinationSheet = true
+    }
 }
 
 struct DashboardView: View {
     @EnvironmentObject private var model: DeltaAppModel
+    var onAddDestination: () -> Void
     @AppStorage(
         DeltaAppPreferenceKeys.backupFreshnessWarningHours,
         store: DeltaAppPreferences.sharedStore()
@@ -285,9 +292,11 @@ struct DashboardView: View {
             SectionHeader(title: "Backup Overview")
             DashboardBackupOverview(
                 profiles: model.profiles,
+                destinationCount: model.repositories.count,
                 jobs: model.jobs,
                 acknowledgedWarningIssueCounts: model.acknowledgedWarningIssueCounts,
-                onOpenBackups: { model.selectedSection = .backups }
+                onOpenBackups: { model.selectedSection = .backups },
+                onOpenDestinations: onAddDestination
             )
         }
     }
@@ -349,9 +358,11 @@ struct DashboardView: View {
 
 private struct DashboardBackupOverview: View {
     var profiles: [BackupProfile]
+    var destinationCount: Int
     var jobs: [JobRun]
     var acknowledgedWarningIssueCounts: [UUID: Int]
     var onOpenBackups: () -> Void
+    var onOpenDestinations: () -> Void
 
     var body: some View {
         Card {
@@ -361,12 +372,12 @@ private struct DashboardBackupOverview: View {
                     VStack(alignment: .leading, spacing: 3) {
                         Text("No backup profiles")
                             .font(.headline)
-                        Text("Add a destination, then create a profile for the folders or volume you want to protect.")
+                        Text(emptyStateMessage)
                             .font(.callout)
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
-                    Button("Open Backups", action: onOpenBackups)
+                    Button(emptyStateActionTitle, action: emptyStateAction)
                         .buttonStyle(.bordered)
                 }
             } else {
@@ -404,6 +415,21 @@ private struct DashboardBackupOverview: View {
                 }
             }
         }
+    }
+
+    private var emptyStateMessage: String {
+        if destinationCount == 0 {
+            return "Add a destination for encrypted restore points, then choose the folders or volume to protect."
+        }
+        return "Create a profile for the folders or volume you want to protect."
+    }
+
+    private var emptyStateActionTitle: String {
+        destinationCount == 0 ? "Add Destination" : "Open Backups"
+    }
+
+    private var emptyStateAction: () -> Void {
+        destinationCount == 0 ? onOpenDestinations : onOpenBackups
     }
 
     private var latestBackup: JobRun? {
@@ -513,6 +539,7 @@ private struct DashboardBackupFact: View {
 
 struct BackupsView: View {
     @EnvironmentObject private var model: DeltaAppModel
+    var onAddDestination: () -> Void
     @State private var isPresentingProfileSheet = false
 
     var body: some View {
@@ -520,26 +547,32 @@ struct BackupsView: View {
             title: "Backups",
             subtitle: "Sources, schedules, and retention",
             actions: {
-                Button {
-                    isPresentingProfileSheet = true
-                } label: {
-                    Label("New profile", systemImage: "plus")
+                if !model.repositories.isEmpty && !model.profiles.isEmpty {
+                    Button {
+                        isPresentingProfileSheet = true
+                    } label: {
+                        Label("New profile", systemImage: "plus")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(!model.isPersistentStoreAvailable)
                 }
-                .buttonStyle(.borderedProminent)
-                .disabled(model.repositories.isEmpty || !model.isPersistentStoreAvailable)
             }
         ) {
             if model.repositories.isEmpty {
                 EmptyStateView(
                     symbol: "shippingbox",
                     title: "Create a destination first",
-                    message: "Backups need a local drive, mounted network drive, or cloud destination."
+                    message: "Backups need a local drive, mounted network drive, or cloud destination.",
+                    actionTitle: "Add Destination",
+                    action: onAddDestination
                 )
             } else if model.profiles.isEmpty {
                 EmptyStateView(
                     symbol: "externaldrive.badge.plus",
                     title: "No profiles yet",
-                    message: "Create a profile for a full volume or selected folders."
+                    message: "Create a profile for a full volume or selected folders.",
+                    actionTitle: "New Profile",
+                    action: { isPresentingProfileSheet = true }
                 )
             } else {
                 VStack(spacing: 10) {
@@ -606,27 +639,31 @@ private struct DashboardHealthCard: View {
 
 struct DestinationsView: View {
     @EnvironmentObject private var model: DeltaAppModel
-    @State private var isPresentingDestinationSheet = false
+    @Binding var isPresentingDestinationSheet: Bool
 
     var body: some View {
         PageScaffold(
             title: "Destinations",
             subtitle: "Where encrypted backups are stored",
             actions: {
-                Button {
-                    isPresentingDestinationSheet = true
-                } label: {
-                    Label("New destination", systemImage: "plus")
+                if !model.repositories.isEmpty {
+                    Button {
+                        isPresentingDestinationSheet = true
+                    } label: {
+                        Label("New destination", systemImage: "plus")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(!model.isPersistentStoreAvailable)
                 }
-                .buttonStyle(.borderedProminent)
-                .disabled(!model.isPersistentStoreAvailable)
             }
         ) {
             if model.repositories.isEmpty {
                 EmptyStateView(
                     symbol: "shippingbox",
                     title: "No destinations",
-                    message: "Add a drive, NAS path, or cloud location to store encrypted restore points."
+                    message: "Add a drive, NAS path, or cloud location to store encrypted restore points.",
+                    actionTitle: "New Destination",
+                    action: { isPresentingDestinationSheet = true }
                 )
             } else {
                 VStack(spacing: 10) {
@@ -645,6 +682,7 @@ struct DestinationsView: View {
 
 struct RestoreView: View {
     @EnvironmentObject private var model: DeltaAppModel
+    var onAddDestination: () -> Void
     @AppStorage(
         DeltaAppPreferenceKeys.previewsRestoresByDefault,
         store: DeltaAppPreferences.sharedStore()
@@ -676,152 +714,28 @@ struct RestoreView: View {
             title: "Restore",
             subtitle: "Browse an earlier backup and recover exactly what you need",
             actions: {
-                Button {
-                    if let repository = selectedRepository {
-                        model.refreshSnapshots(repository: repository)
+                if !model.repositories.isEmpty {
+                    Button {
+                        if let repository = selectedRepository {
+                            model.refreshSnapshots(repository: repository)
+                        }
+                    } label: {
+                        Label("Refresh Points", systemImage: "arrow.clockwise")
                     }
-                } label: {
-                    Label("Refresh Points", systemImage: "arrow.clockwise")
+                    .disabled(selectedRepository == nil || model.isWorking)
                 }
-                .disabled(selectedRepository == nil || model.isWorking)
             }
         ) {
-            RestoreStepCard(number: 1, title: "Restore Point", subtitle: "Choose where the backup is stored and the point in time.") {
-                RestoreForm {
-                    RestoreFormRow(title: "Destination") {
-                        Picker("Destination", selection: $repositoryID) {
-                            Text("Choose").tag(UUID?.none)
-                            ForEach(model.repositories) { repository in
-                                Text(repository.name).tag(Optional(repository.id))
-                            }
-                        }
-                        .labelsHidden()
-                        .frame(width: 300, alignment: .leading)
-                    }
-
-                    RestoreFormRow(title: "Restore Point") {
-                        Picker("Restore Point", selection: $snapshotID) {
-                            Text("Choose").tag("")
-                            ForEach(repositorySnapshots) { snapshot in
-                                Text(restorePointLabel(for: snapshot)).tag(snapshot.id)
-                            }
-                        }
-                        .labelsHidden()
-                        .frame(width: 420, alignment: .leading)
-                    }
-
-                    if let selectedRestorePointSummary {
-                        RestoreFormRow(title: "") {
-                            Text(selectedRestorePointSummary)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                                .truncationMode(.tail)
-                        }
-                    }
-                }
-            }
-
-            RestoreStepCard(number: 2, title: "Scope", subtitle: "Restore everything from that point, or limit recovery to selected paths.") {
-                SnapshotBrowserPanel(
-                    entries: browserEntries,
-                    selectedPaths: $selectedRestorePaths,
-                    expandedPaths: $expandedBrowserPaths,
-                    repository: selectedRepository,
-                    snapshotID: snapshotID,
-                    currentPath: currentBrowserDirectory,
-                    selectedCount: normalizedSelectedRestorePaths.count,
-                    isLoading: isLoadingBrowserEntries,
-                    canBrowse: canBrowseSnapshot,
-                    emptyMessage: browserEmptyMessage,
-                    onOpen: openBrowserDirectory,
-                    onBack: navigateBrowserBack,
-                    onRoot: navigateBrowserRoot,
-                    onRefresh: refreshCurrentBrowserDirectory,
-                    onClearSelection: clearRestoreSelection,
-                    onLoadChildren: loadBrowserDirectoryChildren
+            if model.repositories.isEmpty {
+                EmptyStateView(
+                    symbol: "arrow.uturn.backward.circle",
+                    title: "No destinations to restore from",
+                    message: "Add a destination and create a restore point before recovering files.",
+                    actionTitle: "Add Destination",
+                    action: onAddDestination
                 )
-            }
-
-            RestoreStepCard(number: 3, title: "Destination", subtitle: "Preview by default, then restore to a chosen folder or original paths.") {
-                VStack(alignment: .leading, spacing: 14) {
-                    RestoreFormRow(title: "") {
-                        Toggle("Restore to original paths", isOn: $restoreOriginalPaths)
-                            .toggleStyle(.checkbox)
-                    }
-
-                    if restoreOriginalPaths && !dryRun {
-                        InlineWarning(
-                            symbol: "exclamationmark.triangle",
-                            title: "In-place restore can overwrite current files.",
-                            message: "Create a pre-restore backup and confirm this operation before continuing."
-                        )
-                        RestoreFormRow(title: "") {
-                            Toggle("I understand this in-place restore can overwrite current files.", isOn: $acknowledgedInPlaceRestore)
-                                .toggleStyle(.checkbox)
-                        }
-                    }
-
-                    RestoreFormRow(title: "Destination") {
-                        HStack(spacing: 8) {
-                            TextField("Destination folder", text: $destinationPath)
-                                .textFieldStyle(.roundedBorder)
-                                .disabled(restoreOriginalPaths)
-                            Button {
-                                if let path = model.chooseFolder().first {
-                                    destinationPath = path
-                                }
-                            } label: {
-                                Image(systemName: "folder")
-                            }
-                            .disabled(restoreOriginalPaths)
-                            .deltaTooltip("Choose destination folder")
-                        }
-                    }
-
-                    RestoreFormRow(title: "Existing files") {
-                        Picker("Conflicts", selection: $conflictPolicy) {
-                            ForEach(RestoreConflictPolicy.allCases, id: \.self) { policy in
-                                Text(policy.displayName).tag(policy)
-                            }
-                        }
-                        .labelsHidden()
-                        .frame(width: 220, alignment: .leading)
-                    }
-
-                    RestoreFormRow(title: "Options") {
-                        Toggle("Preview only", isOn: $dryRun)
-                            .toggleStyle(.checkbox)
-                        Toggle("Verify files", isOn: $verify)
-                            .toggleStyle(.checkbox)
-                            .disabled(dryRun)
-                            .deltaTooltip(dryRun ? "Verification runs after a real restore writes files." : "Verify restored file contents after writing.")
-                    }
-
-                    RestoreFormRow(title: "Safety backup") {
-                        Picker("Pre-restore backup", selection: $preRestoreProfileID) {
-                            Text("None").tag(UUID?.none)
-                            ForEach(model.profiles) { profile in
-                                Text(profile.name).tag(Optional(profile.id))
-                            }
-                        }
-                        .labelsHidden()
-                        .frame(width: 300, alignment: .leading)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-
-            HStack {
-                Spacer()
-                Button {
-                    runRestore()
-                } label: {
-                    Label(dryRun ? "Preview Restore" : "Start Restore", systemImage: dryRun ? "doc.text.magnifyingglass" : "arrow.uturn.backward.circle")
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                .disabled(!canRestore || model.isWorking || !model.isPersistentStoreAvailable)
+            } else {
+                restoreWorkflow
             }
         }
         .onAppear {
@@ -844,6 +758,147 @@ struct RestoreView: View {
         }
         .onChange(of: restoreDefaults) { _, _ in
             applyRestoreDefaultsIfNeeded()
+        }
+    }
+
+    @ViewBuilder
+    private var restoreWorkflow: some View {
+        RestoreStepCard(number: 1, title: "Restore Point", subtitle: "Choose where the backup is stored and the point in time.") {
+            RestoreForm {
+                RestoreFormRow(title: "Destination") {
+                    Picker("Destination", selection: $repositoryID) {
+                        Text("Choose").tag(UUID?.none)
+                        ForEach(model.repositories) { repository in
+                            Text(repository.name).tag(Optional(repository.id))
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(width: 300, alignment: .leading)
+                }
+
+                RestoreFormRow(title: "Restore Point") {
+                    Picker("Restore Point", selection: $snapshotID) {
+                        Text("Choose").tag("")
+                        ForEach(repositorySnapshots) { snapshot in
+                            Text(restorePointLabel(for: snapshot)).tag(snapshot.id)
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(width: 420, alignment: .leading)
+                }
+
+                if let selectedRestorePointSummary {
+                    RestoreFormRow(title: "") {
+                        Text(selectedRestorePointSummary)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
+                }
+            }
+        }
+
+        RestoreStepCard(number: 2, title: "Scope", subtitle: "Restore everything from that point, or limit recovery to selected paths.") {
+            SnapshotBrowserPanel(
+                entries: browserEntries,
+                selectedPaths: $selectedRestorePaths,
+                expandedPaths: $expandedBrowserPaths,
+                repository: selectedRepository,
+                snapshotID: snapshotID,
+                currentPath: currentBrowserDirectory,
+                selectedCount: normalizedSelectedRestorePaths.count,
+                isLoading: isLoadingBrowserEntries,
+                canBrowse: canBrowseSnapshot,
+                emptyMessage: browserEmptyMessage,
+                onOpen: openBrowserDirectory,
+                onBack: navigateBrowserBack,
+                onRoot: navigateBrowserRoot,
+                onRefresh: refreshCurrentBrowserDirectory,
+                onClearSelection: clearRestoreSelection,
+                onLoadChildren: loadBrowserDirectoryChildren
+            )
+        }
+
+        RestoreStepCard(number: 3, title: "Destination", subtitle: "Preview by default, then restore to a chosen folder or original paths.") {
+            VStack(alignment: .leading, spacing: 14) {
+                RestoreFormRow(title: "") {
+                    Toggle("Restore to original paths", isOn: $restoreOriginalPaths)
+                        .toggleStyle(.checkbox)
+                }
+
+                if restoreOriginalPaths && !dryRun {
+                    InlineWarning(
+                        symbol: "exclamationmark.triangle",
+                        title: "In-place restore can overwrite current files.",
+                        message: "Create a pre-restore backup and confirm this operation before continuing."
+                    )
+                    RestoreFormRow(title: "") {
+                        Toggle("I understand this in-place restore can overwrite current files.", isOn: $acknowledgedInPlaceRestore)
+                            .toggleStyle(.checkbox)
+                    }
+                }
+
+                RestoreFormRow(title: "Destination") {
+                    HStack(spacing: 8) {
+                        TextField("Destination folder", text: $destinationPath)
+                            .textFieldStyle(.roundedBorder)
+                            .disabled(restoreOriginalPaths)
+                        Button {
+                            if let path = model.chooseFolder().first {
+                                destinationPath = path
+                            }
+                        } label: {
+                            Image(systemName: "folder")
+                        }
+                        .disabled(restoreOriginalPaths)
+                        .deltaTooltip("Choose destination folder")
+                    }
+                }
+
+                RestoreFormRow(title: "Existing files") {
+                    Picker("Conflicts", selection: $conflictPolicy) {
+                        ForEach(RestoreConflictPolicy.allCases, id: \.self) { policy in
+                            Text(policy.displayName).tag(policy)
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(width: 220, alignment: .leading)
+                }
+
+                RestoreFormRow(title: "Options") {
+                    Toggle("Preview only", isOn: $dryRun)
+                        .toggleStyle(.checkbox)
+                    Toggle("Verify files", isOn: $verify)
+                        .toggleStyle(.checkbox)
+                        .disabled(dryRun)
+                        .deltaTooltip(dryRun ? "Verification runs after a real restore writes files." : "Verify restored file contents after writing.")
+                }
+
+                RestoreFormRow(title: "Safety backup") {
+                    Picker("Pre-restore backup", selection: $preRestoreProfileID) {
+                        Text("None").tag(UUID?.none)
+                        ForEach(model.profiles) { profile in
+                            Text(profile.name).tag(Optional(profile.id))
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(width: 300, alignment: .leading)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+
+        HStack {
+            Spacer()
+            Button {
+                runRestore()
+            } label: {
+                Label(dryRun ? "Preview Restore" : "Start Restore", systemImage: dryRun ? "doc.text.magnifyingglass" : "arrow.uturn.backward.circle")
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .disabled(!canRestore || model.isWorking || !model.isPersistentStoreAvailable)
         }
     }
 
@@ -1634,74 +1689,83 @@ struct ActivityView: View {
     }
 
     private var activityWorkspace: some View {
-        HStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 0) {
-                HStack {
-                    Text("Runs")
-                        .font(.headline)
-                    Spacer()
-                    Picker("Filter", selection: $jobFilter) {
-                        ForEach(ActivityJobFilter.allCases) { filter in
-                            Text(filter.title).tag(filter)
-                        }
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
-                    .frame(width: 150)
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 12)
-
-                Divider()
-
-                if visibleJobs.isEmpty {
+        Group {
+            if visibleJobs.isEmpty {
+                VStack(alignment: .leading, spacing: 0) {
+                    activityListHeader
+                    Divider()
                     ContentUnavailableView(
                         jobFilter == .attention ? "No Runs Need Attention" : "No Runs Yet",
                         systemImage: jobFilter == .attention ? "checkmark.circle" : "clock.arrow.circlepath",
                         description: Text(jobFilter == .attention ? "Warning and failed runs appear here." : "Backup and maintenance history will appear here.")
                     )
-                } else {
-                    List(selection: $selectedJobID) {
-                        ForEach(visibleJobs) { job in
-                            ActivityJobListRow(
-                                job: job,
-                                profileName: profileName(for: job),
-                                outcome: model.outcomePresentation(for: job)
-                            )
-                            .tag(job.id)
-                        }
-                    }
-                    .listStyle(.plain)
-                    .scrollContentBackground(.hidden)
-                    .frame(minHeight: 0, maxHeight: .infinity)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-            }
-            .frame(width: 300)
-            .frame(minHeight: 0, maxHeight: .infinity)
-            .clipped()
-
-            Divider()
-
-            if let selectedJob {
-                ActivityJobDetailView(
-                    job: selectedJob,
-                    profileName: profileName(for: selectedJob),
-                    repositoryName: repositoryName(for: selectedJob)
-                )
-                .id(selectedJob.id)
-                .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
-                .clipped()
             } else {
-                ContentUnavailableView(
-                    "Select a Run",
-                    systemImage: "waveform.path.ecg",
-                    description: Text("Choose a run to inspect its result and output.")
-                )
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                HStack(spacing: 0) {
+                    VStack(alignment: .leading, spacing: 0) {
+                        activityListHeader
+                        Divider()
+                        List(selection: $selectedJobID) {
+                            ForEach(visibleJobs) { job in
+                                ActivityJobListRow(
+                                    job: job,
+                                    profileName: profileName(for: job),
+                                    outcome: model.outcomePresentation(for: job)
+                                )
+                                .tag(job.id)
+                            }
+                        }
+                        .listStyle(.plain)
+                        .scrollContentBackground(.hidden)
+                        .frame(minHeight: 0, maxHeight: .infinity)
+                    }
+                    .frame(width: 300)
+                    .frame(minHeight: 0, maxHeight: .infinity)
+                    .clipped()
+
+                    Divider()
+
+                    if let selectedJob {
+                        ActivityJobDetailView(
+                            job: selectedJob,
+                            profileName: profileName(for: selectedJob),
+                            repositoryName: repositoryName(for: selectedJob)
+                        )
+                        .id(selectedJob.id)
+                        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+                        .clipped()
+                    } else {
+                        ContentUnavailableView(
+                            "Select a Run",
+                            systemImage: "waveform.path.ecg",
+                            description: Text("Choose a run to inspect its result and output.")
+                        )
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
+                }
             }
         }
         .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
         .clipped()
+    }
+
+    private var activityListHeader: some View {
+        HStack {
+            Text("Runs")
+                .font(.headline)
+            Spacer()
+            Picker("Filter", selection: $jobFilter) {
+                ForEach(ActivityJobFilter.allCases) { filter in
+                    Text(filter.title).tag(filter)
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+            .frame(width: 150)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
     }
 
     private var visibleJobs: [JobRun] {
@@ -3982,6 +4046,7 @@ struct ProfileRow: View {
     @EnvironmentObject private var model: DeltaAppModel
     var profile: BackupProfile
     @State private var isPresentingEditor = false
+    @State private var isConfirmingCleanup = false
     @State private var isConfirmingDelete = false
 
     var body: some View {
@@ -4031,7 +4096,7 @@ struct ProfileRow: View {
                                 Label("Edit Profile", systemImage: "pencil")
                             }
                             Button {
-                                model.prune(profile: profile)
+                                isConfirmingCleanup = true
                             } label: {
                                 Label("Clean Up Old Backups", systemImage: "scissors")
                             }
@@ -4087,6 +4152,14 @@ struct ProfileRow: View {
             ProfileEditorView(profile: profile)
                 .environmentObject(model)
                 .frame(width: ModalMetrics.sheetWidth, height: ModalMetrics.sheetHeight)
+        }
+        .confirmationDialog("Clean Up Old Restore Points?", isPresented: $isConfirmingCleanup) {
+            Button("Clean Up", role: .destructive) {
+                model.prune(profile: profile)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Delta will permanently forget restore points outside this profile's retention rules and reclaim unreferenced data from \(repositoryName). A destination check runs afterward when enabled.")
         }
         .confirmationDialog("Delete Backup Profile?", isPresented: $isConfirmingDelete) {
             Button("Delete", role: .destructive) {
@@ -6253,20 +6326,47 @@ struct EmptyStateView: View {
     var symbol: String
     var title: String
     var message: String
+    var actionTitle: String?
+    var action: (() -> Void)?
+
+    init(
+        symbol: String,
+        title: String,
+        message: String,
+        actionTitle: String? = nil,
+        action: (() -> Void)? = nil
+    ) {
+        self.symbol = symbol
+        self.title = title
+        self.message = message
+        self.actionTitle = actionTitle
+        self.action = action
+    }
 
     var body: some View {
         Card {
-            VStack(spacing: 8) {
+            VStack(spacing: 13) {
                 Image(systemName: symbol)
-                    .font(.system(size: 32))
+                    .font(.system(size: 28, weight: .medium))
                     .foregroundStyle(.secondary)
+                    .frame(width: 58, height: 58)
+                    .background(.quaternary, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
                 Text(title)
-                    .font(.headline)
+                    .font(.title2.weight(.semibold))
                 Text(message)
+                    .font(.callout)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: 420)
+                if let actionTitle, let action {
+                    Button(actionTitle, action: action)
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.large)
+                }
             }
-            .frame(maxWidth: .infinity, minHeight: 170)
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity, minHeight: 220)
         }
     }
 }

@@ -1511,6 +1511,10 @@ final class DeltaAppModel: ObservableObject {
 
     private func performBackgroundJobWork(activeOperation: ActiveOperation, _ operation: @escaping @Sendable () throws -> [JobRun]) {
         guard requirePersistentDatabase() != nil else { return }
+        guard !isWorking else {
+            alertMessage = "Wait for the current Delta job to finish before starting another operation."
+            return
+        }
         runController.reset()
         localOperationIsRunning = true
         isWorking = true

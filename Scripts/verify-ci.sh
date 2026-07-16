@@ -2,7 +2,19 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$ROOT_DIR/Scripts/lib/delta-release.sh"
 cd "$ROOT_DIR"
+
+while IFS= read -r -d '' script; do
+  /bin/bash -n "$script"
+done < <(/usr/bin/find "$ROOT_DIR/Scripts" -type f -name '*.sh' -print0)
+/usr/bin/xcrun swiftc -typecheck "$ROOT_DIR/Scripts/sparkle-public-key.swift"
+/usr/bin/plutil -lint "$ROOT_DIR/Packaging/Delta.app.plist" >/dev/null
+/usr/bin/plutil -lint "$ROOT_DIR/Packaging/Delta.entitlements" >/dev/null
+/usr/bin/plutil -lint "$ROOT_DIR/Packaging/com.delta.backup.agent.plist" >/dev/null
+/usr/bin/plutil -lint "$ROOT_DIR/Resources/PrivacyInfo.xcprivacy" >/dev/null
+/usr/bin/git -C "$ROOT_DIR" diff --check
+IFS=$'\t' read -r VERSION BUILD < <(delta_assert_release_metadata "$ROOT_DIR")
 
 /usr/bin/swift test
 
@@ -14,19 +26,6 @@ cd "$ROOT_DIR"
 "$ROOT_DIR/Scripts/manual-acceptance-status-self-test.sh"
 "$ROOT_DIR/Scripts/record-manual-acceptance-result-self-test.sh"
 "$ROOT_DIR/Scripts/verify-ci-workflows.sh"
-/bin/bash -n "$ROOT_DIR/Scripts/manual-acceptance-status.sh"
-/bin/bash -n "$ROOT_DIR/Scripts/manual-acceptance-status-self-test.sh"
-/bin/bash -n "$ROOT_DIR/Scripts/record-manual-acceptance-result.sh"
-/bin/bash -n "$ROOT_DIR/Scripts/record-manual-acceptance-result-self-test.sh"
-/bin/bash -n "$ROOT_DIR/Scripts/run-installed-local-s3-acceptance.sh"
-/bin/bash -n "$ROOT_DIR/Scripts/run-installed-local-sftp-acceptance.sh"
-/bin/bash -n "$ROOT_DIR/Scripts/run-installed-local-rest-acceptance.sh"
-/bin/bash -n "$ROOT_DIR/Scripts/run-installed-menu-bar-surface-acceptance.sh"
-/bin/bash -n "$ROOT_DIR/Scripts/run-installed-mounted-volume-acceptance.sh"
-/bin/bash -n "$ROOT_DIR/Scripts/run-installed-rclone-local-acceptance.sh"
-/bin/bash -n "$ROOT_DIR/Scripts/preflight-external-backend-acceptance.sh"
-/bin/bash -n "$ROOT_DIR/Scripts/verify-external-acceptance-evidence.sh"
-/bin/bash -n "$ROOT_DIR/Scripts/verify-external-acceptance-evidence-self-test.sh"
 if [[ ! -x "$ROOT_DIR/Scripts/preflight-external-backend-acceptance.sh" ]]; then
   printf "Scripts/preflight-external-backend-acceptance.sh must be executable.\n" >&2
   exit 1
@@ -109,14 +108,28 @@ SOURCE_INFO="$ROOT_DIR/Packaging/Delta.app.plist"
 [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$SOURCE_INFO")" == '$(MARKETING_VERSION)' ]]
 [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$SOURCE_INFO")" == '$(CURRENT_PROJECT_VERSION)' ]]
 [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$INFO")" == "com.delta.backup" ]]
-[[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$INFO")" == "0.2.0" ]]
-[[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$INFO")" =~ ^[1-9][0-9]*$ ]]
-[[ "$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "$INFO")" == "26.0" ]]
+[[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$INFO")" == "$VERSION" ]]
+[[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$INFO")" == "$BUILD" ]]
+[[ "$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "$INFO")" == "$DELTA_EXPECTED_MINIMUM_SYSTEM" ]]
+[[ "$(/usr/libexec/PlistBuddy -c 'Print :SUFeedURL' "$INFO")" == "$DELTA_EXPECTED_FEED_URL" ]]
 [[ "$(/usr/libexec/PlistBuddy -c 'Print :SURequireSignedFeed' "$INFO")" == "true" ]]
 [[ "$(/usr/libexec/PlistBuddy -c 'Print :SUVerifyUpdateBeforeExtraction' "$INFO")" == "true" ]]
-[[ -f "$ROOT_DIR/dist/Delta.app/Contents/Resources/PrivacyInfo.xcprivacy" ]]
+PUBLIC_KEY="$(/usr/libexec/PlistBuddy -c 'Print :SUPublicEDKey' "$INFO")"
+[[ "$PUBLIC_KEY" =~ ^[A-Za-z0-9+/=]{40,}$ ]]
+
+PRIVACY_MANIFEST="$ROOT_DIR/dist/Delta.app/Contents/Resources/PrivacyInfo.xcprivacy"
+[[ -f "$PRIVACY_MANIFEST" ]]
+/usr/bin/plutil -lint "$PRIVACY_MANIFEST" >/dev/null
+[[ "$(/usr/libexec/PlistBuddy -c 'Print :NSPrivacyTracking' "$PRIVACY_MANIFEST")" == "false" ]]
+[[ "$(/usr/bin/plutil -extract NSPrivacyCollectedDataTypes raw -o - "$PRIVACY_MANIFEST")" == "0" ]]
+[[ "$(/usr/bin/plutil -extract NSPrivacyTrackingDomains raw -o - "$PRIVACY_MANIFEST")" == "0" ]]
+
+HOST_ARCH="$(/usr/bin/uname -m)"
 for executable in Delta DeltaAgent DeltaSecretBridge restic rclone; do
-  [[ -x "$ROOT_DIR/dist/Delta.app/Contents/MacOS/$executable" ]]
+  EXECUTABLE_PATH="$ROOT_DIR/dist/Delta.app/Contents/MacOS/$executable"
+  [[ -x "$EXECUTABLE_PATH" ]]
+  ARCHITECTURES="$(/usr/bin/lipo -archs "$EXECUTABLE_PATH")"
+  [[ " $ARCHITECTURES " == *" $HOST_ARCH "* ]]
 done
 [[ -x "$ROOT_DIR/dist/Delta.app/Contents/Frameworks/Sparkle.framework/Versions/B/Sparkle" ]]
 

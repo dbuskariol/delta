@@ -113,6 +113,12 @@ public struct ResticBackupSummary: Codable, Equatable, Sendable {
 
 public enum ResticLogFormatter {
     public static func displayMessage(for rawMessage: String) -> String {
+        if let retentionMessage = retentionSummaryMessage(from: rawMessage) {
+            return retentionMessage
+        }
+        if let itemCount = jsonArrayItemCount(from: rawMessage) {
+            return "Structured operation output · \(itemCount.formatted()) \(itemCount == 1 ? "item" : "items")"
+        }
         guard let object = jsonObject(from: rawMessage) else {
             return SensitiveLogRedactor.redact(rawMessage.trimmingCharacters(in: .whitespacesAndNewlines))
         }
@@ -140,10 +146,24 @@ public enum ResticLogFormatter {
         guard let output else {
             return nil
         }
+        if let retentionMessage = retentionSummaryMessage(from: output) {
+            return retentionMessage
+        }
         for line in output.split(whereSeparator: \.isNewline).reversed() {
             guard
                 let object = jsonObject(from: String(line)),
                 object["message_type"] as? String == "summary"
+            else {
+                continue
+            }
+            return displayMessage(from: object, fallback: String(line))
+        }
+        for line in output.split(whereSeparator: \.isNewline).reversed() {
+            guard
+                let object = jsonObject(from: String(line)),
+                let messageType = object["message_type"] as? String,
+                messageType != "status",
+                messageType != "verbose_status"
             else {
                 continue
             }
@@ -193,6 +213,42 @@ public enum ResticLogFormatter {
             return nil
         }
         return object
+    }
+
+    private static func retentionSummaryMessage(from rawMessage: String) -> String? {
+        let trimmed = rawMessage.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard
+            trimmed.first == "[",
+            let data = trimmed.data(using: .utf8),
+            let groups = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]],
+            groups.allSatisfy({ $0["keep"] != nil || $0["remove"] != nil || $0["reasons"] != nil })
+        else {
+            return nil
+        }
+
+        let kept = groups.reduce(0) { count, group in
+            count + ((group["keep"] as? [Any])?.count ?? 0)
+        }
+        let removed = groups.reduce(0) { count, group in
+            count + ((group["remove"] as? [Any])?.count ?? 0)
+        }
+        return "Retention complete · kept \(restorePointCountText(kept)) · removed \(restorePointCountText(removed))"
+    }
+
+    private static func jsonArrayItemCount(from rawMessage: String) -> Int? {
+        let trimmed = rawMessage.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard
+            trimmed.first == "[",
+            let data = trimmed.data(using: .utf8),
+            let items = try? JSONSerialization.jsonObject(with: data) as? [Any]
+        else {
+            return nil
+        }
+        return items.count
+    }
+
+    private static func restorePointCountText(_ count: Int) -> String {
+        "\(count.formatted()) restore \(count == 1 ? "point" : "points")"
     }
 
     private static func displayMessage(from object: [String: Any], fallback: String) -> String {
@@ -263,7 +319,7 @@ public enum ResticLogFormatter {
     private static func genericSummaryMessage(from object: [String: Any]) -> String {
         var parts = ["Operation summary"]
         if let files = integer(object["total_files_processed"]) ?? integer(object["total_files"]) {
-            parts.append("\(files.formatted()) files")
+            parts.append("\(files.formatted()) items")
         }
         if let bytes = int64(object["total_bytes_processed"]) ?? int64(object["total_bytes"]) {
             parts.append(ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file))

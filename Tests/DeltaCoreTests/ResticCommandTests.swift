@@ -61,6 +61,7 @@ final class ResticCommandTests: XCTestCase {
             command.arguments[3],
             "'/Applications/Delta.app/Contents/MacOS/Delta' '--secret-bridge' 'account'"
         )
+        XCTAssertEqual(command.standardOutputCapturePolicy, .complete(maximumBytes: 64 * 1_024 * 1_024))
     }
 
     func testPasswordRotationCommandsKeepNewPasswordOutOfArgumentsEnvironmentAndLogs() throws {
@@ -216,6 +217,7 @@ final class ResticCommandTests: XCTestCase {
         XCTAssertTrue(command.arguments.contains("--keep-yearly"))
         XCTAssertTrue(command.arguments.contains("2"))
         XCTAssertTrue(command.arguments.contains("--prune"))
+        XCTAssertEqual(command.standardOutputCapturePolicy, .tail(maximumBytes: 8 * 1_024 * 1_024))
     }
 
     func testBackupCommandIgnoresNonPositiveBandwidthLimits() throws {

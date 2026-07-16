@@ -32,6 +32,33 @@ struct DeltaApp: App {
                 )
         }
         .windowStyle(.hiddenTitleBar)
+        .commands {
+            CommandGroup(replacing: .appSettings) {
+                Button("Settings…") {
+                    model.selectedSection = .settings
+                }
+                .keyboardShortcut(",", modifiers: .command)
+            }
+
+            CommandMenu("Navigate") {
+                navigationCommand("Dashboard", section: .dashboard, key: "1")
+                navigationCommand("Backups", section: .backups, key: "2")
+                navigationCommand("Destinations", section: .destinations, key: "3")
+                navigationCommand("Restore", section: .restore, key: "4")
+                navigationCommand("Activity", section: .activity, key: "5")
+            }
+        }
+    }
+
+    private func navigationCommand(
+        _ title: String,
+        section: DeltaAppModel.Section,
+        key: KeyEquivalent
+    ) -> some View {
+        Button(title) {
+            model.selectedSection = section
+        }
+        .keyboardShortcut(key, modifiers: .command)
     }
 
     private static func runCommandLineModeIfNeeded() {

@@ -22,6 +22,73 @@ final class ResticRunnerTests: XCTestCase {
         XCTAssertEqual(result.standardError, "stderr-line\n")
     }
 
+    func testRunnerPreservesStreamedUTF8WhenACharacterSpansPipeReads() throws {
+        let recorder = OutputRecorder()
+        let runner = ResticRunner { event in
+            recorder.append(event)
+        }
+        let command = ResticCommand(
+            executableURL: URL(fileURLWithPath: "/bin/sh"),
+            arguments: [
+                "-c",
+                "printf '\\342'; sleep 0.1; printf '\\202\\254-report.txt\\n'"
+            ]
+        )
+
+        let result = try runner.run(command)
+
+        XCTAssertEqual(result.standardOutput, "€-report.txt\n")
+        XCTAssertTrue(
+            recorder.events.contains {
+                $0.stream == .standardOutput && $0.message == "€-report.txt"
+            }
+        )
+    }
+
+    func testRunnerBoundsTailCaptureAndPreservesFinalOutput() throws {
+        let command = ResticCommand(
+            executableURL: URL(fileURLWithPath: "/bin/sh"),
+            arguments: ["-c", "i=0; while [ $i -lt 200 ]; do printf x; i=$((i+1)); done; printf '\\nfinal-line\\n'"],
+            standardOutputCapturePolicy: .tail(maximumBytes: 64),
+            maximumStreamedLineBytes: 64
+        )
+
+        let result = try ResticRunner().run(command)
+
+        XCTAssertTrue(result.standardOutputWasTruncated)
+        XCTAssertLessThanOrEqual(result.standardOutput.utf8.count, 64)
+        XCTAssertTrue(result.standardOutput.hasSuffix("final-line\n"))
+    }
+
+    func testRunnerRejectsTruncatedStructuredOutput() throws {
+        let command = ResticCommand(
+            executableURL: URL(fileURLWithPath: "/bin/sh"),
+            arguments: ["-c", "i=0; while [ $i -lt 200 ]; do printf x; i=$((i+1)); done"],
+            standardOutputCapturePolicy: .complete(maximumBytes: 64),
+            maximumStreamedLineBytes: 64
+        )
+
+        XCTAssertThrowsError(try ResticRunner().run(command)) { error in
+            XCTAssertEqual(error as? ResticRunnerError, .standardOutputLimitExceeded(maximumBytes: 64))
+        }
+    }
+
+    func testRunnerOmitsOversizedStreamedLineAndContinuesWithLaterLines() throws {
+        let recorder = OutputRecorder()
+        let command = ResticCommand(
+            executableURL: URL(fileURLWithPath: "/bin/sh"),
+            arguments: ["-c", "i=0; while [ $i -lt 200 ]; do printf x; i=$((i+1)); done; printf '\\nnext-line\\n'"],
+            standardOutputCapturePolicy: .tail(maximumBytes: 64),
+            maximumStreamedLineBytes: 64
+        )
+
+        _ = try ResticRunner(outputHandler: recorder.append).run(command)
+
+        XCTAssertTrue(recorder.events.contains { $0.message.contains("safety limit") })
+        XCTAssertTrue(recorder.events.contains { $0.message == "next-line" })
+        XCTAssertFalse(recorder.events.contains { $0.message.count == 200 })
+    }
+
     func testRunnerDeliversSensitiveInputThroughStandardInput() throws {
         let command = ResticCommand(
             executableURL: URL(fileURLWithPath: "/bin/sh"),
@@ -203,7 +270,30 @@ final class ResticRunnerTests: XCTestCase {
         {"message_type":"summary","total_files":12,"total_bytes":4096}
         """)
 
-        XCTAssertEqual(message, "Operation summary · 12 files · 4 KB")
+        XCTAssertEqual(message, "Operation summary · 12 items · 4 KB")
+    }
+
+    func testLogFormatterSummarizesRetentionJSONWithoutExposingSnapshotMetadata() {
+        let output = """
+        [{"keep":[{"username":"private-user","hostname":"private-mac.local"},{"username":"private-user"}],"remove":[{"username":"private-user","paths":["/Users/private-user/Documents"]}],"reasons":[]}]
+        """
+        let message = ResticLogFormatter.displayMessage(for: output)
+        let result = ResticRunResult(exitCode: 0, standardOutput: output, standardError: "")
+
+        XCTAssertEqual(message, "Retention complete · kept 2 restore points · removed 1 restore point")
+        XCTAssertEqual(result.userFacingMessage, message)
+        XCTAssertFalse(message.contains("private-user"))
+        XCTAssertFalse(message.contains("private-mac"))
+    }
+
+    func testLogFormatterDoesNotEchoUnknownStructuredArrays() {
+        let message = ResticLogFormatter.displayMessage(for: """
+        [{"username":"private-user","hostname":"private-mac.local"}]
+        """)
+
+        XCTAssertEqual(message, "Structured operation output · 1 item")
+        XCTAssertFalse(message.contains("private-user"))
+        XCTAssertFalse(message.contains("private-mac"))
     }
 
     func testLogFormatterTurnsResticErrorJSONIntoReadableItemMessage() {

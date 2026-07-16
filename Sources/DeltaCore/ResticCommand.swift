@@ -1,20 +1,45 @@
 import Foundation
 
+public enum ResticOutputCapturePolicy: Equatable, Sendable {
+    case complete(maximumBytes: Int)
+    case tail(maximumBytes: Int)
+
+    var maximumBytes: Int {
+        switch self {
+        case let .complete(maximumBytes), let .tail(maximumBytes):
+            max(maximumBytes, 1)
+        }
+    }
+
+    var requiresCompleteOutput: Bool {
+        if case .complete = self {
+            return true
+        }
+        return false
+    }
+}
+
 public struct ResticCommand: Equatable, Sendable {
     public var executableURL: URL
     public var arguments: [String]
     public var environment: [String: String]
+    public var standardOutputCapturePolicy: ResticOutputCapturePolicy
+    public var maximumStreamedLineBytes: Int
     var sensitiveStandardInput: Data?
 
     public init(
         executableURL: URL,
         arguments: [String],
         environment: [String: String] = [:],
+        standardOutputCapturePolicy: ResticOutputCapturePolicy = .complete(maximumBytes: 64 * 1_024 * 1_024),
+        maximumStreamedLineBytes: Int = 8 * 1_024 * 1_024,
         sensitiveStandardInput: Data? = nil
     ) {
         self.executableURL = executableURL
         self.arguments = arguments
         self.environment = environment
+        self.standardOutputCapturePolicy = standardOutputCapturePolicy
+        self.maximumStreamedLineBytes = max(maximumStreamedLineBytes, 1)
         self.sensitiveStandardInput = sensitiveStandardInput
     }
 
@@ -321,8 +346,20 @@ public struct ResticCommandBuilder: Sendable {
             executableURL: resticExecutableURL,
             arguments: globalArguments + subcommand,
             environment: environment,
+            standardOutputCapturePolicy: Self.outputCapturePolicy(for: subcommand),
             sensitiveStandardInput: sensitiveStandardInput
         )
+    }
+
+    private static func outputCapturePolicy(for subcommand: [String]) -> ResticOutputCapturePolicy {
+        switch subcommand.first {
+        case "snapshots", "ls":
+            .complete(maximumBytes: 64 * 1_024 * 1_024)
+        case "key" where subcommand.dropFirst().first == "list":
+            .complete(maximumBytes: 16 * 1_024 * 1_024)
+        default:
+            .tail(maximumBytes: 8 * 1_024 * 1_024)
+        }
     }
 
     private enum PasswordSource {

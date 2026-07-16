@@ -24,15 +24,26 @@ public struct ResticRunResult: Equatable, Sendable {
     public var exitCode: Int32
     public var standardOutput: String
     public var standardError: String
+    public var standardOutputWasTruncated: Bool
+    public var standardErrorWasTruncated: Bool
     public var stopReason: ResticRunStopReason?
     public var status: JobStatus
     public var failureKind: ResticFailureKind?
     public var userFacingMessage: String
 
-    public init(exitCode: Int32, standardOutput: String, standardError: String, stopReason: ResticRunStopReason? = nil) {
+    public init(
+        exitCode: Int32,
+        standardOutput: String,
+        standardError: String,
+        standardOutputWasTruncated: Bool = false,
+        standardErrorWasTruncated: Bool = false,
+        stopReason: ResticRunStopReason? = nil
+    ) {
         self.exitCode = exitCode
         self.standardOutput = standardOutput
         self.standardError = standardError
+        self.standardOutputWasTruncated = standardOutputWasTruncated
+        self.standardErrorWasTruncated = standardErrorWasTruncated
         self.stopReason = stopReason
         if let stopReason {
             self.status = .cancelled
@@ -51,6 +62,17 @@ public struct ResticRunResult: Equatable, Sendable {
                     standardError: standardError
                 )
             }
+        }
+    }
+}
+
+public enum ResticRunnerError: Error, Equatable, LocalizedError {
+    case standardOutputLimitExceeded(maximumBytes: Int)
+
+    public var errorDescription: String? {
+        switch self {
+        case let .standardOutputLimitExceeded(maximumBytes):
+            "The backup tool returned more than \(ByteCountFormatter.string(fromByteCount: Int64(maximumBytes), countStyle: .file)) of structured output. Delta stopped processing it instead of using incomplete data."
         }
     }
 }
@@ -329,12 +351,24 @@ public final class ResticRunner: ResticRunning, @unchecked Sendable {
             outputHandler?(event)
             additionalOutputHandler?(event)
         }
-        let stdoutCollector = DataCollector()
-        let stderrCollector = DataCollector()
-        let stdoutLines = LineEmitter(stream: .standardOutput, outputHandler: combinedOutputHandler)
-        let stderrLines = LineEmitter(stream: .standardError, outputHandler: combinedOutputHandler)
+        let stdoutCollector = DataCollector(policy: command.standardOutputCapturePolicy)
+        let stderrCollector = DataCollector(policy: .tail(maximumBytes: 4 * 1_024 * 1_024))
+        let stdoutLines = LineEmitter(
+            stream: .standardOutput,
+            maximumLineBytes: command.maximumStreamedLineBytes,
+            outputHandler: combinedOutputHandler
+        )
+        let stderrLines = LineEmitter(
+            stream: .standardError,
+            maximumLineBytes: command.maximumStreamedLineBytes,
+            outputHandler: combinedOutputHandler
+        )
+        let stdoutReadLock = NSLock()
+        let stderrReadLock = NSLock()
 
         stdoutPipe.fileHandleForReading.readabilityHandler = { handle in
+            stdoutReadLock.lock()
+            defer { stdoutReadLock.unlock() }
             let data = handle.availableData
             if !data.isEmpty {
                 stdoutCollector.append(data)
@@ -342,6 +376,8 @@ public final class ResticRunner: ResticRunning, @unchecked Sendable {
             }
         }
         stderrPipe.fileHandleForReading.readabilityHandler = { handle in
+            stderrReadLock.lock()
+            defer { stderrReadLock.unlock() }
             let data = handle.availableData
             if !data.isEmpty {
                 stderrCollector.append(data)
@@ -372,13 +408,35 @@ public final class ResticRunner: ResticRunning, @unchecked Sendable {
 
         stdoutPipe.fileHandleForReading.readabilityHandler = nil
         stderrPipe.fileHandleForReading.readabilityHandler = nil
+        stdoutReadLock.lock()
+        let remainingStandardOutput = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
+        stdoutReadLock.unlock()
+        if !remainingStandardOutput.isEmpty {
+            stdoutCollector.append(remainingStandardOutput)
+            stdoutLines.append(remainingStandardOutput)
+        }
+        stderrReadLock.lock()
+        let remainingStandardError = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+        stderrReadLock.unlock()
+        if !remainingStandardError.isEmpty {
+            stderrCollector.append(remainingStandardError)
+            stderrLines.append(remainingStandardError)
+        }
         stdoutLines.flush()
         stderrLines.flush()
+
+        if command.standardOutputCapturePolicy.requiresCompleteOutput, stdoutCollector.wasTruncated {
+            throw ResticRunnerError.standardOutputLimitExceeded(
+                maximumBytes: command.standardOutputCapturePolicy.maximumBytes
+            )
+        }
 
         return ResticRunResult(
             exitCode: process.terminationStatus,
             standardOutput: stdoutCollector.stringValue,
             standardError: stderrCollector.stringValue,
+            standardOutputWasTruncated: stdoutCollector.wasTruncated,
+            standardErrorWasTruncated: stderrCollector.wasTruncated,
             stopReason: controller?.requestedStopReason
         )
     }
@@ -437,19 +495,26 @@ private final class ResticStopRequestMonitor: @unchecked Sendable {
 private final class LineEmitter: @unchecked Sendable {
     private let lock = NSLock()
     private let stream: ResticOutputStream
+    private let maximumLineBytes: Int
     private let outputHandler: (@Sendable (ResticOutputEvent) -> Void)?
-    private var pending = ""
+    private var pending = Data()
+    private var isDiscardingOversizedLine = false
 
-    init(stream: ResticOutputStream, outputHandler: (@Sendable (ResticOutputEvent) -> Void)?) {
+    init(
+        stream: ResticOutputStream,
+        maximumLineBytes: Int,
+        outputHandler: (@Sendable (ResticOutputEvent) -> Void)?
+    ) {
         self.stream = stream
+        self.maximumLineBytes = max(maximumLineBytes, 1)
         self.outputHandler = outputHandler
     }
 
     func append(_ data: Data) {
-        guard let string = String(data: data, encoding: .utf8), !string.isEmpty else {
+        guard !data.isEmpty else {
             return
         }
-        let lines = completeLines(afterAppending: string)
+        let lines = completeLines(afterAppending: data)
         emit(lines)
     }
 
@@ -459,24 +524,61 @@ private final class LineEmitter: @unchecked Sendable {
         if pending.isEmpty {
             lines = []
         } else {
-            lines = [pending]
-            pending = ""
+            var finalLine = pending
+            if finalLine.last == Self.carriageReturn {
+                finalLine.removeLast()
+            }
+            lines = finalLine.isEmpty ? [] : [String(decoding: finalLine, as: UTF8.self)]
+            pending.removeAll(keepingCapacity: false)
         }
         lock.unlock()
         emit(lines)
     }
 
-    private func completeLines(afterAppending string: String) -> [String] {
+    private func completeLines(afterAppending data: Data) -> [String] {
         lock.lock()
         defer { lock.unlock() }
-        pending += string
-        let parts = pending.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline).map(String.init)
-        guard pending.last?.isNewline == true else {
-            pending = parts.last ?? ""
-            return Array(parts.dropLast()).filter { !$0.isEmpty }
+
+        var lines: [String] = []
+        var remainder = data[data.startIndex...]
+        while !remainder.isEmpty {
+            if isDiscardingOversizedLine {
+                guard let newline = remainder.firstIndex(of: Self.lineFeed) else {
+                    return lines
+                }
+                isDiscardingOversizedLine = false
+                remainder = remainder[remainder.index(after: newline)...]
+                continue
+            }
+
+            if let newline = remainder.firstIndex(of: Self.lineFeed) {
+                let segment = remainder[..<newline]
+                if pending.count + segment.count <= maximumLineBytes {
+                    pending.append(contentsOf: segment)
+                    if pending.last == Self.carriageReturn {
+                        pending.removeLast()
+                    }
+                    if !pending.isEmpty {
+                        lines.append(String(decoding: pending, as: UTF8.self))
+                    }
+                } else {
+                    lines.append(Self.oversizedLineMessage)
+                }
+                pending.removeAll(keepingCapacity: true)
+                remainder = remainder[remainder.index(after: newline)...]
+                continue
+            }
+
+            if pending.count + remainder.count <= maximumLineBytes {
+                pending.append(contentsOf: remainder)
+            } else {
+                pending.removeAll(keepingCapacity: false)
+                isDiscardingOversizedLine = true
+                lines.append(Self.oversizedLineMessage)
+            }
+            break
         }
-        pending = ""
-        return parts.filter { !$0.isEmpty }
+        return lines
     }
 
     private func emit(_ lines: [String]) {
@@ -487,21 +589,55 @@ private final class LineEmitter: @unchecked Sendable {
             outputHandler(ResticOutputEvent(stream: stream, message: line))
         }
     }
+
+    private static let lineFeed: UInt8 = 0x0A
+    private static let carriageReturn: UInt8 = 0x0D
+    private static let oversizedLineMessage = "Operation output omitted because one line exceeded Delta's safety limit."
 }
 
 private final class DataCollector: @unchecked Sendable {
     private let lock = NSLock()
+    private let policy: ResticOutputCapturePolicy
     private var data = Data()
+    private var didTruncate = false
+
+    init(policy: ResticOutputCapturePolicy) {
+        self.policy = policy
+    }
 
     var stringValue: String {
         lock.lock()
         defer { lock.unlock() }
-        return String(data: data, encoding: .utf8) ?? ""
+        return String(decoding: data, as: UTF8.self)
+    }
+
+    var wasTruncated: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return didTruncate
     }
 
     func append(_ newData: Data) {
         lock.lock()
-        data.append(newData)
+        let maximumBytes = policy.maximumBytes
+        switch policy {
+        case .complete:
+            let availableBytes = max(maximumBytes - data.count, 0)
+            if newData.count > availableBytes {
+                if availableBytes > 0 {
+                    data.append(newData.prefix(availableBytes))
+                }
+                didTruncate = true
+            } else {
+                data.append(newData)
+            }
+        case .tail:
+            data.append(newData)
+            if data.count > maximumBytes {
+                data.removeFirst(data.count - maximumBytes)
+                didTruncate = true
+            }
+        }
         lock.unlock()
     }
 }
