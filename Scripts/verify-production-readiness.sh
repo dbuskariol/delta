@@ -2,6 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$ROOT_DIR/Scripts/lib/delta-release.sh"
 APP="${DELTA_PRODUCTION_APP:-$ROOT_DIR/dist/Delta.app}"
 INSTALLED_APP="${DELTA_PRODUCTION_INSTALLED_APP:-/Applications/Delta.app}"
 MANUAL_REPORT="${DELTA_MANUAL_ACCEPTANCE_REPORT:-$ROOT_DIR/dist/manual-acceptance/latest.md}"
@@ -113,18 +114,13 @@ fi
 /usr/bin/xcrun stapler validate "$APP" >/dev/null 2>&1 || fail "release app does not have a valid stapled notarization ticket."
 /usr/sbin/spctl --assess --type execute "$APP" >/dev/null 2>&1 || fail "Gatekeeper assessment did not pass for the release app."
 
-SUBMISSION_JSON="$NOTARY_OUTPUT_DIR/notary-submit-$SHORT_VERSION-$BUILD_VERSION.json"
-LOG_JSON="$NOTARY_OUTPUT_DIR/notary-log-$SHORT_VERSION-$BUILD_VERSION.json"
-if [[ ! -f "$SUBMISSION_JSON" ]]; then
-  fail "notarization submission JSON was not archived at $SUBMISSION_JSON."
-fi
-SUBMISSION_STATUS="$(/usr/bin/plutil -extract status raw -o - "$SUBMISSION_JSON" 2>/dev/null || true)"
-if [[ "$SUBMISSION_STATUS" != "Accepted" ]]; then
-  fail "archived notarization submission status is ${SUBMISSION_STATUS:-unknown}, not Accepted."
-fi
-if [[ ! -f "$LOG_JSON" ]]; then
-  fail "notarization log JSON was not archived at $LOG_JSON."
-fi
+for NOTARY_ARTIFACT in app dmg; do
+  SUBMISSION_JSON="$(delta_notarization_submission_path "$NOTARY_OUTPUT_DIR" "$NOTARY_ARTIFACT" "$SHORT_VERSION" "$BUILD_VERSION")"
+  LOG_JSON="$(delta_notarization_log_path "$NOTARY_OUTPUT_DIR" "$NOTARY_ARTIFACT" "$SHORT_VERSION" "$BUILD_VERSION")"
+  if ! delta_verify_notarization_record "$NOTARY_OUTPUT_DIR" "$NOTARY_ARTIFACT" "$SHORT_VERSION" "$BUILD_VERSION"; then
+    fail "accepted $NOTARY_ARTIFACT notarization evidence is missing or invalid. Expected $SUBMISSION_JSON and $LOG_JSON."
+  fi
+done
 
 DELTA_VERIFY_INSTALLED_LAUNCH="${DELTA_PRODUCTION_VERIFY_INSTALLED_LAUNCH:-1}" \
   "$ROOT_DIR/Scripts/verify-installed-app.sh" "$INSTALLED_APP"

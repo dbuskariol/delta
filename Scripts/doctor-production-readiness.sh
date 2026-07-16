@@ -2,6 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$ROOT_DIR/Scripts/lib/delta-release.sh"
 APP_PATH="${DELTA_DOCTOR_APP:-$ROOT_DIR/dist/Delta.app}"
 INSTALLED_APP_PATH="${DELTA_DOCTOR_INSTALLED_APP:-/Applications/Delta.app}"
 EXTERNAL_ACCEPTANCE_APP_PATH="$APP_PATH"
@@ -241,18 +242,15 @@ else
   block "Gatekeeper assessment does not pass for the release app."
 fi
 if [[ -n "$short_version" && -n "$build_version" ]]; then
-  submit_json="$NOTARY_OUTPUT_DIR/notary-submit-$short_version-$build_version.json"
-  log_json="$NOTARY_OUTPUT_DIR/notary-log-$short_version-$build_version.json"
-  if [[ -f "$submit_json" && "$(/usr/bin/plutil -extract status raw -o - "$submit_json" 2>/dev/null || true)" == "Accepted" ]]; then
-    pass "Archived notarization submission JSON is accepted."
-  else
-    block "Accepted notarization submission JSON is missing at $submit_json."
-  fi
-  if [[ -f "$log_json" ]]; then
-    pass "Archived notarization log exists."
-  else
-    block "Notarization log JSON is missing at $log_json."
-  fi
+  for artifact in app dmg; do
+    submit_json="$(delta_notarization_submission_path "$NOTARY_OUTPUT_DIR" "$artifact" "$short_version" "$build_version")"
+    log_json="$(delta_notarization_log_path "$NOTARY_OUTPUT_DIR" "$artifact" "$short_version" "$build_version")"
+    if delta_verify_notarization_record "$NOTARY_OUTPUT_DIR" "$artifact" "$short_version" "$build_version"; then
+      pass "Archived $artifact notarization submission and log JSON are accepted."
+    else
+      block "Accepted $artifact notarization evidence is missing or invalid. Expected $submit_json and $log_json."
+    fi
+  done
 fi
 if [[ -n "${DELTA_NOTARY_KEYCHAIN_PROFILE:-}" ]]; then
   pass "DELTA_NOTARY_KEYCHAIN_PROFILE is set."

@@ -47,6 +47,46 @@ delta_json_value() {
   /usr/bin/plutil -extract "$1" raw -o - "$2" 2>/dev/null || true
 }
 
+delta_notarization_submission_path() {
+  local output_dir="$1"
+  local artifact="$2"
+  local version="$3"
+  local build="$4"
+
+  case "$artifact" in
+    app|dmg) ;;
+    *) delta_fail "unsupported notarization artifact kind: $artifact" ;;
+  esac
+  printf '%s/notary-submit-%s-%s-%s.json\n' "$output_dir" "$artifact" "$version" "$build"
+}
+
+delta_notarization_log_path() {
+  local output_dir="$1"
+  local artifact="$2"
+  local version="$3"
+  local build="$4"
+
+  case "$artifact" in
+    app|dmg) ;;
+    *) delta_fail "unsupported notarization artifact kind: $artifact" ;;
+  esac
+  printf '%s/notary-log-%s-%s-%s.json\n' "$output_dir" "$artifact" "$version" "$build"
+}
+
+delta_verify_notarization_record() {
+  local output_dir="$1"
+  local artifact="$2"
+  local version="$3"
+  local build="$4"
+  local submission_json log_json
+
+  submission_json="$(delta_notarization_submission_path "$output_dir" "$artifact" "$version" "$build")"
+  log_json="$(delta_notarization_log_path "$output_dir" "$artifact" "$version" "$build")"
+  [[ -f "$submission_json" && -f "$log_json" ]] || return 1
+  [[ "$(delta_json_value status "$submission_json")" == "Accepted" ]] || return 1
+  [[ "$(delta_json_value status "$log_json")" == "Accepted" ]] || return 1
+}
+
 delta_first_markdown_heading() {
   local document="$1"
   /usr/bin/awk '/^# / { print; exit }' "$document" 2>/dev/null || true

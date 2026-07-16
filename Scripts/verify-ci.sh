@@ -31,6 +31,7 @@ printf '%s\n' \
 "$ROOT_DIR/Scripts/verify-product-language.sh"
 "$ROOT_DIR/Scripts/verify-no-crash-markers.sh"
 "$ROOT_DIR/Scripts/verify-notarization-policy.sh"
+"$ROOT_DIR/Scripts/notarization-artifact-contract-self-test.sh"
 "$ROOT_DIR/Scripts/verify-manual-acceptance-matrix.sh"
 "$ROOT_DIR/Scripts/verify-manual-acceptance-self-test.sh"
 "$ROOT_DIR/Scripts/manual-acceptance-status-self-test.sh"
