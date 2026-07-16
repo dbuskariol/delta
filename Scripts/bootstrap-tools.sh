@@ -69,7 +69,7 @@ bootstrap_restic() {
 }
 
 bootstrap_rclone() {
-  local version checksums_url checksums_file arm_url amd_url arm_archive amd_archive arm_dir amd_dir arm_bin amd_bin
+  local version checksums_url checksums_file arm_url amd_url arm_archive amd_archive arm_dir amd_dir arm_bin amd_bin version_output
   version="$(json_value rclone.version)"
   checksums_url="$(json_value rclone.checksums)"
   checksums_file="$BUILD_DIR/rclone-SHA256SUMS"
@@ -95,7 +95,8 @@ bootstrap_rclone() {
   /usr/bin/lipo -create "$arm_bin" "$amd_bin" -output "$OUTPUT_DIR/rclone"
   /bin/chmod 755 "$OUTPUT_DIR/rclone"
   (cd "$OUTPUT_DIR" && /usr/bin/shasum -a 256 rclone > rclone.sha256)
-  "$OUTPUT_DIR/rclone" version | /usr/bin/head -n 1
+  version_output="$("$OUTPUT_DIR/rclone" version)"
+  printf '%s\n' "${version_output%%$'\n'*}"
   printf "rclone %s installed at %s\n" "$version" "$OUTPUT_DIR/rclone"
 }
 

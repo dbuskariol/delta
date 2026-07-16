@@ -30,6 +30,7 @@ printf '%s\n' \
 
 "$ROOT_DIR/Scripts/verify-product-language.sh"
 "$ROOT_DIR/Scripts/verify-no-crash-markers.sh"
+DELTA_FORCE_SYSTEM_GREP_CRASH_SCAN=1 "$ROOT_DIR/Scripts/verify-no-crash-markers.sh"
 "$ROOT_DIR/Scripts/verify-notarization-policy.sh"
 "$ROOT_DIR/Scripts/notarization-artifact-contract-self-test.sh"
 "$ROOT_DIR/Scripts/verify-manual-acceptance-matrix.sh"

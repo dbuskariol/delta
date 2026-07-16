@@ -63,7 +63,8 @@ fi
 printf "%s\n" "$AGENT_ISOLATED_OUTPUT"
 
 "$APP/Contents/MacOS/restic" version
-"$APP/Contents/MacOS/rclone" version | /usr/bin/head -n 1
+RCLONE_VERSION_OUTPUT="$("$APP/Contents/MacOS/rclone" version)"
+printf '%s\n' "${RCLONE_VERSION_OUTPUT%%$'\n'*}"
 
 set +e
 SECRET_BRIDGE_MISSING_OUTPUT="$("$APP/Contents/MacOS/DeltaSecretBridge" 2>&1)"

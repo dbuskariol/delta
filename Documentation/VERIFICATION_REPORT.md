@@ -31,6 +31,7 @@ A release must not be merged, tagged, or published until the complete exact-comm
 - Simplified Delta's icon and aligned its colour and visual weight with Reccy while preserving Delta's backup identity.
 - Corrected singular custom-schedule wording and aligned the README, release notes, operating guide, screenshots, and release pipeline with the implemented app.
 - Kept scheduled notification submission inside the short-lived agent lifetime until macOS acknowledges the request, with bounded timeout and failure evidence.
+- Removed Intel-sensitive `pipefail` handling from bundled-tool validation and made the crash-marker scan portable to clean macOS runners without ripgrep.
 
 ## Automated verification contract
 
