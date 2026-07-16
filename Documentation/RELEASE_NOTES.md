@@ -15,6 +15,7 @@ Delta 0.3.0 refreshes the app's native macOS Settings experience and strengthens
 - Redacts structured retention metadata from Activity, removes personal home-directory names from exported diagnostics, summarizes generic operations as items, and bounds child-process output while preserving final diagnostics and complete JSON required for parsing.
 - Strengthens certificate-free CI, source-to-artifact metadata checks, and the guarded stable-identity installer used for Keychain and macOS permission continuity.
 - Uses correct singular schedule wording for one-minute custom intervals.
+- Keeps the short-lived scheduled-work process alive until macOS accepts warning and failure notifications, with a bounded timeout and visible warning event when delivery cannot be confirmed.
 - Records the exact commit, app path, and CDHash after a successful release rehearsal so downstream evidence and production-readiness checks cannot accept stale artifacts, correctly validates Sparkle's signed release notes after Sparkle prepends its integrity warning, and keeps app and DMG notarization evidence under one verified artifact contract.
 
 Requires macOS 26 or later. Install from the notarized DMG for drag-to-Applications setup; the signed/notarized ZIP is provided for Sparkle updates and manual installation.

@@ -2,6 +2,32 @@ import XCTest
 @testable import DeltaCore
 
 final class JobNotificationPolicyTests: XCTestCase {
+    func testSynchronousNotificationDeliveryWaitsForSuccessfulCompletion() {
+        let result = DeltaUserNotifier.waitForDelivery(timeout: 1) { completion in
+            completion(nil)
+        }
+
+        XCTAssertEqual(result, .delivered)
+    }
+
+    func testSynchronousNotificationDeliveryReportsSubmissionFailure() {
+        struct SubmissionError: LocalizedError {
+            var errorDescription: String? { "Submission failed" }
+        }
+
+        let result = DeltaUserNotifier.waitForDelivery(timeout: 1) { completion in
+            completion(SubmissionError())
+        }
+
+        XCTAssertEqual(result, .failed("Submission failed"))
+    }
+
+    func testSynchronousNotificationDeliveryTimesOutWithoutCompletion() {
+        let result = DeltaUserNotifier.waitForDelivery(timeout: 0) { _ in }
+
+        XCTAssertEqual(result, .timedOut)
+    }
+
     func testTestAlertRequiresEnabledNotificationsAndDeliverableAuthorization() throws {
         XCTAssertNil(JobNotificationPolicy.testAlertContent(
             settings: JobNotificationSettings(isEnabled: false, includesSuccessfulBackups: true),

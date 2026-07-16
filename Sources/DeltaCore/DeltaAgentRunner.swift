@@ -59,7 +59,24 @@ public enum DeltaAgentRunner {
             ) else {
                 continue
             }
-            DeltaUserNotifier.deliver(content)
+            switch DeltaUserNotifier.deliverAndWait(content) {
+            case .delivered:
+                break
+            case let .failed(detail):
+                try? database.appendEvent(
+                    EventLog(
+                        level: .warning,
+                        message: "Scheduled job notification could not be delivered: \(detail)"
+                    )
+                )
+            case .timedOut:
+                try? database.appendEvent(
+                    EventLog(
+                        level: .warning,
+                        message: "Scheduled job notification delivery timed out. Open Delta and review notification access in Settings."
+                    )
+                )
+            }
         }
     }
 

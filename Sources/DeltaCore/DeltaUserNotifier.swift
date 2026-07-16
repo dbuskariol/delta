@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 import UserNotifications
 
 public enum DeltaNotificationAuthorizationState: Equatable, Sendable {
@@ -53,6 +54,12 @@ public enum DeltaNotificationAuthorizationState: Equatable, Sendable {
     }
 }
 
+public enum DeltaNotificationDeliveryResult: Equatable, Sendable {
+    case delivered
+    case failed(String)
+    case timedOut
+}
+
 public enum DeltaUserNotifier {
     public static func authorizationState() async -> DeltaNotificationAuthorizationState {
         await withCheckedContinuation { continuation in
@@ -68,16 +75,62 @@ public enum DeltaUserNotifier {
     }
 
     public static func deliver(_ content: JobNotificationContent) {
+        UNUserNotificationCenter.current().add(request(for: content))
+    }
+
+    public static func deliverAndWait(
+        _ content: JobNotificationContent,
+        timeout: TimeInterval = 5
+    ) -> DeltaNotificationDeliveryResult {
+        waitForDelivery(timeout: timeout) { completion in
+            UNUserNotificationCenter.current().add(
+                request(for: content),
+                withCompletionHandler: completion
+            )
+        }
+    }
+
+    static func waitForDelivery(
+        timeout: TimeInterval,
+        submit: (@escaping @Sendable (Error?) -> Void) -> Void
+    ) -> DeltaNotificationDeliveryResult {
+        let completionState = DeltaNotificationDeliveryCompletionState()
+        let semaphore = DispatchSemaphore(value: 0)
+        submit { error in
+            completionState.record(error: error)
+            semaphore.signal()
+        }
+
+        guard semaphore.wait(timeout: .now() + max(0, timeout)) == .success else {
+            return .timedOut
+        }
+        return completionState.result
+    }
+
+    private static func request(for content: JobNotificationContent) -> UNNotificationRequest {
         let requestContent = UNMutableNotificationContent()
         requestContent.title = content.title
         requestContent.body = content.body
         requestContent.sound = .default
 
-        let request = UNNotificationRequest(
+        return UNNotificationRequest(
             identifier: "delta.job.\(content.identifier)",
             content: requestContent,
             trigger: nil
         )
-        UNUserNotificationCenter.current().add(request)
+    }
+}
+
+private final class DeltaNotificationDeliveryCompletionState: Sendable {
+    private let storedResult = Mutex<DeltaNotificationDeliveryResult>(.timedOut)
+
+    var result: DeltaNotificationDeliveryResult {
+        storedResult.withLock { $0 }
+    }
+
+    func record(error: Error?) {
+        storedResult.withLock {
+            $0 = error.map { .failed($0.localizedDescription) } ?? .delivered
+        }
     }
 }

@@ -36,6 +36,8 @@ SQLite uses WAL mode and a busy timeout so the app and scheduled process can coo
 
 Operations fail closed on invalid profiles, inaccessible sources, missing credentials, an unavailable destination, a busy repository, or unavailable application state. Restore-to-original-location and in-place overwrite paths require explicit confirmation.
 
+Scheduled notification submission is part of the short-lived agent lifecycle. After a due job finishes, the command-line process waits for `UNUserNotificationCenter` to acknowledge each eligible request, with a bounded five-second timeout; submission failures and timeouts are recorded as warning events before the agent exits.
+
 ## Update and distribution trust
 
 Delta embeds a product-specific Sparkle EdDSA public key and requires a signed feed plus verification before extraction. Release artifacts are universal `arm64` + `x86_64`, signed inside-out with Developer ID, use Hardened Runtime and secure timestamps, and are notarized by Apple. The app archive and DMG are notarized separately; both are stapled and Gatekeeper-assessed before publication.
