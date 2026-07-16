@@ -3766,7 +3766,12 @@ struct SettingsView: View {
                 TimeControls(hour: $defaultProfileScheduleHour, minute: $defaultProfileScheduleMinute)
             }
         case .custom:
-            Stepper("Every \(defaultProfileScheduleIntervalMinutes) minutes", value: $defaultProfileScheduleIntervalMinutes, in: 1...10_080, step: 15)
+            Stepper(
+                ScheduleIntervalPresentation.title(minutes: defaultProfileScheduleIntervalMinutes),
+                value: $defaultProfileScheduleIntervalMinutes,
+                in: 1...10_080,
+                step: 15
+            )
                 .frame(width: 196, alignment: .leading)
         }
     }
@@ -4924,7 +4929,12 @@ struct ProfileEditorView: View {
                 TimeControls(hour: $hour, minute: $minute)
             }
         case .custom:
-            Stepper("Every \(intervalMinutes) minutes", value: $intervalMinutes, in: 1...10_080, step: 15)
+            Stepper(
+                ScheduleIntervalPresentation.title(minutes: intervalMinutes),
+                value: $intervalMinutes,
+                in: 1...10_080,
+                step: 15
+            )
                 .frame(width: 190, alignment: .leading)
         }
     }

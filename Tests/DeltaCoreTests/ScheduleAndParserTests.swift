@@ -2,6 +2,19 @@ import XCTest
 @testable import DeltaCore
 
 final class ScheduleAndParserTests: XCTestCase {
+    func testScheduleIntervalPresentationUsesSingularMinute() {
+        XCTAssertEqual(ScheduleIntervalPresentation.title(minutes: 1), "Every minute")
+    }
+
+    func testScheduleIntervalPresentationUsesPluralMinutes() {
+        XCTAssertEqual(ScheduleIntervalPresentation.title(minutes: 15), "Every 15 minutes")
+        XCTAssertEqual(ScheduleIntervalPresentation.title(minutes: 120), "Every 120 minutes")
+    }
+
+    func testScheduleIntervalPresentationNormalizesInvalidInput() {
+        XCTAssertEqual(ScheduleIntervalPresentation.title(minutes: 0), "Every minute")
+    }
+
     func testDailyScheduleIsDueAfterNextRun() {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!
