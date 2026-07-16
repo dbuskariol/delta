@@ -7,8 +7,8 @@ source "$ROOT_DIR/Scripts/lib/delta-release.sh"
 TMP_DIR="$(/usr/bin/mktemp -d -t delta-notary-contract.XXXXXX)"
 trap '/bin/rm -rf "$TMP_DIR"' EXIT
 
-VERSION="0.2.0"
-BUILD="2"
+VERSION="9.8.7"
+BUILD="654"
 
 for artifact in app dmg; do
   submission="$(delta_notarization_submission_path "$TMP_DIR" "$artifact" "$VERSION" "$BUILD")"

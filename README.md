@@ -6,7 +6,7 @@ Delta is a native encrypted backup and restore manager for macOS 26. It gives [r
 [![Release](https://img.shields.io/github/v/release/dbuskariol/delta)](https://github.com/dbuskariol/delta/releases/latest)
 ![macOS 26](https://img.shields.io/badge/macOS-26%2B-111111?logo=apple&logoColor=white)
 
-![Delta dashboard](Documentation/Screenshots/dashboard-0.2.0.jpg)
+![Delta dashboard](Documentation/Screenshots/dashboard-0.3.0.jpg)
 
 Delta creates file-level backups. It is not a bootable clone, a block-level disk image, Time Machine, or a hosted backup service.
 
@@ -14,7 +14,7 @@ Delta creates file-level backups. It is not a bootable clone, a block-level disk
 
 Each backup profile keeps its source, destination, schedule, retention rules, power policy, exclusions, speed limits, and most recent result together. Delta validates the source and saved credentials before starting, serializes work for each destination, and asks restic to encrypt, compress, incrementally store, and deduplicate the selected data.
 
-![Delta backup profiles](Documentation/Screenshots/backups-0.2.0.jpg)
+![Delta backup profiles](Documentation/Screenshots/backups-0.3.0.jpg)
 
 - Back up selected folders or one readable filesystem volume.
 - Run manually or on hourly, daily, weekly, monthly, and interval schedules.
@@ -26,7 +26,7 @@ Each backup profile keeps its source, destination, schedule, retention rules, po
 
 ## Store encrypted backups where they belong
 
-![Delta destinations](Documentation/Screenshots/destinations-0.2.0.jpg)
+![Delta destinations](Documentation/Screenshots/destinations-0.3.0.jpg)
 
 Every destination uses restic's encrypted repository format. Delta prepares new repositories, checks existing ones, tracks restore points, guards concurrent operations, and keeps provider credentials in the login Keychain.
 
@@ -45,7 +45,7 @@ Provider availability, credentials, server policy, latency, and storage charges 
 
 ## Restore without guessing
 
-![Delta restore browser](Documentation/Screenshots/restore-0.2.0.jpg)
+![Delta restore browser](Documentation/Screenshots/restore-0.3.0.jpg)
 
 Restore starts with a repository and a concrete point in time. Expand its backed-up sources, select any combination of files and folders, and preview the operation before Delta writes data.
 
@@ -60,7 +60,7 @@ Delta reports success only after the underlying restore exits successfully. For 
 
 ## Inspect every operation
 
-![Delta activity history](Documentation/Screenshots/activity-0.2.0.jpg)
+![Delta activity history](Documentation/Screenshots/activity-0.3.0.jpg)
 
 Activity keeps backup, restore, destination preparation, check, and cleanup results in one place. Live process output is bounded so a noisy backend cannot exhaust app memory; parsed summaries remain available while secrets, password commands, and credential-bearing repository URLs are redacted.
 
@@ -68,7 +68,7 @@ A completed backup with unreadable or omitted files remains technically incomple
 
 ## Native Mac controls
 
-![Delta permission settings](Documentation/Screenshots/settings-permissions-0.2.0.jpg)
+![Delta permission settings](Documentation/Screenshots/settings-permissions-0.3.0.jpg)
 
 Delta uses native SwiftUI navigation, toolbars, menus, alerts, file pickers, settings, keyboard focus, and accessibility descriptions. The optional menu-bar control keeps Back Up Now, Run Due Backups, Pause, Resume, Stop, Activity, Updates, and main-window access available while the window is closed.
 
@@ -186,4 +186,4 @@ Use **Settings → Updates** or **Updates** in the menu-bar panel. Delta checks 
 
 ## Status
 
-Delta is in active development at version 0.2.0. The native backup, scheduling, destination, restore-browser, selective restore, retention, repository-check, Activity, diagnostics, permissions, menu-bar, background-agent, and signed-update architectures are implemented. Deterministic installed-app acceptance covers local repositories plus local REST, S3-compatible, SFTP, rclone, and mounted-volume protocol harnesses; those localhost harnesses are regression evidence, not substitutes for genuine external provider acceptance. Public production readiness still depends on current evidence for the exact release candidate, required genuine external backends, and all signing, Apple-service, notarization, stapling, Gatekeeper, Sparkle, and release-history gates.
+Delta is in active development at version 0.3.0. The native backup, scheduling, destination, restore-browser, selective restore, retention, repository-check, Activity, diagnostics, permissions, menu-bar, background-agent, and signed-update architectures are implemented. Deterministic installed-app acceptance covers local repositories plus local REST, S3-compatible, SFTP, rclone, and mounted-volume protocol harnesses; those localhost harnesses are regression evidence, not substitutes for genuine external provider acceptance. Public production readiness still depends on current evidence for the exact release candidate, required genuine external backends, and all signing, Apple-service, notarization, stapling, Gatekeeper, Sparkle, and release-history gates.
