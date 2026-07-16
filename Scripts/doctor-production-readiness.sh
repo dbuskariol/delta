@@ -91,7 +91,7 @@ print_next_actions() {
 
 ## Next Actions
 
-1. Run and record the automated release gate for the exact clean commit:
+1. If the automated gate above is not current, run it for the exact clean commit:
    Scripts/verify-release.sh
 2. Store notarization credentials in the keychain and notarize the verified app:
    xcrun notarytool history --keychain-profile "Reccy Notary"
@@ -296,7 +296,7 @@ if [[ -f "$LOCAL_ACCEPTANCE_REPORT" ]]; then
   full_disk_status="$(first_row_for_id full_disk_access)"
   developer_id_status="$(first_row_for_id developer_id_notarization)"
   printf -- "- Full Disk Access local status: ${full_disk_status:-Unknown}\n"
-  printf -- "- Developer ID local status: ${developer_id_status:-Unknown}\n"
+  printf -- "- Developer ID notarization local status: ${developer_id_status:-Unknown}\n"
 else
   block "Local acceptance report is missing. Run Scripts/run-local-acceptance-probe.sh /Applications/Delta.app."
 fi

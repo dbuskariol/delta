@@ -47,6 +47,11 @@ delta_json_value() {
   /usr/bin/plutil -extract "$1" raw -o - "$2" 2>/dev/null || true
 }
 
+delta_first_markdown_heading() {
+  local document="$1"
+  /usr/bin/awk '/^# / { print; exit }' "$document" 2>/dev/null || true
+}
+
 delta_codesign_details() {
   /usr/bin/codesign -dvvv --verbose=4 "$1" 2>&1
 }

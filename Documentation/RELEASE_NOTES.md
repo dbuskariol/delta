@@ -13,6 +13,6 @@ Delta 0.2.0 refreshes the app's native macOS Settings experience and strengthens
 - Prevents a second background operation from starting while Delta already owns active work.
 - Redacts structured retention metadata from Activity, summarizes generic operations as items, and bounds child-process output while preserving final diagnostics and complete JSON required for parsing.
 - Strengthens certificate-free CI, source-to-artifact metadata checks, and the guarded stable-identity installer used for Keychain and macOS permission continuity.
-- Records the exact commit, app path, and CDHash after a successful release rehearsal so downstream evidence and production-readiness checks cannot accept stale artifacts.
+- Records the exact commit, app path, and CDHash after a successful release rehearsal so downstream evidence and production-readiness checks cannot accept stale artifacts, and correctly validates Sparkle's signed release notes after Sparkle prepends its integrity warning.
 
 Requires macOS 26 or later. Install from the notarized DMG for drag-to-Applications setup; the signed/notarized ZIP is provided for Sparkle updates and manual installation.

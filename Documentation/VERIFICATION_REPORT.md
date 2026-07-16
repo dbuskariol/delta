@@ -138,7 +138,7 @@ The non-writing external preflight passed as a parser/configuration check and re
 
 From a clean review commit, `Scripts/verify-release.sh` passed in prepare mode. It rebuilt and re-ran the complete deterministic acceptance suite, created and verified a Developer ID-signed universal app, signed DMG, Sparkle ZIP, appcast, checksums, release manifest, dSYMs, and notarization upload archive, and did not contact Apple or publish anything.
 
-The rehearsal exposed and this pull request fixes a missing handoff: the successful gate had not written `dist/release-evidence/automated-gate-status`, even though the doctor and final production verifier require it. The writer is atomic, records the exact commit/path/CDHash, runs after both prepare and finalize success, and is exercised by the certificate-free CI gate. Before committing for review, the dirty-tree checks also failed closed as intended:
+The rehearsal exposed and this pull request fixes two missing handoffs. First, the successful gate had not written `dist/release-evidence/automated-gate-status`, even though the doctor and final production verifier require it. The writer is atomic, records the exact commit/path/CDHash, runs after both prepare and finalize success, and is exercised by the certificate-free CI gate. Second, Sparkle prepends an integrity warning comment when it signs external release notes; the local probe now validates the first Markdown heading instead of incorrectly requiring the title on physical line 1. Before committing for review, the dirty-tree checks also failed closed as intended:
 
 ```text
 Scripts/verify-release.sh
@@ -148,7 +148,7 @@ Scripts/verify-production-readiness.sh
 Production readiness failed: git worktree is not clean
 ```
 
-After installing the exact rehearsal app and collecting release evidence, the doctor verified the clean source, Developer ID signature, matching installed CDHash, current-commit evidence, bundled tools, and local acceptance. Remaining blockers are confined to the final CI record for the merged commit, Apple notarization/stapling/Gatekeeper evidence, the manual matrix, and genuine external backends. The local probe keeps 11 partial rows and 1 human-only row clearly separate from completed automated evidence.
+After installing the exact rehearsal app and collecting release evidence, the doctor verified the clean source, Developer ID signature, matching installed CDHash, current-commit evidence, bundled tools, and local acceptance. Remaining blockers are confined to the final CI record for the merged commit, Apple notarization/stapling/Gatekeeper evidence, the manual matrix, and genuine external backends. The local probe keeps partial and human-only evidence clearly separate from completed automated evidence and reports pending notarization as an explicit release blocker.
 
 ## Remaining external acceptance
 

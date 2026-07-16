@@ -16,6 +16,16 @@ done < <(/usr/bin/find "$ROOT_DIR/Scripts" -type f -name '*.sh' -print0)
 /usr/bin/git -C "$ROOT_DIR" diff --check
 IFS=$'\t' read -r VERSION BUILD < <(delta_assert_release_metadata "$ROOT_DIR")
 
+SIGNED_NOTES_FIXTURE="$(/usr/bin/mktemp -t delta-signed-release-notes.XXXXXX)"
+printf '%s\n' \
+  '<!-- sparkle-sign-warning:' \
+  'This comment is prepended by Sparkle when release notes are signed.' \
+  '-->' \
+  "# Delta $VERSION" \
+  >"$SIGNED_NOTES_FIXTURE"
+[[ "$(delta_first_markdown_heading "$SIGNED_NOTES_FIXTURE")" == "# Delta $VERSION" ]]
+/bin/rm -f "$SIGNED_NOTES_FIXTURE"
+
 /usr/bin/swift test
 
 "$ROOT_DIR/Scripts/verify-product-language.sh"

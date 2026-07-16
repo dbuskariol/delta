@@ -2,6 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$ROOT_DIR/Scripts/lib/delta-release.sh"
 APP="${1:-$ROOT_DIR/dist/Delta.app}"
 UPDATES_DIR="${2:-$ROOT_DIR/dist/updates}"
 APPCAST="$UPDATES_DIR/appcast.xml"
@@ -64,7 +65,7 @@ RELEASE_NOTES="$UPDATES_DIR/$RELEASE_NOTES_NAME"
 require_file "$ARCHIVE"
 require_file "$RELEASE_NOTES"
 
-if [[ "$(/usr/bin/sed -n '1p' "$RELEASE_NOTES")" != "# Delta $SHORT_VERSION" ]]; then
+if [[ "$(delta_first_markdown_heading "$RELEASE_NOTES")" != "# Delta $SHORT_VERSION" ]]; then
   fail "release notes $RELEASE_NOTES_NAME do not describe Delta $SHORT_VERSION"
 fi
 
