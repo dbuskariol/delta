@@ -25,6 +25,7 @@ This candidate is **not ready for external production distribution**. The releas
 - Corrected generic operation summaries to count `items`, avoiding false file counts when directories are included.
 - Hardened the stable-app installer with bundle, minimum-system, team, designated-requirement, same-volume staging, rollback, and post-install verification.
 - Expanded the CI gate with script syntax, helper type-checking, plist/privacy linting, metadata-derived version checks, and working-tree whitespace validation.
+- Made a successful release rehearsal atomically record its commit, exact app path, CDHash, mode, and timestamp for the downstream doctor, evidence collector, and production gate; CI now self-tests that handoff.
 - Added repository-wide `AGENTS.md`, a screenshot-led README, current release notes, architecture/compliance updates, and privacy-safe screenshots.
 
 ## Automated verification
@@ -62,9 +63,9 @@ Focused `ResticRunnerTests` also passed all 26 tests, including the new UTF-8, b
 | Authority | Developer ID Application: Daniel Buskariol (`BJCVJ5G7MJ`) |
 | Team | `BJCVJ5G7MJ` |
 | Hardened runtime | 26.5.0 |
-| CDHash | `1785fd98e7b7a49922c8f313891187decfe15bfa` |
-| Main executable SHA-256 | `ae8b9313f438752b8539a62cddc927484afa08b2ccf13a4e87865d05645b4c12` |
-| dSYM archive SHA-256 | `cdb314835b51126bbbed07a6f9b627ec1e9c649b2fc7b3c0fd1e9d83d9bacd28` |
+| CDHash | `8d3af3ecdd5df3006c07de37102465d1618376bd` |
+| Main executable SHA-256 | `d3220e145d73e9b2d156f90bc91b54d4cbe1e0fa1d58505dceb37803a710e792` |
+| dSYM archive SHA-256 | `7182e55a25ac47f46ec7cffe89caeff849b83f5eec981132ec4277d594b9baa9` |
 
 The `dist` and installed main executables have the same SHA-256, and both app bundles pass strict deep code-signature verification. The guarded installer preserved the designated requirement and signing team.
 
@@ -135,9 +136,9 @@ The non-writing external preflight passed as a parser/configuration check and re
 - Not configured: 10
 - Invalid: 0
 
-`Scripts/doctor-production-readiness.sh` correctly reported 8 blockers and 7 warnings. It verified the Developer ID signature and matching installed CDHash, then blocked on missing release-gate state, notarization evidence, manual acceptance, and genuine external backends.
+From a clean review commit, `Scripts/verify-release.sh` passed in prepare mode. It rebuilt and re-ran the complete deterministic acceptance suite, created and verified a Developer ID-signed universal app, signed DMG, Sparkle ZIP, appcast, checksums, release manifest, dSYMs, and notarization upload archive, and did not contact Apple or publish anything.
 
-Before the changes were committed for review, the final gates failed as intended:
+The rehearsal exposed and this pull request fixes a missing handoff: the successful gate had not written `dist/release-evidence/automated-gate-status`, even though the doctor and final production verifier require it. The writer is atomic, records the exact commit/path/CDHash, runs after both prepare and finalize success, and is exercised by the certificate-free CI gate. Before committing for review, the dirty-tree checks also failed closed as intended:
 
 ```text
 Scripts/verify-release.sh
@@ -147,13 +148,13 @@ Scripts/verify-production-readiness.sh
 Production readiness failed: git worktree is not clean
 ```
 
-The combined local probe recorded 11 partial rows, 1 human-only row, and 10 failed release-state rows. Those failures are accounted for: eight depend on the missing clean-commit automated release record, one needs signed Sparkle artifacts, and one needs notarization/Gatekeeper evidence.
+After installing the exact rehearsal app and collecting release evidence, the doctor verified the clean source, Developer ID signature, matching installed CDHash, current-commit evidence, bundled tools, and local acceptance. Remaining blockers are confined to the final CI record for the merged commit, Apple notarization/stapling/Gatekeeper evidence, the manual matrix, and genuine external backends. The local probe keeps 11 partial rows and 1 human-only row clearly separate from completed automated evidence.
 
 ## Remaining external acceptance
 
 External distribution still requires all of the following for the exact committed candidate:
 
-1. Land the pull request, then pass `Scripts/verify-release.sh` from the exact clean release commit.
+1. Land the pull request, then rerun `Scripts/verify-release.sh` so the automated status and artifacts are bound to the exact merged commit.
 2. Complete and verify the manual acceptance matrix for that exact commit and app CDHash.
 3. Run genuine mounted SMB or NFS, non-local SFTP, and non-local S3-compatible lifecycles with current credentials and infrastructure. Localhost and temporary APFS evidence must remain labeled as supporting evidence.
 4. Complete any additional backend families required for the intended release: REST, B2, Azure, GCS, Swift, rclone, and custom URLs.

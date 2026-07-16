@@ -55,6 +55,42 @@ delta_signature_team() {
   /usr/bin/awk -F= '/^TeamIdentifier=/{print $2; exit}' <<<"$(delta_codesign_details "$1")"
 }
 
+delta_signature_cdhash() {
+  /usr/bin/awk -F= '/^CDHash=/{print $2; exit}' <<<"$(delta_codesign_details "$1")"
+}
+
+delta_record_automated_gate_status() {
+  local root="$1"
+  local app="$2"
+  local mode="$3"
+  local output_dir="$root/dist/release-evidence"
+  local output="$output_dir/automated-gate-status"
+  local temporary
+  local app_path
+  local app_cdhash
+  local git_commit
+
+  [[ -d "$app" ]] || delta_fail "cannot record automated gate status without the verified app: $app"
+  app_path="$(cd "$(dirname "$app")" && pwd -P)/$(basename "$app")"
+  app_cdhash="$(delta_signature_cdhash "$app_path")"
+  [[ -n "$app_cdhash" ]] || delta_fail "cannot record automated gate status without an app CDHash: $app_path"
+  git_commit="$(/usr/bin/git -C "$root" rev-parse --short HEAD)"
+  [[ -n "$git_commit" ]] || delta_fail 'cannot record automated gate status without a git commit'
+
+  /bin/mkdir -p "$output_dir"
+  temporary="$(/usr/bin/mktemp "$output_dir/.automated-gate-status.XXXXXX")"
+  {
+    printf 'status=Passed\n'
+    printf 'git_commit=%s\n' "$git_commit"
+    printf 'app_path=%s\n' "$app_path"
+    printf 'app_cdhash=%s\n' "$app_cdhash"
+    printf 'mode=%s\n' "$mode"
+    printf 'recorded_at=%s\n' "$(/bin/date -u +%Y-%m-%dT%H:%M:%SZ)"
+  } >"$temporary"
+  /bin/mv -f "$temporary" "$output"
+  delta_note "Recorded the automated gate for $git_commit and app CDHash $app_cdhash"
+}
+
 delta_assert_developer_id_signature() {
   local signed_path="$1"
   local expected_team="${2:-}"

@@ -38,11 +38,13 @@ if [[ "$MODE" == "prepare" ]]; then
     "$ROOT_DIR/Scripts/generate-appcast.sh"
   DELTA_ALLOW_UNNOTARIZED_PACKAGE=1 \
     "$ROOT_DIR/Scripts/create-release-manifest.sh"
+  delta_record_automated_gate_status "$ROOT_DIR" "$ROOT_DIR/dist/Delta.app" "$MODE"
   delta_note 'Release rehearsal passed; no Apple service or publishing state was changed'
   exit 0
 fi
 
 "$ROOT_DIR/Scripts/notarize-release.sh"
 "$ROOT_DIR/Scripts/create-release-manifest.sh"
+delta_record_automated_gate_status "$ROOT_DIR" "$ROOT_DIR/dist/Delta.app" "$MODE"
 
 delta_note "Delta $VERSION ($BUILD) is signed, notarized, stapled, Sparkle-signed, and ready to publish"

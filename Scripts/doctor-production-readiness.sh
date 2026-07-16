@@ -91,8 +91,8 @@ print_next_actions() {
 
 ## Next Actions
 
-1. Install a Developer ID Application certificate, then rebuild the release app with that identity:
-   DELTA_CODESIGN_IDENTITY="Developer ID Application: ..." Scripts/verify-release.sh
+1. Run and record the automated release gate for the exact clean commit:
+   Scripts/verify-release.sh
 2. Store notarization credentials in the keychain and notarize the verified app:
    xcrun notarytool history --keychain-profile "Reccy Notary"
    DELTA_NOTARY_KEYCHAIN_PROFILE="Reccy Notary" Scripts/release.sh finalize

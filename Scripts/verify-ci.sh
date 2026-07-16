@@ -101,6 +101,14 @@ fi
 /bin/rm -f "$BUILD_LOG"
 
 /usr/bin/codesign --verify --strict --deep --verbose=2 "$ROOT_DIR/dist/Delta.app"
+delta_record_automated_gate_status "$ROOT_DIR" "$ROOT_DIR/dist/Delta.app" "ci-self-test"
+GATE_STATUS_FILE="$ROOT_DIR/dist/release-evidence/automated-gate-status"
+GATE_APP_CDHASH="$(delta_signature_cdhash "$ROOT_DIR/dist/Delta.app")"
+[[ "$(/usr/bin/awk -F= '$1 == "status" { print $2; exit }' "$GATE_STATUS_FILE")" == "Passed" ]]
+[[ "$(/usr/bin/awk -F= '$1 == "git_commit" { print $2; exit }' "$GATE_STATUS_FILE")" == "$(/usr/bin/git -C "$ROOT_DIR" rev-parse --short HEAD)" ]]
+[[ "$(/usr/bin/awk -F= '$1 == "app_cdhash" { print $2; exit }' "$GATE_STATUS_FILE")" == "$GATE_APP_CDHASH" ]]
+[[ "$(/usr/bin/awk -F= '$1 == "mode" { print $2; exit }' "$GATE_STATUS_FILE")" == "ci-self-test" ]]
+/bin/rm -f "$GATE_STATUS_FILE"
 "$ROOT_DIR/Scripts/verify-external-acceptance-evidence-self-test.sh" "$ROOT_DIR/dist/Delta.app"
 
 INFO="$ROOT_DIR/dist/Delta.app/Contents/Info.plist"
