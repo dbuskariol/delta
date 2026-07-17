@@ -44,7 +44,17 @@ restore_state() {
   esac
 
   if [[ "$ORIGINAL_PAUSE_WAS_SET" == "1" ]]; then
-    /usr/bin/defaults write "$PREFERENCES_DOMAIN" "$PAUSE_KEY" -bool "$ORIGINAL_PAUSE_VALUE" >/dev/null
+    case "$ORIGINAL_PAUSE_VALUE" in
+      1|true|TRUE|yes|YES)
+        /usr/bin/defaults write "$PREFERENCES_DOMAIN" "$PAUSE_KEY" -bool true >/dev/null
+        ;;
+      0|false|FALSE|no|NO)
+        /usr/bin/defaults write "$PREFERENCES_DOMAIN" "$PAUSE_KEY" -bool false >/dev/null
+        ;;
+      *)
+        printf 'Could not restore unexpected Scheduled Backups pause value: %s\n' "$ORIGINAL_PAUSE_VALUE" >&2
+        ;;
+    esac
   else
     /usr/bin/defaults delete "$PREFERENCES_DOMAIN" "$PAUSE_KEY" >/dev/null 2>&1 || true
   fi

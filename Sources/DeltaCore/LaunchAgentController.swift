@@ -109,12 +109,18 @@ public enum LaunchAgentRegistrationPolicy {
         switch status {
         case .notRegistered:
             return .register
+        case .notFound:
+            // A previous app version may have left Service Management unable to
+            // resolve the registration even though the current signed bundle now
+            // contains both required artifacts. Registering again refreshes that
+            // stale entry without touching profiles, credentials, or backup data.
+            return currentFingerprint == nil ? .none : .register
         case .enabled:
             guard let currentFingerprint else {
                 return .none
             }
             return registeredFingerprint == currentFingerprint ? .none : .reregister
-        case .requiresApproval, .notFound, .unavailable, .unknown:
+        case .requiresApproval, .unavailable, .unknown:
             return .none
         }
     }
