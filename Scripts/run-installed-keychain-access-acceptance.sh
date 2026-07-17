@@ -13,7 +13,7 @@ if [[ ! -d "$APP_PATH" ]]; then
 fi
 
 DELTA_EXECUTABLE="$APP_PATH/Contents/MacOS/Delta"
-AGENT="$APP_PATH/Contents/MacOS/DeltaAgent"
+AGENT="$APP_PATH/Contents/Resources/DeltaAgent"
 LEGACY_BRIDGE="$APP_PATH/Contents/MacOS/DeltaSecretBridge"
 BRIDGE="$DELTA_EXECUTABLE"
 for executable in "$DELTA_EXECUTABLE" "$AGENT" "$LEGACY_BRIDGE"; do

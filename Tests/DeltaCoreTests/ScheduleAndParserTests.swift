@@ -2,6 +2,23 @@ import XCTest
 @testable import DeltaCore
 
 final class ScheduleAndParserTests: XCTestCase {
+    func testLaunchAgentBundleLayoutUsesServiceManagementLocations() {
+        XCTAssertEqual(
+            LaunchAgentBundleLayout.agentExecutableRelativePath,
+            "Contents/Resources/DeltaAgent"
+        )
+        XCTAssertEqual(
+            LaunchAgentBundleLayout.launchAgentsRelativePath,
+            "Contents/Library/LaunchAgents"
+        )
+
+        let agentURL = URL(fileURLWithPath: "/Applications/Delta.app/Contents/Resources/DeltaAgent")
+        XCTAssertEqual(
+            LaunchAgentBundleLayout.mainAppExecutableURL(forAgentExecutableURL: agentURL).path,
+            "/Applications/Delta.app/Contents/MacOS/Delta"
+        )
+    }
+
     func testScheduleIntervalPresentationUsesSingularMinute() {
         XCTAssertEqual(ScheduleIntervalPresentation.title(minutes: 1), "Every minute")
     }
@@ -150,6 +167,15 @@ final class ScheduleAndParserTests: XCTestCase {
         XCTAssertEqual(LaunchAgentRegistrationStatus.requiresApproval.displayName, "Needs Approval")
         XCTAssertEqual(LaunchAgentRegistrationStatus.notRegistered.displayName, "Off")
         XCTAssertEqual(LaunchAgentRegistrationStatus.notFound.displayName, "Needs Reinstall")
+    }
+
+    func testLaunchAgentStatusStableValuesSupportInstalledAcceptance() {
+        XCTAssertEqual(LaunchAgentRegistrationStatus.enabled.stableValue, "enabled")
+        XCTAssertEqual(LaunchAgentRegistrationStatus.requiresApproval.stableValue, "requiresApproval")
+        XCTAssertEqual(LaunchAgentRegistrationStatus.notRegistered.stableValue, "notRegistered")
+        XCTAssertEqual(LaunchAgentRegistrationStatus.notFound.stableValue, "notFound")
+        XCTAssertEqual(LaunchAgentRegistrationStatus.unavailable.stableValue, "unavailable")
+        XCTAssertEqual(LaunchAgentRegistrationStatus.unknown("future").stableValue, "unknown:future")
     }
 
     func testLaunchAgentStatusParserHandlesRawServiceManagementStates() {

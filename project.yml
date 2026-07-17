@@ -104,7 +104,7 @@ targets:
         link: false
         codeSign: true
         copy:
-          destination: executables
+          destination: resources
       - target: DeltaSecretBridge
         embed: true
         link: false
@@ -121,11 +121,11 @@ targets:
     settings:
       base:
         CODE_SIGN_ENTITLEMENTS: Packaging/Delta.entitlements
-        CURRENT_PROJECT_VERSION: 1
+        CURRENT_PROJECT_VERSION: 7
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: Packaging/Delta.app.plist
         LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/../Frameworks"
-        MARKETING_VERSION: 0.1.0
+        MARKETING_VERSION: 0.3.1
         PRODUCT_BUNDLE_IDENTIFIER: com.delta.backup
         PRODUCT_NAME: Delta
         SKIP_INSTALL: NO

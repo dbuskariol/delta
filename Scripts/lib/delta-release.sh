@@ -288,10 +288,16 @@ delta_assert_release_app() {
 
   [[ -f "$app/Contents/Frameworks/Sparkle.framework/Versions/B/Sparkle" ]] \
     || delta_fail 'the embedded Sparkle framework is missing'
+  local agent_plist="$app/Contents/Library/LaunchAgents/com.delta.backup.agent.plist"
+  [[ -f "$agent_plist" ]] || delta_fail 'the scheduled-backup property list is missing'
+  [[ "$(/usr/bin/plutil -extract BundleProgram raw -o - "$agent_plist")" == "Contents/Resources/DeltaAgent" ]] \
+    || delta_fail 'the scheduled-backup executable is not in the Service Management resource location'
+  [[ ! -e "$app/Contents/MacOS/DeltaAgent" ]] \
+    || delta_fail 'the obsolete scheduled-backup executable location remains in the app'
   local signed_code code_architectures
   for signed_code in \
     "$app/Contents/MacOS/Delta" \
-    "$app/Contents/MacOS/DeltaAgent" \
+    "$app/Contents/Resources/DeltaAgent" \
     "$app/Contents/MacOS/DeltaSecretBridge" \
     "$app/Contents/MacOS/restic" \
     "$app/Contents/MacOS/rclone" \
@@ -306,7 +312,7 @@ delta_assert_release_app() {
   done
   for signed_code in \
     "$app/Contents/MacOS/Delta" \
-    "$app/Contents/MacOS/DeltaAgent" \
+    "$app/Contents/Resources/DeltaAgent" \
     "$app/Contents/MacOS/DeltaSecretBridge" \
     "$app/Contents/MacOS/restic" \
     "$app/Contents/MacOS/rclone" \

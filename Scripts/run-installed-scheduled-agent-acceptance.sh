@@ -12,7 +12,7 @@ if [[ ! -d "$APP_PATH" ]]; then
 fi
 
 DELTA_EXECUTABLE="$APP_PATH/Contents/MacOS/Delta"
-AGENT="$APP_PATH/Contents/MacOS/DeltaAgent"
+AGENT="$APP_PATH/Contents/Resources/DeltaAgent"
 for executable in "$DELTA_EXECUTABLE" "$AGENT"; do
   if [[ ! -x "$executable" ]]; then
     printf "Required installed executable is missing or not executable: %s\n" "$executable" >&2
