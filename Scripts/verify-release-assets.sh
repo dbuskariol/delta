@@ -90,11 +90,15 @@ if [[ "${DELTA_ALLOW_UNNOTARIZED_PACKAGE:-0}" != "1" ]]; then
   delta_assert_notarized_app "$DMG_APP"
 fi
 
-for executable in \
-  Delta DeltaAgent DeltaSecretBridge restic rclone
+for relative_path in \
+  Contents/MacOS/Delta \
+  Contents/Resources/DeltaAgent \
+  Contents/MacOS/DeltaSecretBridge \
+  Contents/MacOS/restic \
+  Contents/MacOS/rclone
 do
-  /usr/bin/cmp -s "$ZIP_APP/Contents/MacOS/$executable" "$DMG_APP/Contents/MacOS/$executable" \
-    || delta_fail "ZIP and DMG executables differ: $executable"
+  /usr/bin/cmp -s "$ZIP_APP/$relative_path" "$DMG_APP/$relative_path" \
+    || delta_fail "ZIP and DMG executables differ: $relative_path"
 done
 /usr/bin/cmp -s \
   "$ZIP_APP/Contents/Frameworks/Sparkle.framework/Versions/B/Sparkle" \

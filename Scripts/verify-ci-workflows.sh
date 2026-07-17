@@ -60,6 +60,7 @@ for script in \
   audit-release-history.sh build-app.sh build-release.sh create-dmg.sh \
   create-release-manifest.sh generate-appcast.sh notarize-release.sh \
   package-update.sh publish-release.sh release.sh verify-release-assets.sh \
+  run-installed-service-management-acceptance.sh \
   verify-release-candidate.sh verify-production-readiness.sh \
   verify-sparkle-update.sh
 do

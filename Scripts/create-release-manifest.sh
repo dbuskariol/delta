@@ -101,7 +101,7 @@ if [[ -f "$SYMBOLS" ]]; then
   while IFS= read -r uuid; do
     /usr/bin/plutil -insert "debugSymbols.uuids.$uuid_index" -string "$uuid" "$MANIFEST_PLIST"
     uuid_index=$((uuid_index + 1))
-  done < <(/usr/bin/dwarfdump --uuid "$APP/Contents/MacOS/Delta" "$APP/Contents/MacOS/DeltaAgent" "$APP/Contents/MacOS/DeltaSecretBridge" \
+  done < <(/usr/bin/dwarfdump --uuid "$APP/Contents/MacOS/Delta" "$APP/Contents/Resources/DeltaAgent" "$APP/Contents/MacOS/DeltaSecretBridge" \
     | /usr/bin/awk '{print $2" "$3}' | /usr/bin/sort -u)
 fi
 
