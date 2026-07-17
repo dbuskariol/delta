@@ -1,9 +1,9 @@
-# Delta 0.3.2
+# Delta 0.3.3
 
-Delta 0.3.2 completes the Scheduled Backups upgrade repair:
+Delta 0.3.3 restores live Activity output following:
 
-- Repairs a stale macOS scheduled-backup registration left in the missing-service state by an earlier Delta version when the current signed bundle contains the corrected scheduler.
-- Uses the same direct Service Management registration that macOS accepts manually, without deleting profiles, credentials, local history, or backup repositories.
-- Keeps a genuinely incomplete app bundle fail-closed: Delta still requires both the bundled scheduler and its launch-agent property list before attempting repair.
+- Keeps the Output view scrolled to the newest line as backup logs arrive.
+- Continues refreshing long runs after the bounded live-log window reaches 200 entries by tracking the newest persisted log rather than the unchanged row count.
+- Retains bounded, lazy log rendering and stable loading of earlier output.
 
 Requires macOS 26 or later. Install from the notarized DMG for drag-to-Applications setup; the signed/notarized ZIP is provided for Sparkle updates and manual installation.
