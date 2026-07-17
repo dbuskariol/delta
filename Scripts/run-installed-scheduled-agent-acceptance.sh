@@ -5,6 +5,8 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP_PATH="${1:-${DELTA_ACCEPTANCE_APP:-/Applications/Delta.app}}"
 OUTPUT_DIR="${DELTA_SCHEDULED_AGENT_ACCEPTANCE_DIR:-$ROOT_DIR/dist/local-acceptance}"
 SERVICE="com.delta.backup.destination-secrets"
+PREFERENCES_DOMAIN="com.delta.backup.preferences"
+PAUSE_KEY="Delta.pausesScheduledBackups"
 
 if [[ ! -d "$APP_PATH" ]]; then
   printf "Delta app bundle not found at %s\n" "$APP_PATH" >&2
@@ -33,11 +35,33 @@ AGENT_STDOUT="$WORK_DIR/agent.stdout"
 AGENT_STDERR="$WORK_DIR/agent.stderr"
 VERIFY_STDOUT="$WORK_DIR/verify.stdout"
 VERIFY_STDERR="$WORK_DIR/verify.stderr"
+ORIGINAL_PAUSE_VALUE="$(/usr/bin/defaults read "$PREFERENCES_DOMAIN" "$PAUSE_KEY" 2>/dev/null || true)"
+ORIGINAL_PAUSE_WAS_SET=0
+if [[ -n "$ORIGINAL_PAUSE_VALUE" ]]; then
+  ORIGINAL_PAUSE_WAS_SET=1
+fi
 
 cleanup() {
   DELTA_ENABLE_KEYCHAIN_ACCEPTANCE=1 \
     "$DELTA_EXECUTABLE" --acceptance-delete-secret "$ACCOUNT" >/dev/null 2>&1 || true
   /usr/bin/security delete-generic-password -a "$ACCOUNT" -s "$SERVICE" >/dev/null 2>&1 || true
+
+  if [[ "$ORIGINAL_PAUSE_WAS_SET" == "1" ]]; then
+    case "$ORIGINAL_PAUSE_VALUE" in
+      1|true|TRUE|yes|YES)
+        /usr/bin/defaults write "$PREFERENCES_DOMAIN" "$PAUSE_KEY" -bool true >/dev/null
+        ;;
+      0|false|FALSE|no|NO)
+        /usr/bin/defaults write "$PREFERENCES_DOMAIN" "$PAUSE_KEY" -bool false >/dev/null
+        ;;
+      *)
+        printf 'Could not restore unexpected Scheduled Backups pause value: %s\n' "$ORIGINAL_PAUSE_VALUE" >&2
+        ;;
+    esac
+  else
+    /usr/bin/defaults delete "$PREFERENCES_DOMAIN" "$PAUSE_KEY" >/dev/null 2>&1 || true
+  fi
+
   /bin/rm -rf "$WORK_DIR"
 }
 trap cleanup EXIT
@@ -90,6 +114,11 @@ if [[ "$SEED_STATUS" -ne 0 ]]; then
   printf "Installed Scheduled Backups acceptance failed. See %s\n" "$OUTPUT" >&2
   exit "$SEED_STATUS"
 fi
+
+# The acceptance profile is isolated, but the scheduler pause preference is shared
+# with the installed app. Temporarily resume scheduled work and restore the exact
+# prior preference in cleanup so a user's paused state cannot invalidate the probe.
+/usr/bin/defaults write "$PREFERENCES_DOMAIN" "$PAUSE_KEY" -bool false >/dev/null
 
 set +e
 DELTA_APP_SUPPORT_DIR="$SUPPORT_DIR" "$AGENT" >"$AGENT_STDOUT" 2>"$AGENT_STDERR"
