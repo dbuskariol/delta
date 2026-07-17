@@ -3,7 +3,8 @@ import Foundation
 public enum MenuBarSurfaceContract {
     public static let headerTitles = [
         "Delta",
-        "Last Backup"
+        "Last Backup",
+        "Backup"
     ]
 
     public static let actionTitles = [
@@ -12,10 +13,10 @@ public enum MenuBarSurfaceContract {
         "Scheduled Paused",
         "Pause",
         "Stop",
-        "Open",
-        "Activity",
+        "Open Delta",
+        "Open Activity",
         "Refresh",
-        "Updates",
+        "Check for Updates",
         "Quit Delta"
     ]
 
@@ -63,8 +64,8 @@ public enum MenuBarSurfaceContract {
         require(actionTitles, contains: "Scheduled Paused", in: "actions", failures: &failures)
         require(actionTitles, contains: "Pause", in: "actions", failures: &failures)
         require(actionTitles, contains: "Stop", in: "actions", failures: &failures)
-        require(actionTitles, contains: "Activity", in: "actions", failures: &failures)
-        require(actionTitles, contains: "Updates", in: "actions", failures: &failures)
+        require(actionTitles, contains: "Open Activity", in: "actions", failures: &failures)
+        require(actionTitles, contains: "Check for Updates", in: "actions", failures: &failures)
         require(actionTitles, contains: "Quit Delta", in: "actions", failures: &failures)
         require(statusTexts, contains: "Last backup completed", in: "statuses", failures: &failures)
         require(statusTexts, contains: "Last backup completed with warnings", in: "statuses", failures: &failures)

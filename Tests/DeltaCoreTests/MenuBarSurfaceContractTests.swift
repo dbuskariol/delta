@@ -8,8 +8,8 @@ final class MenuBarSurfaceContractTests: XCTestCase {
         XCTAssertTrue(MenuBarSurfaceContract.actionTitles.contains("Scheduled Paused"))
         XCTAssertTrue(MenuBarSurfaceContract.actionTitles.contains("Pause"))
         XCTAssertTrue(MenuBarSurfaceContract.actionTitles.contains("Stop"))
-        XCTAssertTrue(MenuBarSurfaceContract.actionTitles.contains("Activity"))
-        XCTAssertTrue(MenuBarSurfaceContract.actionTitles.contains("Updates"))
+        XCTAssertTrue(MenuBarSurfaceContract.actionTitles.contains("Open Activity"))
+        XCTAssertTrue(MenuBarSurfaceContract.actionTitles.contains("Check for Updates"))
         XCTAssertTrue(MenuBarSurfaceContract.statusTexts.contains("Last backup completed"))
         XCTAssertTrue(MenuBarSurfaceContract.statusTexts.contains("Last backup completed with warnings"))
     }

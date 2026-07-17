@@ -7,6 +7,7 @@ Delta 0.3.0 refreshes the app's native macOS Settings experience and strengthens
 - Uses native popup menus for Settings choices and keeps descriptions readable beside switches and actions at every supported window size.
 - Pins Settings to the bottom of the sidebar and removes the redundant readiness footer.
 - Simplifies Delta's app icon and aligns its colour, weight, and visual language with Reccy while preserving Delta's backup identity.
+- Reworks the menu-bar popover around Reccy's compact native structure: a material-backed header, quiet backup summary, concise run controls, and an accessible icon footer replace the dashboard-style card stack.
 - Gives each onboarding and empty state one clear primary action instead of duplicating page-level controls, and opens destination creation directly from Dashboard, Backups, and Restore.
 - Replaces Restore's disabled first-run form and Activity's competing split-view placeholders with focused, full-width empty states.
 - Adds a native Settings command with the standard Command-comma shortcut plus Command-1 through Command-5 navigation for Delta's primary sections.

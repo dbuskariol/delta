@@ -68,7 +68,6 @@ final class DeltaStatusItemController: NSObject, ObservableObject, NSPopoverDele
         }
         .environmentObject(model)
         .environmentObject(softwareUpdateController)
-        .frame(width: 340)
 
         popover.contentViewController = NSHostingController(rootView: rootView)
     }
