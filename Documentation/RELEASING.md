@@ -49,7 +49,7 @@ Finalization writes public candidates under `dist/updates`, private notarization
 
 ## Publish
 
-`Scripts/publish-release.sh` performs the publishing transaction. It re-runs the history/security audit, creates a draft with the six intended public assets, downloads those bytes into a new temporary directory, repeats the full signature/notarization/Gatekeeper/ZIP/DMG/provenance/Sparkle verification, and only then makes the release public and latest.
+`Scripts/publish-release.sh` performs the publishing transaction. Before contacting GitHub it re-runs the history/security audit, verifies the complete artifact graph, and requires `Scripts/verify-production-readiness.sh` to pass for the exact installed candidate, current manual acceptance report, and genuine external-backend evidence. It then creates a draft with the six intended public assets, downloads those bytes into a new temporary directory, repeats the full signature/notarization/Gatekeeper/ZIP/DMG/provenance/Sparkle verification, and only then makes the release public and latest.
 
 ## GitHub Actions
 

@@ -28,6 +28,7 @@ done
 
 "$ROOT_DIR/Scripts/audit-release-history.sh"
 DELTA_EXPECTED_RELEASE_COMMIT="$COMMIT" "$ROOT_DIR/Scripts/verify-release-assets.sh" "$UPDATES_DIR"
+"$ROOT_DIR/Scripts/verify-production-readiness.sh"
 
 delta_require_tool gh
 [[ "$(gh api user --jq .login)" == "dbuskariol" ]] || delta_fail 'the active GitHub CLI account is not dbuskariol'

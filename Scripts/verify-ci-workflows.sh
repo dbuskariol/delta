@@ -60,9 +60,16 @@ for script in \
   audit-release-history.sh build-app.sh build-release.sh create-dmg.sh \
   create-release-manifest.sh generate-appcast.sh notarize-release.sh \
   package-update.sh publish-release.sh release.sh verify-release-assets.sh \
-  verify-release-candidate.sh verify-sparkle-update.sh
+  verify-release-candidate.sh verify-production-readiness.sh \
+  verify-sparkle-update.sh
 do
   /bin/bash -n "$ROOT_DIR/Scripts/$script"
 done
+
+if ! /usr/bin/grep -Fq '"$ROOT_DIR/Scripts/verify-production-readiness.sh"' \
+  "$ROOT_DIR/Scripts/publish-release.sh"; then
+  printf "Release publishing does not enforce the production-readiness gate.\n" >&2
+  exit 1
+fi
 
 printf "CI workflow verified.\n"
