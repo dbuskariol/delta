@@ -1881,6 +1881,8 @@ private struct ActivityJobListRow: View {
 }
 
 private struct ActivityJobDetailView: View {
+    private static let logBottomAnchor = "activity-log-bottom"
+
     @EnvironmentObject private var model: DeltaAppModel
     var job: JobRun
     var profileName: String?
@@ -1981,12 +1983,32 @@ private struct ActivityJobDetailView: View {
                         profileID: job.profileID
                     )
                 } else {
-                    List(entries) { entry in
-                        ActivityLogRow(entry: entry)
+                    ScrollViewReader { proxy in
+                        ScrollView(.vertical) {
+                            LazyVStack(alignment: .leading, spacing: 0) {
+                                ForEach(entries) { entry in
+                                    ActivityLogRow(entry: entry)
+                                        .padding(.horizontal, 8)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                    Divider()
+                                }
+                                Color.clear
+                                    .frame(height: 1)
+                                    .id(Self.logBottomAnchor)
+                            }
+                        }
+                        .defaultScrollAnchor(.bottom)
+                        .onChange(of: entries.last?.id) { previousID, latestID in
+                            guard latestID != nil, latestID != previousID else { return }
+                            Task { @MainActor in
+                                await Task.yield()
+                                withAnimation(.easeOut(duration: 0.18)) {
+                                    proxy.scrollTo(Self.logBottomAnchor, anchor: .bottom)
+                                }
+                            }
+                        }
+                        .frame(minHeight: 0, maxHeight: .infinity)
                     }
-                    .listStyle(.plain)
-                    .scrollContentBackground(.hidden)
-                    .frame(minHeight: 0, maxHeight: .infinity)
                 }
             }
             .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
@@ -2000,7 +2022,9 @@ private struct ActivityJobDetailView: View {
     }
 
     private var loadIdentity: String {
-        let liveRevision = job.status == .running ? model.jobLogs.count : 0
+        // The live list is bounded, so its count stops changing once it is full. The newest
+        // entry ID keeps Activity refreshing for every persisted line throughout long runs.
+        let liveRevision = job.status == .running ? model.jobLogs.last?.id.uuidString ?? "empty" : "complete"
         return "\(job.id.uuidString)-\(logFilter.rawValue)-\(liveRevision)"
     }
 
