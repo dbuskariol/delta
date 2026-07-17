@@ -1,10 +1,9 @@
-# Delta 0.3.1
+# Delta 0.3.2
 
-Delta 0.3.1 is a focused Scheduled Backups hotfix:
+Delta 0.3.2 completes the Scheduled Backups upgrade repair:
 
-- Fixes fresh installations reporting that the scheduled-backup service is missing even though `DeltaAgent` is present in the app.
-- Places the signed scheduler executable in the Service Management resource location referenced by its bundled launch-agent property list.
-- Keeps scheduler-to-app execution correct from the new bundle location.
-- Adds installed-app verification of the real `SMAppService` discovery status so a directly executable helper can no longer be mistaken for a registerable scheduled service.
+- Repairs a stale macOS scheduled-backup registration left in the missing-service state by an earlier Delta version when the current signed bundle contains the corrected scheduler.
+- Uses the same direct Service Management registration that macOS accepts manually, without deleting profiles, credentials, local history, or backup repositories.
+- Keeps a genuinely incomplete app bundle fail-closed: Delta still requires both the bundled scheduler and its launch-agent property list before attempting repair.
 
 Requires macOS 26 or later. Install from the notarized DMG for drag-to-Applications setup; the signed/notarized ZIP is provided for Sparkle updates and manual installation.
