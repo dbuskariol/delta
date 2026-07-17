@@ -35,9 +35,11 @@ if [[ "${DELTA_VERIFY_INSTALLED_LAUNCH:-0}" == "1" ]]; then
   /bin/rm -f "$LAUNCH_LOG"
 fi
 
-"$APP/Contents/MacOS/DeltaAgent" --status
+"$APP/Contents/Resources/DeltaAgent" --status
+DELTA_ENABLE_SERVICE_MANAGEMENT_ACCEPTANCE=1 \
+  "$APP/Contents/MacOS/Delta" --acceptance-scheduled-service status
 
-AGENT_DRY_RUN_OUTPUT="$("$APP/Contents/MacOS/DeltaAgent" --dry-run 2>&1)"
+AGENT_DRY_RUN_OUTPUT="$("$APP/Contents/Resources/DeltaAgent" --dry-run 2>&1)"
 if [[ "$AGENT_DRY_RUN_OUTPUT" != *"dry run did not start scheduled backups"* ]]; then
   printf "Installed DeltaAgent dry-run did not report non-mutating behavior: %s\n" "$AGENT_DRY_RUN_OUTPUT" >&2
   exit 1
@@ -46,7 +48,7 @@ printf "%s\n" "$AGENT_DRY_RUN_OUTPUT"
 
 ISOLATED_SUPPORT="$(/usr/bin/mktemp -d -t delta-installed-support.XXXXXX)"
 set +e
-AGENT_ISOLATED_OUTPUT="$(DELTA_APP_SUPPORT_DIR="$ISOLATED_SUPPORT" "$APP/Contents/MacOS/DeltaAgent" 2>&1)"
+AGENT_ISOLATED_OUTPUT="$(DELTA_APP_SUPPORT_DIR="$ISOLATED_SUPPORT" "$APP/Contents/Resources/DeltaAgent" 2>&1)"
 AGENT_ISOLATED_STATUS=$?
 set -e
 if [[ "$AGENT_ISOLATED_STATUS" -ne 0 || "$AGENT_ISOLATED_OUTPUT" != *"completed 0 due backup run(s)"* ]]; then

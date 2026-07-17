@@ -145,12 +145,21 @@ PRIVACY_MANIFEST="$ROOT_DIR/dist/Delta.app/Contents/Resources/PrivacyInfo.xcpriv
 [[ "$(/usr/bin/plutil -extract NSPrivacyTrackingDomains raw -o - "$PRIVACY_MANIFEST")" == "0" ]]
 
 HOST_ARCH="$(/usr/bin/uname -m)"
-for executable in Delta DeltaAgent DeltaSecretBridge restic rclone; do
-  EXECUTABLE_PATH="$ROOT_DIR/dist/Delta.app/Contents/MacOS/$executable"
+for EXECUTABLE_PATH in \
+  "$ROOT_DIR/dist/Delta.app/Contents/MacOS/Delta" \
+  "$ROOT_DIR/dist/Delta.app/Contents/Resources/DeltaAgent" \
+  "$ROOT_DIR/dist/Delta.app/Contents/MacOS/DeltaSecretBridge" \
+  "$ROOT_DIR/dist/Delta.app/Contents/MacOS/restic" \
+  "$ROOT_DIR/dist/Delta.app/Contents/MacOS/rclone"
+do
   [[ -x "$EXECUTABLE_PATH" ]]
   ARCHITECTURES="$(/usr/bin/lipo -archs "$EXECUTABLE_PATH")"
   [[ " $ARCHITECTURES " == *" $HOST_ARCH "* ]]
 done
+AGENT_PLIST="$ROOT_DIR/dist/Delta.app/Contents/Library/LaunchAgents/com.delta.backup.agent.plist"
+[[ -f "$AGENT_PLIST" ]]
+[[ "$(/usr/bin/plutil -extract BundleProgram raw -o - "$AGENT_PLIST")" == "Contents/Resources/DeltaAgent" ]]
+[[ ! -e "$ROOT_DIR/dist/Delta.app/Contents/MacOS/DeltaAgent" ]]
 [[ -x "$ROOT_DIR/dist/Delta.app/Contents/Frameworks/Sparkle.framework/Versions/B/Sparkle" ]]
 
 # Shipping packagers reject this ad-hoc app; CI verifies that the boundary is

@@ -7,7 +7,7 @@ Delta is a native macOS 26 application around restic's encrypted repository form
 | Process | Lifetime and boundary |
 | --- | --- |
 | `Delta` | User-facing SwiftUI/AppKit process. It edits configuration, coordinates interactive work, observes scheduled work, and hosts the Sparkle updater. |
-| `DeltaAgent` | Short-lived Service Management agent. It wakes at a bounded interval, execs the main Delta executable for due-work evaluation, and exits. |
+| `DeltaAgent` | Short-lived Service Management agent stored at `Contents/Resources/DeltaAgent`, matching the bundled launch-agent `BundleProgram`. It wakes at a bounded interval, execs the main Delta executable for due-work evaluation, and exits. |
 | `DeltaSecretBridge` | Restricted compatibility executable for noninteractive Keychain access. Normal scheduled password resolution uses the main app executable so Keychain trust follows one signed identity. |
 | `restic` | Bundled child process with a curated environment. It never receives a destination password in command-line arguments or the ambient process environment. |
 | `rclone` | Bundled optional transport selected by restic for configured rclone destinations. |

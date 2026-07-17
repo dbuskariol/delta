@@ -167,7 +167,7 @@ No locally signed build should be described as a public release candidate until 
 Use **Settings → Updates** or **Updates** in the menu-bar panel. Delta checks a signed appcast, verifies the EdDSA archive signature before extraction, and accepts only appropriately signed and notarized application updates. The notarized DMG remains the manual recovery path.
 
 - **A source is unavailable:** reselect it, confirm the drive is mounted, then review filesystem permissions and Full Disk Access if protected data is involved.
-- **A scheduled backup did not run:** confirm Scheduled Backups is enabled and approved in Login Items, then review pause, power, missed-run, source, destination, and saved-password status.
+- **A scheduled backup did not run:** update to Delta 0.3.1 or later, confirm Scheduled Backups is enabled and approved in Login Items, then review pause, power, missed-run, source, destination, and saved-password status.
 - **Saved Passwords needs repair:** use Settings → Permissions to review access and rewrite the Keychain access list for the currently signed Delta app.
 - **A destination is unavailable or locked:** reconnect it, verify credentials, and ensure another restic client is not operating on the same repository.
 - **An update is unavailable:** use Check Now, confirm network access to GitHub Releases, or install the notarized DMG manually.

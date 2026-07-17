@@ -84,6 +84,8 @@ struct DeltaApp: App {
             runAcceptancePreferences()
         case "--acceptance-menu-bar-surface":
             runAcceptanceMenuBarSurface()
+        case "--acceptance-scheduled-service":
+            runAcceptanceScheduledService(arguments: Array(arguments.dropFirst()))
         case "--acceptance-seed-scheduled-agent":
             runAcceptanceSeedScheduledAgent(arguments: Array(arguments.dropFirst()))
         case "--acceptance-verify-scheduled-agent":
@@ -114,6 +116,69 @@ struct DeltaApp: App {
             fputs("DeltaSecretBridge error: \(error.localizedDescription)\n", stderr)
             exit(1)
         }
+    }
+
+    private static func runAcceptanceScheduledService(arguments: [String]) -> Never {
+        guard ProcessInfo.processInfo.environment["DELTA_ENABLE_SERVICE_MANAGEMENT_ACCEPTANCE"] == "1" else {
+            fputs("Delta Service Management acceptance command is disabled.\n", stderr)
+            exit(64)
+        }
+        guard arguments.count == 1, let action = arguments.first else {
+            fputs("usage: Delta --acceptance-scheduled-service <status|register|unregister>\n", stderr)
+            exit(64)
+        }
+
+        do {
+            switch action {
+            case "status":
+                break
+            case "register":
+                try LaunchAgentController.register()
+            case "unregister":
+                try LaunchAgentController.unregister()
+            default:
+                fputs("usage: Delta --acceptance-scheduled-service <status|register|unregister>\n", stderr)
+                exit(64)
+            }
+        } catch {
+            fputs("Delta Service Management acceptance failed: \(error.localizedDescription)\n", stderr)
+            exit(1)
+        }
+
+        let executableURL = LaunchAgentBundleLayout.agentExecutableURL(in: .main)
+        let plistURL = LaunchAgentBundleLayout.plistURL(
+            in: .main,
+            plistName: LaunchAgentController.defaultPlistName
+        )
+        let plistProgram: String?
+        do {
+            let data = try Data(contentsOf: plistURL)
+            let plist = try PropertyListSerialization.propertyList(from: data, format: nil)
+            plistProgram = (plist as? [String: Any])?["BundleProgram"] as? String
+        } catch {
+            plistProgram = nil
+        }
+        let status = LaunchAgentController.status()
+
+        print("Scheduled service status: \(status.stableValue)")
+        print("Scheduled service program: \(plistProgram ?? "missing")")
+        print("Scheduled service executable: \(FileManager.default.isExecutableFile(atPath: executableURL.path) ? "present" : "missing")")
+
+        guard action == "status" else {
+            exit(0)
+        }
+        guard
+            plistProgram == LaunchAgentBundleLayout.agentExecutableRelativePath,
+            FileManager.default.isExecutableFile(atPath: executableURL.path),
+            status != .notFound,
+            status != .unavailable
+        else {
+            exit(1)
+        }
+        if case .unknown = status {
+            exit(1)
+        }
+        exit(0)
     }
 
     private static func runDueBackups() -> Never {

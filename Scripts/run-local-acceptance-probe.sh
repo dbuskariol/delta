@@ -219,7 +219,7 @@ else
     append_row "full_disk_access" "$(item_area full_disk_access)" "Failed" "Installed Delta diagnostics could not verify Full Disk Access: $installed_diagnostics_evidence" "Fix installed diagnostics, then use Settings > Full Disk Access and rerun."
   fi
 
-  agent="$APP_PATH/Contents/MacOS/DeltaAgent"
+  agent="$APP_PATH/Contents/Resources/DeltaAgent"
   if [[ -x "$agent" ]]; then
     agent_status_output="$(run_capture agent_status "$agent" --status)"
     agent_status_status="$(command_status agent_status)"
@@ -230,10 +230,12 @@ else
     agent_due_status="$(command_status agent_due)"
     scheduled_agent_output="$(run_capture scheduled_agent "$ROOT_DIR/Scripts/run-installed-scheduled-agent-acceptance.sh" "$APP_PATH")"
     scheduled_agent_status="$(command_status scheduled_agent)"
-    if [[ "$agent_status_status" -eq 0 && "$agent_dry_status" -eq 0 && "$agent_due_status" -eq 0 && "$scheduled_agent_status" -eq 0 ]]; then
-      append_row "scheduled_backups" "$(item_area scheduled_backups)" "Partial" "Scheduler status, dry-run, no-profile isolated due-run, and seeded scheduler backup acceptance passed: $agent_status_output $agent_dry_output $agent_due_output $scheduled_agent_output" "Approve Login Items if macOS asks, quit Delta, wait for a real scheduled interval, and confirm the run appears after relaunch."
+    service_management_output="$(run_capture service_management "$ROOT_DIR/Scripts/run-installed-service-management-acceptance.sh" "$APP_PATH")"
+    service_management_status="$(command_status service_management)"
+    if [[ "$agent_status_status" -eq 0 && "$agent_dry_status" -eq 0 && "$agent_due_status" -eq 0 && "$scheduled_agent_status" -eq 0 && "$service_management_status" -eq 0 ]]; then
+      append_row "scheduled_backups" "$(item_area scheduled_backups)" "Partial" "Service Management discovery/registration, scheduler status, dry-run, no-profile isolated due-run, and seeded scheduler backup acceptance passed: $service_management_output $agent_status_output $agent_dry_output $agent_due_output $scheduled_agent_output" "Approve Login Items if macOS asks, quit Delta, wait for a real scheduled interval, and confirm the run appears after relaunch."
     else
-      append_row "scheduled_backups" "$(item_area scheduled_backups)" "Failed" "Scheduler checks failed. status=$agent_status_status dry=$agent_dry_status due=$agent_due_status scheduled=$scheduled_agent_status output: $agent_status_output $agent_dry_output $agent_due_output $scheduled_agent_output" "Fix bundled Scheduled Backups scheduler before manual schedule testing."
+      append_row "scheduled_backups" "$(item_area scheduled_backups)" "Failed" "Scheduler checks failed. service_management=$service_management_status status=$agent_status_status dry=$agent_dry_status due=$agent_due_status scheduled=$scheduled_agent_status output: $service_management_output $agent_status_output $agent_dry_output $agent_due_output $scheduled_agent_output" "Fix bundled Scheduled Backups scheduler before manual schedule testing."
     fi
   else
     append_row "scheduled_backups" "$(item_area scheduled_backups)" "Failed" "DeltaAgent was not executable at $agent." "Rebuild and reinstall the app bundle."

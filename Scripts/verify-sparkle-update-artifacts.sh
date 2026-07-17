@@ -102,7 +102,7 @@ ARCHIVE_LIST="$(/usr/bin/unzip -Z1 "$ARCHIVE")"
 for archived_path in \
   "Delta.app/Contents/Info.plist" \
   "Delta.app/Contents/MacOS/Delta" \
-  "Delta.app/Contents/MacOS/DeltaAgent" \
+  "Delta.app/Contents/Resources/DeltaAgent" \
   "Delta.app/Contents/MacOS/DeltaSecretBridge" \
   "Delta.app/Contents/MacOS/restic" \
   "Delta.app/Contents/MacOS/rclone" \
@@ -129,7 +129,7 @@ EXTRACTED_INFO="$EXTRACTED_APP/Contents/Info.plist"
 [[ "$(plist_value SUVerifyUpdateBeforeExtraction "$EXTRACTED_INFO")" == "true" ]] || fail "archived SUVerifyUpdateBeforeExtraction must be true"
 
 require_executable "$EXTRACTED_APP/Contents/MacOS/Delta"
-require_executable "$EXTRACTED_APP/Contents/MacOS/DeltaAgent"
+require_executable "$EXTRACTED_APP/Contents/Resources/DeltaAgent"
 require_executable "$EXTRACTED_APP/Contents/MacOS/DeltaSecretBridge"
 require_executable "$EXTRACTED_APP/Contents/MacOS/restic"
 require_executable "$EXTRACTED_APP/Contents/MacOS/rclone"

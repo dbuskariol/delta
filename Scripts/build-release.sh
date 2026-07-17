@@ -99,6 +99,7 @@ DSYMS_DIR="$ARCHIVE_PATH/dSYMs"
 for product in Delta DeltaAgent DeltaSecretBridge; do
   case "$product" in
     Delta) binary="$OUTPUT_APP/Contents/MacOS/Delta"; dsym="$DSYMS_DIR/Delta.app.dSYM/Contents/Resources/DWARF/Delta" ;;
+    DeltaAgent) binary="$OUTPUT_APP/Contents/Resources/DeltaAgent"; dsym="$DSYMS_DIR/DeltaAgent.dSYM/Contents/Resources/DWARF/DeltaAgent" ;;
     *) binary="$OUTPUT_APP/Contents/MacOS/$product"; dsym="$DSYMS_DIR/$product.dSYM/Contents/Resources/DWARF/$product" ;;
   esac
   [[ -f "$dsym" ]] || delta_fail "the release archive did not contain matching symbols for $product"

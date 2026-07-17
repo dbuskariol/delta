@@ -45,6 +45,17 @@ public enum LaunchAgentRegistrationStatus: Equatable, Sendable {
         self != .enabled
     }
 
+    public var stableValue: String {
+        switch self {
+        case .enabled: "enabled"
+        case .requiresApproval: "requiresApproval"
+        case .notRegistered: "notRegistered"
+        case .notFound: "notFound"
+        case .unavailable: "unavailable"
+        case let .unknown(value): "unknown:\(value)"
+        }
+    }
+
     static func parse(_ rawValue: String) -> LaunchAgentRegistrationStatus {
         let normalized = rawValue
             .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -114,11 +125,9 @@ public enum LaunchAgentRegistrationFingerprint {
         bundle: Bundle = .main,
         plistName: String = LaunchAgentController.defaultPlistName
     ) -> String? {
-        let plistURL = bundle.bundleURL
-            .appendingPathComponent("Contents/Library/LaunchAgents", isDirectory: true)
-            .appendingPathComponent(plistName)
+        let plistURL = LaunchAgentBundleLayout.plistURL(in: bundle, plistName: plistName)
+        let executableURL = LaunchAgentBundleLayout.agentExecutableURL(in: bundle)
         guard
-            let executableURL = agentExecutableURL(in: bundle),
             let executableData = try? Data(contentsOf: executableURL),
             let plistData = try? Data(contentsOf: plistURL)
         else {
@@ -134,13 +143,27 @@ public enum LaunchAgentRegistrationFingerprint {
         return hasher.finalize().map { String(format: "%02x", $0) }.joined()
     }
 
-    private static func agentExecutableURL(in bundle: Bundle) -> URL? {
-        if let executableURL = bundle.url(forAuxiliaryExecutable: "DeltaAgent") {
-            return executableURL
-        }
-        return bundle.executableURL?
+}
+
+public enum LaunchAgentBundleLayout {
+    public static let agentExecutableRelativePath = "Contents/Resources/DeltaAgent"
+    public static let launchAgentsRelativePath = "Contents/Library/LaunchAgents"
+
+    public static func agentExecutableURL(in bundle: Bundle) -> URL {
+        bundle.bundleURL.appendingPathComponent(agentExecutableRelativePath)
+    }
+
+    public static func plistURL(in bundle: Bundle, plistName: String) -> URL {
+        bundle.bundleURL
+            .appendingPathComponent(launchAgentsRelativePath, isDirectory: true)
+            .appendingPathComponent(plistName)
+    }
+
+    public static func mainAppExecutableURL(forAgentExecutableURL executableURL: URL) -> URL {
+        executableURL
             .deletingLastPathComponent()
-            .appendingPathComponent("DeltaAgent")
+            .deletingLastPathComponent()
+            .appendingPathComponent("MacOS/Delta")
     }
 }
 

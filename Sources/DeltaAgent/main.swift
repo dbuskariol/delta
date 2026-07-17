@@ -43,6 +43,10 @@ enum DeltaAgentMain {
 
     private static func mainAppURL() -> URL {
         let executable = URL(fileURLWithPath: CommandLine.arguments.first ?? "")
+        let bundledMainApp = LaunchAgentBundleLayout.mainAppExecutableURL(forAgentExecutableURL: executable)
+        if FileManager.default.isExecutableFile(atPath: bundledMainApp.path) {
+            return bundledMainApp
+        }
         let sibling = executable.deletingLastPathComponent().appendingPathComponent("Delta")
         if FileManager.default.isExecutableFile(atPath: sibling.path) {
             return sibling
