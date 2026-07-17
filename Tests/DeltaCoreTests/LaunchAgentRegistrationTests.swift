@@ -15,6 +15,30 @@ final class LaunchAgentRegistrationTests: XCTestCase {
         )
     }
 
+    func testPolicyRepairsNotFoundServiceWhenBundledArtifactsExist() {
+        XCTAssertEqual(
+            LaunchAgentRegistrationPolicy.action(
+                status: .notFound,
+                hasEnabledSchedules: true,
+                registeredFingerprint: nil,
+                currentFingerprint: "current"
+            ),
+            .register
+        )
+    }
+
+    func testPolicyDoesNotRegisterNotFoundServiceWhenBundledArtifactsAreMissing() {
+        XCTAssertEqual(
+            LaunchAgentRegistrationPolicy.action(
+                status: .notFound,
+                hasEnabledSchedules: true,
+                registeredFingerprint: nil,
+                currentFingerprint: nil
+            ),
+            .none
+        )
+    }
+
     func testPolicyReregistersWhenBundledServiceChanged() {
         XCTAssertEqual(
             LaunchAgentRegistrationPolicy.action(

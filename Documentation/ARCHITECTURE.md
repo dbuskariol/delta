@@ -14,6 +14,8 @@ Delta is a native macOS 26 application around restic's encrypted repository form
 
 The main app and agent share `DeltaCore`; there is no network service, privileged helper, kernel extension, or root daemon.
 
+Scheduled-service registration is gated by a fingerprint of the bundled agent and launch-agent property list. Delta registers an unregistered service, re-registers an enabled service when those artifacts change, and directly registers a service that macOS reports as not found only when the current bundle fingerprint proves both artifacts exist. This repairs stale registrations left by an earlier app layout while keeping a genuinely incomplete bundle fail-closed.
+
 ## Data flow
 
 1. A native file picker records security-scoped bookmarks for selected sources, destinations, and restore targets.
