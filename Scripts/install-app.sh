@@ -35,6 +35,11 @@ NEW_TEAM="$(delta_signature_team "$APP_SOURCE")"
   || delta_fail "install source team $NEW_TEAM does not match expected team $DELTA_EXPECTED_TEAM_ID"
 NEW_REQUIREMENT="$(/usr/bin/codesign -d -r- "$APP_SOURCE" 2>&1 | /usr/bin/sed -n 's/^designated => //p')"
 [[ -n "$NEW_REQUIREMENT" ]] || delta_fail 'install source has no designated code requirement'
+NEW_VERSION="$(delta_plist_value CFBundleShortVersionString "$SOURCE_INFO")"
+NEW_BUILD="$(delta_plist_value CFBundleVersion "$SOURCE_INFO")"
+NEW_CDHASH="$(delta_signature_cdhash "$APP_SOURCE")"
+[[ -n "$NEW_VERSION" && -n "$NEW_BUILD" && -n "$NEW_CDHASH" ]] \
+  || delta_fail 'install source is missing its version, build, or signed code hash'
 
 if [[ -d "$APP_TARGET" ]]; then
   CURRENT_INFO="$APP_TARGET/Contents/Info.plist"
@@ -44,6 +49,16 @@ if [[ -d "$APP_TARGET" ]]; then
 
   CURRENT_DETAILS="$(/usr/bin/codesign -dvv "$APP_TARGET" 2>&1 || true)"
   CURRENT_TEAM="$(/usr/bin/awk -F= '/^TeamIdentifier=/{print $2; exit}' <<<"$CURRENT_DETAILS")"
+  CURRENT_VERSION="$(delta_plist_value CFBundleShortVersionString "$CURRENT_INFO")"
+  CURRENT_BUILD="$(delta_plist_value CFBundleVersion "$CURRENT_INFO")"
+  CURRENT_CDHASH="$(delta_signature_cdhash "$APP_TARGET")"
+  delta_assert_immutable_build_identity \
+    "$CURRENT_VERSION" \
+    "$CURRENT_BUILD" \
+    "$CURRENT_CDHASH" \
+    "$NEW_VERSION" \
+    "$NEW_BUILD" \
+    "$NEW_CDHASH"
   if [[ -n "$CURRENT_TEAM" && "$CURRENT_TEAM" != "not set" && "$CURRENT_TEAM" != "$NEW_TEAM" ]]; then
     delta_fail "refusing to replace a Delta install signed by a different team ($CURRENT_TEAM)"
   fi
