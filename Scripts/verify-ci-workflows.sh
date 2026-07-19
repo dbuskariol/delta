@@ -73,4 +73,25 @@ if ! /usr/bin/grep -Fq '"$ROOT_DIR/Scripts/verify-production-readiness.sh"' \
   exit 1
 fi
 
+if /usr/bin/grep -Fq 'DELTA_VERIFY_INSTALLED_LAUNCH=1 "$ROOT_DIR/Scripts/verify-installed-app.sh" "$APP"' \
+  "$ROOT_DIR/Scripts/verify-release-candidate.sh"; then
+  printf "Release rehearsal must not launch a transient candidate with the installed app state.\n" >&2
+  exit 1
+fi
+if ! /usr/bin/grep -Fq 'Service Management acceptance requires an app installed directly in /Applications' \
+  "$ROOT_DIR/Scripts/run-installed-service-management-acceptance.sh"; then
+  printf "Service Management acceptance is missing its installed-identity guard.\n" >&2
+  exit 1
+fi
+if ! /usr/bin/grep -Fq 'run-local-acceptance-probe.sh" "$IDENTITY_ACCEPTANCE_APP_PATH"' \
+  "$ROOT_DIR/Scripts/collect-release-evidence.sh"; then
+  printf "Release evidence can run identity-sensitive acceptance against a transient candidate.\n" >&2
+  exit 1
+fi
+if ! /usr/bin/grep -Fq 'signature_value "$INSTALLED_APP_PATH" CDHash' \
+  "$ROOT_DIR/Scripts/collect-release-evidence.sh"; then
+  printf "Release evidence does not bind installed identity acceptance to the candidate CDHash.\n" >&2
+  exit 1
+fi
+
 printf "CI workflow verified.\n"
