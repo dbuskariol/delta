@@ -169,8 +169,24 @@ final class DeltaStatusItemController: NSObject, ObservableObject, NSPopoverDele
             isWorking: model?.isWorking ?? false,
             activeJobKind: model?.activeOperation?.kind,
             latestBackupStatus: latestBackupRun?.status,
-            acknowledgedOmissionCount: latestBackupRun.flatMap { model?.acknowledgedWarningIssueCounts[$0.id] }
+            acknowledgedOmissionCount: latestBackupRun.flatMap { model?.acknowledgedWarningIssueCounts[$0.id] },
+            hasDestinationAttention: timeMachineNeedsAttention
         )
+    }
+
+    private var timeMachineNeedsAttention: Bool {
+        guard let model else { return false }
+        return model.repositories
+            .filter { $0.format == .timeMachine }
+            .contains { repository in
+                guard let state = model.timeMachineStatesByRepository[repository.id] else {
+                    return true
+                }
+                if state.lifecycle == .preparing || state.lifecycle == .disconnecting {
+                    return false
+                }
+                return TimeMachineDestinationPresentation.make(state: state).primaryAction != .backUpNow
+            }
     }
 
     private var latestBackupRun: JobRun? {

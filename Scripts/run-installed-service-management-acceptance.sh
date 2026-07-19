@@ -18,7 +18,8 @@ service_action() {
 }
 
 status_value() {
-  service_action status | /usr/bin/awk -F': ' '$1 == "Scheduled service status" { print $2; exit }'
+  service_action status | /usr/bin/awk -F': ' \
+    '$1 == "Scheduled service status" && value == "" { value = $2 } END { print value }'
 }
 
 INITIAL_STATUS="$(status_value)"

@@ -55,6 +55,14 @@ public final class BackupCoordinator: @unchecked Sendable {
 
     @discardableResult
     public func initializeRepository(_ repository: BackupRepository) throws -> JobRun {
+        guard repository.format == .delta else {
+            return try failedRun(
+                profileID: nil,
+                repositoryID: repository.id,
+                kind: .initializeRepository,
+                message: resticFormatMismatchMessage
+            )
+        }
         guard availabilityChecker.isAvailable(repository, allowingCreation: true) else {
             return try failedRun(
                 profileID: nil,
@@ -103,6 +111,13 @@ public final class BackupCoordinator: @unchecked Sendable {
 
     @discardableResult
     public func runBackup(profile: BackupProfile, repository: BackupRepository) throws -> JobRun {
+        guard repository.format == .delta else {
+            return try failedBackupRun(
+                profileID: profile.id,
+                repositoryID: repository.id,
+                message: resticFormatMismatchMessage
+            )
+        }
         let validatedProfile: BackupProfile
         do {
             validatedProfile = try profileValidator.validate(profile, knownRepositoryIDs: [repository.id]).profile
@@ -169,6 +184,7 @@ public final class BackupCoordinator: @unchecked Sendable {
 
     @discardableResult
     public func refreshSnapshots(repository: BackupRepository) throws -> [ResticSnapshot] {
+        try requireDeltaFormat(repository)
         guard availabilityChecker.isAvailable(repository, allowingCreation: false) else {
             throw BackupCoordinatorError.destinationUnavailable
         }
@@ -189,6 +205,7 @@ public final class BackupCoordinator: @unchecked Sendable {
     }
 
     public func listSnapshotEntries(repository: BackupRepository, snapshotID: String, directoryPath: String? = nil) throws -> [ResticSnapshotEntry] {
+        try requireDeltaFormat(repository)
         guard availabilityChecker.isAvailable(repository, allowingCreation: false) else {
             throw BackupCoordinatorError.destinationUnavailable
         }
@@ -245,6 +262,12 @@ public final class BackupCoordinator: @unchecked Sendable {
 
     @discardableResult
     public func restore(request: RestoreRequest, repository: BackupRepository) throws -> JobRun {
+        guard repository.format == .delta else {
+            return try failedRestoreRun(
+                repositoryID: repository.id,
+                message: resticFormatMismatchMessage
+            )
+        }
         try database.saveRestoreRequest(request)
         if case .originalPaths = request.destination, !request.dryRun, !request.confirmedOriginalPathRestore {
             return try failedRestoreRun(
@@ -293,6 +316,16 @@ public final class BackupCoordinator: @unchecked Sendable {
 
     @discardableResult
     public func runRetentionMaintenance(profile: BackupProfile, repository: BackupRepository) throws -> [JobRun] {
+        guard repository.format == .delta else {
+            return [
+                try failedRun(
+                    profileID: profile.id,
+                    repositoryID: repository.id,
+                    kind: .prune,
+                    message: resticFormatMismatchMessage
+                )
+            ]
+        }
         guard profile.retention.hasKeepRules else {
             let run = skippedMaintenanceRun(profile: profile, repository: repository)
             try database.saveJobRun(run)
@@ -322,6 +355,14 @@ public final class BackupCoordinator: @unchecked Sendable {
 
     @discardableResult
     public func check(repository: BackupRepository, readDataSubset: String? = nil) throws -> JobRun {
+        guard repository.format == .delta else {
+            return try failedRun(
+                profileID: nil,
+                repositoryID: repository.id,
+                kind: .check,
+                message: resticFormatMismatchMessage
+            )
+        }
         guard availabilityChecker.isAvailable(repository, allowingCreation: false) else {
             return try failedRun(
                 profileID: nil,
@@ -810,18 +851,30 @@ public final class BackupCoordinator: @unchecked Sendable {
         repositories[index].lastVerifiedAt = date
         try database.saveRepository(repositories[index])
     }
+
+    private func requireDeltaFormat(_ repository: BackupRepository) throws {
+        guard repository.format == .delta else {
+            throw BackupCoordinatorError.unsupportedRepositoryFormat
+        }
+    }
+
+    private var resticFormatMismatchMessage: String {
+        "This operation was not started because the destination uses Time Machine. Use that destination's Time Machine controls instead of a Delta backup profile or restore point."
+    }
 }
 
 public enum BackupCoordinatorError: Error, LocalizedError {
     case resticFailed(String)
     case destinationBusy
     case destinationUnavailable
+    case unsupportedRepositoryFormat
 
     public var errorDescription: String? {
         switch self {
         case let .resticFailed(message): "Backup tool failed: \(message)"
         case .destinationBusy: "Destination is busy with another backup, restore, or maintenance job."
         case .destinationUnavailable: "Destination is not available. Connect or mount the destination and try again."
+        case .unsupportedRepositoryFormat: "This operation requires a Delta encrypted backup destination. Use the Time Machine destination controls instead."
         }
     }
 }

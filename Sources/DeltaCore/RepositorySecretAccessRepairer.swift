@@ -138,9 +138,19 @@ public struct RepositorySecretAccessRepairer: Sendable {
         var accounts = [
             RepositorySecretAccount(
                 account: repository.keychainAccount,
-                purpose: "Destination encryption password"
+                purpose: repository.format == .timeMachine
+                    ? "Time Machine disk encryption password"
+                    : "Destination encryption password"
             )
         ]
+        if let manifestAccount = repository.timeMachineSettings?.manifestKeychainAccount {
+            accounts.append(
+                RepositorySecretAccount(
+                    account: manifestAccount,
+                    purpose: "Time Machine manifest authentication"
+                )
+            )
+        }
         accounts.append(
             contentsOf: repository.credentialReferences.map {
                 RepositorySecretAccount(

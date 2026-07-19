@@ -334,6 +334,27 @@ final class ResticRunnerTests: XCTestCase {
         XCTAssertFalse(result.userFacingMessage.contains("abc123"))
     }
 
+    func testRedactorCoversDerivedRcloneSecretsAndSignedURLQueries() {
+        let raw = """
+        RCLONE_CONFIG_DELTA_KEY=backend-secret
+        RCLONE_CONFIG_DELTA_ACCESS_TOKEN: access-token
+        RCLONE_CONFIG_DELTA_SAS_URL=https://account.blob.example/container?sv=1&sig=signed-secret&se=tomorrow
+        https://example.test/object?access_token=query-secret&name=safe
+        """
+
+        let redacted = SensitiveLogRedactor.redact(raw)
+
+        XCTAssertFalse(redacted.contains("backend-secret"))
+        XCTAssertFalse(redacted.contains("access-token"))
+        XCTAssertFalse(redacted.contains("signed-secret"))
+        XCTAssertFalse(redacted.contains("query-secret"))
+        XCTAssertTrue(redacted.contains("RCLONE_CONFIG_DELTA_KEY=<redacted>"))
+        XCTAssertTrue(redacted.contains("RCLONE_CONFIG_DELTA_ACCESS_TOKEN:<redacted>"))
+        XCTAssertTrue(redacted.contains("RCLONE_CONFIG_DELTA_SAS_URL=<redacted>"))
+        XCTAssertTrue(redacted.contains("access_token=<redacted>"))
+        XCTAssertTrue(redacted.contains("name=safe"))
+    }
+
     func testExitCodeThreeMapsToUnreadableSourceWarningWithoutOutputText() {
         let result = ResticRunResult(exitCode: 3, standardOutput: "", standardError: "")
 

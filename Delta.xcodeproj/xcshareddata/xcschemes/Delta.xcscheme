@@ -35,6 +35,20 @@
                ReferencedContainer = "container:Delta.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "YES"
+            buildForProfiling = "YES"
+            buildForArchiving = "YES"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "F78A6EC8191EC7A96366BAD5"
+               BuildableName = "DeltaTimeMachineFS.appex"
+               BlueprintName = "DeltaTimeMachineFS"
+               ReferencedContainer = "container:Delta.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
       </BuildActionEntries>
    </BuildAction>
    <TestAction

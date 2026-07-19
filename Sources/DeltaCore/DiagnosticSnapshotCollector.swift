@@ -15,6 +15,11 @@ public struct DiagnosticSnapshotCollector {
         let profiles = (try? database.fetchProfiles()) ?? []
         let snapshots = (try? database.fetchSnapshots()) ?? []
         let jobs = (try? database.fetchJobRuns(limit: 100)) ?? []
+        let timeMachineStates = Dictionary(
+            uniqueKeysWithValues: ((try? database.fetchTimeMachineDestinationStates()) ?? []).map {
+                ($0.repositoryID, $0)
+            }
+        )
         let resticURL = ResticExecutableLocator().locate(in: bundle)
         let rcloneURL = resticURL.deletingLastPathComponent().appendingPathComponent("rclone")
         let fullDiskAccessStatus = FullDiskAccessProbe().check(fileManager: fileManager)
@@ -97,10 +102,20 @@ public struct DiagnosticSnapshotCollector {
                 )
             ],
             destinations: repositories.map {
-                DiagnosticDestinationSummary(
+                let state = timeMachineStates[$0.id]
+                return DiagnosticDestinationSummary(
                     name: $0.name,
                     kind: $0.backend.kind.displayName,
-                    lastVerifiedAt: $0.lastVerifiedAt
+                    lastVerifiedAt: $0.lastVerifiedAt,
+                    format: $0.format.displayName,
+                    timeMachineState: $0.format == .timeMachine ? state?.lifecycle.displayName : nil,
+                    committedGeneration: $0.format == .timeMachine ? state?.committedGeneration : nil,
+                    cleanCacheBytes: $0.format == .timeMachine ? state?.cleanCacheBytes : nil,
+                    dirtyCacheBytes: $0.format == .timeMachine ? state?.dirtyCacheBytes : nil,
+                    timeMachineFailureContext: $0.format == .timeMachine
+                        ? state?.lastFailureContext?.rawValue
+                        : nil,
+                    timeMachineLastError: $0.format == .timeMachine ? state?.lastError : nil
                 )
             },
             profiles: profiles.map {

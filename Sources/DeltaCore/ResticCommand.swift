@@ -89,6 +89,7 @@ public struct ResticCommand: Equatable, Sendable {
 }
 
 public enum ResticCommandValidationError: Error, Equatable, LocalizedError {
+    case unsupportedRepositoryFormat
     case missingSnapshotID
     case missingRestoreTarget
     case invalidRestorePath(String)
@@ -96,6 +97,8 @@ public enum ResticCommandValidationError: Error, Equatable, LocalizedError {
 
     public var errorDescription: String? {
         switch self {
+        case .unsupportedRepositoryFormat:
+            return "This operation requires a Delta encrypted backup destination. Time Machine destinations use macOS backup and restore controls instead of restic."
         case .missingSnapshotID:
             return "Choose a restore point before starting restore."
         case .missingRestoreTarget:
@@ -321,6 +324,9 @@ public struct ResticCommandBuilder: Sendable {
         passwordSource: PasswordSource = .secretBridge,
         sensitiveStandardInput: Data? = nil
     ) throws -> ResticCommand {
+        guard repository.format == .delta else {
+            throw ResticCommandValidationError.unsupportedRepositoryFormat
+        }
         let repositoryURL = try backendURLBuilder.repositoryURL(for: repository.backend)
         var globalArguments = ["-r", repositoryURL]
         switch passwordSource {
@@ -454,7 +460,11 @@ public struct ResticCommandBuilder: Sendable {
             guard FileManager.default.isExecutableFile(atPath: rcloneURL.path) else {
                 return []
             }
-            return ["-o", "rclone.program=\(rcloneURL.path)"]
+            // Restic parses rclone.program as a command string. Selecting the
+            // verified sibling by name avoids reparsing an absolute app path
+            // that may contain spaces, while resticEnvironment pins this tool
+            // directory ahead of every inherited PATH entry.
+            return ["-o", "rclone.program=\(rcloneURL.lastPathComponent)"]
         default:
             return []
         }
