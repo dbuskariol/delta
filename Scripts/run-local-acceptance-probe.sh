@@ -8,6 +8,7 @@ source "$ROOT_DIR/Scripts/manual-acceptance-items.sh"
 APP_PATH="${1:-${DELTA_ACCEPTANCE_APP:-/Applications/Delta.app}}"
 OUTPUT_DIR="${DELTA_LOCAL_ACCEPTANCE_DIR:-$ROOT_DIR/dist/local-acceptance}"
 GATE_STATUS_FILE="$ROOT_DIR/dist/release-evidence/automated-gate-status"
+TIME_MACHINE_SYSTEM_EVIDENCE="${DELTA_TIME_MACHINE_SYSTEM_ACCEPTANCE_EVIDENCE:-$ROOT_DIR/dist/time-machine-system-support/latest.txt}"
 
 mkdir -p "$OUTPUT_DIR"
 
@@ -558,13 +559,21 @@ else
   else
     append_row "remote_first_backup_preparation" "$(item_area remote_first_backup_preparation)" "Manual Required" "Remote destination preparation needs a real unprepared remote and an existing remote to avoid false confidence. Configure external backend acceptance to automate the backend lifecycle." "Start backup on new unprepared remote and existing remote; confirm init happens only when needed."
   fi
+  time_machine_system_output="$(run_capture time_machine_system_support \
+    "$ROOT_DIR/Scripts/verify-time-machine-system-support-evidence.sh" \
+    "$APP_PATH" \
+    "$TIME_MACHINE_SYSTEM_EVIDENCE")"
+  time_machine_system_status="$(command_status time_machine_system_support)"
   if [[ "$automated_gate_status" == "Passed" && "$automated_gate_commit" == "$git_commit" ]] \
+    && [[ "$time_machine_system_status" -eq 0 ]] \
     && grep -Fq "TimeMachineObjectStoreTests" "$ROOT_DIR/Tests/DeltaCoreTests/TimeMachineObjectStoreTests.swift" \
     && grep -Fq "TimeMachineSystemControllerTests" "$ROOT_DIR/Tests/DeltaCoreTests/TimeMachineSystemControllerTests.swift"
   then
-    append_row "time_machine_format" "$(item_area time_machine_format)" "Partial" "The automated gate passed the certificate-free Time Machine object, cache, lease, recovery, transport, IPC, controller, packaging, and real local-rclone regression suites for commit $git_commit. It did not activate FSKit, complete a macOS Time Machine backup, restore user data, or exercise a genuine remote provider." "Install the exact stable-signed candidate and complete the full permission, mount, backup, restore, fault, resource, reconnect, update, accessibility, and genuine-provider matrix."
+    append_row "time_machine_format" "$(item_area time_machine_format)" "Partial" "The automated gate passed the certificate-free Time Machine object, cache, lease, recovery, transport, IPC, controller, packaging, and real local-rclone regression suites for commit $git_commit. Clean first-registration acceptance also proved that the exact notarized /Applications candidate reached enabled public Service Management state and returned its authenticated embedded-helper code hash before registrations were cleaned up. $time_machine_system_output It did not complete a macOS Time Machine backup, restore user data, or exercise a genuine remote provider." "Complete the full permission, FSKit mount, backup, restore, fault, resource, reconnect, update, accessibility, and genuine-provider matrix with the exact stable-signed candidate."
+  elif [[ -e "$TIME_MACHINE_SYSTEM_EVIDENCE" ]]; then
+    append_row "time_machine_format" "$(item_area time_machine_format)" "Failed" "Time Machine system-support evidence exists but does not verify against this exact installed candidate: $time_machine_system_output" "Repeat clean first-registration acceptance with the exact notarized candidate, then complete the full Time Machine lifecycle matrix."
   else
-    append_row "time_machine_format" "$(item_area time_machine_format)" "Manual Required" "Certificate-free tests cannot activate the provisioned FSKit extension or prove a completed macOS Time Machine backup and restore." "Install the exact stable-signed candidate and complete the full permission, mount, backup, restore, fault, resource, reconnect, update, accessibility, and genuine-provider matrix."
+    append_row "time_machine_format" "$(item_area time_machine_format)" "Manual Required" "Certificate-free tests cannot prove a modern privileged helper launch because Apple requires administrator approval before an SMAppService launch daemon is eligible to run. Clean first-registration authenticated helper evidence and a completed macOS Time Machine backup and restore remain required." "On a clean acceptance host, run Scripts/run-installed-time-machine-system-support-acceptance.sh against the exact notarized /Applications/Delta.app, approve Login Items in System Settings, then complete the full permission, FSKit mount, backup, restore, fault, resource, reconnect, update, accessibility, and genuine-provider matrix."
   fi
   if [[ "$installed_menu_bar_status" -eq 0 ]]
   then

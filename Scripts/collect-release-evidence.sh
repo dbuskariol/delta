@@ -26,6 +26,7 @@ LATEST="$OUTPUT_DIR/latest.md"
 INFO_PLIST="$APP_PATH/Contents/Info.plist"
 GATE_STATUS_FILE="$ROOT_DIR/dist/release-evidence/automated-gate-status"
 MANUAL_ACCEPTANCE_REPORT="${DELTA_MANUAL_ACCEPTANCE_REPORT:-$ROOT_DIR/dist/manual-acceptance/latest.md}"
+TIME_MACHINE_SYSTEM_EVIDENCE="${DELTA_TIME_MACHINE_SYSTEM_ACCEPTANCE_EVIDENCE:-$ROOT_DIR/dist/time-machine-system-support/latest.txt}"
 
 plist_value() {
   local key="$1"
@@ -141,6 +142,14 @@ if [[ -n "$IDENTITY_ACCEPTANCE_APP_PATH" ]]; then
   append_command "Service Management Lifecycle Acceptance" "$ROOT_DIR/Scripts/run-installed-service-management-acceptance.sh" "$IDENTITY_ACCEPTANCE_APP_PATH"
   append_command "Installed Preferences Acceptance" "$ROOT_DIR/Scripts/run-installed-preferences-acceptance.sh" "$IDENTITY_ACCEPTANCE_APP_PATH"
   append_command "Installed App Smoke Verification" "$ROOT_DIR/Scripts/verify-installed-app.sh" "$INSTALLED_APP_PATH"
+  append_command "Time Machine System Support Acceptance Verification" \
+    "$ROOT_DIR/Scripts/verify-time-machine-system-support-evidence.sh" \
+    "$IDENTITY_ACCEPTANCE_APP_PATH" \
+    "$TIME_MACHINE_SYSTEM_EVIDENCE"
+  if [[ -e "$TIME_MACHINE_SYSTEM_EVIDENCE" ]]; then
+    append_command "Time Machine System Support Acceptance Evidence" \
+      /bin/cat "$TIME_MACHINE_SYSTEM_EVIDENCE"
+  fi
   EXTERNAL_ACCEPTANCE_APP_PATH="$INSTALLED_APP_PATH"
 else
   append_command "Scheduled Backups Acceptance" missing_installed_identity
@@ -244,12 +253,22 @@ fi
 } >>"$OUTPUT"
 /bin/rm -f "$EXTERNAL_ACCEPTANCE_OUTPUT"
 
+TIME_MACHINE_SYSTEM_ACCEPTANCE_PASSED="No"
+if [[ -n "$IDENTITY_ACCEPTANCE_APP_PATH" ]] \
+  && "$ROOT_DIR/Scripts/verify-time-machine-system-support-evidence.sh" \
+    "$IDENTITY_ACCEPTANCE_APP_PATH" \
+    "$TIME_MACHINE_SYSTEM_EVIDENCE" >/dev/null 2>&1
+then
+  TIME_MACHINE_SYSTEM_ACCEPTANCE_PASSED="Yes"
+fi
+
 READY_FOR_EXTERNAL_DISTRIBUTION="No"
 if [[ "$AUTOMATED_GATE_STATUS" == "Passed" \
   && "$AUTOMATED_GATE_APP_HASH_MATCH" == "Yes" \
   && "$MANUAL_MATRIX_PASSED" == "Yes" \
   && "$MANUAL_REPORT_CURRENT" == "Yes" \
   && "$EXTERNAL_ACCEPTANCE_PASSED" == "Yes" \
+  && "$TIME_MACHINE_SYSTEM_ACCEPTANCE_PASSED" == "Yes" \
   && "$NOTARIZATION_COMPLETE" == "Yes" ]]
 then
   READY_FOR_EXTERNAL_DISTRIBUTION="Yes"
@@ -269,6 +288,7 @@ Manual matrix passed: $MANUAL_MATRIX_PASSED
 - Manual report matches git commit: $MANUAL_REPORT_CURRENT
 - Manual matrix passed: $MANUAL_MATRIX_PASSED
 - Real external backend acceptance passed: $EXTERNAL_ACCEPTANCE_PASSED
+- Clean-install Time Machine system support passed: $TIME_MACHINE_SYSTEM_ACCEPTANCE_PASSED
 - Developer ID notarization complete: $NOTARIZATION_COMPLETE
 - Ready for external distribution: $READY_FOR_EXTERNAL_DISTRIBUTION
 EOF

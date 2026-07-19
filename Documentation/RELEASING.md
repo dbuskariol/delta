@@ -50,9 +50,20 @@ The Keychain profile name is not product metadata; the existing `Reccy Notary` p
 
 Finalization writes public candidates under `dist/updates`, private notarization evidence under `dist/notarization`, and private dSYMs under `dist/symbols`.
 
+Before publishing, install the exact finalized candidate and prove its privileged Time Machine support on a clean acceptance host:
+
+```sh
+Scripts/install-app.sh dist/Delta.app
+Scripts/run-installed-time-machine-system-support-acceptance.sh /Applications/Delta.app
+```
+
+The host must begin with both Delta Time Machine Service Management items unregistered. Apple's public `SMAppService` contract requires an administrator to approve a launch daemon in System Settings before it is eligible to run, so this is deliberately an interactive installed-candidate gate rather than a headless CI simulation. The script waits for the native approval, requires both items to become enabled, authenticates the running helper against the exact embedded helper code hash, unregisters both items through public APIs, and writes candidate-bound evidence under `dist/time-machine-system-support`. It never runs a helper directly, edits Background Task Management or launchd state, or accepts a renamed, `dist`, DerivedData, archive, or worktree app.
+
 ## Publish
 
 `Scripts/publish-release.sh` performs the publishing transaction. Before contacting GitHub it re-runs the history/security audit, verifies the complete artifact graph, and requires `Scripts/verify-production-readiness.sh` to pass for the exact installed candidate, current manual acceptance report, and genuine external-backend evidence. It then creates a draft with the six intended public assets, downloads those bytes into a new temporary directory, repeats the full signature/notarization/Gatekeeper/ZIP/DMG/provenance/Sparkle verification, and only then makes the release public and latest.
+
+Production readiness also verifies the clean-install Time Machine system-support report against the exact installed app, source commit, immutable build identity, app CDHash, helper CDHash, enabled registration states, authenticated readiness result, and supported cleanup state. A report from a different candidate or a development machine with retained registration state cannot satisfy the gate.
 
 One marketing-version/build-number pair identifies one immutable signed app. `Scripts/install-app.sh` refuses to replace an installed Delta app with different signed bytes carrying the same `CFBundleShortVersionString` and `CFBundleVersion`; advance `CURRENT_PROJECT_VERSION` before building a replacement. This prevents local build/test churn from presenting macOS Service Management with two helper executables under one release identity and makes installed acceptance match the update topology users receive through Sparkle.
 
