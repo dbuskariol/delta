@@ -448,6 +448,7 @@ final class TimeMachineSystemControllerTests: XCTestCase {
         XCTAssertEqual(
             TimeMachineSystemRegistrationFingerprint.current(bundleURL: root),
             TimeMachineSystemRegistrationFingerprint.fingerprint(
+                bundlePath: root.standardizedFileURL.resolvingSymlinksInPath().path,
                 artifacts: artifacts
             )
         )
@@ -457,6 +458,20 @@ final class TimeMachineSystemControllerTests: XCTestCase {
             )
         )
         XCTAssertNil(TimeMachineSystemRegistrationFingerprint.current(bundleURL: root))
+    }
+
+    func testTimeMachineSystemFingerprintBindsInstalledBundlePath() {
+        let artifacts = [Data("same-service".utf8), Data("same-helper".utf8)]
+        XCTAssertNotEqual(
+            TimeMachineSystemRegistrationFingerprint.fingerprint(
+                bundlePath: "/Applications/Delta.app",
+                artifacts: artifacts
+            ),
+            TimeMachineSystemRegistrationFingerprint.fingerprint(
+                bundlePath: "/Applications/Renamed Delta.app",
+                artifacts: artifacts
+            )
+        )
     }
 
     func testTimeMachineSystemRegistrationRefreshRequiresIdleEnabledDestinations() {
@@ -675,6 +690,100 @@ final class TimeMachineSystemControllerTests: XCTestCase {
                 helperStatus: .enabled,
                 registeredFingerprint: "old",
                 currentFingerprint: nil
+            ),
+            .none
+        )
+    }
+
+    func testPostRegistrationRepairPreservesFreshlyRegisteredComponents() {
+        XCTAssertEqual(
+            TimeMachineSystemAccessPostRegistrationPolicy.action(
+                priorServiceStatus: .enabled,
+                priorHelperStatus: .notRegistered,
+                serviceStatus: .enabled,
+                helperStatus: .enabled,
+                registeredFingerprint: "old",
+                currentFingerprint: "current"
+            ),
+            .repair(.backgroundService)
+        )
+        XCTAssertEqual(
+            TimeMachineSystemAccessPostRegistrationPolicy.action(
+                priorServiceStatus: .notRegistered,
+                priorHelperStatus: .enabled,
+                serviceStatus: .enabled,
+                helperStatus: .enabled,
+                registeredFingerprint: "old",
+                currentFingerprint: "current"
+            ),
+            .repair(.setupHelper)
+        )
+        XCTAssertEqual(
+            TimeMachineSystemAccessPostRegistrationPolicy.action(
+                priorServiceStatus: .notRegistered,
+                priorHelperStatus: .notRegistered,
+                serviceStatus: .enabled,
+                helperStatus: .enabled,
+                registeredFingerprint: "old",
+                currentFingerprint: "current"
+            ),
+            .recordCurrentFingerprint
+        )
+        XCTAssertEqual(
+            TimeMachineSystemAccessPostRegistrationPolicy.action(
+                priorServiceStatus: .enabled,
+                priorHelperStatus: .enabled,
+                serviceStatus: .enabled,
+                helperStatus: .enabled,
+                registeredFingerprint: "old",
+                currentFingerprint: "current"
+            ),
+            .repair(.all)
+        )
+    }
+
+    func testPostRegistrationRepairWaitsForApprovalAndCompleteEvidence() {
+        XCTAssertEqual(
+            TimeMachineSystemAccessPostRegistrationPolicy.action(
+                priorServiceStatus: .enabled,
+                priorHelperStatus: .notRegistered,
+                serviceStatus: .enabled,
+                helperStatus: .requiresApproval,
+                registeredFingerprint: "old",
+                currentFingerprint: "current"
+            ),
+            .repair(.backgroundService)
+        )
+        XCTAssertEqual(
+            TimeMachineSystemAccessPostRegistrationPolicy.action(
+                priorServiceStatus: .enabled,
+                priorHelperStatus: .enabled,
+                serviceStatus: .enabled,
+                helperStatus: .requiresApproval,
+                registeredFingerprint: "old",
+                currentFingerprint: "current"
+            ),
+            .none
+        )
+        XCTAssertEqual(
+            TimeMachineSystemAccessPostRegistrationPolicy.action(
+                priorServiceStatus: .notRegistered,
+                priorHelperStatus: .notRegistered,
+                serviceStatus: .enabled,
+                helperStatus: .enabled,
+                registeredFingerprint: nil,
+                currentFingerprint: nil
+            ),
+            .none
+        )
+        XCTAssertEqual(
+            TimeMachineSystemAccessPostRegistrationPolicy.action(
+                priorServiceStatus: .notRegistered,
+                priorHelperStatus: .notRegistered,
+                serviceStatus: .enabled,
+                helperStatus: .notRegistered,
+                registeredFingerprint: nil,
+                currentFingerprint: "current"
             ),
             .none
         )
