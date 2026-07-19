@@ -689,6 +689,18 @@ final class TimeMachineSystemControllerTests: XCTestCase {
         )
     }
 
+    func testTimeMachineHelperUsesCurrentServiceManagementExecutableLayout() {
+        XCTAssertEqual(
+            TimeMachineSetupHelperController.executableRelativePath,
+            "Contents/MacOS/DeltaTimeMachineHelper"
+        )
+        XCTAssertFalse(
+            TimeMachineSetupHelperController.executableRelativePath.contains(
+                "Contents/Library/LaunchServices"
+            )
+        )
+    }
+
     func testTimeMachineSystemAccessTreatsPendingApprovalAsAcceptedRegistration() {
         XCTAssertTrue(
             TimeMachineSystemAccessRegistrationPolicy.accepted(status: .enabled)

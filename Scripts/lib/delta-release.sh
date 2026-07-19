@@ -396,7 +396,7 @@ delta_assert_release_app() {
   local time_machine_service_plist="$app/Contents/Library/LaunchAgents/com.delta.backup.timemachine.service.plist"
   local time_machine_helper_plist="$app/Contents/Library/LaunchDaemons/com.delta.backup.timemachine.helper.plist"
   local time_machine_service="$app/Contents/Resources/DeltaTimeMachineService"
-  local time_machine_helper="$app/Contents/Library/LaunchServices/DeltaTimeMachineHelper"
+  local time_machine_helper="$app/Contents/MacOS/DeltaTimeMachineHelper"
   local time_machine_extension="$app/Contents/Extensions/DeltaTimeMachineFS.appex"
   [[ -f "$time_machine_service_plist" ]] || delta_fail 'the Time Machine storage-service property list is missing'
   [[ -f "$time_machine_helper_plist" ]] || delta_fail 'the Time Machine setup-helper property list is missing'
@@ -404,8 +404,10 @@ delta_assert_release_app() {
   [[ -x "$time_machine_helper" ]] || delta_fail 'the Time Machine setup-helper executable is missing'
   [[ "$(/usr/bin/plutil -extract BundleProgram raw -o - "$time_machine_service_plist")" == "Contents/Resources/DeltaTimeMachineService" ]] \
     || delta_fail 'the Time Machine storage service is not in its declared Service Management location'
-  [[ "$(/usr/bin/plutil -extract BundleProgram raw -o - "$time_machine_helper_plist")" == "Contents/Library/LaunchServices/DeltaTimeMachineHelper" ]] \
+  [[ "$(/usr/bin/plutil -extract BundleProgram raw -o - "$time_machine_helper_plist")" == "Contents/MacOS/DeltaTimeMachineHelper" ]] \
     || delta_fail 'the Time Machine setup helper is not in its declared Service Management location'
+  [[ ! -e "$app/Contents/Library/LaunchServices/DeltaTimeMachineHelper" ]] \
+    || delta_fail 'the obsolete SMJobBless Time Machine helper location remains in the app'
   [[ -d "$time_machine_extension" ]] || delta_fail 'the Time Machine FSKit extension is missing'
   local service_identifier helper_identifier
   service_identifier="$(delta_signature_identifier "$time_machine_service")"
