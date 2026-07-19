@@ -1409,8 +1409,15 @@ public final class TimeMachineDiskBackend: @unchecked Sendable {
         state.committedManifestDigest = head.signedManifest.manifestDigest
         state.cleanCacheBytes = usage.cleanBytes
         state.dirtyCacheBytes = usage.dirtyBytes
-        state.lastError = nil
-        state.lastFailureContext = nil
+        // The storage process owns remote synchronization health only. It may
+        // report that a transient transport failure recovered, but must never
+        // erase a helper, mount, tmutil, rollback, or persistence failure
+        // recorded by the connection coordinator. Those failures remain until
+        // an authoritative system reconciliation or explicit disconnect.
+        if state.lastFailureContext == .remoteSynchronization {
+            state.lastError = nil
+            state.lastFailureContext = nil
+        }
         state.updatedAt = Date()
         try database.saveTimeMachineDestinationState(state)
     }
@@ -1424,8 +1431,12 @@ public final class TimeMachineDiskBackend: @unchecked Sendable {
         // to require an explicit disconnect before edit or removal.
         state.cleanCacheBytes = usage.cleanBytes
         state.dirtyCacheBytes = usage.dirtyBytes
-        state.lastError = TimeMachineDestinationFailurePresentation.userMessage(for: error)
-        state.lastFailureContext = .remoteSynchronization
+        if state.lastFailureContext == nil
+            || state.lastFailureContext == .remoteSynchronization {
+            state.lastError = TimeMachineDestinationFailurePresentation
+                .userMessage(for: error)
+            state.lastFailureContext = .remoteSynchronization
+        }
         state.updatedAt = Date()
         try database.saveTimeMachineDestinationState(state)
     }

@@ -129,7 +129,7 @@ Delta requires macOS 26 or later.
 1. Download the notarized DMG from the [latest release](https://github.com/dbuskariol/delta/releases/latest).
 2. Open the DMG and drag Delta to Applications.
 3. Open Delta from Applications and add a destination. Choose Delta encrypted backup for a restic profile, or Time Machine for a macOS-managed backup disk.
-4. For Time Machine, approve File System Extensions and Background Items when macOS asks, connect the disk in Delta, then configure and inspect backups in macOS Time Machine.
+4. For Time Machine, keep the app at `/Applications/Delta.app`, approve File System Extensions and Background Items when macOS asks, connect the disk in Delta, then configure and inspect backups in macOS Time Machine. Delta refuses to register production system components from a renamed, temporary, or build-output copy.
 5. Run a first backup, inspect its authoritative history, and perform a test restore before considering the setup complete.
 
 Public releases also include a signed ZIP for Sparkle updates, `SHA256SUMS`, external release notes, and a machine-readable provenance manifest.
@@ -184,7 +184,7 @@ Use **Settings → Updates** or **Updates** in the menu-bar panel. Delta checks 
 - **A scheduled backup did not run:** update to Delta 0.3.2 or later, confirm Scheduled Backups is enabled and approved in Login Items, then review pause, power, missed-run, source, destination, and saved-password status. Delta 0.3.2 repairs the stale missing-service registration that an earlier version could leave after an update; it does not require deleting profiles or backup data.
 - **Saved Passwords needs repair:** use Settings → Permissions to review access and rewrite the Keychain access list for the currently signed Delta app.
 - **A destination is unavailable or locked:** reconnect it, verify credentials, and ensure another restic client is not operating on the same repository.
-- **A Time Machine disk will not connect:** open Settings → Permissions, review File System Extensions and Time Machine System Support, approve any pending macOS Background Items request, then retry. Delta cannot grant these approvals itself.
+- **A Time Machine disk will not connect:** confirm the app is named `Delta.app` directly in `/Applications`, then open Settings → Permissions, review File System Extensions and Time Machine System Support, approve any pending macOS Background Items request, and retry. Delta cannot grant these approvals itself.
 - **A connected Time Machine disk reports a remote-storage error:** restore provider connectivity first, then use the destination's offered recovery action. Disconnect the disk before editing, checking, or removing its remote configuration; Delta deliberately keeps an uncertain or failed mount visible instead of claiming it was ejected.
 - **An update is unavailable:** use Check Now, confirm network access to GitHub Releases, or install the notarized DMG manually.
 - **Support needs evidence:** copy or export the sanitized diagnostic report from Settings. Known secrets, credential-bearing URLs, and personal home-directory names are redacted.

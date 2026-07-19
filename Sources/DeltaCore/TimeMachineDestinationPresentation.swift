@@ -142,7 +142,7 @@ public struct TimeMachineDestinationPresentation: Equatable, Sendable {
         case .preparing, .disconnecting:
             primaryAction = .none
         case .mounted:
-            primaryAction = state.lastError == nil ? .backUpNow : .none
+            primaryAction = state.isReadyForBackup ? .backUpNow : .none
         case .needsRepair:
             primaryAction = .repair
         case .failed:
@@ -154,20 +154,27 @@ public struct TimeMachineDestinationPresentation: Equatable, Sendable {
             }
         }
 
+        let mountedConnectionIsIncomplete = state.lifecycle == .mounted
+            && !state.isReadyForBackup
+        let hasWarning = state.lastError != nil || mountedConnectionIsIncomplete
         return TimeMachineDestinationPresentation(
             status: status(for: state),
             primaryAction: primaryAction,
-            warningTitle: state.lastError.map { _ in warningTitle(for: state) },
+            warningTitle: hasWarning ? warningTitle(for: state) : nil,
             warningMessage: state.lastError.map(
                 TimeMachineSetupCommandFailurePolicy.normalizedUserMessage
-            ),
-            warningSymbol: state.lastError.map { _ in warningSymbol(for: state) },
+            ) ?? (mountedConnectionIsIncomplete
+                ? "Delta could not verify this mounted disk as the active macOS Time Machine destination. Disconnect it before trying to connect again."
+                : nil),
+            warningSymbol: hasWarning ? warningSymbol(for: state) : nil,
             isMounted: state.lifecycle == .mounted || state.lifecycle == .disconnecting
         )
     }
 
     private static func status(for state: TimeMachineDestinationState) -> String {
-        guard state.lastError != nil else {
+        let mountedConnectionIsIncomplete = state.lifecycle == .mounted
+            && !state.isReadyForBackup
+        guard state.lastError != nil || mountedConnectionIsIncomplete else {
             return state.lifecycle.displayName
         }
         switch state.lastFailureContext {
@@ -188,7 +195,9 @@ public struct TimeMachineDestinationPresentation: Equatable, Sendable {
         case .remoteAvailability:
             return "Storage Unavailable"
         case nil:
-            return state.lifecycle == .mounted ? "Needs Attention" : state.lifecycle.displayName
+            return mountedConnectionIsIncomplete
+                ? "Connection Incomplete"
+                : state.lifecycle.displayName
         }
     }
 
@@ -215,7 +224,9 @@ public struct TimeMachineDestinationPresentation: Equatable, Sendable {
                 ? "Time Machine disk is reconnecting"
                 : "Time Machine storage is unavailable"
         case nil:
-            return state.lifecycle == .needsRepair || state.lifecycle == .failed
+            return state.lifecycle == .mounted
+                ? "Time Machine connection is incomplete"
+                : state.lifecycle == .needsRepair || state.lifecycle == .failed
                 ? "Time Machine disk needs repair"
                 : "Time Machine disk is unavailable"
         }
@@ -240,7 +251,9 @@ public struct TimeMachineDestinationPresentation: Equatable, Sendable {
         case .remoteSynchronization, .storageService:
             return "arrow.triangle.2.circlepath"
         case nil:
-            return "exclamationmark.triangle"
+            return state.lifecycle == .mounted
+                ? "eject.fill"
+                : "exclamationmark.triangle"
         }
     }
 }

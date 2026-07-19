@@ -108,7 +108,9 @@ public struct DiagnosticSnapshotCollector {
                     kind: $0.backend.kind.displayName,
                     lastVerifiedAt: $0.lastVerifiedAt,
                     format: $0.format.displayName,
-                    timeMachineState: $0.format == .timeMachine ? state?.lifecycle.displayName : nil,
+                    timeMachineState: $0.format == .timeMachine
+                        ? TimeMachineDestinationPresentation.make(state: state).status
+                        : nil,
                     committedGeneration: $0.format == .timeMachine ? state?.committedGeneration : nil,
                     cleanCacheBytes: $0.format == .timeMachine ? state?.cleanCacheBytes : nil,
                     dirtyCacheBytes: $0.format == .timeMachine ? state?.dirtyCacheBytes : nil,
