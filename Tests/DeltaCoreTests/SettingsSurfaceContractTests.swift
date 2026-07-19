@@ -2,6 +2,37 @@ import XCTest
 @testable import DeltaCore
 
 final class SettingsSurfaceContractTests: XCTestCase {
+    func testLoginItemsActionHasOneAuthoritativePermissionRow() {
+        XCTAssertEqual(
+            SettingsLoginItemsActionPlacement.resolve(
+                timeMachineSystemSupportNeedsAttention: true,
+                scheduledBackupsNeedAttention: true
+            ),
+            .timeMachineSystemSupport
+        )
+        XCTAssertEqual(
+            SettingsLoginItemsActionPlacement.resolve(
+                timeMachineSystemSupportNeedsAttention: true,
+                scheduledBackupsNeedAttention: false
+            ),
+            .timeMachineSystemSupport
+        )
+        XCTAssertEqual(
+            SettingsLoginItemsActionPlacement.resolve(
+                timeMachineSystemSupportNeedsAttention: false,
+                scheduledBackupsNeedAttention: true
+            ),
+            .scheduledBackups
+        )
+        XCTAssertEqual(
+            SettingsLoginItemsActionPlacement.resolve(
+                timeMachineSystemSupportNeedsAttention: false,
+                scheduledBackupsNeedAttention: false
+            ),
+            .hidden
+        )
+    }
+
     func testSettingsSurfaceContractCoversRequiredCategoriesAndSummary() {
         XCTAssertEqual(
             SettingsSurfaceContract.categoryTitles,
@@ -58,6 +89,7 @@ final class SettingsSurfaceContractTests: XCTestCase {
         XCTAssertTrue(SettingsSurfaceContract.requiredManualAcceptanceCoverage.contains("Password access repair"))
         XCTAssertTrue(SettingsSurfaceContract.requiredManualAcceptanceCoverage.contains("Compact status summary"))
         XCTAssertTrue(SettingsSurfaceContract.requiredManualAcceptanceCoverage.contains("Run Due Now scheduled-backup action"))
+        XCTAssertTrue(SettingsSurfaceContract.requiredManualAcceptanceCoverage.contains("One Login Items recovery action per settings context"))
         XCTAssertTrue(SettingsSurfaceContract.requiredManualAcceptanceCoverage.contains("Expandable Scheduled Backups explanation"))
         XCTAssertTrue(SettingsSurfaceContract.requiredManualAcceptanceCoverage.contains("Sparkle automatic check and download controls"))
         XCTAssertTrue(SettingsSurfaceContract.requiredManualAcceptanceCoverage.contains("Idle-sleep protection"))
