@@ -384,7 +384,9 @@ final class TimeMachineRepositoryTests: XCTestCase {
                 repositoryID: repository.id,
                 storeID: settings.storeID,
                 lifecycle: .mounted,
-                mountPoint: "/Volumes/History"
+                mountPoint: "/Volumes/History",
+                lastError: "Connection rollback still requires a disconnect.",
+                lastFailureContext: .systemConnection
             )
         )
         let transport = LocalTimeMachineObjectTransport(rootURL: remoteURL)
@@ -419,7 +421,15 @@ final class TimeMachineRepositoryTests: XCTestCase {
                 transport: AnyTimeMachineRemoteObjectTransport(transport),
                 applicationSupportURL: supportURL
             )
-            let result = backend.handle(
+            let initializedState = try XCTUnwrap(
+                database.fetchTimeMachineDestinationState(repositoryID: repository.id)
+            )
+            XCTAssertEqual(initializedState.lastFailureContext, .systemConnection)
+            XCTAssertEqual(
+                initializedState.lastError,
+                "Connection rollback still requires a disconnect."
+            )
+            let systemFailureResult = backend.handle(
                 request: TimeMachineDiskRequest(
                     operation: .read,
                     path: "../invalid-band",
@@ -428,7 +438,33 @@ final class TimeMachineRepositoryTests: XCTestCase {
                 ),
                 payload: Data()
             )
-            XCTAssertNotEqual(result.response.errorNumber, 0)
+            XCTAssertNotEqual(systemFailureResult.response.errorNumber, 0)
+            let preservedSystemFailure = try XCTUnwrap(
+                database.fetchTimeMachineDestinationState(repositoryID: repository.id)
+            )
+            XCTAssertEqual(
+                preservedSystemFailure.lastFailureContext,
+                .systemConnection
+            )
+            XCTAssertEqual(
+                preservedSystemFailure.lastError,
+                "Connection rollback still requires a disconnect."
+            )
+
+            var connectedState = preservedSystemFailure
+            connectedState.lastError = nil
+            connectedState.lastFailureContext = nil
+            try database.saveTimeMachineDestinationState(connectedState)
+            let storageFailureResult = backend.handle(
+                request: TimeMachineDiskRequest(
+                    operation: .read,
+                    path: "../invalid-band",
+                    offset: 0,
+                    length: 1
+                ),
+                payload: Data()
+            )
+            XCTAssertNotEqual(storageFailureResult.response.errorNumber, 0)
         }
 
         let state = try XCTUnwrap(
@@ -1002,6 +1038,42 @@ final class TimeMachineRepositoryTests: XCTestCase {
         XCTAssertEqual(incompleteRollback.warningSymbol, "eject.fill")
         XCTAssertTrue(incompleteRollback.isMounted)
 
+        let residualMountWithoutDestination = TimeMachineDestinationPresentation.make(
+            state: TimeMachineDestinationState(
+                repositoryID: repositoryID,
+                storeID: storeID,
+                lifecycle: .mounted,
+                mountSessionID: UUID(),
+                mountPoint: "/Volumes/History",
+                diskImagePath: "History.sparsebundle",
+                deviceIdentifier: "disk42s1"
+            )
+        )
+        XCTAssertEqual(residualMountWithoutDestination.status, "Connection Incomplete")
+        XCTAssertEqual(residualMountWithoutDestination.primaryAction, .none)
+        XCTAssertEqual(
+            residualMountWithoutDestination.warningTitle,
+            "Time Machine connection is incomplete"
+        )
+        XCTAssertEqual(residualMountWithoutDestination.warningSymbol, "eject.fill")
+        XCTAssertTrue(residualMountWithoutDestination.isMounted)
+
+        let readyForBackup = TimeMachineDestinationState(
+            repositoryID: repositoryID,
+            storeID: storeID,
+            lifecycle: .mounted,
+            mountSessionID: UUID(),
+            mountPoint: "/Volumes/History",
+            diskImagePath: "History.sparsebundle",
+            deviceIdentifier: "disk42s1",
+            timeMachineDestinationID: UUID().uuidString
+        )
+        XCTAssertTrue(readyForBackup.isReadyForBackup)
+        XCTAssertEqual(
+            TimeMachineDestinationPresentation.make(state: readyForBackup).primaryAction,
+            .backUpNow
+        )
+
         let disconnecting = TimeMachineDestinationPresentation.make(
             state: TimeMachineDestinationState(
                 repositoryID: repositoryID,
@@ -1111,6 +1183,58 @@ final class TimeMachineRepositoryTests: XCTestCase {
         XCTAssertEqual(destinationCleanup.status, "Cleanup Needed")
         XCTAssertEqual(destinationCleanup.primaryAction, .connect)
         XCTAssertEqual(destinationCleanup.warningTitle, "Remove the old Time Machine destination")
+    }
+
+    func testBackupReadinessRequiresEveryAuthoritativeSystemField() {
+        let repositoryID = UUID()
+        let storeID = UUID()
+        let mountSessionID = UUID()
+        let destinationID = UUID().uuidString
+        let complete = TimeMachineDestinationState(
+            repositoryID: repositoryID,
+            storeID: storeID,
+            lifecycle: .mounted,
+            mountSessionID: mountSessionID,
+            mountPoint: "/Volumes/History",
+            diskImagePath: "History.sparsebundle",
+            deviceIdentifier: "disk42s1",
+            timeMachineDestinationID: destinationID
+        )
+        XCTAssertTrue(complete.isReadyForBackup)
+
+        var incompleteStates: [TimeMachineDestinationState] = []
+        var missingSession = complete
+        missingSession.mountSessionID = nil
+        incompleteStates.append(missingSession)
+        var missingMount = complete
+        missingMount.mountPoint = nil
+        incompleteStates.append(missingMount)
+        var missingImage = complete
+        missingImage.diskImagePath = nil
+        incompleteStates.append(missingImage)
+        var missingDevice = complete
+        missingDevice.deviceIdentifier = nil
+        incompleteStates.append(missingDevice)
+        var missingDestination = complete
+        missingDestination.timeMachineDestinationID = nil
+        incompleteStates.append(missingDestination)
+        var malformedDestination = complete
+        malformedDestination.timeMachineDestinationID = "not-a-destination-id"
+        incompleteStates.append(malformedDestination)
+        var pendingFailure = complete
+        pendingFailure.lastFailureContext = .systemConnection
+        incompleteStates.append(pendingFailure)
+        var failedLifecycle = complete
+        failedLifecycle.lifecycle = .failed
+        incompleteStates.append(failedLifecycle)
+
+        for state in incompleteStates {
+            XCTAssertFalse(state.isReadyForBackup)
+            XCTAssertNotEqual(
+                TimeMachineDestinationPresentation.make(state: state).primaryAction,
+                .backUpNow
+            )
+        }
     }
 
     func testStorageFailurePresentationKeepsTechnicalObjectIdentityInActivityOnly() {

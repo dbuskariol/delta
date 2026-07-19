@@ -19,11 +19,14 @@ Delta 0.4.0 adds native Time Machine-format destinations:
 - Verifies that an app-managed disk recovery key is retained under the immutable remote disk identity before removing any local configuration or bounded cache, including safe migration from early repository-scoped development keys.
 - Keeps the bundled rclone backend working when Delta is installed in a folder or app name containing spaces, while still pinning execution to the verified sibling tool.
 - Keeps Time Machine and restic repository semantics separate: macOS remains authoritative for Time Machine history and restores, while restic continues to own Delta-format backup, restore, retention, prune, and check behavior.
-- Keeps automatic Time Machine system-support retries current without adding the same unchanged failure to Activity every minute.
+- Attempts automatic Time Machine system-support replacement once per exact installed component fingerprint, preventing repeated Background Items churn while preserving one authoritative recovery action.
 - Keeps an automatic system-support check from monopolizing the Set Up action, detects a stale Service Management path after the installed app moves, lets an explicit Set Up repair a stale helper or user-service registration, and preserves any component newly registered by that same request instead of forcing a second privileged approval.
 - Keeps release rehearsals and evidence collection from launching or registering Service Management components from a transient build path. Identity-sensitive launch, Login Items, and helper acceptance now require the exact app installed under `/Applications`.
+- Refuses production Time Machine registration and privileged mutations unless the running app is exactly `/Applications/Delta.app`, preventing renamed acceptance apps, DerivedData, `dist`, and worktree builds from replacing the installed Background Items state while retaining safe disconnect cleanup.
 - Makes helper and user-service replacement resilient to macOS briefly retaining the retired Background Items record after asynchronous unregistration, using a bounded retry only while the public status remains unregistered.
 - Re-registers changed Time Machine helper and storage-service bytes automatically after an idle app update through Apple's public Service Management lifecycle, avoiding a stale-helper connection timeout and preserving one authoritative Permissions recovery state if macOS requires approval.
+- Requires a short authenticated readiness response from the exact embedded privileged helper before recording system support as current or mounting a disk, so an enabled-but-unlaunchable macOS background item fails before remote writes and routes to native Set Up recovery instead of consuming the twelve-minute mutation deadline.
+- Keeps a partial FSKit/APFS mount in an explicit cleanup-only state: storage telemetry can no longer erase a system-connection failure, and no UI or command surface offers Back Up Now until macOS returns the exact Time Machine destination identity.
 
 This release also restores live Activity output following:
 

@@ -16,6 +16,7 @@ public enum TimeMachineSetupExecutionPolicy {
     public static let operationRuntime: TimeInterval = 10 * 60
     public static let rollbackRuntime: TimeInterval = 60
     public static let clientReplyTimeout: TimeInterval = 12 * 60
+    public static let helperReadinessTimeout: TimeInterval = 15
     public static let maximumRequestBytes = 65_536
     public static let maximumPasswordBytes = TimeMachineRepositorySettings
         .maximumDiskPasswordBytes
@@ -300,10 +301,34 @@ public struct TimeMachineSetupDeadline: Equatable, Sendable {
 }
 
 @objc public protocol TimeMachineSetupHelperXPC {
+    func verifyReadiness(
+        withReply reply: @escaping (Data?, Data?) -> Void
+    )
+
     func execute(
         _ requestData: Data,
         withReply reply: @escaping (Data?, Data?) -> Void
     )
+}
+
+public struct TimeMachineSetupHelperReadiness: Codable, Equatable, Sendable {
+    public var codeHash: Data
+
+    public init(codeHash: Data) {
+        self.codeHash = codeHash
+    }
+}
+
+public enum TimeMachineSetupHelperReadinessPolicy {
+    public static func isCurrent(
+        expectedCodeHash: Data,
+        observedCodeHash: Data
+    ) -> Bool {
+        DeltaCodeSigningPeerValidator.matches(
+            expectedCodeHash: expectedCodeHash,
+            observedCodeHash: observedCodeHash
+        )
+    }
 }
 
 public enum TimeMachineSetupOperation: String, Codable, Sendable {
@@ -526,10 +551,101 @@ public enum TimeMachineSetupClientError: Error, Equatable, LocalizedError {
     }
 }
 
+public enum TimeMachineSetupHelperReadinessError: Error, Equatable, LocalizedError {
+    case invalidResponse
+    case unavailable(String)
+    case timedOut
+    case executableMismatch
+
+    public var errorDescription: String? {
+        switch self {
+        case .invalidResponse:
+            "Delta's Time Machine setup helper returned an invalid readiness response."
+        case let .unavailable(message):
+            "Delta's Time Machine setup helper is unavailable: \(message)"
+        case .timedOut:
+            "Delta's Time Machine setup helper did not become ready in time."
+        case .executableMismatch:
+            "macOS launched a Time Machine setup helper that does not match this installed Delta app."
+        }
+    }
+}
+
 public struct TimeMachineSetupHelperClient: Sendable {
     public static let machServiceName = "com.delta.backup.timemachine.helper"
 
     public init() {}
+
+    public func verifyReadiness(
+        expectedCodeHash: Data,
+        timeout: TimeInterval = TimeMachineSetupExecutionPolicy
+            .helperReadinessTimeout
+    ) throws {
+        guard !expectedCodeHash.isEmpty, expectedCodeHash.count <= 64 else {
+            throw TimeMachineSetupHelperReadinessError.invalidResponse
+        }
+        let connection = makeConnection()
+        let semaphore = DispatchSemaphore(value: 0)
+        let result = LockedSetupReadinessResult()
+        connection.invalidationHandler = {
+            result.finish(
+                .failure(.unavailable("The helper connection closed."))
+            )
+            semaphore.signal()
+        }
+        connection.interruptionHandler = {
+            result.finish(
+                .failure(.unavailable("The helper connection was interrupted."))
+            )
+            semaphore.signal()
+        }
+        connection.activate()
+
+        guard let proxy = connection.remoteObjectProxyWithErrorHandler({ error in
+            result.finish(.failure(.unavailable(error.localizedDescription)))
+            semaphore.signal()
+        }) as? TimeMachineSetupHelperXPC else {
+            connection.invalidate()
+            throw TimeMachineSetupHelperReadinessError.unavailable(
+                "The helper protocol is unavailable."
+            )
+        }
+        proxy.verifyReadiness { data, failureData in
+            if
+                let failureData,
+                let failure = try? JSONDecoder().decode(
+                    TimeMachineSetupFailure.self,
+                    from: failureData
+                )
+            {
+                result.finish(.failure(.unavailable(failure.message)))
+            } else if
+                let data,
+                let decoded = try? JSONDecoder().decode(
+                    TimeMachineSetupHelperReadiness.self,
+                    from: data
+                )
+            {
+                result.finish(.success(decoded))
+            } else {
+                result.finish(.failure(.invalidResponse))
+            }
+            semaphore.signal()
+        }
+
+        guard semaphore.wait(timeout: .now() + timeout) == .success else {
+            connection.invalidate()
+            throw TimeMachineSetupHelperReadinessError.timedOut
+        }
+        connection.invalidate()
+        let readiness = try result.value().get()
+        guard TimeMachineSetupHelperReadinessPolicy.isCurrent(
+            expectedCodeHash: expectedCodeHash,
+            observedCodeHash: readiness.codeHash
+        ) else {
+            throw TimeMachineSetupHelperReadinessError.executableMismatch
+        }
+    }
 
     public func execute(
         _ request: TimeMachineSetupRequest,
@@ -608,6 +724,36 @@ public struct TimeMachineSetupHelperClient: Sendable {
             )
         )
         return connection
+    }
+}
+
+private final class LockedSetupReadinessResult: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: Result<
+        TimeMachineSetupHelperReadiness,
+        TimeMachineSetupHelperReadinessError
+    >?
+
+    func finish(
+        _ result: Result<
+            TimeMachineSetupHelperReadiness,
+            TimeMachineSetupHelperReadinessError
+        >
+    ) {
+        lock.lock()
+        if stored == nil {
+            stored = result
+        }
+        lock.unlock()
+    }
+
+    func value() -> Result<
+        TimeMachineSetupHelperReadiness,
+        TimeMachineSetupHelperReadinessError
+    > {
+        lock.lock()
+        defer { lock.unlock() }
+        return stored ?? .failure(.invalidResponse)
     }
 }
 
