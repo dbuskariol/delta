@@ -51,10 +51,18 @@ struct DeltaMenuBarView: View {
         VStack(alignment: .leading, spacing: 14) {
             if let operation = model.activeOperation {
                 activeOperationCard(operation)
-            } else {
+            } else if !model.profiles.isEmpty {
                 lastBackupSection
             }
-            backupActions
+            if !model.profiles.isEmpty {
+                backupActions
+            }
+            if !timeMachineRepositories.isEmpty {
+                timeMachineActions
+            }
+            if model.profiles.isEmpty, timeMachineRepositories.isEmpty {
+                noBackupsConfigured
+            }
         }
         .padding(14)
     }
@@ -279,6 +287,94 @@ struct DeltaMenuBarView: View {
         .controlSize(.regular)
     }
 
+    private var timeMachineActions: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            sectionHeader("Time Machine")
+
+            Button {
+                openApp(section: .destinations)
+            } label: {
+                HStack(spacing: 9) {
+                    Image(systemName: "clock.arrow.circlepath")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(timeMachineStatusColor)
+                        .frame(width: 18)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(timeMachineStatusTitle)
+                            .font(.subheadline.weight(.medium))
+                            .lineLimit(1)
+                        Text(timeMachineStatusDetail)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.tertiary)
+                }
+                .contentShape(Rectangle())
+                .padding(10)
+            }
+            .buttonStyle(.plain)
+            .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 10))
+            .accessibilityHint("Open Time Machine destinations in Delta")
+
+            HStack(spacing: 8) {
+                if timeMachineBackupCandidates.count <= 1 {
+                    Button {
+                        if let repository = timeMachineBackupCandidates.first {
+                            model.startTimeMachineBackup(repository)
+                        }
+                    } label: {
+                        Label("Back Up Now", systemImage: "play.fill")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(!canStartTimeMachineBackup)
+                    .accessibilityLabel(timeMachineBackupAccessibilityLabel)
+                    .deltaTooltip(timeMachineBackupTooltip)
+                } else {
+                    Menu {
+                        ForEach(timeMachineBackupCandidates) { repository in
+                            Button(repository.name) {
+                                model.startTimeMachineBackup(repository)
+                            }
+                        }
+                    } label: {
+                        Label("Back Up Now", systemImage: "play.fill")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(!canStartTimeMachineBackup)
+                    .deltaTooltip("Choose a connected Time Machine disk and start a backup with macOS.")
+                }
+
+                Button {
+                    model.openTimeMachine()
+                } label: {
+                    Image(systemName: "clock.arrow.circlepath")
+                        .frame(width: 18, height: 18)
+                }
+                .buttonStyle(.bordered)
+                .disabled(!timeMachineHasMountedDisk)
+                .accessibilityLabel("Open Time Machine")
+                .deltaTooltip("Browse and restore from a connected Time Machine disk.")
+            }
+            .controlSize(.regular)
+        }
+    }
+
+    private var noBackupsConfigured: some View {
+        Button {
+            openApp(section: .destinations)
+        } label: {
+            Label("Add a backup destination", systemImage: "externaldrive.badge.plus")
+                .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.bordered)
+    }
+
     private var footer: some View {
         HStack(spacing: 5) {
             footerButton("Open Delta", systemImage: "macwindow") {
@@ -334,6 +430,86 @@ struct DeltaMenuBarView: View {
 
     private var restorePointCount: Int {
         model.snapshots.count
+    }
+
+    private var timeMachineRepositories: [BackupRepository] {
+        model.repositories.filter { $0.format == .timeMachine }
+    }
+
+    private var timeMachineBackupCandidates: [BackupRepository] {
+        timeMachineRepositories.filter {
+            TimeMachineDestinationPresentation.make(
+                state: model.timeMachineStatesByRepository[$0.id]
+            ).primaryAction == .backUpNow
+        }
+    }
+
+    private var timeMachineHasMountedDisk: Bool {
+        timeMachineRepositories.contains {
+            TimeMachineDestinationPresentation.make(
+                state: model.timeMachineStatesByRepository[$0.id]
+            ).isMounted
+        }
+    }
+
+    private var timeMachineNeedsAttention: Bool {
+        timeMachineRepositories.contains { repository in
+            guard let state = model.timeMachineStatesByRepository[repository.id] else {
+                return true
+            }
+            if state.lifecycle == .preparing || state.lifecycle == .disconnecting {
+                return false
+            }
+            return TimeMachineDestinationPresentation.make(state: state).primaryAction != .backUpNow
+        }
+    }
+
+    private var timeMachineStatusTitle: String {
+        if timeMachineRepositories.count == 1,
+           let repository = timeMachineRepositories.first {
+            return repository.name
+        }
+        return "\(timeMachineRepositories.count) Time Machine disks"
+    }
+
+    private var timeMachineStatusDetail: String {
+        if timeMachineRepositories.count == 1,
+           let repository = timeMachineRepositories.first {
+            return TimeMachineDestinationPresentation.make(
+                state: model.timeMachineStatesByRepository[repository.id]
+            ).status
+        }
+        let mountedCount = timeMachineRepositories.filter {
+            TimeMachineDestinationPresentation.make(
+                state: model.timeMachineStatesByRepository[$0.id]
+            ).isMounted
+        }.count
+        return "\(mountedCount) connected"
+    }
+
+    private var timeMachineStatusColor: Color {
+        if timeMachineNeedsAttention { return .orange }
+        if !timeMachineBackupCandidates.isEmpty { return .teal }
+        return .secondary
+    }
+
+    private var canStartTimeMachineBackup: Bool {
+        model.isPersistentStoreAvailable
+            && !model.isWorking
+            && !timeMachineBackupCandidates.isEmpty
+    }
+
+    private var timeMachineBackupAccessibilityLabel: String {
+        guard let repository = timeMachineBackupCandidates.first else {
+            return "Back Up Now with Time Machine"
+        }
+        return "Back Up \(repository.name) Now with Time Machine"
+    }
+
+    private var timeMachineBackupTooltip: String {
+        timeMachineBackupCandidates.isEmpty
+            ? "Connect a ready Time Machine disk in Destinations before starting a backup."
+            : "Ask macOS Time Machine to back up to this connected disk."
     }
 
     private var statusSymbol: String {
@@ -402,7 +578,8 @@ struct DeltaMenuBarView: View {
             isWorking: model.isWorking,
             activeJobKind: model.activeOperation?.kind,
             latestBackupStatus: lastBackupRun?.status,
-            acknowledgedOmissionCount: lastBackupRun.flatMap { model.acknowledgedWarningIssueCounts[$0.id] }
+            acknowledgedOmissionCount: lastBackupRun.flatMap { model.acknowledgedWarningIssueCounts[$0.id] },
+            hasDestinationAttention: timeMachineNeedsAttention
         )
     }
 

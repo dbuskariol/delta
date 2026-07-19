@@ -1,6 +1,12 @@
 # Restic Compliance Notes
 
-Delta uses restic as the backup engine. This document maps Delta behavior to restic commands, options, backend syntax, and expected exit handling.
+Delta uses restic as the backup engine for destinations whose format is **Delta encrypted backup**. This document maps that format to restic commands, options, backend syntax, and expected exit handling.
+
+## Scope: Delta format and Time Machine format
+
+Time Machine is a separate native engine, not a restic repository mode. A Time Machine-format destination never invokes `restic init`, `backup`, `snapshots`, `restore`, `forget`, `prune`, or `check`, and Delta never presents its sparsebundle, manifests, or immutable band objects as restic-compatible data. The app routes Time Machine actions through their native manager, while both `BackupCoordinator` and `ResticCommandBuilder` independently reject a Time Machine destination before availability checks, restore-request persistence, credential resolution, or process construction. macOS `backupd`, DiskImages, and APFS own Time Machine backup history and restore semantics; Delta supplies the encrypted remote disk, authenticated generation publication, bounded cache, credentials, and lifecycle controls.
+
+The two formats can use some of the same destination families and the bundled rclone executable, but they do not share repository bytes, passwords, locks, success criteria, maintenance commands, or recovery procedures. Restic REST servers and custom restic URLs are unavailable for Time Machine because neither is a generic object transport. All remaining command and exit-code statements in this document apply only to Delta-format destinations.
 
 ## Version
 
@@ -107,8 +113,10 @@ This follows restic's SFTP guidance that automatic backups require passwordless 
 rclone is pinned to the bundled executable when available:
 
 ```text
--o rclone.program=<Delta.app>/Contents/MacOS/rclone
+-o rclone.program=rclone
 ```
+
+The curated restic environment places the directory containing Delta's verified bundled tools first in `PATH`, so the name resolves to the sibling bundled rclone rather than an ambient executable. Using the executable name also avoids restic's command-string parser truncating an absolute app path that contains spaces.
 
 ## Backup
 

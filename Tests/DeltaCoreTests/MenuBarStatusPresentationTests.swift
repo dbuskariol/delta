@@ -32,6 +32,29 @@ final class MenuBarStatusPresentationTests: XCTestCase {
         XCTAssertEqual(presentation.tone, .ready)
     }
 
+    func testDestinationAttentionOverridesReadyButNotAnActiveBackupFailure() {
+        let readyWithDestinationFailure = MenuBarStatusPresentation.make(
+            isPersistentStoreAvailable: true,
+            isWorking: false,
+            activeJobKind: nil,
+            latestBackupStatus: .succeeded,
+            hasDestinationAttention: true
+        )
+
+        XCTAssertEqual(readyWithDestinationFailure.headerText, "Destination needs attention")
+        XCTAssertEqual(readyWithDestinationFailure.badgeText, "Attention")
+        XCTAssertEqual(readyWithDestinationFailure.tone, .attention)
+
+        let failedBackup = MenuBarStatusPresentation.make(
+            isPersistentStoreAvailable: true,
+            isWorking: false,
+            activeJobKind: nil,
+            latestBackupStatus: .failed,
+            hasDestinationAttention: true
+        )
+        XCTAssertEqual(failedBackup.headerText, "Last backup failed")
+    }
+
     func testActiveBackupShowsRunningState() {
         let presentation = MenuBarStatusPresentation.make(
             isPersistentStoreAvailable: true,

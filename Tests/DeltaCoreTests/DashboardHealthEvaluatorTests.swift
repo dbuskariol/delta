@@ -146,6 +146,157 @@ final class DashboardHealthEvaluatorTests: XCTestCase {
         XCTAssertEqual(warnings.map(\.isCritical), [true, false, false])
     }
 
+    func testTimeMachineDestinationWarningsUseLifecycleInsteadOfBackendFolderAvailability() {
+        let now = Date(timeIntervalSince1970: 100_000)
+        func repository(_ name: String, verified: Bool = false) -> BackupRepository {
+            BackupRepository(
+                name: name,
+                backend: .local(path: "/missing/\(name)"),
+                format: .timeMachine,
+                timeMachineSettings: TimeMachineRepositorySettings(
+                    volumeName: name,
+                    imageCapacityBytes: 1_073_741_824,
+                    cacheLimitBytes: 67_108_864
+                ),
+                lastVerifiedAt: verified ? now : nil
+            )
+        }
+        let retry = repository("Retry")
+        let repair = repository("Repair")
+        let detach = repository("Detach")
+        let persistence = repository("Recorded")
+        let verification = repository("Verified", verified: true)
+        let unavailable = repository("Provider", verified: true)
+        let synchronization = repository("Synchronizing", verified: true)
+        let disconnected = repository("Offline", verified: true)
+        let healthy = repository("Connected", verified: true)
+        let states = [
+            retry.id: TimeMachineDestinationState(
+                repositoryID: retry.id,
+                storeID: retry.timeMachineSettings!.storeID,
+                lifecycle: .failed,
+                lastError: "helper unavailable",
+                lastFailureContext: .systemConnection
+            ),
+            repair.id: TimeMachineDestinationState(
+                repositoryID: repair.id,
+                storeID: repair.timeMachineSettings!.storeID,
+                lifecycle: .needsRepair,
+                lastError: "generation missing",
+                lastFailureContext: .remotePreparation
+            ),
+            detach.id: TimeMachineDestinationState(
+                repositoryID: detach.id,
+                storeID: detach.timeMachineSettings!.storeID,
+                lifecycle: .mounted,
+                mountPoint: "/Volumes/Detach",
+                lastError: "disk busy",
+                lastFailureContext: .systemDisconnection
+            ),
+            persistence.id: TimeMachineDestinationState(
+                repositoryID: persistence.id,
+                storeID: persistence.timeMachineSettings!.storeID,
+                lifecycle: .mounted,
+                mountPoint: "/Volumes/Recorded",
+                lastError: "The disk is connected, but its state was not saved.",
+                lastFailureContext: .systemStatePersistence
+            ),
+            verification.id: TimeMachineDestinationState(
+                repositoryID: verification.id,
+                storeID: verification.timeMachineSettings!.storeID,
+                lifecycle: .failed,
+                lastError: "Remote Time Machine data failed integrity verification. Restore a known-good provider version, then check the destination again.",
+                lastFailureContext: .remoteVerification
+            ),
+            unavailable.id: TimeMachineDestinationState(
+                repositoryID: unavailable.id,
+                storeID: unavailable.timeMachineSettings!.storeID,
+                lifecycle: .failed,
+                lastError: "Reconnect the mounted provider, then check it again.",
+                lastFailureContext: .remoteAvailability
+            ),
+            synchronization.id: TimeMachineDestinationState(
+                repositoryID: synchronization.id,
+                storeID: synchronization.timeMachineSettings!.storeID,
+                lifecycle: .mounted,
+                mountPoint: "/Volumes/Synchronizing",
+                lastError: "The storage service is reconnecting.",
+                lastFailureContext: .remoteSynchronization
+            ),
+            disconnected.id: TimeMachineDestinationState(
+                repositoryID: disconnected.id,
+                storeID: disconnected.timeMachineSettings!.storeID,
+                lifecycle: .disconnected
+            ),
+            healthy.id: TimeMachineDestinationState(
+                repositoryID: healthy.id,
+                storeID: healthy.timeMachineSettings!.storeID,
+                lifecycle: .mounted,
+                mountPoint: "/Volumes/Connected"
+            )
+        ]
+
+        let warnings = DashboardHealthEvaluator().destinationWarnings(
+            repositories: [
+                retry,
+                repair,
+                detach,
+                persistence,
+                verification,
+                unavailable,
+                synchronization,
+                disconnected,
+                healthy
+            ],
+            timeMachineStatesByRepository: states,
+            threshold: .thirtyDays,
+            now: now,
+            limit: 10
+        )
+
+        XCTAssertEqual(warnings.map(\.title), [
+            "Retry: Time Machine disk could not connect",
+            "Repair: Time Machine disk setup needs repair",
+            "Detach: Time Machine disk is still connected",
+            "Recorded: Time Machine disk state was not saved",
+            "Verified: Time Machine verification failed",
+            "Provider: Time Machine storage is unavailable",
+            "Synchronizing: Time Machine disk is reconnecting",
+            "Offline is disconnected"
+        ])
+        XCTAssertEqual(
+            warnings.map(\.isCritical),
+            [true, true, true, true, true, true, true, false]
+        )
+        XCTAssertTrue(warnings[4].detail.contains("integrity verification"))
+        XCTAssertTrue(warnings[4].detail.contains("check the destination again"))
+        XCTAssertFalse(warnings[4].title.contains("repair"))
+        XCTAssertEqual(
+            warnings[5].detail,
+            "Reconnect the mounted provider, then check it again."
+        )
+        XCTAssertEqual(warnings[6].detail, "The storage service is reconnecting.")
+    }
+
+    func testTimeMachineDestinationWithoutLifecycleStateNeedsRepair() {
+        let repository = BackupRepository(
+            name: "Recovered Disk",
+            backend: .local(path: "/missing/recovered"),
+            format: .timeMachine
+        )
+
+        let warnings = DashboardHealthEvaluator().destinationWarnings(
+            repositories: [repository],
+            threshold: .thirtyDays
+        )
+
+        XCTAssertEqual(
+            warnings.map(\.title),
+            ["Recovered Disk: Time Machine disk setup is incomplete"]
+        )
+        XCTAssertEqual(warnings.first?.isCritical, true)
+    }
+
     func testDestinationWarningsCallOutLowFreeSpaceForLocalDestinations() throws {
         let fixture = try Fixture()
         defer { fixture.cleanUp() }

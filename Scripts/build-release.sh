@@ -13,6 +13,7 @@ EXPORTED_APP="$EXPORT_PATH/Delta.app"
 EXPORT_OPTIONS_PLIST="$OUTPUT_DIR/DeveloperIDExportOptions.plist"
 OUTPUT_APP="$OUTPUT_DIR/Delta.app"
 SIGNING_IDENTITY="${DELTA_CODESIGN_IDENTITY:-}"
+FSKIT_PROFILE_NAME="${DELTA_FSKIT_DISTRIBUTION_PROFILE_NAME:-}"
 
 if [[ -z "$SIGNING_IDENTITY" ]]; then
   SIGNING_IDENTITY="$(delta_find_developer_id_identity)"
@@ -22,6 +23,11 @@ fi
   || delta_fail "release signing identity must be $DELTA_EXPECTED_SIGNING_IDENTITY"
 [[ "$DELTA_EXPECTED_TEAM_ID" == "BJCVJ5G7MJ" ]] \
   || delta_fail "release team must be BJCVJ5G7MJ (found $DELTA_EXPECTED_TEAM_ID)"
+if [[ -z "$FSKIT_PROFILE_NAME" ]]; then
+  FSKIT_PROFILE_NAME="$(delta_find_fskit_distribution_profile_name || true)"
+fi
+[[ -n "$FSKIT_PROFILE_NAME" ]] \
+  || delta_fail 'no all-device FSKit distribution profile is installed for the Time Machine extension'
 
 "$ROOT_DIR/Scripts/bootstrap-tools.sh"
 "$ROOT_DIR/Scripts/verify-tools.sh"
@@ -38,13 +44,13 @@ XCODE_ARGS=(
   -destination "generic/platform=macOS"
   -derivedDataPath "$DERIVED_DATA"
   -archivePath "$ARCHIVE_PATH"
+  -allowProvisioningUpdates
   CLANG_ENABLE_CODE_COVERAGE=NO
   GCC_GENERATE_TEST_COVERAGE_FILES=NO
   GCC_INSTRUMENT_PROGRAM_FLOW_ARCS=NO
   ARCHS="arm64 x86_64"
   ONLY_ACTIVE_ARCH=NO
-  CODE_SIGN_STYLE=Manual
-  CODE_SIGN_IDENTITY="$SIGNING_IDENTITY"
+  CODE_SIGN_STYLE=Automatic
   DEVELOPMENT_TEAM="$DELTA_EXPECTED_TEAM_ID"
 )
 if [[ "${DELTA_VERBOSE_BUILD:-0}" != "1" ]]; then
@@ -68,7 +74,7 @@ ARCHIVED_TEAM="$(delta_signature_team "$BUILT_APP")"
 /bin/rm -f "$EXPORT_OPTIONS_PLIST"
 /usr/bin/plutil -create xml1 "$EXPORT_OPTIONS_PLIST"
 /usr/bin/plutil -insert method -string developer-id "$EXPORT_OPTIONS_PLIST"
-/usr/bin/plutil -insert signingStyle -string manual "$EXPORT_OPTIONS_PLIST"
+/usr/bin/plutil -insert signingStyle -string automatic "$EXPORT_OPTIONS_PLIST"
 /usr/bin/plutil -insert teamID -string "$ARCHIVED_TEAM" "$EXPORT_OPTIONS_PLIST"
 /usr/bin/plutil -insert signingCertificate -string "$SIGNING_IDENTITY" "$EXPORT_OPTIONS_PLIST"
 
@@ -77,6 +83,7 @@ EXPORT_ARGS=(
   -archivePath "$ARCHIVE_PATH"
   -exportPath "$EXPORT_PATH"
   -exportOptionsPlist "$EXPORT_OPTIONS_PLIST"
+  -allowProvisioningUpdates
 )
 if [[ "${DELTA_VERBOSE_BUILD:-0}" != "1" ]]; then
   EXPORT_ARGS=(-quiet "${EXPORT_ARGS[@]}")
@@ -96,10 +103,20 @@ DSYMS_DIR="$ARCHIVE_PATH/dSYMs"
 [[ -d "$DSYMS_DIR/Delta.app.dSYM" ]] \
   || delta_fail 'the release archive did not contain Delta.app.dSYM'
 
-for product in Delta DeltaAgent DeltaSecretBridge; do
+for product in \
+  Delta \
+  DeltaAgent \
+  DeltaSecretBridge \
+  DeltaTimeMachineService \
+  DeltaTimeMachineHelper \
+  DeltaTimeMachineFS
+do
   case "$product" in
     Delta) binary="$OUTPUT_APP/Contents/MacOS/Delta"; dsym="$DSYMS_DIR/Delta.app.dSYM/Contents/Resources/DWARF/Delta" ;;
     DeltaAgent) binary="$OUTPUT_APP/Contents/Resources/DeltaAgent"; dsym="$DSYMS_DIR/DeltaAgent.dSYM/Contents/Resources/DWARF/DeltaAgent" ;;
+    DeltaTimeMachineService) binary="$OUTPUT_APP/Contents/Resources/DeltaTimeMachineService"; dsym="$DSYMS_DIR/DeltaTimeMachineService.dSYM/Contents/Resources/DWARF/DeltaTimeMachineService" ;;
+    DeltaTimeMachineHelper) binary="$OUTPUT_APP/Contents/Library/LaunchServices/DeltaTimeMachineHelper"; dsym="$DSYMS_DIR/DeltaTimeMachineHelper.dSYM/Contents/Resources/DWARF/DeltaTimeMachineHelper" ;;
+    DeltaTimeMachineFS) binary="$OUTPUT_APP/Contents/Extensions/DeltaTimeMachineFS.appex/Contents/MacOS/DeltaTimeMachineFS"; dsym="$DSYMS_DIR/DeltaTimeMachineFS.appex.dSYM/Contents/Resources/DWARF/DeltaTimeMachineFS" ;;
     *) binary="$OUTPUT_APP/Contents/MacOS/$product"; dsym="$DSYMS_DIR/$product.dSYM/Contents/Resources/DWARF/$product" ;;
   esac
   [[ -f "$dsym" ]] || delta_fail "the release archive did not contain matching symbols for $product"

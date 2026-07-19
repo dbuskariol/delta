@@ -12,4 +12,6 @@ OSStatus DeltaCreateTrustedApplicationAccess(
     SecAccessRef _Nullable * _Nonnull accessOut
 );
 
+void DeltaSecureZero(void * _Nullable bytes, size_t byteCount);
+
 #endif

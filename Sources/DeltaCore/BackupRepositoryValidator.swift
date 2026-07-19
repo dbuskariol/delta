@@ -10,6 +10,10 @@ public enum BackupRepositoryValidationError: Error, Equatable, LocalizedError {
     case invalidPort(Int)
     case invalidURL(String)
     case invalidRcloneRemote(String)
+    case timeMachineUnsupportedBackend(RepositoryBackendKind)
+    case invalidTimeMachineVolumeName(String)
+    case invalidTimeMachineImageCapacity(Int64)
+    case invalidTimeMachineCacheLimit(Int64)
 
     public var errorDescription: String? {
         switch self {
@@ -31,6 +35,14 @@ public enum BackupRepositoryValidationError: Error, Equatable, LocalizedError {
             "Enter a valid http or https URL, not '\(value)'."
         case let .invalidRcloneRemote(remote):
             "Enter the rclone remote name without a colon, not '\(remote)'."
+        case let .timeMachineUnsupportedBackend(kind):
+            "\(kind.displayName) cannot safely store a Time Machine disk. Choose an object-capable or filesystem destination."
+        case let .invalidTimeMachineVolumeName(name):
+            "Enter a Time Machine disk name from 1 to 63 characters without '/' or ':', not '\(name)'."
+        case let .invalidTimeMachineImageCapacity(bytes):
+            "Choose a Time Machine disk capacity from 256 MiB to 64 TiB. The entered byte count is \(bytes)."
+        case let .invalidTimeMachineCacheLimit(bytes):
+            "Choose a Time Machine cache from 64 MiB to less than the disk capacity. The entered byte count is \(bytes)."
         }
     }
 }
@@ -38,6 +50,8 @@ public enum BackupRepositoryValidationError: Error, Equatable, LocalizedError {
 public struct BackupRepositoryValidationResult: Equatable, Sendable {
     public var name: String
     public var backend: RepositoryBackend
+    public var format: BackupFormat
+    public var timeMachineSettings: TimeMachineRepositorySettings?
 }
 
 public struct BackupRepositoryValidator: Sendable {
@@ -50,6 +64,8 @@ public struct BackupRepositoryValidator: Sendable {
     public func validate(
         name: String,
         backend: RepositoryBackend,
+        format: BackupFormat = .delta,
+        timeMachineSettings: TimeMachineRepositorySettings? = nil,
         validateLocalAvailability: Bool = true
     ) throws -> BackupRepositoryValidationResult {
         let trimmedName = trimmed(name)
@@ -58,14 +74,66 @@ public struct BackupRepositoryValidator: Sendable {
         }
 
         let normalizedBackend = try normalized(backend)
+        let normalizedTimeMachineSettings: TimeMachineRepositorySettings?
+        switch format {
+        case .delta:
+            normalizedTimeMachineSettings = nil
+        case .timeMachine:
+            guard normalizedBackend.kind.supportsTimeMachineObjectStorage else {
+                throw BackupRepositoryValidationError.timeMachineUnsupportedBackend(normalizedBackend.kind)
+            }
+            normalizedTimeMachineSettings = try normalized(
+                timeMachineSettings ?? TimeMachineRepositorySettings(volumeName: trimmedName)
+            )
+        }
         if validateLocalAvailability, case let .local(path) = normalizedBackend {
-            let repository = BackupRepository(name: trimmedName, backend: .local(path: path))
+            let repository = BackupRepository(
+                name: trimmedName,
+                backend: .local(path: path),
+                format: format,
+                timeMachineSettings: normalizedTimeMachineSettings
+            )
             guard availabilityChecker.isAvailable(repository) else {
                 throw BackupRepositoryValidationError.localDestinationUnavailable(path)
             }
         }
 
-        return BackupRepositoryValidationResult(name: trimmedName, backend: normalizedBackend)
+        return BackupRepositoryValidationResult(
+            name: trimmedName,
+            backend: normalizedBackend,
+            format: format,
+            timeMachineSettings: normalizedTimeMachineSettings
+        )
+    }
+
+    private func normalized(_ settings: TimeMachineRepositorySettings) throws -> TimeMachineRepositorySettings {
+        guard let volumeName = TimeMachineRepositorySettings.normalizedVolumeName(
+            settings.volumeName
+        ) else {
+            throw BackupRepositoryValidationError.invalidTimeMachineVolumeName(settings.volumeName)
+        }
+
+        let validCapacity = ClosedRange(
+            uncheckedBounds: (
+                TimeMachineRepositorySettings.minimumImageCapacityBytes,
+                TimeMachineRepositorySettings.maximumImageCapacityBytes
+            )
+        )
+        guard validCapacity.contains(settings.imageCapacityBytes) else {
+            throw BackupRepositoryValidationError.invalidTimeMachineImageCapacity(settings.imageCapacityBytes)
+        }
+
+        let minimumCache = TimeMachineRepositorySettings.minimumCacheLimitBytes
+        guard
+            settings.cacheLimitBytes >= minimumCache,
+            settings.cacheLimitBytes < settings.imageCapacityBytes
+        else {
+            throw BackupRepositoryValidationError.invalidTimeMachineCacheLimit(settings.cacheLimitBytes)
+        }
+
+        var normalized = settings
+        normalized.volumeName = volumeName
+        return normalized
     }
 
     private func normalized(_ backend: RepositoryBackend) throws -> RepositoryBackend {

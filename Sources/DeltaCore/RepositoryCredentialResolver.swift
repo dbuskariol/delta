@@ -1,5 +1,18 @@
 import Foundation
 
+public enum RepositoryCredentialUpdateError: Error, Equatable, LocalizedError {
+    case rollbackIncomplete(originalMessage: String, failureCount: Int)
+
+    public var errorDescription: String? {
+        switch self {
+        case let .rollbackIncomplete(originalMessage, failureCount):
+            let redactedMessage = SensitiveLogRedactor.redact(originalMessage)
+            let noun = failureCount == 1 ? "item" : "items"
+            return "\(redactedMessage) Delta also could not restore \(failureCount) saved provider credential \(noun) to the previous state. Review the destination's saved credentials before using it again."
+        }
+    }
+}
+
 public struct RepositoryCredentialResolver: Sendable {
     public var loadSecret: @Sendable (String) throws -> String
     public var saveSecret: @Sendable (String, String) throws -> Void
@@ -70,6 +83,45 @@ public struct RepositoryCredentialResolver: Sendable {
         repositoryID: UUID,
         allowedKeys: [String]
     ) throws -> [RepositoryCredentialReference] {
+        try stageCredentialUpdate(
+            credentials,
+            existingReferences: existingReferences,
+            repositoryID: repositoryID,
+            allowedKeys: allowedKeys
+        ).references
+    }
+
+    /// Keeps Keychain mutations and the caller's durable configuration update
+    /// in one recoverable transaction. The closure must commit every local
+    /// reference to the returned credentials before it returns. If it throws,
+    /// all touched Keychain items are restored to their exact prior state.
+    public func withUpdatedCredentials<Result>(
+        _ credentials: [String: String],
+        existingReferences: [RepositoryCredentialReference],
+        repositoryID: UUID,
+        allowedKeys: [String],
+        perform: ([RepositoryCredentialReference]) throws -> Result
+    ) throws -> Result {
+        let stage = try stageCredentialUpdate(
+            credentials,
+            existingReferences: existingReferences,
+            repositoryID: repositoryID,
+            allowedKeys: allowedKeys
+        )
+        do {
+            return try perform(stage.references)
+        } catch {
+            try restoreCredentialUpdate(stage.rollbackItems, originalError: error)
+            throw error
+        }
+    }
+
+    private func stageCredentialUpdate(
+        _ credentials: [String: String],
+        existingReferences: [RepositoryCredentialReference],
+        repositoryID: UUID,
+        allowedKeys: [String]
+    ) throws -> CredentialUpdateStage {
         let existingByKey = Dictionary(uniqueKeysWithValues: existingReferences.map { ($0.environmentKey, $0) })
         let allowedKeys = allowedKeys.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
         var updatedReferences: [RepositoryCredentialReference] = []
@@ -120,14 +172,40 @@ public struct RepositoryCredentialResolver: Sendable {
                 }
                 try deleteSecret(oldReference.keychainAccount)
             }
-            return updatedReferences.sorted { $0.environmentKey < $1.environmentKey }
+            return CredentialUpdateStage(
+                references: updatedReferences.sorted { $0.environmentKey < $1.environmentKey },
+                rollbackItems: rollbackItems
+            )
         } catch {
-            for rollbackItem in rollbackItems.reversed() {
-                rollbackItem.rollback(saveSecret: saveSecret, deleteSecret: deleteSecret)
-            }
+            try restoreCredentialUpdate(rollbackItems, originalError: error)
             throw error
         }
     }
+
+    private func restoreCredentialUpdate(
+        _ rollbackItems: [CredentialRollbackItem],
+        originalError: Error
+    ) throws {
+        var failureCount = 0
+        for rollbackItem in rollbackItems.reversed() {
+            do {
+                try rollbackItem.rollback(saveSecret: saveSecret, deleteSecret: deleteSecret)
+            } catch {
+                failureCount += 1
+            }
+        }
+        guard failureCount == 0 else {
+            throw RepositoryCredentialUpdateError.rollbackIncomplete(
+                originalMessage: originalError.localizedDescription,
+                failureCount: failureCount
+            )
+        }
+    }
+}
+
+private struct CredentialUpdateStage {
+    var references: [RepositoryCredentialReference]
+    var rollbackItems: [CredentialRollbackItem]
 }
 
 private struct CredentialRollbackItem {
@@ -137,11 +215,11 @@ private struct CredentialRollbackItem {
     func rollback(
         saveSecret: @Sendable (String, String) throws -> Void,
         deleteSecret: @Sendable (String) throws -> Void
-    ) {
+    ) throws {
         if let previousSecret {
-            try? saveSecret(previousSecret, account)
+            try saveSecret(previousSecret, account)
         } else {
-            try? deleteSecret(account)
+            try deleteSecret(account)
         }
     }
 }

@@ -14,6 +14,8 @@ readonly DELTA_EXPECTED_MINIMUM_SYSTEM="26.0"
 readonly DELTA_EXPECTED_ARCHITECTURES=(arm64 x86_64)
 readonly DELTA_EXPECTED_TEAM_ID="${DELTA_DEVELOPMENT_TEAM:-BJCVJ5G7MJ}"
 readonly DELTA_EXPECTED_SIGNING_IDENTITY="Developer ID Application: Daniel Buskariol (BJCVJ5G7MJ)"
+readonly DELTA_EXPECTED_FSKIT_APPLICATION_IDENTIFIER="$DELTA_EXPECTED_TEAM_ID.com.delta.backup.timemachine-filesystem"
+readonly DELTA_EXPECTED_TIME_MACHINE_APP_GROUP="$DELTA_EXPECTED_TEAM_ID.deltatm"
 readonly DELTA_EXPECTED_GITHUB_REPOSITORY="${DELTA_GITHUB_REPOSITORY:-dbuskariol/delta}"
 readonly DELTA_EXPECTED_FEED_URL="https://github.com/$DELTA_EXPECTED_GITHUB_REPOSITORY/releases/latest/download/appcast.xml"
 
@@ -41,6 +43,51 @@ delta_require_tool() {
 
 delta_plist_value() {
   /usr/libexec/PlistBuddy -c "Print :$1" "$2" 2>/dev/null || true
+}
+
+delta_assert_time_machine_app_group_entitlement() {
+  local signed_path="$1"
+  local entitlements
+  entitlements="$(/usr/bin/mktemp -t delta-time-machine-app-group.XXXXXX)"
+  if ! /usr/bin/codesign -d --entitlements :- "$signed_path" >"$entitlements" 2>/dev/null; then
+    /bin/rm -f "$entitlements"
+    delta_fail "Time Machine component has no readable entitlements: $signed_path"
+  fi
+  if [[ "$(delta_plist_value 'com.apple.security.application-groups:0' "$entitlements")" != "$DELTA_EXPECTED_TIME_MACHINE_APP_GROUP" ]] \
+    || [[ -n "$(delta_plist_value 'com.apple.security.application-groups:1' "$entitlements")" ]]; then
+    /bin/rm -f "$entitlements"
+    delta_fail "Time Machine component does not have the exact supported App Group: $signed_path"
+  fi
+  /bin/rm -f "$entitlements"
+}
+
+delta_find_fskit_distribution_profile_name() {
+  local profile_directory profile decoded name
+  local profile_directories=(
+    "${HOME:?}/Library/Developer/Xcode/UserData/Provisioning Profiles"
+    "${HOME:?}/Library/MobileDevice/Provisioning Profiles"
+  )
+
+  for profile_directory in "${profile_directories[@]}"; do
+    [[ -d "$profile_directory" ]] || continue
+    for profile in "$profile_directory"/*.provisionprofile; do
+      [[ -f "$profile" ]] || continue
+      decoded="$(/usr/bin/mktemp -t delta-fskit-distribution-profile.XXXXXX)"
+      if /usr/bin/security cms -D -i "$profile" >"$decoded" 2>/dev/null \
+        && [[ "$(delta_plist_value ProvisionsAllDevices "$decoded")" == "true" ]] \
+        && [[ "$(delta_plist_value Entitlements:com.apple.developer.fskit.fsmodule "$decoded")" == "true" ]] \
+        && [[ "$(delta_plist_value Entitlements:com.apple.application-identifier "$decoded")" == "$DELTA_EXPECTED_FSKIT_APPLICATION_IDENTIFIER" ]] \
+        && [[ "$(delta_plist_value TeamIdentifier:0 "$decoded")" == "$DELTA_EXPECTED_TEAM_ID" ]]; then
+        name="$(delta_plist_value Name "$decoded")"
+        /bin/rm -f "$decoded"
+        [[ -n "$name" ]] || continue
+        printf '%s\n' "$name"
+        return 0
+      fi
+      /bin/rm -f "$decoded"
+    done
+  done
+  return 1
 }
 
 delta_json_value() {
@@ -102,6 +149,39 @@ delta_signature_team() {
 
 delta_signature_cdhash() {
   /usr/bin/awk -F= '/^CDHash=/{print $2; exit}' <<<"$(delta_codesign_details "$1")"
+}
+
+delta_signature_identifier() {
+  /usr/bin/awk -F= '/^Identifier=/{print $2; exit}' <<<"$(delta_codesign_details "$1")"
+}
+
+delta_assert_certificate_free_fskit_extension() {
+  local app="$1"
+  local extension="$app/Contents/Extensions/DeltaTimeMachineFS.appex"
+
+  [[ -d "$extension" ]] \
+    || delta_fail 'the certificate-free CI app is missing its inert Time Machine extension'
+  /usr/bin/codesign --verify --strict --verbose=2 "$extension" >/dev/null 2>&1 \
+    || delta_fail 'the certificate-free Time Machine extension failed strict signature verification'
+  local signing_details
+  signing_details="$(/usr/bin/codesign -dv --verbose=4 "$extension" 2>&1)"
+  /usr/bin/grep -q '^Signature=adhoc$' <<<"$signing_details" \
+    || delta_fail 'the certificate-free Time Machine extension is not ad-hoc signed'
+  local team
+  team="$(delta_signature_team "$extension")"
+  [[ -z "$team" || "$team" == "not set" ]] \
+    || delta_fail 'the certificate-free Time Machine extension unexpectedly has a signing team'
+  [[ ! -e "$extension/Contents/embedded.provisionprofile" ]] \
+    || delta_fail 'the certificate-free Time Machine extension unexpectedly embeds a provisioning profile'
+
+  local entitlements
+  entitlements="$(/usr/bin/mktemp -t delta-ci-fskit-entitlements.XXXXXX)"
+  /usr/bin/codesign -d --entitlements :- "$extension" >"$entitlements" 2>/dev/null || true
+  if /usr/bin/grep -q 'com.apple.developer.fskit.fsmodule' "$entitlements"; then
+    /bin/rm -f "$entitlements"
+    delta_fail 'the certificate-free Time Machine extension unexpectedly carries the restricted FSKit entitlement'
+  fi
+  /bin/rm -f "$entitlements"
 }
 
 delta_record_automated_gate_status() {
@@ -179,8 +259,10 @@ delta_assert_developer_id_signature() {
 }
 
 delta_find_developer_id_identity() {
-  /usr/bin/security find-identity -v -p codesigning 2>/dev/null \
-    | /usr/bin/awk -F\" -v expected="$DELTA_EXPECTED_SIGNING_IDENTITY" '$2 == expected { print $2; exit }'
+  local identities
+  identities="$(/usr/bin/security find-identity -v -p codesigning 2>/dev/null || true)"
+  /usr/bin/awk -F\" -v expected="$DELTA_EXPECTED_SIGNING_IDENTITY" \
+    '$2 == expected { print $2; exit }' <<<"$identities"
 }
 
 delta_assert_clean_worktree() {
@@ -294,11 +376,87 @@ delta_assert_release_app() {
     || delta_fail 'the scheduled-backup executable is not in the Service Management resource location'
   [[ ! -e "$app/Contents/MacOS/DeltaAgent" ]] \
     || delta_fail 'the obsolete scheduled-backup executable location remains in the app'
+  local time_machine_service_plist="$app/Contents/Library/LaunchAgents/com.delta.backup.timemachine.service.plist"
+  local time_machine_helper_plist="$app/Contents/Library/LaunchDaemons/com.delta.backup.timemachine.helper.plist"
+  local time_machine_service="$app/Contents/Resources/DeltaTimeMachineService"
+  local time_machine_helper="$app/Contents/Library/LaunchServices/DeltaTimeMachineHelper"
+  local time_machine_extension="$app/Contents/Extensions/DeltaTimeMachineFS.appex"
+  [[ -f "$time_machine_service_plist" ]] || delta_fail 'the Time Machine storage-service property list is missing'
+  [[ -f "$time_machine_helper_plist" ]] || delta_fail 'the Time Machine setup-helper property list is missing'
+  [[ -x "$time_machine_service" ]] || delta_fail 'the Time Machine storage-service executable is missing'
+  [[ -x "$time_machine_helper" ]] || delta_fail 'the Time Machine setup-helper executable is missing'
+  [[ "$(/usr/bin/plutil -extract BundleProgram raw -o - "$time_machine_service_plist")" == "Contents/Resources/DeltaTimeMachineService" ]] \
+    || delta_fail 'the Time Machine storage service is not in its declared Service Management location'
+  [[ "$(/usr/bin/plutil -extract BundleProgram raw -o - "$time_machine_helper_plist")" == "Contents/Library/LaunchServices/DeltaTimeMachineHelper" ]] \
+    || delta_fail 'the Time Machine setup helper is not in its declared Service Management location'
+  [[ -d "$time_machine_extension" ]] || delta_fail 'the Time Machine FSKit extension is missing'
+  local service_identifier helper_identifier
+  service_identifier="$(delta_signature_identifier "$time_machine_service")"
+  [[ "$service_identifier" == "DeltaTimeMachineService" ]] \
+    || delta_fail "the Time Machine storage service has the wrong code-signing identifier: ${service_identifier:-missing}"
+  helper_identifier="$(delta_signature_identifier "$time_machine_helper")"
+  [[ "$helper_identifier" == "com.delta.backup.timemachine-helper" ]] \
+    || delta_fail "the Time Machine setup helper has the wrong code-signing identifier: ${helper_identifier:-missing}"
+  delta_assert_time_machine_app_group_entitlement "$app"
+  delta_assert_time_machine_app_group_entitlement "$time_machine_service"
+  delta_assert_time_machine_app_group_entitlement "$time_machine_extension"
+  local time_machine_entitlements
+  time_machine_entitlements="$(/usr/bin/mktemp -t delta-fskit-entitlements.XXXXXX)"
+  if ! /usr/bin/codesign -d --entitlements :- "$time_machine_extension" >"$time_machine_entitlements" 2>/dev/null; then
+    /bin/rm -f "$time_machine_entitlements"
+    delta_fail 'the Time Machine extension signature has no readable entitlements'
+  fi
+  if [[ "$(delta_plist_value com.apple.developer.fskit.fsmodule "$time_machine_entitlements")" != "true" ]]; then
+    /bin/rm -f "$time_machine_entitlements"
+    delta_fail 'the Time Machine extension signature is missing the FSKit Module entitlement'
+  fi
+  if [[ "$(delta_plist_value com.apple.security.app-sandbox "$time_machine_entitlements")" != "true" ]]; then
+    /bin/rm -f "$time_machine_entitlements"
+    delta_fail 'the Time Machine extension signature is missing App Sandbox'
+  fi
+  if [[ "$(delta_plist_value com.apple.security.network.client "$time_machine_entitlements")" == "true" ]] \
+    || [[ "$(delta_plist_value com.apple.security.network.server "$time_machine_entitlements")" == "true" ]]; then
+    /bin/rm -f "$time_machine_entitlements"
+    delta_fail 'the Time Machine extension must not carry network client or server access'
+  fi
+  if /usr/bin/grep -q 'com.apple.security.temporary-exception' "$time_machine_entitlements"; then
+    /bin/rm -f "$time_machine_entitlements"
+    delta_fail 'the Time Machine extension must not carry App Sandbox temporary exceptions'
+  fi
+  /bin/rm -f "$time_machine_entitlements"
+  local time_machine_profile="$time_machine_extension/Contents/embedded.provisionprofile"
+  [[ -f "$time_machine_profile" ]] || delta_fail 'the Time Machine extension is missing its Developer ID provisioning profile'
+  local time_machine_profile_plist
+  time_machine_profile_plist="$(/usr/bin/mktemp -t delta-fskit-profile.XXXXXX)"
+  if ! /usr/bin/security cms -D -i "$time_machine_profile" >"$time_machine_profile_plist" 2>/dev/null; then
+    /bin/rm -f "$time_machine_profile_plist"
+    delta_fail 'the Time Machine extension provisioning profile is unreadable'
+  fi
+  if [[ "$(delta_plist_value ProvisionsAllDevices "$time_machine_profile_plist")" != "true" ]]; then
+    /bin/rm -f "$time_machine_profile_plist"
+    delta_fail 'the Time Machine extension profile is not valid for Developer ID distribution'
+  fi
+  if [[ "$(delta_plist_value Entitlements:com.apple.developer.fskit.fsmodule "$time_machine_profile_plist")" != "true" ]]; then
+    /bin/rm -f "$time_machine_profile_plist"
+    delta_fail 'the Time Machine extension profile does not grant the FSKit Module entitlement'
+  fi
+  if [[ "$(delta_plist_value Entitlements:com.apple.application-identifier "$time_machine_profile_plist")" != "$team.com.delta.backup.timemachine-filesystem" ]]; then
+    /bin/rm -f "$time_machine_profile_plist"
+    delta_fail 'the Time Machine extension profile is for a different application identifier'
+  fi
+  if [[ "$(delta_plist_value TeamIdentifier:0 "$time_machine_profile_plist")" != "$team" ]]; then
+    /bin/rm -f "$time_machine_profile_plist"
+    delta_fail 'the Time Machine extension profile is for a different development team'
+  fi
+  /bin/rm -f "$time_machine_profile_plist"
   local signed_code code_architectures
   for signed_code in \
     "$app/Contents/MacOS/Delta" \
     "$app/Contents/Resources/DeltaAgent" \
     "$app/Contents/MacOS/DeltaSecretBridge" \
+    "$time_machine_service" \
+    "$time_machine_helper" \
+    "$time_machine_extension" \
     "$app/Contents/MacOS/restic" \
     "$app/Contents/MacOS/rclone" \
     "$app/Contents/Frameworks/Sparkle.framework/Versions/B/XPCServices/Installer.xpc" \
@@ -314,6 +472,9 @@ delta_assert_release_app() {
     "$app/Contents/MacOS/Delta" \
     "$app/Contents/Resources/DeltaAgent" \
     "$app/Contents/MacOS/DeltaSecretBridge" \
+    "$time_machine_service" \
+    "$time_machine_helper" \
+    "$time_machine_extension/Contents/MacOS/DeltaTimeMachineFS" \
     "$app/Contents/MacOS/restic" \
     "$app/Contents/MacOS/rclone" \
     "$app/Contents/Frameworks/Sparkle.framework/Versions/B/Sparkle" \
