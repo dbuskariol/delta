@@ -7,6 +7,7 @@ if [[ ! -d "$APP" ]]; then
   printf "Installed Delta app was not found at %s\n" "$APP" >&2
   exit 1
 fi
+APP="$(cd "$APP" && pwd -P)"
 
 /usr/bin/codesign --verify --strict --deep --verbose=2 "$APP"
 
@@ -21,6 +22,10 @@ if /usr/bin/grep -q '^TeamIdentifier=not set$' <<<"$SIGNING_DETAILS"; then
 fi
 
 if [[ "${DELTA_VERIFY_INSTALLED_LAUNCH:-0}" == "1" ]]; then
+  if [[ "$(dirname "$APP")" != "/Applications" || "$APP" != *.app ]]; then
+    printf "Identity-sensitive launch acceptance requires an app installed directly in /Applications, not %s\n" "$APP" >&2
+    exit 64
+  fi
   LAUNCH_LOG="$(/usr/bin/mktemp -t delta-installed-launch.XXXXXX)"
   "$APP/Contents/MacOS/Delta" >"$LAUNCH_LOG" 2>&1 &
   DELTA_PID=$!

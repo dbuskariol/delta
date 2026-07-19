@@ -25,7 +25,11 @@ DELTA_RESTIC_INTEGRATION=1 \
 RESTIC_BINARY="$APP/Contents/MacOS/restic" \
 /usr/bin/swift test --filter ResticIntegrationTests
 
-DELTA_VERIFY_INSTALLED_LAUNCH=1 "$ROOT_DIR/Scripts/verify-installed-app.sh" "$APP"
+# A release candidate in dist is not the installed identity. Launching its full
+# UI would allow normal startup reconciliation to register embedded services
+# from a transient path. Installed launch and Service Management acceptance are
+# performed separately against the exact app under /Applications.
+"$ROOT_DIR/Scripts/verify-installed-app.sh" "$APP"
 "$ROOT_DIR/Scripts/run-installed-keychain-access-acceptance.sh" "$APP"
 "$ROOT_DIR/Scripts/run-installed-diagnostics-acceptance.sh" "$APP"
 "$ROOT_DIR/Scripts/run-installed-preferences-acceptance.sh" "$APP"
