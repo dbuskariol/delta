@@ -20,7 +20,7 @@ Delta 0.4.0 adds native Time Machine-format destinations:
 - Keeps the bundled rclone backend working when Delta is installed in a folder or app name containing spaces, while still pinning execution to the verified sibling tool.
 - Keeps Time Machine and restic repository semantics separate: macOS remains authoritative for Time Machine history and restores, while restic continues to own Delta-format backup, restore, retention, prune, and check behavior.
 - Keeps automatic Time Machine system-support retries current without adding the same unchanged failure to Activity every minute.
-- Keeps an automatic system-support check from monopolizing the Set Up action, and lets an explicit Set Up repair a stale helper or user-service registration through macOS Service Management.
+- Keeps an automatic system-support check from monopolizing the Set Up action, detects a stale Service Management path after the installed app moves, lets an explicit Set Up repair a stale helper or user-service registration, and preserves any component newly registered by that same request instead of forcing a second privileged approval.
 
 This release also restores live Activity output following:
 
