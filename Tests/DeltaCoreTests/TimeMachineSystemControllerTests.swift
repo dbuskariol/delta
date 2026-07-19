@@ -673,6 +673,19 @@ final class TimeMachineSystemControllerTests: XCTestCase {
         )
     }
 
+    func testSetupHelperRuntimeVerificationRejectsNoncanonicalAppBeforeXPC() {
+        XCTAssertThrowsError(
+            try TimeMachineSetupHelperRuntimeVerifier.verify(
+                bundle: Bundle(for: Self.self)
+            )
+        ) { error in
+            XCTAssertEqual(
+                error as? TimeMachineSetupHelperReadinessError,
+                .noncanonicalInstallation
+            )
+        }
+    }
+
     func testInstalledComponentLayoutFindsOnlyAnEnclosingApplicationBundle() {
         XCTAssertEqual(
             TimeMachineInstalledComponentLayout.applicationBundleURL(

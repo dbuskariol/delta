@@ -106,6 +106,10 @@ struct DeltaApp: App {
             runAcceptanceMenuBarSurface()
         case "--acceptance-scheduled-service":
             runAcceptanceScheduledService(arguments: Array(arguments.dropFirst()))
+        case "--acceptance-time-machine-system-support":
+            runAcceptanceTimeMachineSystemSupport(
+                arguments: Array(arguments.dropFirst())
+            )
         case "--acceptance-seed-scheduled-agent":
             runAcceptanceSeedScheduledAgent(arguments: Array(arguments.dropFirst()))
         case "--acceptance-verify-scheduled-agent":
@@ -198,6 +202,140 @@ struct DeltaApp: App {
         if case .unknown = status {
             exit(1)
         }
+        exit(0)
+    }
+
+    private static func runAcceptanceTimeMachineSystemSupport(
+        arguments: [String]
+    ) -> Never {
+        guard ProcessInfo.processInfo.environment[
+            "DELTA_ENABLE_TIME_MACHINE_SYSTEM_ACCEPTANCE"
+        ] == "1" else {
+            fputs(
+                "Delta Time Machine system-support acceptance command is disabled.\n",
+                stderr
+            )
+            exit(64)
+        }
+        guard arguments.count == 1, let action = arguments.first else {
+            fputs(
+                "usage: Delta --acceptance-time-machine-system-support <status|register|verify|unregister>\n",
+                stderr
+            )
+            exit(64)
+        }
+
+        let bundle = Bundle.main
+        let isCanonical = TimeMachineInstalledApplicationPolicy
+            .isCanonicalInstallation(bundleURL: bundle.bundleURL)
+        var readiness = "not checked"
+
+        do {
+            switch action {
+            case "status":
+                break
+            case "register":
+                guard isCanonical else {
+                    throw TimeMachineSetupHelperReadinessError
+                        .noncanonicalInstallation
+                }
+                var failures: [String] = []
+                do {
+                    try TimeMachineServiceController.register()
+                } catch {
+                    if !TimeMachineSystemAccessRegistrationPolicy.accepted(
+                        status: TimeMachineServiceController.status()
+                    ) {
+                        failures.append(
+                            "storage service: \(error.localizedDescription)"
+                        )
+                    }
+                }
+                do {
+                    try TimeMachineSetupHelperController.register()
+                } catch {
+                    if !TimeMachineSystemAccessRegistrationPolicy.accepted(
+                        status: TimeMachineSetupHelperController.status()
+                    ) {
+                        failures.append(
+                            "setup helper: \(error.localizedDescription)"
+                        )
+                    }
+                }
+                if !failures.isEmpty {
+                    throw NSError(
+                        domain: "com.delta.backup.acceptance.time-machine",
+                        code: 1,
+                        userInfo: [
+                            NSLocalizedDescriptionKey: failures.joined(
+                                separator: "; "
+                            )
+                        ]
+                    )
+                }
+            case "verify":
+                guard TimeMachineServiceController.status() == .enabled else {
+                    throw TimeMachineSystemAccessRepairError
+                        .registrationIncomplete
+                }
+                guard TimeMachineSetupHelperController.status() == .enabled else {
+                    throw TimeMachineSystemAccessRepairError
+                        .registrationIncomplete
+                }
+                try TimeMachineSetupHelperRuntimeVerifier.verify(bundle: bundle)
+                readiness = "verified"
+            case "unregister":
+                guard isCanonical else {
+                    throw TimeMachineSetupHelperReadinessError
+                        .noncanonicalInstallation
+                }
+                if TimeMachineSetupHelperController.status()
+                    != .notRegistered
+                {
+                    try TimeMachineSetupHelperController.unregister()
+                }
+                if TimeMachineServiceController.status() != .notRegistered {
+                    try TimeMachineServiceController.unregister()
+                }
+            default:
+                fputs(
+                    "usage: Delta --acceptance-time-machine-system-support <status|register|verify|unregister>\n",
+                    stderr
+                )
+                exit(64)
+            }
+        } catch {
+            fputs(
+                "Delta Time Machine system-support acceptance failed: \(error.localizedDescription)\n",
+                stderr
+            )
+            exit(1)
+        }
+
+        let helperURL = bundle.bundleURL.appendingPathComponent(
+            TimeMachineSetupHelperController.executableRelativePath
+        )
+        let helperCodeHash = (try? TimeMachineSetupHelperController
+            .installedCodeHash(bundle: bundle))?.map {
+                String(format: "%02x", $0)
+            }.joined()
+
+        print(
+            "Time Machine app installation: \(isCanonical ? "canonical" : "noncanonical")"
+        )
+        print(
+            "Time Machine storage service status: \(TimeMachineServiceController.status().stableValue)"
+        )
+        print(
+            "Time Machine setup helper status: \(TimeMachineSetupHelperController.status().stableValue)"
+        )
+        print(
+            "Time Machine setup helper executable: \(FileManager.default.isExecutableFile(atPath: helperURL.path) ? "present" : "missing")"
+        )
+        print(
+            "Time Machine setup helper code hash: \(helperCodeHash ?? "unavailable")"
+        )
+        print("Time Machine setup helper readiness: \(readiness)")
         exit(0)
     }
 
