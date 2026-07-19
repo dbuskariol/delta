@@ -379,6 +379,18 @@ public enum TimeMachineSystemRegistrationRetryPolicy {
     }
 }
 
+public enum TimeMachineSystemRegistrationEventPolicy {
+    /// Automatic retries keep the system-support status current, but Activity
+    /// should only gain evidence when the observed failure changes. The live
+    /// permission status remains authoritative on every attempt.
+    public static func shouldRecordFailure(
+        previousMessage: String?,
+        currentMessage: String
+    ) -> Bool {
+        previousMessage != currentMessage
+    }
+}
+
 public enum FileSystemExtensionsGuide {
     public static let settingsURL = LoginItemsGuide.settingsURL
 }
