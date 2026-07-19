@@ -115,7 +115,7 @@ do
     Delta) binary="$OUTPUT_APP/Contents/MacOS/Delta"; dsym="$DSYMS_DIR/Delta.app.dSYM/Contents/Resources/DWARF/Delta" ;;
     DeltaAgent) binary="$OUTPUT_APP/Contents/Resources/DeltaAgent"; dsym="$DSYMS_DIR/DeltaAgent.dSYM/Contents/Resources/DWARF/DeltaAgent" ;;
     DeltaTimeMachineService) binary="$OUTPUT_APP/Contents/Resources/DeltaTimeMachineService"; dsym="$DSYMS_DIR/DeltaTimeMachineService.dSYM/Contents/Resources/DWARF/DeltaTimeMachineService" ;;
-    DeltaTimeMachineHelper) binary="$OUTPUT_APP/Contents/Library/LaunchServices/DeltaTimeMachineHelper"; dsym="$DSYMS_DIR/DeltaTimeMachineHelper.dSYM/Contents/Resources/DWARF/DeltaTimeMachineHelper" ;;
+    DeltaTimeMachineHelper) binary="$OUTPUT_APP/Contents/MacOS/DeltaTimeMachineHelper"; dsym="$DSYMS_DIR/DeltaTimeMachineHelper.dSYM/Contents/Resources/DWARF/DeltaTimeMachineHelper" ;;
     DeltaTimeMachineFS) binary="$OUTPUT_APP/Contents/Extensions/DeltaTimeMachineFS.appex/Contents/MacOS/DeltaTimeMachineFS"; dsym="$DSYMS_DIR/DeltaTimeMachineFS.appex.dSYM/Contents/Resources/DWARF/DeltaTimeMachineFS" ;;
     *) binary="$OUTPUT_APP/Contents/MacOS/$product"; dsym="$DSYMS_DIR/$product.dSYM/Contents/Resources/DWARF/$product" ;;
   esac

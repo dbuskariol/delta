@@ -27,6 +27,7 @@ Delta 0.4.0 adds native Time Machine-format destinations:
 - Re-registers changed Time Machine helper and storage-service bytes automatically after an idle app update through Apple's public Service Management lifecycle, avoiding a stale-helper connection timeout and preserving one authoritative Permissions recovery state if macOS requires approval.
 - Requires a short authenticated readiness response from the exact embedded privileged helper before recording system support as current or mounting a disk, so an enabled-but-unlaunchable macOS background item fails before remote writes and routes to native Set Up recovery instead of consuming the twelve-minute mutation deadline.
 - Keeps a partial FSKit/APFS mount in an explicit cleanup-only state: storage telemetry can no longer erase a system-connection failure, and no UI or command surface offers Back Up Now until macOS returns the exact Time Machine destination identity.
+- Places the privileged setup daemon in Apple's current `SMAppService` executable layout and rejects the obsolete `SMJobBless` helper location, preventing update-time launch constraints from being bound to a legacy bundle structure.
 
 This release also restores live Activity output following:
 

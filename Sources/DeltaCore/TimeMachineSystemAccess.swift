@@ -158,7 +158,7 @@ public enum TimeMachineServiceController {
 public enum TimeMachineSetupHelperController {
     public static let plistName = "com.delta.backup.timemachine.helper.plist"
     public static let executableRelativePath =
-        "Contents/Library/LaunchServices/DeltaTimeMachineHelper"
+        "Contents/MacOS/DeltaTimeMachineHelper"
 
     public static func register() throws {
         #if canImport(ServiceManagement)

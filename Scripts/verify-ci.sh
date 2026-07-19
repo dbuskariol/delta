@@ -182,7 +182,7 @@ for EXECUTABLE_PATH in \
   "$ROOT_DIR/dist/Delta.app/Contents/Resources/DeltaAgent" \
   "$ROOT_DIR/dist/Delta.app/Contents/MacOS/DeltaSecretBridge" \
   "$ROOT_DIR/dist/Delta.app/Contents/Resources/DeltaTimeMachineService" \
-  "$ROOT_DIR/dist/Delta.app/Contents/Library/LaunchServices/DeltaTimeMachineHelper" \
+  "$ROOT_DIR/dist/Delta.app/Contents/MacOS/DeltaTimeMachineHelper" \
   "$ROOT_DIR/dist/Delta.app/Contents/Extensions/DeltaTimeMachineFS.appex/Contents/MacOS/DeltaTimeMachineFS" \
   "$ROOT_DIR/dist/Delta.app/Contents/MacOS/restic" \
   "$ROOT_DIR/dist/Delta.app/Contents/MacOS/rclone"
@@ -191,6 +191,10 @@ do
   ARCHITECTURES="$(/usr/bin/lipo -archs "$EXECUTABLE_PATH")"
   [[ " $ARCHITECTURES " == *" $HOST_ARCH "* ]]
 done
+[[ ! -e "$ROOT_DIR/dist/Delta.app/Contents/Library/LaunchServices/DeltaTimeMachineHelper" ]]
+TIME_MACHINE_HELPER_PLIST="$ROOT_DIR/dist/Delta.app/Contents/Library/LaunchDaemons/com.delta.backup.timemachine.helper.plist"
+[[ -f "$TIME_MACHINE_HELPER_PLIST" ]]
+[[ "$(/usr/bin/plutil -extract BundleProgram raw -o - "$TIME_MACHINE_HELPER_PLIST")" == "Contents/MacOS/DeltaTimeMachineHelper" ]]
 AGENT_PLIST="$ROOT_DIR/dist/Delta.app/Contents/Library/LaunchAgents/com.delta.backup.agent.plist"
 [[ -f "$AGENT_PLIST" ]]
 [[ "$(/usr/bin/plutil -extract BundleProgram raw -o - "$AGENT_PLIST")" == "Contents/Resources/DeltaAgent" ]]
