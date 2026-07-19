@@ -93,5 +93,12 @@ if ! /usr/bin/grep -Fq 'signature_value "$INSTALLED_APP_PATH" CDHash' \
   printf "Release evidence does not bind installed identity acceptance to the candidate CDHash.\n" >&2
   exit 1
 fi
+if ! /usr/bin/grep -Fq 'if [[ "$IS_INSTALLED_IDENTITY" == "1" ]]' \
+  "$ROOT_DIR/Scripts/verify-installed-app.sh" \
+  || ! /usr/bin/grep -Fq 'Scheduled service status skipped for transient candidate' \
+    "$ROOT_DIR/Scripts/verify-installed-app.sh"; then
+  printf "Transient candidate verification can still query Service Management.\n" >&2
+  exit 1
+fi
 
 printf "CI workflow verified.\n"
