@@ -293,7 +293,7 @@ delta_assert_clean_worktree() {
 
 delta_assert_release_metadata() {
   local root="$1"
-  local settings version build notes_heading tag
+  local settings version build project_versions project_builds notes_heading tag
   settings="$(/usr/bin/xcodebuild \
     -project "$root/Delta.xcodeproj" \
     -scheme Delta \
@@ -306,6 +306,15 @@ delta_assert_release_metadata() {
     || delta_fail "MARKETING_VERSION is not a release version: ${version:-missing}"
   [[ "$build" =~ ^[1-9][0-9]*$ ]] \
     || delta_fail "CURRENT_PROJECT_VERSION must be a positive integer: ${build:-missing}"
+
+  if [[ -f "$root/project.yml" ]]; then
+    project_versions="$(/usr/bin/awk '/MARKETING_VERSION:/ { print $2 }' "$root/project.yml" | /usr/bin/sort -u)"
+    project_builds="$(/usr/bin/awk '/CURRENT_PROJECT_VERSION:/ { print $2 }' "$root/project.yml" | /usr/bin/sort -u)"
+    [[ "$project_versions" == "$version" ]] \
+      || delta_fail "project.yml MARKETING_VERSION values must all match $version"
+    [[ "$project_builds" == "$build" ]] \
+      || delta_fail "project.yml CURRENT_PROJECT_VERSION values must all match $build"
+  fi
 
   notes_heading="$(/usr/bin/sed -n '1p' "$root/Documentation/RELEASE_NOTES.md" 2>/dev/null || true)"
   [[ "$notes_heading" == "# Delta $version" ]] \

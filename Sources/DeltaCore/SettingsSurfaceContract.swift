@@ -1,5 +1,24 @@
 import Foundation
 
+public enum SettingsLoginItemsActionPlacement: Equatable, Sendable {
+    case timeMachineSystemSupport
+    case scheduledBackups
+    case hidden
+
+    public static func resolve(
+        timeMachineSystemSupportNeedsAttention: Bool,
+        scheduledBackupsNeedAttention: Bool
+    ) -> Self {
+        if timeMachineSystemSupportNeedsAttention {
+            return .timeMachineSystemSupport
+        }
+        if scheduledBackupsNeedAttention {
+            return .scheduledBackups
+        }
+        return .hidden
+    }
+}
+
 public enum SettingsSurfaceContract {
     public static let categoryGeneral = "General"
     public static let categoryPermissions = "Permissions"
@@ -119,6 +138,7 @@ public enum SettingsSurfaceContract {
         "Compact status summary",
         "Run Due Now scheduled-backup action",
         "Start at Login separate from Scheduled Backups",
+        "One Login Items recovery action per settings context",
         "Sparkle automatic check and download controls",
         "Idle-sleep protection",
         "Expandable Scheduled Backups explanation",
@@ -183,6 +203,7 @@ public enum SettingsSurfaceContract {
         require(requiredManualAcceptanceCoverage, contains: "No raw system service terminology", in: "manual coverage", failures: &failures)
         require(requiredManualAcceptanceCoverage, contains: "Scheduled Backups activity shortcut", in: "manual coverage", failures: &failures)
         require(requiredManualAcceptanceCoverage, contains: "Password access repair", in: "manual coverage", failures: &failures)
+        require(requiredManualAcceptanceCoverage, contains: "One Login Items recovery action per settings context", in: "manual coverage", failures: &failures)
         require(requiredManualAcceptanceCoverage, contains: "Destination free-space warning control", in: "manual coverage", failures: &failures)
         require(requiredManualAcceptanceCoverage, contains: "Configurable new-profile schedule defaults", in: "manual coverage", failures: &failures)
         require(requiredManualAcceptanceCoverage, contains: "Expandable Scheduled Backups explanation", in: "manual coverage", failures: &failures)
