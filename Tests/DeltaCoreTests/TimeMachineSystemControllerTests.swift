@@ -632,6 +632,54 @@ final class TimeMachineSystemControllerTests: XCTestCase {
         )
     }
 
+    func testExplicitTimeMachineSystemAccessRepairsOnlyStaleEnabledRegistration() {
+        XCTAssertEqual(
+            TimeMachineSystemAccessRequestPolicy.action(
+                serviceStatus: .enabled,
+                helperStatus: .enabled,
+                registeredFingerprint: "old",
+                currentFingerprint: "current"
+            ),
+            .reregister
+        )
+        XCTAssertEqual(
+            TimeMachineSystemAccessRequestPolicy.action(
+                serviceStatus: .enabled,
+                helperStatus: .enabled,
+                registeredFingerprint: "current",
+                currentFingerprint: "current"
+            ),
+            .none
+        )
+        XCTAssertEqual(
+            TimeMachineSystemAccessRequestPolicy.action(
+                serviceStatus: .notRegistered,
+                helperStatus: .enabled,
+                registeredFingerprint: "old",
+                currentFingerprint: "current"
+            ),
+            .register
+        )
+        XCTAssertEqual(
+            TimeMachineSystemAccessRequestPolicy.action(
+                serviceStatus: .enabled,
+                helperStatus: .requiresApproval,
+                registeredFingerprint: "old",
+                currentFingerprint: "current"
+            ),
+            .none
+        )
+        XCTAssertEqual(
+            TimeMachineSystemAccessRequestPolicy.action(
+                serviceStatus: .enabled,
+                helperStatus: .enabled,
+                registeredFingerprint: "old",
+                currentFingerprint: nil
+            ),
+            .none
+        )
+    }
+
     func testFileSystemExtensionReadinessBindsExactInstalledURL() {
         let expected = URL(
             fileURLWithPath: "/Applications/Delta.app/Contents/Extensions/DeltaTimeMachineFS.appex"
