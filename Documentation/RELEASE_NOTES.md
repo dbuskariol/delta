@@ -23,6 +23,7 @@ Delta 0.4.0 adds native Time Machine-format destinations:
 - Keeps an automatic system-support check from monopolizing the Set Up action, detects a stale Service Management path after the installed app moves, lets an explicit Set Up repair a stale helper or user-service registration, and preserves any component newly registered by that same request instead of forcing a second privileged approval.
 - Keeps release rehearsals and evidence collection from launching or registering Service Management components from a transient build path. Identity-sensitive launch, Login Items, and helper acceptance now require the exact app installed under `/Applications`.
 - Makes helper and user-service replacement resilient to macOS briefly retaining the retired Background Items record after asynchronous unregistration, using a bounded retry only while the public status remains unregistered.
+- Re-registers changed Time Machine helper and storage-service bytes automatically after an idle app update through Apple's public Service Management lifecycle, avoiding a stale-helper connection timeout and preserving one authoritative Permissions recovery state if macOS requires approval.
 
 This release also restores live Activity output following:
 

@@ -2046,38 +2046,15 @@ final class DeltaAppModel: ObservableObject {
                 self.finishTimeMachineSystemRegistrationTask()
             }
             do {
-                // Never unregister the privileged helper during an update:
-                // doing so revokes its Login Items approval. Instead ask the
-                // signed running helper to compare its mapped code signature
-                // with the newly installed executable and exit only when no
-                // Delta FSKit volume is mounted. Its existing registration then
-                // launches the new bytes on the next connection.
-                let expectedHelperCodeHash = try await Task.detached(
-                    priority: .utility
-                ) {
-                    try TimeMachineSetupHelperController.installedCodeHash()
-                }.value
-                let helperRefresh = try await TimeMachineSetupHelperClient()
-                    .refreshIfOutdatedAsync(
-                        expectedCodeHash: expectedHelperCodeHash
-                    )
-                guard helperRefresh.status != .mountedDiskPreventsRefresh else {
-                    throw TimeMachineSystemRegistrationRefreshError
-                        .mountedDiskPreventsRefresh
-                }
-                if helperRefresh.status == .terminating {
-                    try await Task.sleep(for: .milliseconds(750))
-                }
-                do {
-                    try await TimeMachineServiceController.reregister()
-                } catch {
-                    let status = TimeMachineServiceController.status()
-                    guard TimeMachineSystemAccessRegistrationPolicy.accepted(
-                        status: status
-                    ) else {
-                        throw error
-                    }
-                }
+                // Apple's Service Management contract requires changed agent
+                // and daemon executables or plists to be re-registered. The
+                // readiness policy above proves there is no mounted Delta disk
+                // or active operation before either registered process is
+                // stopped. The shared re-registration path then waits for
+                // unregister completion and tolerates only the documented
+                // transient Background Items settling state.
+                try await TimeMachineSetupHelperController.reregister()
+                try await TimeMachineServiceController.reregister()
                 let serviceStatus = TimeMachineServiceController.status()
                 let helperStatus = TimeMachineSetupHelperController.status()
                 self.publishIfChanged(&self.timeMachineServiceStatus, serviceStatus)

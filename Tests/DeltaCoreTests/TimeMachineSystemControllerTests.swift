@@ -543,36 +543,6 @@ final class TimeMachineSystemControllerTests: XCTestCase {
         )
     }
 
-    func testHelperRefreshPreservesApprovalAndFailsClosedForMountedDisk() {
-        let old = Data(repeating: 0x11, count: 20)
-        let current = Data(repeating: 0x22, count: 20)
-
-        XCTAssertEqual(
-            TimeMachineSetupHelperRefreshPolicy.status(
-                currentCodeHash: current,
-                expectedCodeHash: current,
-                hasMountedDeltaFileSystem: true
-            ),
-            .current
-        )
-        XCTAssertEqual(
-            TimeMachineSetupHelperRefreshPolicy.status(
-                currentCodeHash: old,
-                expectedCodeHash: current,
-                hasMountedDeltaFileSystem: true
-            ),
-            .mountedDiskPreventsRefresh
-        )
-        XCTAssertEqual(
-            TimeMachineSetupHelperRefreshPolicy.status(
-                currentCodeHash: old,
-                expectedCodeHash: current,
-                hasMountedDeltaFileSystem: false
-            ),
-            .terminating
-        )
-    }
-
     func testCodeSigningIdentityMatchesCurrentTestExecutable() throws {
         let executable = URL(fileURLWithPath: CommandLine.arguments[0])
         XCTAssertEqual(
