@@ -3725,6 +3725,15 @@ struct SettingsView: View {
         }
     }
 
+    private var loginItemsActionPlacement: SettingsLoginItemsActionPlacement {
+        .resolve(
+            timeMachineSystemSupportNeedsAttention:
+                hasTimeMachineDestinations && !model.timeMachineSystemSupportIsCurrent,
+            scheduledBackupsNeedAttention:
+                scheduledBackupsPermissionPresentation == .needsAttention
+        )
+    }
+
     private var passwordAccessPermissionPresentation: SettingsPermissionPresentation {
         switch backgroundSecretAccessSummary.state {
         case .ready:
@@ -3768,8 +3777,8 @@ struct SettingsView: View {
                 model.requestTimeMachineSystemAccess()
             }
             .buttonStyle(.borderedProminent)
-            Button("Review Login Items") {
-                model.openLoginItemsSettings()
+            if loginItemsActionPlacement == .timeMachineSystemSupport {
+                reviewLoginItemsPermissionAction
             }
         }
     }
@@ -3797,10 +3806,14 @@ struct SettingsView: View {
 
     @ViewBuilder
     private var scheduledBackupsPermissionActions: some View {
-        if scheduledBackupsPermissionPresentation == .needsAttention {
-            Button("Review Login Items") {
-                model.openLoginItemsSettings()
-            }
+        if loginItemsActionPlacement == .scheduledBackups {
+            reviewLoginItemsPermissionAction
+        }
+    }
+
+    private var reviewLoginItemsPermissionAction: some View {
+        Button("Review Login Items") {
+            model.openLoginItemsSettings()
         }
     }
 
