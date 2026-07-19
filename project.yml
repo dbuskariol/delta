@@ -95,10 +95,10 @@ targets:
     settings:
       base:
         CREATE_INFOPLIST_SECTION_IN_BINARY: YES
-        CURRENT_PROJECT_VERSION: 9
+        CURRENT_PROJECT_VERSION: 10
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: Packaging/DeltaTimeMachineHelper.Info.plist
-        MARKETING_VERSION: 0.3.3
+        MARKETING_VERSION: 0.4.0
         PRODUCT_BUNDLE_IDENTIFIER: com.delta.backup.timemachine-helper
         PRODUCT_NAME: DeltaTimeMachineHelper
         SKIP_INSTALL: YES
@@ -115,13 +115,13 @@ targets:
       base:
         APPLICATION_EXTENSION_API_ONLY: YES
         CODE_SIGN_ENTITLEMENTS: "$(DELTA_FSKIT_CODE_SIGN_ENTITLEMENTS)"
-        CURRENT_PROJECT_VERSION: 9
+        CURRENT_PROJECT_VERSION: 10
         DELTA_FSKIT_CODE_SIGN_ENTITLEMENTS: Packaging/DeltaTimeMachineFS.entitlements
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_FILE: Packaging/DeltaTimeMachineFS.Info.plist
         INFOPLIST_KEY_CFBundleDisplayName: Delta Time Machine Storage
         LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/../Frameworks @executable_path/../../../../Frameworks"
-        MARKETING_VERSION: 0.3.3
+        MARKETING_VERSION: 0.4.0
         PRODUCT_BUNDLE_IDENTIFIER: com.delta.backup.timemachine-filesystem
         PRODUCT_NAME: DeltaTimeMachineFS
         SKIP_INSTALL: YES
@@ -210,11 +210,11 @@ targets:
     settings:
       base:
         CODE_SIGN_ENTITLEMENTS: Packaging/Delta.entitlements
-        CURRENT_PROJECT_VERSION: 9
+        CURRENT_PROJECT_VERSION: 10
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: Packaging/Delta.app.plist
         LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/../Frameworks"
-        MARKETING_VERSION: 0.3.3
+        MARKETING_VERSION: 0.4.0
         PRODUCT_BUNDLE_IDENTIFIER: com.delta.backup
         PRODUCT_NAME: Delta
         SKIP_INSTALL: NO
