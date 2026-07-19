@@ -721,6 +721,28 @@ final class TimeMachineSystemControllerTests: XCTestCase {
         )
     }
 
+    func testTimeMachineSystemRegistrationFailureEventsOnlyRecordChanges() {
+        let firstFailure = "Time Machine system support could not be refreshed."
+        XCTAssertTrue(
+            TimeMachineSystemRegistrationEventPolicy.shouldRecordFailure(
+                previousMessage: nil,
+                currentMessage: firstFailure
+            )
+        )
+        XCTAssertFalse(
+            TimeMachineSystemRegistrationEventPolicy.shouldRecordFailure(
+                previousMessage: firstFailure,
+                currentMessage: firstFailure
+            )
+        )
+        XCTAssertTrue(
+            TimeMachineSystemRegistrationEventPolicy.shouldRecordFailure(
+                previousMessage: firstFailure,
+                currentMessage: "The helper now requires approval."
+            )
+        )
+    }
+
     func testPrivilegedSetupRequestNeverCarriesDiskPassword() throws {
         let mountSessionID = UUID()
         let register = TimeMachineSetupRequest(
