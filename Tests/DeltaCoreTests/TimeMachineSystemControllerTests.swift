@@ -602,7 +602,7 @@ final class TimeMachineSystemControllerTests: XCTestCase {
                     fileURLWithPath: "/Applications/Delta.app/Contents/Resources/DeltaTimeMachineService"
                 )
             ),
-            URL(fileURLWithPath: "/Applications/Delta.app")
+            URL(fileURLWithPath: "/Applications/Delta.app", isDirectory: true)
         )
         XCTAssertNil(
             TimeMachineInstalledComponentLayout.applicationBundleURL(
