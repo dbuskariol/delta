@@ -2030,6 +2030,7 @@ final class DeltaAppModel: ObservableObject {
         }
         lastTimeMachineRegistrationAttemptFingerprint = currentFingerprint
         lastTimeMachineRegistrationAttemptUptime = ProcessInfo.processInfo.systemUptime
+        let previousRegistrationError = timeMachineSystemRegistrationError
         timeMachineSystemRegistrationError = nil
         timeMachineRegistrationTask = Task { [weak self] in
             guard let self else { return }
@@ -2095,12 +2096,17 @@ final class DeltaAppModel: ObservableObject {
                 let message = "Time Machine system support could not be refreshed: \(SensitiveLogRedactor.redact(error.localizedDescription))"
                 self.timeMachineSystemRegistrationError = message
                 self.refreshTimeMachineSystemSupportCurrency()
-                try? self.database?.appendEvent(
-                    EventLog(
-                        level: .error,
-                        message: message
+                if TimeMachineSystemRegistrationEventPolicy.shouldRecordFailure(
+                    previousMessage: previousRegistrationError,
+                    currentMessage: message
+                ) {
+                    try? self.database?.appendEvent(
+                        EventLog(
+                            level: .error,
+                            message: message
+                        )
                     )
-                )
+                }
             }
         }
     }

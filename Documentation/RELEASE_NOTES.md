@@ -19,6 +19,7 @@ Delta 0.4.0 adds native Time Machine-format destinations:
 - Verifies that an app-managed disk recovery key is retained under the immutable remote disk identity before removing any local configuration or bounded cache, including safe migration from early repository-scoped development keys.
 - Keeps the bundled rclone backend working when Delta is installed in a folder or app name containing spaces, while still pinning execution to the verified sibling tool.
 - Keeps Time Machine and restic repository semantics separate: macOS remains authoritative for Time Machine history and restores, while restic continues to own Delta-format backup, restore, retention, prune, and check behavior.
+- Keeps automatic Time Machine system-support retries current without adding the same unchanged failure to Activity every minute.
 
 This release also restores live Activity output following:
 
