@@ -19,6 +19,8 @@ The main app and agents share typed `DeltaCore` boundaries. Delta has no kernel 
 
 Scheduled-service registration is gated by a fingerprint of the bundled agent and launch-agent property list. Delta registers an unregistered service, re-registers an enabled service when those artifacts change, and directly registers a service that macOS reports as not found only when the current bundle fingerprint proves both artifacts exist. This repairs stale registrations left by an earlier app layout while keeping a genuinely incomplete bundle fail-closed.
 
+Time Machine system-support registration is likewise bound to a streaming fingerprint of the installed user service, privileged helper, property lists, and FSKit extension. An idle installed-app update first asks the already approved helper to retire itself when its mapped code no longer matches the installed bytes, preserving macOS approval during ordinary updates. A failed automatic attempt backs off from completion and never monopolizes the user action. If Service Management still points at an older or moved app whose helper cannot launch, the explicit **Set Up** action waits for the current bounded check, then re-registers the helper and user service through public Service Management APIs; macOS remains authoritative and may request renewed Login Items approval. Delta never edits launchd or approval databases directly.
+
 ## Data flow
 
 1. A native file picker records security-scoped bookmarks for selected sources, destinations, and restore targets.

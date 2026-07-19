@@ -322,6 +322,51 @@ public enum TimeMachineSystemAccessRegistrationPolicy {
     }
 }
 
+public enum TimeMachineSystemAccessRequestAction: Equatable, Sendable {
+    case none
+    case register
+    case reregister
+}
+
+public enum TimeMachineSystemAccessRequestPolicy {
+    /// An explicit user request may repair an enabled registration that still
+    /// points at an older or moved app. Automatic update reconciliation avoids
+    /// unregistering the privileged helper because that can require renewed
+    /// Login Items approval; the explicit Set Up action is the supported
+    /// recovery boundary for that Service Management transition.
+    public static func action(
+        serviceStatus: LaunchAgentRegistrationStatus,
+        helperStatus: LaunchAgentRegistrationStatus,
+        registeredFingerprint: String?,
+        currentFingerprint: String?
+    ) -> TimeMachineSystemAccessRequestAction {
+        guard
+            TimeMachineSystemAccessRegistrationPolicy.accepted(status: serviceStatus),
+            TimeMachineSystemAccessRegistrationPolicy.accepted(status: helperStatus)
+        else {
+            return .register
+        }
+        guard serviceStatus == .enabled, helperStatus == .enabled else {
+            return .none
+        }
+        guard let currentFingerprint else {
+            return .none
+        }
+        return registeredFingerprint == currentFingerprint ? .none : .reregister
+    }
+}
+
+public enum TimeMachineSystemAccessRepairError: Error, LocalizedError {
+    case registrationIncomplete
+
+    public var errorDescription: String? {
+        switch self {
+        case .registrationIncomplete:
+            "macOS did not complete the Time Machine background-item registration. Review Login Items, then try again."
+        }
+    }
+}
+
 public enum TimeMachineSystemRegistrationMaintenancePolicy {
     public static func isCurrent(
         serviceStatus: LaunchAgentRegistrationStatus,

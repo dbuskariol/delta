@@ -276,6 +276,8 @@ final class DeltaAppModel: ObservableObject {
     private var backgroundSecretAccessTask: Task<Void, Never>?
     private var backgroundRegistrationTask: Task<Void, Never>?
     private var timeMachineRegistrationTask: Task<Void, Never>?
+    private var hasPendingTimeMachineSystemAccessRequest = false
+    private var pendingTimeMachineSystemAccessRequestShowsResultAlert = false
     private var lastTimeMachineRegistrationAttemptFingerprint: String?
     private var lastTimeMachineRegistrationAttemptUptime: TimeInterval?
     private var currentTimeMachineSystemFingerprint: String?
@@ -2034,7 +2036,15 @@ final class DeltaAppModel: ObservableObject {
         timeMachineSystemRegistrationError = nil
         timeMachineRegistrationTask = Task { [weak self] in
             guard let self else { return }
-            defer { self.timeMachineRegistrationTask = nil }
+            defer {
+                // Back off from completion rather than start time. A failed
+                // helper handshake may consume the complete bounded timeout;
+                // using its start time would otherwise make the next database
+                // refresh launch another attempt immediately.
+                self.lastTimeMachineRegistrationAttemptUptime = ProcessInfo
+                    .processInfo.systemUptime
+                self.finishTimeMachineSystemRegistrationTask()
+            }
             do {
                 // Never unregister the privileged helper during an update:
                 // doing so revokes its Login Items approval. Instead ask the
@@ -2163,9 +2173,33 @@ final class DeltaAppModel: ObservableObject {
 
     func requestTimeMachineSystemAccess(showsResultAlert: Bool = true) {
         if timeMachineRegistrationTask != nil {
+            hasPendingTimeMachineSystemAccessRequest = true
+            pendingTimeMachineSystemAccessRequestShowsResultAlert =
+                pendingTimeMachineSystemAccessRequestShowsResultAlert
+                    || showsResultAlert
             if showsResultAlert {
-                alertMessage = "Delta is refreshing Time Machine system support for this app version. Try again in a moment."
+                alertMessage = "Delta is finishing its current Time Machine support check. Set Up will continue automatically."
             }
+            return
+        }
+        let registeredFingerprint = DeltaAppPreferences.string(
+            for: DeltaAppPreferenceKeys.timeMachineSystemFingerprint,
+            default: ""
+        )
+        let initialAction = TimeMachineSystemAccessRequestPolicy.action(
+            serviceStatus: TimeMachineServiceController.status(),
+            helperStatus: TimeMachineSetupHelperController.status(),
+            registeredFingerprint: registeredFingerprint.isEmpty
+                ? nil
+                : registeredFingerprint,
+            currentFingerprint: currentTimeMachineSystemFingerprint
+        )
+        if initialAction == .reregister,
+           let currentFingerprint = currentTimeMachineSystemFingerprint {
+            repairTimeMachineSystemAccess(
+                currentFingerprint: currentFingerprint,
+                showsResultAlert: showsResultAlert
+            )
             return
         }
         var failures: [String] = []
@@ -2214,10 +2248,7 @@ final class DeltaAppModel: ObservableObject {
                 || timeMachineSetupHelperStatus == .requiresApproval),
            let fingerprint = currentTimeMachineSystemFingerprint
         {
-            let storedFingerprint = DeltaAppPreferences.string(
-                for: DeltaAppPreferenceKeys.timeMachineSystemFingerprint,
-                default: ""
-            )
+            let storedFingerprint = registeredFingerprint
             if (registeredSomething && storedFingerprint.isEmpty)
                 || storedFingerprint == fingerprint
             {
@@ -2229,12 +2260,10 @@ final class DeltaAppModel: ObservableObject {
             } else if timeMachineServiceStatus == .enabled,
                       timeMachineSetupHelperStatus == .enabled
             {
-                lastTimeMachineRegistrationAttemptFingerprint = nil
-                lastTimeMachineRegistrationAttemptUptime = nil
-                synchronizeTimeMachineSystemRegistration()
-                if showsResultAlert {
-                    alertMessage = "Delta is refreshing Time Machine system support for this app version."
-                }
+                repairTimeMachineSystemAccess(
+                    currentFingerprint: fingerprint,
+                    showsResultAlert: showsResultAlert
+                )
                 return
             }
         }
@@ -2246,6 +2275,94 @@ final class DeltaAppModel: ObservableObject {
         } else {
             alertMessage = "Delta could not request all Time Machine system access: \(failures.joined(separator: "; "))"
         }
+    }
+
+    private func repairTimeMachineSystemAccess(
+        currentFingerprint: String,
+        showsResultAlert: Bool
+    ) {
+        guard softwareUpdateReadiness == .ready else {
+            let message = "Wait for the current Delta operation to finish and disconnect every Delta Time Machine disk before setting up system support."
+            timeMachineSystemRegistrationError = message
+            if showsResultAlert {
+                alertMessage = message
+            }
+            return
+        }
+        timeMachineSystemRegistrationError = nil
+        timeMachineRegistrationTask = Task { [weak self] in
+            guard let self else { return }
+            defer { self.finishTimeMachineSystemRegistrationTask() }
+            do {
+                // This is an explicit user-requested repair. Re-registering
+                // through Service Management replaces a stale helper or agent
+                // path without private launchd state changes. macOS remains
+                // authoritative and may require renewed Login Items approval.
+                try await TimeMachineSetupHelperController.reregister()
+                try await TimeMachineServiceController.reregister()
+
+                let serviceStatus = TimeMachineServiceController.status()
+                let helperStatus = TimeMachineSetupHelperController.status()
+                self.publishIfChanged(&self.timeMachineServiceStatus, serviceStatus)
+                self.publishIfChanged(&self.timeMachineSetupHelperStatus, helperStatus)
+                guard
+                    TimeMachineSystemAccessRegistrationPolicy.accepted(
+                        status: serviceStatus
+                    ),
+                    TimeMachineSystemAccessRegistrationPolicy.accepted(
+                        status: helperStatus
+                    )
+                else {
+                    throw TimeMachineSystemAccessRepairError.registrationIncomplete
+                }
+                DeltaAppPreferences.sharedStore().set(
+                    currentFingerprint,
+                    forKey: DeltaAppPreferenceKeys.timeMachineSystemFingerprint
+                )
+                self.lastTimeMachineRegistrationAttemptFingerprint = nil
+                self.lastTimeMachineRegistrationAttemptUptime = nil
+                self.timeMachineSystemRegistrationError = nil
+                self.refreshTimeMachineSystemSupportCurrency()
+                try? self.database?.appendEvent(
+                    EventLog(
+                        level: .info,
+                        message: serviceStatus == .enabled && helperStatus == .enabled
+                            ? "Time Machine system support was repaired for the installed Delta version."
+                            : "Time Machine system support was updated and is waiting for Login Items approval."
+                    )
+                )
+                self.refreshSystemState(force: true)
+                if showsResultAlert {
+                    self.alertMessage = serviceStatus == .enabled
+                        && helperStatus == .enabled
+                        ? "Time Machine system support is ready."
+                        : "Time Machine support was updated. Approve Delta's background items in Login Items, then return to Delta."
+                }
+            } catch {
+                let serviceStatus = TimeMachineServiceController.status()
+                let helperStatus = TimeMachineSetupHelperController.status()
+                self.publishIfChanged(&self.timeMachineServiceStatus, serviceStatus)
+                self.publishIfChanged(&self.timeMachineSetupHelperStatus, helperStatus)
+                let message = "Time Machine system support could not be set up: \(SensitiveLogRedactor.redact(error.localizedDescription))"
+                self.timeMachineSystemRegistrationError = message
+                self.refreshTimeMachineSystemSupportCurrency()
+                try? self.database?.appendEvent(
+                    EventLog(level: .error, message: message)
+                )
+                if showsResultAlert {
+                    self.alertMessage = message
+                }
+            }
+        }
+    }
+
+    private func finishTimeMachineSystemRegistrationTask() {
+        timeMachineRegistrationTask = nil
+        guard hasPendingTimeMachineSystemAccessRequest else { return }
+        let showsResultAlert = pendingTimeMachineSystemAccessRequestShowsResultAlert
+        hasPendingTimeMachineSystemAccessRequest = false
+        pendingTimeMachineSystemAccessRequestShowsResultAlert = false
+        requestTimeMachineSystemAccess(showsResultAlert: showsResultAlert)
     }
 
     private func refreshTimeMachineSystemSupportCurrency() {
