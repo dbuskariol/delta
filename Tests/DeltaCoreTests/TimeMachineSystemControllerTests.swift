@@ -647,6 +647,51 @@ final class TimeMachineSystemControllerTests: XCTestCase {
         )
     }
 
+    func testServiceManagementReregistrationRetriesOnlyTheUnsettledState() {
+        XCTAssertEqual(
+            ServiceManagementReregistrationPolicy.retryDelay(
+                afterFailedAttempt: 0,
+                status: .notRegistered
+            ),
+            .milliseconds(250)
+        )
+        XCTAssertEqual(
+            ServiceManagementReregistrationPolicy.retryDelay(
+                afterFailedAttempt: 1,
+                status: .notRegistered
+            ),
+            .milliseconds(500)
+        )
+        XCTAssertEqual(
+            ServiceManagementReregistrationPolicy.retryDelay(
+                afterFailedAttempt: 2,
+                status: .notRegistered
+            ),
+            .seconds(1)
+        )
+        XCTAssertNil(
+            ServiceManagementReregistrationPolicy.retryDelay(
+                afterFailedAttempt: 3,
+                status: .notRegistered
+            )
+        )
+
+        for status in [
+            LaunchAgentRegistrationStatus.enabled,
+            .requiresApproval,
+            .notFound,
+            .unavailable,
+            .unknown("future")
+        ] {
+            XCTAssertNil(
+                ServiceManagementReregistrationPolicy.retryDelay(
+                    afterFailedAttempt: 0,
+                    status: status
+                )
+            )
+        }
+    }
+
     func testExplicitTimeMachineSystemAccessRepairsOnlyStaleEnabledRegistration() {
         XCTAssertEqual(
             TimeMachineSystemAccessRequestPolicy.action(

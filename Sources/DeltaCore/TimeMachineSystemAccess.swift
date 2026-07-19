@@ -176,40 +176,15 @@ public enum TimeMachineSetupHelperController {
     public static func reregister() async throws {
         #if canImport(ServiceManagement)
         let service = SMAppService.daemon(plistName: plistName)
-        try await withCheckedThrowingContinuation {
-            (continuation: CheckedContinuation<Void, Error>) in
-            service.unregister { error in
-                if let error {
-                    continuation.resume(throwing: error)
-                    return
-                }
-                do {
-                    try service.register()
-                    continuation.resume(returning: ())
-                } catch {
-                    continuation.resume(throwing: error)
-                }
-            }
-        }
+        try await ServiceManagementRegistration.reregister(service)
         #endif
     }
 
     public static func status() -> LaunchAgentRegistrationStatus {
         #if canImport(ServiceManagement)
-        switch SMAppService.daemon(plistName: plistName).status {
-        case .enabled:
-            return .enabled
-        case .requiresApproval:
-            return .requiresApproval
-        case .notRegistered:
-            return .notRegistered
-        case .notFound:
-            return .notFound
-        @unknown default:
-            return LaunchAgentRegistrationStatus.parse(
-                "\(SMAppService.daemon(plistName: plistName).status)"
-            )
-        }
+        return ServiceManagementRegistration.status(
+            of: SMAppService.daemon(plistName: plistName)
+        )
         #else
         return .unavailable
         #endif
@@ -337,7 +312,7 @@ public enum TimeMachineSystemAccessRegistrationPolicy {
     /// registration that is waiting for the user's Login Items approval. The
     /// post-call status is authoritative for that expected transition.
     public static func accepted(status: LaunchAgentRegistrationStatus) -> Bool {
-        status == .enabled || status == .requiresApproval
+        ServiceManagementReregistrationPolicy.accepts(status)
     }
 }
 
