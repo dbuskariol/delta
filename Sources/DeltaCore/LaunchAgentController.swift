@@ -95,6 +95,32 @@ public enum LaunchAgentRegistrationAction: Equatable, Sendable {
     case reregister
 }
 
+public enum ServiceManagementReregistrationPolicy {
+    private static let retryDelays: [Duration] = [
+        .milliseconds(250),
+        .milliseconds(500),
+        .seconds(1)
+    ]
+
+    public static func accepts(_ status: LaunchAgentRegistrationStatus) -> Bool {
+        status == .enabled || status == .requiresApproval
+    }
+
+    /// Service Management's asynchronous unregister completion can precede
+    /// Background Task Management fully retiring the old record. Retry only
+    /// while macOS still reports no registration; approval, denial, missing
+    /// artifacts, and unknown states remain authoritative and fail closed.
+    public static func retryDelay(
+        afterFailedAttempt attempt: Int,
+        status: LaunchAgentRegistrationStatus
+    ) -> Duration? {
+        guard status == .notRegistered, retryDelays.indices.contains(attempt) else {
+            return nil
+        }
+        return retryDelays[attempt]
+    }
+}
+
 public enum LaunchAgentRegistrationPolicy {
     public static func action(
         status: LaunchAgentRegistrationStatus,
@@ -173,6 +199,60 @@ public enum LaunchAgentBundleLayout {
     }
 }
 
+#if canImport(ServiceManagement)
+@available(macOS 13.0, *)
+enum ServiceManagementRegistration {
+    static func status(of service: SMAppService) -> LaunchAgentRegistrationStatus {
+        switch service.status {
+        case .enabled:
+            return .enabled
+        case .requiresApproval:
+            return .requiresApproval
+        case .notRegistered:
+            return .notRegistered
+        case .notFound:
+            return .notFound
+        @unknown default:
+            return LaunchAgentRegistrationStatus.parse("\(service.status)")
+        }
+    }
+
+    static func reregister(_ service: SMAppService) async throws {
+        try await withCheckedThrowingContinuation {
+            (continuation: CheckedContinuation<Void, Error>) in
+            service.unregister { error in
+                if let error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume(returning: ())
+                }
+            }
+        }
+
+        var failedAttempt = 0
+        while true {
+            do {
+                try service.register()
+                return
+            } catch {
+                let currentStatus = status(of: service)
+                if ServiceManagementReregistrationPolicy.accepts(currentStatus) {
+                    return
+                }
+                guard let delay = ServiceManagementReregistrationPolicy.retryDelay(
+                    afterFailedAttempt: failedAttempt,
+                    status: currentStatus
+                ) else {
+                    throw error
+                }
+                try await Task.sleep(for: delay)
+                failedAttempt += 1
+            }
+        }
+    }
+}
+#endif
+
 public enum LaunchAgentController {
     public static let defaultPlistName = "com.delta.backup.agent.plist"
 
@@ -196,20 +276,7 @@ public enum LaunchAgentController {
         #if canImport(ServiceManagement)
         if #available(macOS 13.0, *) {
             let service = SMAppService.agent(plistName: plistName)
-            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-                service.unregister { error in
-                    if let error {
-                        continuation.resume(throwing: error)
-                        return
-                    }
-                    do {
-                        try service.register()
-                        continuation.resume(returning: ())
-                    } catch {
-                        continuation.resume(throwing: error)
-                    }
-                }
-            }
+            try await ServiceManagementRegistration.reregister(service)
         }
         #endif
     }
@@ -217,18 +284,9 @@ public enum LaunchAgentController {
     public static func status(plistName: String = defaultPlistName) -> LaunchAgentRegistrationStatus {
         #if canImport(ServiceManagement)
         if #available(macOS 13.0, *) {
-            switch SMAppService.agent(plistName: plistName).status {
-            case .enabled:
-                return .enabled
-            case .requiresApproval:
-                return .requiresApproval
-            case .notRegistered:
-                return .notRegistered
-            case .notFound:
-                return .notFound
-            @unknown default:
-                return LaunchAgentRegistrationStatus.parse("\(SMAppService.agent(plistName: plistName).status)")
-            }
+            return ServiceManagementRegistration.status(
+                of: SMAppService.agent(plistName: plistName)
+            )
         }
         #endif
         return .unavailable
