@@ -95,7 +95,7 @@ for relative_path in \
   Contents/Resources/DeltaAgent \
   Contents/MacOS/DeltaSecretBridge \
   Contents/Resources/DeltaTimeMachineService \
-  Contents/Library/LaunchServices/DeltaTimeMachineHelper \
+  Contents/MacOS/DeltaTimeMachineHelper \
   Contents/Extensions/DeltaTimeMachineFS.appex/Contents/MacOS/DeltaTimeMachineFS \
   Contents/MacOS/restic \
   Contents/MacOS/rclone

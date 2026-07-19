@@ -5,7 +5,7 @@
     <key>Label</key>
     <string>com.delta.backup.timemachine.helper</string>
     <key>BundleProgram</key>
-    <string>Contents/Library/LaunchServices/DeltaTimeMachineHelper</string>
+    <string>Contents/MacOS/DeltaTimeMachineHelper</string>
     <key>MachServices</key>
     <dict>
         <key>com.delta.backup.timemachine.helper</key>
