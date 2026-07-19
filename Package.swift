@@ -11,7 +11,10 @@ let package = Package(
         .executable(name: "Delta", targets: ["Delta"]),
         .executable(name: "DeltaAgent", targets: ["DeltaAgent"]),
         .executable(name: "DeltaSecretBridge", targets: ["DeltaSecretBridge"]),
-        .library(name: "DeltaCore", targets: ["DeltaCore"])
+        .executable(name: "DeltaTimeMachineService", targets: ["DeltaTimeMachineService"]),
+        .executable(name: "DeltaTimeMachineHelper", targets: ["DeltaTimeMachineHelper"]),
+        .library(name: "DeltaCore", targets: ["DeltaCore"]),
+        .library(name: "DeltaTimeMachineIPC", targets: ["DeltaTimeMachineIPC"])
     ],
     dependencies: [
         .package(url: "https://github.com/groue/GRDB.swift.git", from: "7.0.0"),
@@ -22,9 +25,11 @@ let package = Package(
             name: "DeltaCore",
             dependencies: [
                 "DeltaSecurity",
+                "DeltaTimeMachineIPC",
                 .product(name: "GRDB", package: "GRDB.swift")
             ]
         ),
+        .target(name: "DeltaTimeMachineIPC"),
         .target(
             name: "DeltaSecurity",
             publicHeadersPath: "include"
@@ -44,10 +49,19 @@ let package = Package(
             name: "DeltaSecretBridge",
             dependencies: ["DeltaCore"]
         ),
+        .executableTarget(
+            name: "DeltaTimeMachineService",
+            dependencies: ["DeltaCore", "DeltaTimeMachineIPC"]
+        ),
+        .executableTarget(
+            name: "DeltaTimeMachineHelper",
+            dependencies: ["DeltaCore"]
+        ),
         .testTarget(
             name: "DeltaCoreTests",
             dependencies: [
                 "DeltaCore",
+                "DeltaTimeMachineIPC",
                 .product(name: "GRDB", package: "GRDB.swift")
             ]
         )

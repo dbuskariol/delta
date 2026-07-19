@@ -274,7 +274,9 @@ public enum AppLoginItemController {
 }
 
 public enum FullDiskAccessGuide {
-    public static let settingsURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")!
+    public static let settingsURL = URL(
+        string: "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_AllFiles"
+    )!
 }
 
 public enum LoginItemsGuide {

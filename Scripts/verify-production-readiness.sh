@@ -129,7 +129,8 @@ DELTA_VERIFY_INSTALLED_LAUNCH="${DELTA_PRODUCTION_VERIFY_INSTALLED_LAUNCH:-1}" \
 
 EVIDENCE_OUTPUT="$(DELTA_EVIDENCE_INSTALLED_APP="$INSTALLED_APP" "$ROOT_DIR/Scripts/collect-release-evidence.sh" "$APP")"
 printf "%s\n" "$EVIDENCE_OUTPUT"
-EVIDENCE_PATH="$(printf "%s\n" "$EVIDENCE_OUTPUT" | /usr/bin/awk '/^Wrote release evidence to / { print substr($0, 27); exit }')"
+EVIDENCE_PATH="$(printf "%s\n" "$EVIDENCE_OUTPUT" | /usr/bin/awk \
+  '/^Wrote release evidence to / && value == "" { value = substr($0, 27) } END { print value }')"
 if [[ -z "$EVIDENCE_PATH" || ! -f "$EVIDENCE_PATH" ]]; then
   fail "release evidence was not generated."
 fi

@@ -3,6 +3,7 @@ import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject private var model: DeltaAppModel
+    @EnvironmentObject private var softwareUpdateController: SoftwareUpdateController
     @State private var isPresentingDestinationSheet = false
 
     var body: some View {
@@ -46,6 +47,12 @@ struct ContentView: View {
             if section == .settings {
                 model.refreshSystemState(force: true)
             }
+        }
+        .onChange(of: model.softwareUpdateReadiness) { _, _ in
+            softwareUpdateController.applicationSafetyDidChange()
+        }
+        .onAppear {
+            softwareUpdateController.applicationSafetyDidChange()
         }
         .alert("Delta", isPresented: alertBinding) {
             Button("OK") {
@@ -174,7 +181,7 @@ struct DashboardView: View {
                         }
                         Spacer()
                         Button {
-                            model.selectedSection = .settings
+                            model.showSettings(.permissions)
                         } label: {
                             Label("Review", systemImage: "arrow.right")
                         }
@@ -196,7 +203,7 @@ struct DashboardView: View {
                         }
                         Spacer()
                         Button {
-                            model.selectedSection = .settings
+                            model.showSettings(.permissions)
                         } label: {
                             Label("Repair", systemImage: "arrow.right")
                         }
@@ -280,11 +287,21 @@ struct DashboardView: View {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("Readiness")
                                 .font(.headline)
-                            Text("Full Disk Access has not been confirmed. Full-volume backups may miss protected data.")
+                            Text("Full Disk Access has not been confirmed. Full-volume backups may miss protected data, and Time Machine disks cannot be added or removed.")
                                 .foregroundStyle(.secondary)
                         }
                         Spacer()
-                        StateBadge(text: "Needs Access", color: .orange)
+                        VStack(alignment: .trailing, spacing: 8) {
+                            StateBadge(text: "Needs Access", color: .orange)
+                            Button {
+                                model.showSettings(.permissions)
+                            } label: {
+                                Label("Review", systemImage: "arrow.right")
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                            .deltaTooltip("Review Full Disk Access and Delta's other macOS permissions.")
+                        }
                     }
                 }
             }
@@ -293,6 +310,7 @@ struct DashboardView: View {
             DashboardBackupOverview(
                 profiles: model.profiles,
                 destinationCount: model.repositories.count,
+                deltaDestinationCount: model.repositories.filter { $0.format == .delta }.count,
                 jobs: model.jobs,
                 acknowledgedWarningIssueCounts: model.acknowledgedWarningIssueCounts,
                 onOpenBackups: { model.selectedSection = .backups },
@@ -315,6 +333,7 @@ struct DashboardView: View {
         let freeSpaceThreshold = DestinationFreeSpaceWarningThreshold.normalized(destinationFreeSpaceWarningGiB)
         return DashboardHealthEvaluator().destinationWarnings(
             repositories: model.repositories,
+            timeMachineStatesByRepository: model.timeMachineStatesByRepository,
             threshold: threshold,
             freeSpaceThreshold: freeSpaceThreshold
         )
@@ -359,6 +378,7 @@ struct DashboardView: View {
 private struct DashboardBackupOverview: View {
     var profiles: [BackupProfile]
     var destinationCount: Int
+    var deltaDestinationCount: Int
     var jobs: [JobRun]
     var acknowledgedWarningIssueCounts: [UUID: Int]
     var onOpenBackups: () -> Void
@@ -421,15 +441,20 @@ private struct DashboardBackupOverview: View {
         if destinationCount == 0 {
             return "Add a destination for encrypted restore points, then choose the folders or volume to protect."
         }
+        if deltaDestinationCount == 0 {
+            return "Delta backup profiles require a Delta encrypted backup destination. macOS manages Time Machine sources and schedules."
+        }
         return "Create a profile for the folders or volume you want to protect."
     }
 
     private var emptyStateActionTitle: String {
-        destinationCount == 0 ? "Add Destination" : "Open Backups"
+        if destinationCount == 0 { return "Add Destination" }
+        if deltaDestinationCount == 0 { return "Add Delta Destination" }
+        return "Open Backups"
     }
 
     private var emptyStateAction: () -> Void {
-        destinationCount == 0 ? onOpenDestinations : onOpenBackups
+        deltaDestinationCount == 0 ? onOpenDestinations : onOpenBackups
     }
 
     private var latestBackup: JobRun? {
@@ -547,7 +572,7 @@ struct BackupsView: View {
             title: "Backups",
             subtitle: "Sources, schedules, and retention",
             actions: {
-                if !model.repositories.isEmpty && !model.profiles.isEmpty {
+                if !deltaRepositories.isEmpty && !model.profiles.isEmpty {
                     Button {
                         isPresentingProfileSheet = true
                     } label: {
@@ -564,6 +589,14 @@ struct BackupsView: View {
                     title: "Create a destination first",
                     message: "Backups need a local drive, mounted network drive, or cloud destination.",
                     actionTitle: "Add Destination",
+                    action: onAddDestination
+                )
+            } else if deltaRepositories.isEmpty {
+                EmptyStateView(
+                    symbol: "clock.arrow.circlepath",
+                    title: "Time Machine is managed by macOS",
+                    message: "Delta presents the remote disk, while macOS manages Time Machine sources and schedules. Add a Delta encrypted backup destination to create Delta profiles.",
+                    actionTitle: "Add Delta Destination",
                     action: onAddDestination
                 )
             } else if model.profiles.isEmpty {
@@ -587,6 +620,10 @@ struct BackupsView: View {
                 .environmentObject(model)
                 .frame(width: ModalMetrics.sheetWidth, height: ModalMetrics.sheetHeight)
         }
+    }
+
+    private var deltaRepositories: [BackupRepository] {
+        model.repositories.filter { $0.format == .delta }
     }
 }
 
@@ -714,7 +751,15 @@ struct RestoreView: View {
             title: "Restore",
             subtitle: "Browse an earlier backup and recover exactly what you need",
             actions: {
-                if !model.repositories.isEmpty {
+                if !timeMachineRepositories.isEmpty, !deltaRepositories.isEmpty {
+                    Button {
+                        model.openTimeMachine()
+                    } label: {
+                        Label("Open Time Machine", systemImage: "clock.arrow.circlepath")
+                    }
+                    .deltaTooltip("Browse and restore from connected Time Machine backups using macOS.")
+                }
+                if !deltaRepositories.isEmpty {
                     Button {
                         if let repository = selectedRepository {
                             model.refreshSnapshots(repository: repository)
@@ -734,13 +779,21 @@ struct RestoreView: View {
                     actionTitle: "Add Destination",
                     action: onAddDestination
                 )
+            } else if deltaRepositories.isEmpty {
+                EmptyStateView(
+                    symbol: "clock.arrow.circlepath",
+                    title: "Restore with Time Machine",
+                    message: "Time Machine owns browsing and recovery for these destinations. Connect the disk, then use the native Time Machine restore experience.",
+                    actionTitle: "Open Time Machine",
+                    action: { model.openTimeMachine() }
+                )
             } else {
                 restoreWorkflow
             }
         }
         .onAppear {
             applyRestoreDefaultsIfNeeded()
-            repositoryID = repositoryID ?? model.repositories.first?.id
+            repositoryID = repositoryID ?? model.repositories.first(where: { $0.format == .delta })?.id
             reconcileSelectedRestorePoint()
             refreshRestorePointsIfNeeded()
         }
@@ -761,6 +814,14 @@ struct RestoreView: View {
         }
     }
 
+    private var deltaRepositories: [BackupRepository] {
+        model.repositories.filter { $0.format == .delta }
+    }
+
+    private var timeMachineRepositories: [BackupRepository] {
+        model.repositories.filter { $0.format == .timeMachine }
+    }
+
     @ViewBuilder
     private var restoreWorkflow: some View {
         RestoreStepCard(number: 1, title: "Restore Point", subtitle: "Choose where the backup is stored and the point in time.") {
@@ -768,7 +829,7 @@ struct RestoreView: View {
                 RestoreFormRow(title: "Destination") {
                     Picker("Destination", selection: $repositoryID) {
                         Text("Choose").tag(UUID?.none)
-                        ForEach(model.repositories) { repository in
+                        ForEach(model.repositories.filter { $0.format == .delta }) { repository in
                             Text(repository.name).tag(Optional(repository.id))
                         }
                     }
@@ -2481,6 +2542,13 @@ private struct ActivityLogRow: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.vertical, 3)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilitySummary)
+    }
+
+    private var accessibilitySummary: String {
+        let level = entry.stream == .standardError ? "Issue" : "Information"
+        return "\(entry.date.formatted(date: .omitted, time: .standard)), \(level), \(entry.message)"
     }
 }
 
@@ -2535,65 +2603,9 @@ private extension JobOutcomePresentation {
 }
 
 struct SettingsView: View {
-    private enum SettingsCategory: CaseIterable, Hashable, Identifiable {
-        case general
-        case permissions
-        case defaults
-        case updates
-        case support
-
-        var id: String { title }
-
-        var title: String {
-            switch self {
-            case .general:
-                return SettingsSurfaceContract.categoryGeneral
-            case .permissions:
-                return SettingsSurfaceContract.categoryPermissions
-            case .defaults:
-                return SettingsSurfaceContract.categoryDefaults
-            case .updates:
-                return SettingsSurfaceContract.categoryUpdates
-            case .support:
-                return SettingsSurfaceContract.categoryAdvanced
-            }
-        }
-
-        var symbol: String {
-            switch self {
-            case .general:
-                return "gearshape"
-            case .permissions:
-                return "lock.shield"
-            case .defaults:
-                return "slider.horizontal.3"
-            case .updates:
-                return "arrow.down.circle"
-            case .support:
-                return "stethoscope"
-            }
-        }
-
-        var subtitle: String {
-            switch self {
-            case .general:
-                return "Choose how Delta runs scheduled work and behaves on this Mac."
-            case .permissions:
-                return "Review the macOS access used for unattended and protected backups."
-            case .defaults:
-                return "Set sensible defaults for new backups and restores."
-            case .updates:
-                return "Keep Delta current through signed, verified updates."
-            case .support:
-                return "Inspect diagnostics and local support files."
-            }
-        }
-    }
-
     @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var model: DeltaAppModel
     @EnvironmentObject private var softwareUpdateController: SoftwareUpdateController
-    @State private var settingsCategory: SettingsCategory = .general
     @State private var showsScheduledBackupsDetails = false
     @AppStorage(
         DeltaAppPreferenceKeys.updateCheckIntervalSeconds,
@@ -3007,6 +3019,28 @@ struct SettingsView: View {
                             SettingsDivider()
 
                             SettingsPermissionRow(
+                                title: "Time Machine File System",
+                                detail: timeMachineFileSystemPermissionDescription,
+                                systemImage: "externaldrive.badge.timemachine",
+                                status: timeMachineFileSystemPermissionPresentation
+                            ) {
+                                timeMachineFileSystemPermissionActions
+                            }
+
+                            SettingsDivider()
+
+                            SettingsPermissionRow(
+                                title: "Time Machine System Support",
+                                detail: timeMachineSystemSupportDescription,
+                                systemImage: "lock.shield",
+                                status: timeMachineSystemSupportPermissionPresentation
+                            ) {
+                                timeMachineSystemSupportPermissionActions
+                            }
+
+                            SettingsDivider()
+
+                            SettingsPermissionRow(
                                 title: "Notifications",
                                 detail:
                                     "Only required when job alerts are enabled. Delta uses notifications for backup results and warnings, never advertising.",
@@ -3072,7 +3106,7 @@ struct SettingsView: View {
                             SettingsControlRow(
                                 title: "Destination checks",
                                 detail:
-                                    "Show dashboard attention when a destination has never been checked, is unavailable locally, or its last check is older than this."
+                                    "Show dashboard attention when a destination has never been successfully verified, is unavailable locally, or its last successful verification is older than this."
                             ) {
                                 Picker("", selection: $destinationVerificationWarningHours) {
                                     ForEach(DestinationVerificationWarningThreshold.allCases) { threshold in
@@ -3406,7 +3440,8 @@ struct SettingsView: View {
                         SettingsCard(title: "Delta") {
                             SettingsActionRow(
                                 title: "Delta \(appVersion) (\(buildVersion))",
-                                detail: "Updates are signed and verified by Sparkle before installation.",
+                                detail: softwareUpdateController.updateSafetyDetail
+                                    ?? "Updates are signed and verified by Sparkle before installation.",
                                 systemImage: "app.badge.checkmark"
                             ) {
                                 Button("Check Now") {
@@ -3576,9 +3611,14 @@ struct SettingsView: View {
         model.profiles.filter { $0.schedule.isEnabled }.count
     }
 
+    private var settingsCategory: DeltaAppModel.SettingsCategory {
+        get { model.selectedSettingsCategory }
+        nonmutating set { model.selectedSettingsCategory = newValue }
+    }
+
     private var settingsNavigation: some View {
         HStack(spacing: 6) {
-            ForEach(SettingsCategory.allCases) { category in
+            ForEach(DeltaAppModel.SettingsCategory.allCases) { category in
                 Button {
                     settingsCategory = category
                 } label: {
@@ -3634,6 +3674,24 @@ struct SettingsView: View {
 
     private var fullDiskAccessPermissionPresentation: SettingsPermissionPresentation {
         model.fullDiskAccessStatus.hasLikelyFullDiskAccess ? .ready : .notAllowed
+    }
+
+    private var hasTimeMachineDestinations: Bool {
+        model.repositories.contains { $0.format == .timeMachine }
+    }
+
+    private var timeMachineFileSystemPermissionPresentation: SettingsPermissionPresentation {
+        guard hasTimeMachineDestinations else { return .notNeeded }
+        switch model.timeMachineFileSystemStatus {
+        case .enabled: return .ready
+        case .disabled: return .needsAttention
+        case .notInstalled, .unavailable: return .notAllowed
+        }
+    }
+
+    private var timeMachineSystemSupportPermissionPresentation: SettingsPermissionPresentation {
+        guard hasTimeMachineDestinations else { return .notNeeded }
+        return model.timeMachineSystemSupportIsCurrent ? .ready : .needsAttention
     }
 
     private var notificationPermissionPresentation: SettingsPermissionPresentation {
@@ -3694,6 +3752,29 @@ struct SettingsView: View {
     }
 
     @ViewBuilder
+    private var timeMachineFileSystemPermissionActions: some View {
+        if hasTimeMachineDestinations, model.timeMachineFileSystemStatus != .enabled {
+            Button("System Settings") {
+                model.openFileSystemExtensionsSettings()
+            }
+            .buttonStyle(.borderedProminent)
+        }
+    }
+
+    @ViewBuilder
+    private var timeMachineSystemSupportPermissionActions: some View {
+        if hasTimeMachineDestinations, !model.timeMachineSystemSupportIsCurrent {
+            Button("Set Up") {
+                model.requestTimeMachineSystemAccess()
+            }
+            .buttonStyle(.borderedProminent)
+            Button("Review Login Items") {
+                model.openLoginItemsSettings()
+            }
+        }
+    }
+
+    @ViewBuilder
     private var notificationPermissionActions: some View {
         switch notificationAuthorizationState {
         case .notDetermined:
@@ -3747,8 +3828,41 @@ struct SettingsView: View {
 
     private var fullDiskAccessDescription: String {
         model.fullDiskAccessStatus.hasLikelyFullDiskAccess
-            ? "Protected locations look readable for full-volume and selected-folder backups."
-            : "Protected locations are not readable yet. Open Privacy & Security, add Delta with the + button if needed, then recheck access."
+            ? "Protected locations look readable for full-volume backups and macOS Time Machine destination changes."
+            : "Required for protected backup sources and to add or remove Time Machine disks. Open Privacy & Security, add Delta with the + button if needed, then recheck access."
+    }
+
+    private var timeMachineFileSystemPermissionDescription: String {
+        guard hasTimeMachineDestinations else {
+            return "Only required when a destination uses Time Machine format."
+        }
+        switch model.timeMachineFileSystemStatus {
+        case .enabled:
+            return "Delta's File System Extension is enabled and can present remote sparsebundle files to macOS."
+        case .disabled:
+            return "Open Login Items & Extensions, select File System Extensions, and turn on Delta Time Machine Storage."
+        case .notInstalled:
+            return "The File System Extension is missing from this Delta installation. Reinstall the signed app."
+        case let .unavailable(message):
+            return "macOS could not report File System Extension status: \(message)"
+        }
+    }
+
+    private var timeMachineSystemSupportDescription: String {
+        guard hasTimeMachineDestinations else {
+            return "Only required when a destination uses Time Machine format."
+        }
+        if model.timeMachineSystemSupportIsCurrent {
+            return "The user service can reach saved remote credentials, and the narrowly scoped system helper can safely add or remove the verified disk in Time Machine."
+        }
+        if let error = model.timeMachineSystemRegistrationError {
+            return error
+        }
+        if model.timeMachineServiceStatus == .enabled,
+           model.timeMachineSetupHelperStatus == .enabled {
+            return "Delta needs to refresh Time Machine system support for this installed app version before connecting a disk."
+        }
+        return "Set up Delta's background service and narrowly scoped disk helper, then approve them in Login Items if macOS asks."
     }
 
     private var canSendTestNotification: Bool {
@@ -4308,16 +4422,25 @@ struct ProfileRow: View {
 
 struct DestinationRow: View {
     @EnvironmentObject private var model: DeltaAppModel
+    @EnvironmentObject private var softwareUpdateController: SoftwareUpdateController
     var destination: BackupRepository
     @State private var isPresentingEditor = false
     @State private var passwordSheetMode: DestinationPasswordSheetMode?
     @State private var isConfirmingDelete = false
+    @State private var isPresentingRecoveryKey = false
 
     var body: some View {
         Card {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(alignment: .top, spacing: 14) {
-                    StatusIcon(symbol: destination.backend.kind == .local ? "externaldrive" : "network", color: destination.lastVerifiedAt == nil ? .secondary : .teal)
+                    StatusIcon(
+                        symbol: destination.format == .timeMachine
+                            ? "clock.arrow.circlepath"
+                            : (destination.backend.kind == .local ? "externaldrive" : "network"),
+                        color: destination.format == .timeMachine
+                            ? timeMachineStatusColor
+                            : (destination.lastVerifiedAt == nil ? .secondary : .teal)
+                    )
                     VStack(alignment: .leading, spacing: 5) {
                         Text(destination.name)
                             .font(.headline)
@@ -4331,15 +4454,93 @@ struct DestinationRow: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                     HStack(spacing: 8) {
-                        Button {
-                            model.checkRepository(destination)
-                        } label: {
-                            Label("Check", systemImage: "checkmark.shield")
+                        if destination.format == .timeMachine {
+                            switch timeMachinePresentation.primaryAction {
+                            case .backUpNow:
+                                Button {
+                                    model.startTimeMachineBackup(destination)
+                                } label: {
+                                    Label("Back Up Now", systemImage: "arrow.clockwise")
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .controlSize(.small)
+                                .disabled(
+                                    model.isWorking
+                                        || !model.isPersistentStoreAvailable
+                                )
+                                .deltaTooltip("Ask macOS Time Machine to start an automatic-style backup to this destination.")
+                            case .connect:
+                                Button {
+                                    if let message = softwareUpdateController.timeMachineConnectionBlockMessage {
+                                        model.alertMessage = message
+                                        return
+                                    }
+                                    softwareUpdateController.reserveTimeMachineSystemTransition()
+                                    model.connectTimeMachineDestination(destination)
+                                } label: {
+                                    Label(timeMachineConnectionActionTitle, systemImage: "externaldrive.connected.to.line.below")
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .controlSize(.small)
+                                .disabled(model.isWorking || !model.isPersistentStoreAvailable)
+                                .deltaTooltip("Present this encrypted remote disk to macOS Time Machine.")
+                            case .repair:
+                                Button {
+                                    model.initializeRepository(destination)
+                                } label: {
+                                    Label("Repair Setup", systemImage: "wrench.and.screwdriver")
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .controlSize(.small)
+                                .disabled(model.isWorking || !model.isPersistentStoreAvailable)
+                                .deltaTooltip("Authenticate and repair this destination's remote Time Machine setup.")
+                            case .checkRemoteStorage:
+                                Button {
+                                    model.checkRepository(destination)
+                                } label: {
+                                    Label("Check Again", systemImage: "checkmark.shield")
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .controlSize(.small)
+                                .disabled(model.isWorking || !model.isPersistentStoreAvailable)
+                                .deltaTooltip("Recheck the authenticated remote Time Machine history after restoring or reconnecting its storage.")
+                            case .none:
+                                if let lifecycle = model.timeMachineStatesByRepository[destination.id]?.lifecycle,
+                                   lifecycle == .preparing || lifecycle == .disconnecting {
+                                    ProgressView()
+                                        .controlSize(.small)
+                                        .accessibilityLabel(
+                                            lifecycle == .disconnecting
+                                                ? "Disconnecting \(destination.name)"
+                                                : "Connecting \(destination.name)"
+                                        )
+                                }
+                            }
+                            if timeMachineIsMounted {
+                                Button {
+                                    softwareUpdateController.reserveTimeMachineSystemTransition()
+                                    model.disconnectTimeMachineDestination(destination)
+                                } label: {
+                                    Image(systemName: "eject")
+                                        .frame(width: 18, height: 18)
+                                }
+                                .buttonStyle(.bordered)
+                                .controlSize(.small)
+                                .disabled(model.isWorking || !model.isPersistentStoreAvailable)
+                                .accessibilityLabel("Disconnect \(destination.name)")
+                                .deltaTooltip("Finish pending writes and safely disconnect this Time Machine disk.")
+                            }
+                        } else {
+                            Button {
+                                model.checkRepository(destination)
+                            } label: {
+                                Label("Check", systemImage: "checkmark.shield")
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                            .disabled(model.isWorking || !model.isPersistentStoreAvailable)
+                            .deltaTooltip("Verify this destination and a sample of stored backup data.")
                         }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                        .disabled(model.isWorking || !model.isPersistentStoreAvailable)
-                        .deltaTooltip("Verify this destination and a sample of stored backup data.")
 
                         Menu {
                             Button {
@@ -4347,31 +4548,69 @@ struct DestinationRow: View {
                             } label: {
                                 Label("Edit Destination", systemImage: "pencil")
                             }
-                            Button {
-                                passwordSheetMode = .rotate
-                            } label: {
-                                Label("Change Encryption Password", systemImage: "key.horizontal")
-                            }
-                            Button {
-                                passwordSheetMode = .reconnect
-                            } label: {
-                                Label("Reconnect with Original Password", systemImage: "link.badge.plus")
-                            }
-                            Button {
-                                model.refreshSnapshots(repository: destination)
-                            } label: {
-                                Label("Refresh Restore Points", systemImage: "arrow.clockwise")
+                            .disabled(timeMachineBlocksConfigurationChanges)
+                            if destination.format == .delta {
+                                Button {
+                                    passwordSheetMode = .rotate
+                                } label: {
+                                    Label("Change Encryption Password", systemImage: "key.horizontal")
+                                }
+                                Button {
+                                    passwordSheetMode = .reconnect
+                                } label: {
+                                    Label("Reconnect with Original Password", systemImage: "link.badge.plus")
+                                }
+                                Button {
+                                    model.refreshSnapshots(repository: destination)
+                                } label: {
+                                    Label("Refresh Restore Points", systemImage: "arrow.clockwise")
+                                }
+                            } else {
+                                Button {
+                                    model.openTimeMachine()
+                                } label: {
+                                    Label("Browse Time Machine Backups", systemImage: "clock.arrow.circlepath")
+                                }
+                                .disabled(!timeMachineIsMounted)
+                                Button {
+                                    model.openTimeMachineSettings()
+                                } label: {
+                                    Label("Time Machine Settings", systemImage: "gear")
+                                }
+                                Button {
+                                    model.checkRepository(destination)
+                                } label: {
+                                    Label("Check Remote Storage", systemImage: "checkmark.shield")
+                                }
+                                .disabled(timeMachineBlocksConfigurationChanges)
+                                if destination.secretStorageMode == .appManagedKeychain {
+                                    Button {
+                                        isPresentingRecoveryKey = true
+                                    } label: {
+                                        Label("Show Recovery Key", systemImage: "key.viewfinder")
+                                    }
+                                }
                             }
                             Button {
                                 model.initializeRepository(destination)
                             } label: {
                                 Label("Repair Destination Setup", systemImage: "wrench.and.screwdriver")
                             }
+                            .disabled(timeMachineBlocksConfigurationChanges)
+                            if destination.format == .timeMachine, timeMachineBlocksConfigurationChanges {
+                                Text(timeMachineIsMounted
+                                    ? "Disconnect to edit, repair, or verify remote storage."
+                                    : "Wait for the current connection operation to finish.")
+                            }
                             Divider()
                             Button(role: .destructive) {
                                 isConfirmingDelete = true
                             } label: {
                                 Label("Remove Destination", systemImage: "trash")
+                            }
+                            .disabled(timeMachineRemovalIsUnavailable)
+                            if timeMachineRemovalRequiresConnection {
+                                Text("Connect this Time Machine disk before removing it from Delta so the saved macOS destination can be verified and removed safely.")
                             }
                         } label: {
                             Image(systemName: "ellipsis")
@@ -4388,9 +4627,23 @@ struct DestinationRow: View {
                 Divider()
 
                 LazyVGrid(columns: rowFactColumns, alignment: .leading, spacing: 12) {
-                    RowFact(symbol: "shippingbox", title: "Type", value: destination.backend.kind.displayName)
-                    RowFact(symbol: "clock.arrow.circlepath", title: "Restore Points", value: "\(restorePointCount)")
-                    RowFact(symbol: "checkmark.seal", title: "Last Check", value: verificationSummary)
+                    RowFact(symbol: "shippingbox", title: "Format", value: destination.format.displayName)
+                    RowFact(
+                        symbol: destination.format == .timeMachine ? "externaldrive.connected.to.line.below" : "clock.arrow.circlepath",
+                        title: destination.format == .timeMachine ? "Time Machine" : "Restore Points",
+                        value: destination.format == .timeMachine ? timeMachineStatus : "\(restorePointCount)"
+                    )
+                    if destination.format == .timeMachine {
+                        RowFact(symbol: "calendar", title: "Schedule", value: "Managed by macOS")
+                    }
+                    RowFact(symbol: "checkmark.seal", title: "Last Verified", value: verificationSummary)
+                }
+                if let timeMachineError {
+                    InlineWarning(
+                        symbol: timeMachinePresentation.warningSymbol ?? "exclamationmark.triangle",
+                        title: timeMachineWarningTitle,
+                        message: timeMachineError
+                    )
                 }
             }
         }
@@ -4402,25 +4655,117 @@ struct DestinationRow: View {
             DestinationPasswordView(destination: destination, mode: mode)
                 .environmentObject(model)
         }
+        .sheet(isPresented: $isPresentingRecoveryKey) {
+            TimeMachineRecoveryKeyView(destination: destination)
+                .environmentObject(model)
+        }
         .confirmationDialog("Remove Destination?", isPresented: $isConfirmingDelete) {
             Button("Remove", role: .destructive) {
                 model.deleteRepository(destination)
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This removes the destination from Delta, deletes cached restore point metadata, and removes Delta's saved password. Backup data at the destination is not deleted; keep the original encryption password if you may reconnect it later.")
+            Text(destinationRemovalMessage)
         }
     }
 
     private var verificationSummary: String {
         guard let lastVerifiedAt = destination.lastVerifiedAt else {
-            return "Not checked"
+            return "Never"
         }
         return lastVerifiedAt.formatted(date: .abbreviated, time: .shortened)
     }
 
     private var restorePointCount: Int {
         model.snapshotsByRepository[destination.id]?.count ?? 0
+    }
+
+    private var timeMachineStatus: String {
+        timeMachinePresentation.status
+    }
+
+    private var timeMachineIsMounted: Bool {
+        timeMachinePresentation.isMounted
+    }
+
+    private var timeMachineBlocksConfigurationChanges: Bool {
+        destination.format == .timeMachine
+            && model.timeMachineStatesByRepository[destination.id]?.blocksConfigurationChanges == true
+    }
+
+    private var timeMachineRemovalRequiresConnection: Bool {
+        guard
+            destination.format == .timeMachine,
+            let state = model.timeMachineStatesByRepository[destination.id]
+        else { return false }
+        return state.lifecycle != .mounted
+            && state.timeMachineDestinationID != nil
+    }
+
+    private var timeMachineRemovalIsUnavailable: Bool {
+        guard
+            destination.format == .timeMachine,
+            let state = model.timeMachineStatesByRepository[destination.id]
+        else { return false }
+        return state.lifecycle == .preparing
+            || state.lifecycle == .disconnecting
+            || timeMachineRemovalRequiresConnection
+    }
+
+    private var timeMachineError: String? {
+        guard destination.format == .timeMachine else { return nil }
+        return timeMachinePresentation.warningMessage
+    }
+
+    private var timeMachinePresentation: TimeMachineDestinationPresentation {
+        TimeMachineDestinationPresentation.make(
+            state: model.timeMachineStatesByRepository[destination.id]
+        )
+    }
+
+    private var timeMachineWarningTitle: String {
+        timeMachinePresentation.warningTitle ?? "Time Machine disk is unavailable"
+    }
+
+    private var timeMachineConnectionActionTitle: String {
+        switch model.timeMachineStatesByRepository[destination.id]?.lastFailureContext {
+        case .systemConnection, .storageService:
+            "Try Again"
+        default:
+            "Connect"
+        }
+    }
+
+    private var timeMachineStatusColor: Color {
+        guard let state = model.timeMachineStatesByRepository[destination.id] else {
+            return .orange
+        }
+        if state.lastError != nil {
+            return .orange
+        }
+        switch state.lifecycle {
+        case .mounted, .ready:
+            return .teal
+        case .preparing, .disconnecting:
+            return .blue
+        case .waitingForPermissions, .needsRepair, .failed:
+            return .orange
+        case .disconnected:
+            return .secondary
+        }
+    }
+
+    private var destinationRemovalMessage: String {
+        guard destination.format == .timeMachine else {
+            return "This removes the destination from Delta, deletes cached restore point metadata, and removes Delta's saved password. Backup data at the destination is not deleted; keep the original encryption password if you may reconnect it later."
+        }
+        let systemRemoval = timeMachineIsMounted
+            ? "Delta will remove this verified disk from macOS Time Machine and safely detach it. "
+            : ""
+        if destination.secretStorageMode == .appManagedKeychain {
+            return "\(systemRemoval)Removing this destination deletes Delta's local configuration and bounded cache, but not remote backup data. The encrypted-disk recovery key remains in this Mac's Keychain so the remote disk can be reconnected later; provider credentials must be entered again."
+        }
+        return "\(systemRemoval)Removing this destination deletes Delta's local configuration, bounded cache, and saved credentials, but not remote backup data. Keep the original encryption password to reconnect the remote disk later."
     }
 
     private var backendSummary: String {
@@ -4445,6 +4790,121 @@ struct DestinationRow: View {
             return "\(remote):\(path)"
         case let .custom(repository):
             return repository
+        }
+    }
+}
+
+struct TimeMachineRecoveryKeyView: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var model: DeltaAppModel
+    let destination: BackupRepository
+    @State private var recoveryKey: String?
+    @State private var errorMessage: String?
+    @State private var isLoading = false
+    @State private var copied = false
+    @State private var clipboardCleanupTask: Task<Void, Never>?
+    @State private var clipboardChangeCount: Int?
+
+    var body: some View {
+        SheetScaffold(
+            title: "Time Machine Recovery Key",
+            subtitle: "Save this key somewhere secure if you need to reconnect the encrypted disk on another Mac."
+        ) {
+            SheetFormSection(
+                title: destination.name,
+                subtitle: "Anyone with this key and access to the remote destination can unlock its Time Machine disk.",
+                symbol: "key.viewfinder"
+            ) {
+                FieldRow(title: "Recovery key") {
+                    Group {
+                        if let recoveryKey {
+                            Text(recoveryKey)
+                                .textSelection(.enabled)
+                                .font(.system(.body, design: .monospaced))
+                        } else if isLoading {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else {
+                            Text("Hidden")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .frame(width: ModalMetrics.primaryControlWidth, alignment: .leading)
+                    .accessibilityLabel("Time Machine recovery key")
+                    .accessibilityValue(recoveryKey == nil ? "Hidden" : "Revealed")
+                }
+                if let errorMessage {
+                    FieldRow(title: "") {
+                        InlineWarning(
+                            symbol: "exclamationmark.triangle",
+                            title: "Recovery key unavailable",
+                            message: errorMessage
+                        )
+                    }
+                }
+                FieldRow(title: "") {
+                    Text("When copied, Delta clears the clipboard after one minute unless you copy something else first.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .frame(width: ModalMetrics.primaryControlWidth, alignment: .leading)
+                }
+            }
+
+            SheetActions {
+                Button("Done") { dismiss() }
+                if let recoveryKey {
+                    Button(copied ? "Copied" : "Copy Recovery Key") {
+                        copy(recoveryKey)
+                    }
+                    .buttonStyle(.borderedProminent)
+                } else {
+                    Button("Reveal Recovery Key") {
+                        reveal()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(isLoading)
+                }
+            }
+        }
+        .frame(width: ModalMetrics.sheetWidth, height: ModalMetrics.compactDestinationSheetHeight)
+        .onDisappear {
+            clipboardCleanupTask?.cancel()
+            if let clipboardChangeCount,
+               NSPasteboard.general.changeCount == clipboardChangeCount {
+                NSPasteboard.general.clearContents()
+            }
+        }
+    }
+
+    private func reveal() {
+        isLoading = true
+        errorMessage = nil
+        Task {
+            do {
+                recoveryKey = try await model.timeMachineRecoveryKey(for: destination)
+            } catch {
+                errorMessage = SensitiveLogRedactor.redact(error.localizedDescription)
+            }
+            isLoading = false
+        }
+    }
+
+    private func copy(_ value: String) {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        guard pasteboard.setString(value, forType: .string) else { return }
+        copied = true
+        let protectedChangeCount = pasteboard.changeCount
+        clipboardChangeCount = protectedChangeCount
+        clipboardCleanupTask?.cancel()
+        clipboardCleanupTask = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(60))
+            guard !Task.isCancelled else { return }
+            if NSPasteboard.general.changeCount == protectedChangeCount {
+                NSPasteboard.general.clearContents()
+            }
+            clipboardChangeCount = nil
+            copied = false
         }
     }
 }
@@ -4784,7 +5244,7 @@ struct ProfileEditorView: View {
                 FieldRow(title: "Destination") {
                     Picker("Destination", selection: $repositoryID) {
                         Text("Choose").tag(UUID?.none)
-                        ForEach(model.repositories) { repository in
+                        ForEach(model.repositories.filter { $0.format == .delta }) { repository in
                             Text(repository.name).tag(Optional(repository.id))
                         }
                     }
@@ -4893,7 +5353,7 @@ struct ProfileEditorView: View {
             }
         }
         .onAppear {
-            repositoryID = repositoryID ?? model.repositories.first?.id
+            repositoryID = repositoryID ?? model.repositories.first(where: { $0.format == .delta })?.id
         }
         .onChange(of: mode) { oldMode, newMode in
             guard oldMode != newMode else { return }
@@ -5105,10 +5565,25 @@ struct TimeControls: View {
 }
 
 struct DestinationEditorView: View {
+    private enum TimeMachineCreationMode: String, CaseIterable, Identifiable {
+        case newDisk
+        case reconnect
+
+        var id: String { rawValue }
+
+        var displayName: String {
+            switch self {
+            case .newDisk: "New Disk"
+            case .reconnect: "Existing Disk"
+            }
+        }
+    }
+
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var model: DeltaAppModel
     private let existingDestination: BackupRepository?
     @State private var name = "Primary Destination"
+    @State private var format: BackupFormat = .delta
     @State private var kind: RepositoryBackendKind = .local
     @State private var primary = ""
     @State private var secondary = ""
@@ -5119,11 +5594,19 @@ struct DestinationEditorView: View {
     @State private var passphrase = ""
     @State private var passphraseConfirmation = ""
     @State private var credentialValues: [String: String] = [:]
+    @State private var timeMachineVolumeName = "Delta Time Machine"
+    @State private var timeMachineCapacityGiB = "1024"
+    @State private var timeMachineCacheMiB = "1024"
+    @State private var timeMachineCreationMode: TimeMachineCreationMode = .newDisk
+    @State private var timeMachineRecoveryPassword = ""
+    @State private var isSubmitting = false
+    @State private var submissionError: String?
 
     init(destination: BackupRepository? = nil) {
         existingDestination = destination
         let backendState = Self.editorState(for: destination?.backend ?? .local(path: ""))
         _name = State(initialValue: destination?.name ?? "Primary Destination")
+        _format = State(initialValue: destination?.format ?? .delta)
         _kind = State(initialValue: backendState.kind)
         _primary = State(initialValue: backendState.primary)
         _secondary = State(initialValue: backendState.secondary)
@@ -5131,6 +5614,14 @@ struct DestinationEditorView: View {
         _quaternary = State(initialValue: backendState.quaternary)
         _sftpIdentityFilePath = State(initialValue: backendState.sftpIdentityFilePath)
         _storageMode = State(initialValue: destination?.secretStorageMode ?? .appManagedKeychain)
+        let timeMachineSettings = destination?.timeMachineSettings
+        _timeMachineVolumeName = State(initialValue: timeMachineSettings?.volumeName ?? "Delta Time Machine")
+        _timeMachineCapacityGiB = State(
+            initialValue: String((timeMachineSettings?.imageCapacityBytes ?? TimeMachineRepositorySettings.defaultImageCapacityBytes) / 1_073_741_824)
+        )
+        _timeMachineCacheMiB = State(
+            initialValue: String((timeMachineSettings?.cacheLimitBytes ?? TimeMachineRepositorySettings.defaultCacheLimitBytes) / 1_048_576)
+        )
         _credentialValues = State(initialValue: Dictionary(uniqueKeysWithValues: ResticBackendCredentialTemplates.fields(for: backendState.kind).map { ($0.environmentKey, "") }))
     }
 
@@ -5146,9 +5637,41 @@ struct DestinationEditorView: View {
                         .textFieldStyle(.roundedBorder)
                 }
 
+                FieldRow(title: "Format") {
+                    Picker("Format", selection: $format) {
+                        ForEach(BackupFormat.allCases, id: \.self) { format in
+                            Text(format.displayName).tag(format)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.segmented)
+                    .frame(width: ModalMetrics.primaryControlWidth, alignment: .leading)
+                    .disabled(existingDestination != nil)
+                }
+
+                FieldRow(title: "") {
+                    Text(format.detail)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .frame(width: ModalMetrics.primaryControlWidth, alignment: .leading)
+                }
+
+                if format == .timeMachine, existingDestination == nil {
+                    FieldRow(title: "Set up") {
+                        Picker("Set up", selection: $timeMachineCreationMode) {
+                            ForEach(TimeMachineCreationMode.allCases) { mode in
+                                Text(mode.displayName).tag(mode)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.segmented)
+                        .frame(width: ModalMetrics.primaryControlWidth, alignment: .leading)
+                    }
+                }
+
                 FieldRow(title: "Type") {
                     Picker("Type", selection: $kind) {
-                        ForEach(RepositoryBackendKind.allCases, id: \.self) { kind in
+                        ForEach(availableBackendKinds, id: \.self) { kind in
                             Text(kind.displayName).tag(kind)
                         }
                     }
@@ -5160,12 +5683,85 @@ struct DestinationEditorView: View {
                 credentialFields
             }
 
+            if format == .timeMachine {
+                SheetFormSection(
+                    title: "Time Machine Disk",
+                    subtitle: isReconnectingTimeMachine
+                        ? "Reconnect an existing Delta-managed Time Machine disk without replacing or reinitializing its remote data."
+                        : "Delta presents this remote storage to macOS as a native encrypted Time Machine disk. Only a bounded working cache stays on this Mac.",
+                    symbol: "clock.arrow.circlepath"
+                ) {
+                    if !isReconnectingTimeMachine {
+                        FieldRow(title: "Disk name") {
+                            TextField("Delta Time Machine", text: $timeMachineVolumeName)
+                                .textFieldStyle(.roundedBorder)
+                                .disabled(existingDestination != nil)
+                        }
+                        FieldRow(title: "Capacity") {
+                            HStack(spacing: 8) {
+                                TextField("1024", text: $timeMachineCapacityGiB)
+                                    .textFieldStyle(.roundedBorder)
+                                    .frame(width: 110)
+                                    .disabled(existingDestination != nil)
+                                Text("GiB logical capacity")
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        if existingDestination != nil {
+                            FieldRow(title: "") {
+                                Text("Disk name and logical capacity are fixed after creation.")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .frame(width: ModalMetrics.primaryControlWidth, alignment: .leading)
+                            }
+                        }
+                    }
+                    FieldRow(title: "Local cache") {
+                        HStack(spacing: 8) {
+                            TextField("1024", text: $timeMachineCacheMiB)
+                                .textFieldStyle(.roundedBorder)
+                                .frame(width: 110)
+                            Text("MiB maximum")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    FieldRow(title: "") {
+                        Text("A performance window, not a backup-size limit. Delta streams verified bands as needed; backups of any supported size use this bounded cache plus at most one 64 MiB transfer-verification batch.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(width: ModalMetrics.primaryControlWidth, alignment: .leading)
+                    }
+                    FieldRow(title: "") {
+                        SettingsNotice(
+                            symbol: isReconnectingTimeMachine ? "arrow.triangle.2.circlepath" : "externaldrive.badge.icloud",
+                            title: isReconnectingTimeMachine ? "Authenticated recovery" : "Remote-first storage",
+                            text: isReconnectingTimeMachine
+                                ? "Delta reads the remote recovery record, authenticates it with the disk password, and verifies the latest signed generation before saving any local configuration. The disk name and capacity come from that authenticated record."
+                                : "Delta never stages the complete sparsebundle locally. Writes enter the bounded cache; a Time Machine sync succeeds only after the authenticated remote generation is durable.",
+                            color: .blue
+                        )
+                    }
+                }
+            }
+
             SheetFormSection(
                 title: "Encryption",
-                subtitle: "Every Delta destination is encrypted. Choose who manages the password needed for restore.",
+                subtitle: encryptionSubtitle,
                 symbol: "lock.shield"
             ) {
-                if existingDestination == nil {
+                if isReconnectingTimeMachine {
+                    FieldRow(title: "Recovery key") {
+                        SecureField("Original password or recovery key", text: $timeMachineRecoveryPassword)
+                            .textFieldStyle(.roundedBorder)
+                    }
+                    FieldRow(title: "") {
+                        Text("Leave this blank to use an app-managed recovery key already saved on this Mac.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .frame(width: ModalMetrics.primaryControlWidth, alignment: .leading)
+                    }
+                } else if existingDestination == nil {
                     FieldRow(title: "Password") {
                         Picker("Password", selection: $storageMode) {
                             ForEach(SecretStorageMode.allCases, id: \.self) { mode in
@@ -5203,7 +5799,7 @@ struct DestinationEditorView: View {
                             .foregroundStyle(.secondary)
                     }
                     FieldRow(title: "") {
-                        Text("Use the destination actions menu to reconnect or change the encryption password.")
+                        Text(existingEncryptionDetail)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -5213,13 +5809,41 @@ struct DestinationEditorView: View {
 
             SheetActions {
                 Button("Cancel") { dismiss() }
-                Button(existingDestination == nil ? "Create" : "Save") {
-                    if saveDestination() {
-                        dismiss()
+                    .keyboardShortcut(.cancelAction)
+                Button(actionTitle) {
+                    if isReconnectingTimeMachine {
+                        isSubmitting = true
+                        Task {
+                            let success = await model.reconnectTimeMachineRepository(
+                                name: name,
+                                backend: backend,
+                                cacheLimitBytes: parsedTimeMachineCacheBytes ?? 0,
+                                recoveryPassword: timeMachineRecoveryPassword,
+                                backendCredentials: sanitizedCredentialValues
+                            )
+                            isSubmitting = false
+                            if success {
+                                dismiss()
+                            } else {
+                                captureSubmissionError()
+                            }
+                        }
+                    } else {
+                        if saveDestination() {
+                            dismiss()
+                        } else {
+                            captureSubmissionError()
+                        }
                     }
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(!canCreate || !model.isPersistentStoreAvailable)
+                .disabled(
+                    !canCreate
+                        || !model.isPersistentStoreAvailable
+                        || isSubmitting
+                        || model.isWorking
+                )
+                .keyboardShortcut(.defaultAction)
             }
         }
         .frame(width: ModalMetrics.sheetWidth, height: preferredSheetHeight)
@@ -5228,6 +5852,21 @@ struct DestinationEditorView: View {
             let fields = ResticBackendCredentialTemplates.fields(for: newKind)
             credentialValues = Dictionary(uniqueKeysWithValues: fields.map { ($0.environmentKey, credentialValues[$0.environmentKey] ?? "") })
         }
+        .onChange(of: format) { _, newFormat in
+            if newFormat == .timeMachine, !kind.supportsTimeMachineObjectStorage {
+                kind = .local
+            }
+            if newFormat != .timeMachine {
+                timeMachineCreationMode = .newDisk
+            }
+        }
+        .alert(submissionErrorTitle, isPresented: submissionErrorBinding) {
+            Button("OK") {
+                submissionError = nil
+            }
+        } message: {
+            Text(submissionError ?? "The destination could not be saved.")
+        }
     }
 
     private var sheetTitle: String {
@@ -5235,7 +5874,34 @@ struct DestinationEditorView: View {
     }
 
     private var sheetSubtitle: String {
-        existingDestination == nil ? "Choose where encrypted restore points are stored." : "Update where encrypted restore points are stored."
+        if format == .timeMachine {
+            return existingDestination == nil
+                ? "Choose where the encrypted Time Machine disk is stored."
+                : "Update this Time Machine disk's remote connection and bounded local cache."
+        }
+        return existingDestination == nil
+            ? "Choose where encrypted restore points are stored."
+            : "Update where encrypted restore points are stored."
+    }
+
+    private var encryptionSubtitle: String {
+        if isReconnectingTimeMachine {
+            return "Use the original disk password or an exported recovery key."
+        }
+        if format == .timeMachine, existingDestination != nil {
+            return "This encrypted disk keeps its original password and recovery method."
+        }
+        if format == .timeMachine {
+            return "Choose who manages the password for the encrypted Time Machine disk."
+        }
+        return "Every Delta destination is encrypted. Choose who manages the password needed for restore."
+    }
+
+    private var existingEncryptionDetail: String {
+        if format == .timeMachine {
+            return "The disk password cannot be changed from this editor. To reconnect its remote data, create a destination using Time Machine › Existing Disk and the original password or recovery key."
+        }
+        return "Use the destination actions menu to reconnect or change the encryption password."
     }
 
     private var preferredSheetHeight: CGFloat {
@@ -5254,8 +5920,11 @@ struct DestinationEditorView: View {
 
         let credentialRows = ResticBackendCredentialTemplates.fields(for: kind).count
         let passphraseRows = existingDestination == nil && storageMode == .userManagedPassphrase ? 2 : 0
+        let timeMachineRows = format == .timeMachine
+            ? (isReconnectingTimeMachine ? 5 : 6)
+            : 0
         let contentHeight = ModalMetrics.compactDestinationSheetHeight
-            + CGFloat(max(backendRows - 1, 0) + credentialRows + passphraseRows) * fieldHeight
+            + CGFloat(max(backendRows - 1, 0) + credentialRows + passphraseRows + timeMachineRows) * fieldHeight
         return min(contentHeight, ModalMetrics.sheetHeight)
     }
 
@@ -5275,6 +5944,8 @@ struct DestinationEditorView: View {
                     } label: {
                         Image(systemName: "folder")
                     }
+                    .accessibilityLabel("Choose destination folder")
+                    .deltaTooltip("Choose the folder that will store this destination.")
                 }
             }
         case .sftp:
@@ -5293,6 +5964,7 @@ struct DestinationEditorView: View {
                     } label: {
                         Image(systemName: "key")
                     }
+                    .accessibilityLabel("Choose SSH private key")
                     .deltaTooltip("Choose an SSH private key file for non-interactive SFTP backups.")
                 }
             }
@@ -5375,9 +6047,47 @@ struct DestinationEditorView: View {
         credentialValues.filter { !$0.key.isEmpty && !$0.value.isEmpty }
     }
 
+    private var availableBackendKinds: [RepositoryBackendKind] {
+        RepositoryBackendKind.allCases.filter {
+            format == .delta || $0.supportsTimeMachineObjectStorage
+        }
+    }
+
+    private var timeMachineSettings: TimeMachineRepositorySettings? {
+        guard format == .timeMachine, !isReconnectingTimeMachine else { return nil }
+        let gib: Int64 = 1_073_741_824
+        let mib: Int64 = 1_048_576
+        guard
+            let capacity = Int64(timeMachineCapacityGiB),
+            let cache = Int64(timeMachineCacheMiB),
+            capacity > 0,
+            cache > 0,
+            capacity <= Int64.max / gib,
+            cache <= Int64.max / mib
+        else {
+            return nil
+        }
+        let existing = existingDestination?.timeMachineSettings
+        return TimeMachineRepositorySettings(
+            storeID: existing?.storeID ?? UUID(),
+            volumeName: timeMachineVolumeName,
+            imageCapacityBytes: capacity * gib,
+            cacheLimitBytes: cache * mib,
+            manifestKeychainAccount: existing?.manifestKeychainAccount
+        )
+    }
+
     private var canCreate: Bool {
         guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
         guard !primary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
+        if format == .timeMachine {
+            guard kind.supportsTimeMachineObjectStorage else { return false }
+            if isReconnectingTimeMachine {
+                guard parsedTimeMachineCacheBytes != nil else { return false }
+            } else {
+                guard timeMachineSettings != nil else { return false }
+            }
+        }
         if kind == .sftp && secondary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return false
         }
@@ -5399,18 +6109,70 @@ struct DestinationEditorView: View {
         return Int(value)
     }
 
+    private var isReconnectingTimeMachine: Bool {
+        existingDestination == nil
+            && format == .timeMachine
+            && timeMachineCreationMode == .reconnect
+    }
+
+    private var parsedTimeMachineCacheBytes: Int64? {
+        let mib: Int64 = 1_048_576
+        guard
+            let cache = Int64(timeMachineCacheMiB),
+            cache > 0,
+            cache <= Int64.max / mib
+        else {
+            return nil
+        }
+        return cache * mib
+    }
+
+    private var actionTitle: String {
+        if isSubmitting { return "Reconnecting…" }
+        if isReconnectingTimeMachine { return "Reconnect" }
+        return existingDestination == nil ? "Create" : "Save"
+    }
+
+    private var submissionErrorTitle: String {
+        if isReconnectingTimeMachine {
+            return "Couldn’t Reconnect Time Machine Disk"
+        }
+        return existingDestination == nil
+            ? "Couldn’t Create Destination"
+            : "Couldn’t Save Destination"
+    }
+
+    private var submissionErrorBinding: Binding<Bool> {
+        Binding(
+            get: { submissionError != nil },
+            set: { isPresented in
+                if !isPresented {
+                    submissionError = nil
+                }
+            }
+        )
+    }
+
+    private func captureSubmissionError() {
+        submissionError = model.alertMessage ?? "The destination could not be saved."
+        model.alertMessage = nil
+    }
+
     private func saveDestination() -> Bool {
         if let existingDestination {
             return model.saveRepository(
                 existingDestination,
                 name: name,
                 backend: backend,
+                timeMachineSettings: timeMachineSettings,
                 backendCredentials: sanitizedCredentialValues
             )
         } else {
             return model.createRepository(
                 name: name,
                 backend: backend,
+                format: format,
+                timeMachineSettings: timeMachineSettings,
                 storageMode: storageMode,
                 passphrase: passphrase,
                 backendCredentials: sanitizedCredentialValues

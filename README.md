@@ -1,6 +1,6 @@
 # Delta
 
-Delta is a native encrypted backup and restore manager for macOS 26. It gives [restic](https://restic.net/)'s incremental, deduplicated repository format a focused Mac interface for choosing what to protect, scheduling unattended work, inspecting every result, maintaining destinations, and restoring individual files or complete backup points.
+Delta is a native encrypted backup and restore manager for macOS 26. It supports Delta-format backups powered by [restic](https://restic.net/) and a native Time Machine format that presents Delta-managed remote storage to macOS without first staging a complete sparsebundle locally.
 
 [![CI](https://github.com/dbuskariol/delta/actions/workflows/ci.yml/badge.svg)](https://github.com/dbuskariol/delta/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/dbuskariol/delta)](https://github.com/dbuskariol/delta/releases/latest)
@@ -8,7 +8,7 @@ Delta is a native encrypted backup and restore manager for macOS 26. It gives [r
 
 ![Delta dashboard](Documentation/Screenshots/dashboard-0.3.0.jpg)
 
-Delta creates file-level backups. It is not a bootable clone, a block-level disk image, Time Machine, or a hosted backup service.
+Delta-format profiles create file-level restic backups. Time Machine-format destinations instead let macOS own backup history and restore semantics. Delta is not a bootable clone or hosted backup service.
 
 ## Know what is protected
 
@@ -28,7 +28,7 @@ Each backup profile keeps its source, destination, schedule, retention rules, po
 
 ![Delta destinations](Documentation/Screenshots/destinations-0.3.0.jpg)
 
-Every destination uses restic's encrypted repository format. Delta prepares new repositories, checks existing ones, tracks restore points, guards concurrent operations, and keeps provider credentials in the login Keychain.
+Each destination chooses one immutable format. Delta-format destinations use restic's interoperable encrypted repository. Time Machine-format destinations use an encrypted APFS sparsebundle whose band data is stored as authenticated immutable remote objects behind a strictly bounded local cache. Provider credentials remain in the login Keychain in either mode.
 
 | Destination | Delta behavior |
 | --- | --- |
@@ -41,7 +41,9 @@ Every destination uses restic's encrypted repository format. Delta prepares new 
 | rclone remote | Uses the bundled rclone transport for an already configured remote |
 | Advanced restic URL | Accepts a user-managed backend URL for interoperable configurations |
 
-Provider availability, credentials, server policy, latency, and storage charges remain outside Delta's control. A mounted NAS must be connected before its profile can run; a cloud destination still needs a valid provider account and network path.
+Provider availability, credentials, server policy, latency, and storage charges remain outside Delta's control. A mounted NAS must be connected before its profile can run; a cloud destination still needs a valid provider account and network path. For an existing Time Machine disk, Delta never recreates a missing local or mounted folder or treats a detached provider as empty backup history: it reports `Storage Unavailable` and waits for the same destination to return.
+
+Time Machine mode supports local or mounted filesystem paths, SFTP, S3-compatible, Backblaze B2, Azure Blob, Google Cloud Storage, OpenStack Swift, and configured rclone object destinations. It does not use restic's REST protocol or arbitrary restic URLs. macOS owns the schedule, backup history, browsing, and restore experience; Delta owns connection, remote durability, cache limits, recovery records, and provider access.
 
 ## Restore without guessing
 
@@ -57,6 +59,8 @@ Restore starts with a repository and a concrete point in time. Expand its backed
 - Refresh restore points and repository contents without losing the selected destination context.
 
 Delta reports success only after the underlying restore exits successfully. For high-value recovery, independently open or hash representative restored files before relying on the result.
+
+For Time Machine-format destinations, connect the disk in Delta and use macOS's native Time Machine browser. Delta does not re-label a transport write or a mounted disk as a completed backup; macOS remains authoritative for Time Machine backup and restore outcomes.
 
 ## Inspect every operation
 
@@ -78,9 +82,13 @@ Settings covers scheduling, power behavior, notifications, login, permissions, h
 
 ## Encryption and credentials
 
-Restic encrypts repository metadata and file content before storage. Delta can generate a high-entropy repository password or save a user-supplied passphrase. Destination passwords and provider secrets remain in the login Keychain; scheduled reads prohibit interactive prompts and fail closed when the signed app or background agent cannot access the saved item.
+Restic encrypts Delta-format repository metadata and file content before storage. Time Machine-format destinations use Apple's AES-256 encrypted sparsebundle plus Delta's authenticated remote-generation layer. Delta can generate a high-entropy password or save a user-supplied passphrase. Destination passwords and provider secrets remain in the login Keychain; background reads prohibit interactive prompts and fail closed when the signed component cannot access the saved item.
 
 Losing a user-managed repository password means losing access to that repository. Delta cannot bypass restic encryption. Password rotation stages and verifies a new restic key before retiring the previous key, with rollback designed to leave the repository usable if an intermediate step fails.
+
+An app-managed Time Machine destination has a store-scoped recovery key that can be explicitly revealed and copied. Save it securely before relying on recovery from another Mac. Reconnecting reads a fixed remote recovery record, unwraps the independent manifest key with the disk password, and authenticates the latest signed generation before saving any local configuration.
+
+Time Machine's local working cache is reconstructible, bounded, and always configured smaller than the logical encrypted disk. Its size controls buffering performance and the cache portion of local footprint, not backup or source-file size. Delta may evict clean bands immediately; when the working window fills, it spills dirty bands only after their immutable remote objects are uploaded and read-back verified, then continues through the same bounded window. A durability barrier succeeds only after every changed band and the signed generation are verified at the selected destination. Repeated DiskImages reads use a fixed two-band, 16 MiB authenticated memory window, and provider verification may temporarily use one additional fixed 64 MiB transfer batch; neither overhead grows with the backup. A full sparsebundle is never staged locally, whether the backup contains megabytes or terabytes. The provider can still observe encrypted-object sizes, counts, names, and timing plus non-secret recovery metadata such as the configured volume name and capacity.
 
 ## Permissions and privacy
 
@@ -89,12 +97,14 @@ Delta does not collect analytics, advertising identifiers, backup contents, cred
 | macOS access | When it is needed |
 | --- | --- |
 | Selected files and folders | Custom sources, restore targets, local destinations, and SSH key selection |
-| Full Disk Access | Optional for a full-volume backup or protected folders macOS otherwise prevents Delta from reading |
+| Full Disk Access | Required to add or remove a Time Machine-format disk; also required when a Delta-format backup includes a full volume or protected folders macOS otherwise prevents Delta from reading |
 | Login Items | Required only when Scheduled Backups is enabled so macOS can run Delta's signed agent |
 | Notifications | Optional for job alerts and success summaries |
 | Keychain | Required to save repository passwords and remote-provider credentials |
+| File System Extensions | Required only for Time Machine-format destinations so macOS can mount Delta's user-space remote storage volume |
+| Background Items | Required only for Time Machine-format destinations so the mounted disk and on-demand setup helper survive the main app closing |
 
-Delta does not require administrator privileges, Accessibility, Screen Recording, Camera, Microphone, Contacts, or Location access. Read [SECURITY.md](SECURITY.md) for the trust model, secret handling, diagnostics policy, and vulnerability reporting.
+Delta-format backups do not require administrator privileges. Time Machine setup uses a narrowly scoped, signed privileged helper and macOS may request administrator approval when it is registered or updated. Delta does not require Accessibility, Screen Recording, Camera, Microphone, Contacts, or Location access. Read [SECURITY.md](SECURITY.md) for the trust model, secret handling, diagnostics policy, and vulnerability reporting.
 
 ## Architecture
 
@@ -104,6 +114,9 @@ Delta does not require administrator privileges, Accessibility, Screen Recording
 | `DeltaAgent` | Signed Login Item agent that evaluates due work and exits |
 | `DeltaCore` | Models, policy, SQLite/GRDB persistence, scheduling, command construction, parsing, process control, and Keychain integration |
 | `DeltaSecretBridge` | Restricted helper path for noninteractive destination-password reads |
+| `DeltaTimeMachineService` | User storage service for authenticated remote generations, bounded cache, locks, and reconnect |
+| `DeltaTimeMachineFS` | User-approved sandboxed FSKit extension presenting sparse remote-backed files to DiskImages through an authenticated same-user socket in Delta's macOS App Group; no provider credentials or network entitlement |
+| `DeltaTimeMachineHelper` | On-demand privileged helper that validates the already attached Delta disk and changes only its exact macOS Time Machine destination configuration |
 | `restic` | Encrypted repository format, snapshots, deduplication, restore, retention, and checks |
 | `rclone` | Optional transport for additional remote storage providers |
 
@@ -115,8 +128,9 @@ Delta requires macOS 26 or later.
 
 1. Download the notarized DMG from the [latest release](https://github.com/dbuskariol/delta/releases/latest).
 2. Open the DMG and drag Delta to Applications.
-3. Open Delta from Applications, add a destination, and create the first backup profile.
-4. Run the profile once, inspect Activity, and perform a test restore before considering the setup complete.
+3. Open Delta from Applications and add a destination. Choose Delta encrypted backup for a restic profile, or Time Machine for a macOS-managed backup disk.
+4. For Time Machine, approve File System Extensions and Background Items when macOS asks, connect the disk in Delta, then configure and inspect backups in macOS Time Machine.
+5. Run a first backup, inspect its authoritative history, and perform a test restore before considering the setup complete.
 
 Public releases also include a signed ZIP for Sparkle updates, `SHA256SUMS`, external release notes, and a machine-readable provenance manifest.
 
@@ -135,7 +149,7 @@ swift test
 Scripts/verify-ci.sh
 ```
 
-`Scripts/verify-ci.sh` is the certificate-free CI gate. It checks Swift tests, Debug and Release builds, strict metadata and privacy configuration, scripts, bundled tools, product language, packaged-app behavior, deterministic restic lifecycles, and fail-closed release assumptions. GitHub executes the same gate on native Apple-silicon and Intel macOS 26 runners.
+`Scripts/verify-ci.sh` is the certificate-free CI gate. It checks Swift tests, Debug and Release builds, strict metadata and privacy configuration, scripts, bundled tools, product language, packaged-app behavior, deterministic restic lifecycles, and fail-closed release assumptions. Its ad-hoc FSKit extension is intentionally inert and verified to contain neither the restricted module entitlement nor a provisioning profile; shipping validation separately requires both. GitHub executes the same gate on native Apple-silicon and Intel macOS 26 runners.
 
 Identity-sensitive acceptance uses a stable Apple Development or Developer ID-signed app installed in `/Applications`. Replacing it with an ad-hoc or differently signed build can invalidate Keychain access and macOS privacy approvals. Use the guarded installer only with an intended stable identity:
 
@@ -154,12 +168,12 @@ No locally signed build should be described as a public release candidate until 
 
 ## Recovery expectations and limitations
 
-- Delta protects files through restic restore points; it does not make a Mac bootable or restore the operating system itself.
+- Delta-format backups protect files through restic restore points; Time Machine-format destinations use macOS's native history and recovery. Neither makes a bootable clone.
 - A backup is only one copy. Keep at least one independent, preferably off-site destination and periodically test recovery from it.
 - Delta cannot recover a lost repository password, repair a provider outage, or read data that macOS denied to the backup process.
 - Disconnected drives, unmounted shares, expired cloud credentials, repository locks, insufficient free space, and offline servers block work and remain visible as failures or attention states.
 - Cleanup can permanently remove old restore points and unreferenced repository data. Review retention rules, the selected profile, and the selected destination before confirming it.
-- Removing a profile or destination from Delta does not delete its repository data, but removing the saved password can make reconnecting impossible unless that password is retained elsewhere.
+- Disconnecting a Time Machine destination behaves like unplugging a physical backup disk: Delta detaches the APFS disk but preserves its macOS Time Machine registration and exact destination identity for the next reconnect. Explicit removal first requires the verified disk to be connected, removes only that exact identity from macOS, then deletes its reconstructible local cache and configuration—not remote backup data. Delta verifies and retains an app-managed recovery key under the remote disk identity before deleting local state; user-managed users must retain the original password. Provider credentials must be entered again when reconnecting.
 - Backend support describes configurations Delta and restic can address; genuine provider acceptance still depends on the exact server, account, permissions, network, and release evidence.
 
 ## Updating and troubleshooting
@@ -170,6 +184,8 @@ Use **Settings → Updates** or **Updates** in the menu-bar panel. Delta checks 
 - **A scheduled backup did not run:** update to Delta 0.3.2 or later, confirm Scheduled Backups is enabled and approved in Login Items, then review pause, power, missed-run, source, destination, and saved-password status. Delta 0.3.2 repairs the stale missing-service registration that an earlier version could leave after an update; it does not require deleting profiles or backup data.
 - **Saved Passwords needs repair:** use Settings → Permissions to review access and rewrite the Keychain access list for the currently signed Delta app.
 - **A destination is unavailable or locked:** reconnect it, verify credentials, and ensure another restic client is not operating on the same repository.
+- **A Time Machine disk will not connect:** open Settings → Permissions, review File System Extensions and Time Machine System Support, approve any pending macOS Background Items request, then retry. Delta cannot grant these approvals itself.
+- **A connected Time Machine disk reports a remote-storage error:** restore provider connectivity first, then use the destination's offered recovery action. Disconnect the disk before editing, checking, or removing its remote configuration; Delta deliberately keeps an uncertain or failed mount visible instead of claiming it was ejected.
 - **An update is unavailable:** use Check Now, confirm network access to GitHub Releases, or install the notarized DMG manually.
 - **Support needs evidence:** copy or export the sanitized diagnostic report from Settings. Known secrets, credential-bearing URLs, and personal home-directory names are redacted.
 
@@ -186,4 +202,4 @@ Use **Settings → Updates** or **Updates** in the menu-bar panel. Delta checks 
 
 ## Status
 
-Delta is in active development at version 0.3.0. The native backup, scheduling, destination, restore-browser, selective restore, retention, repository-check, Activity, diagnostics, permissions, menu-bar, background-agent, and signed-update architectures are implemented. Deterministic installed-app acceptance covers local repositories plus local REST, S3-compatible, SFTP, rclone, and mounted-volume protocol harnesses; those localhost harnesses are regression evidence, not substitutes for genuine external provider acceptance. Public production readiness still depends on current evidence for the exact release candidate, required genuine external backends, and all signing, Apple-service, notarization, stapling, Gatekeeper, Sparkle, and release-history gates.
+Delta is in active development at version 0.3.3. The Time Machine architecture and recovery workflow are implemented on the feature branch but are not yet production-accepted or shipped. Deterministic and localhost evidence remains regression evidence, not a substitute for a complete installed Time Machine backup/restore, genuine external-provider acceptance, Intel runtime coverage, or the exact notarized release candidate. Public production readiness still depends on those runtime results plus all signing, Apple-service, notarization, stapling, Gatekeeper, Sparkle, and release-history gates.

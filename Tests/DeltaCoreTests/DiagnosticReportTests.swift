@@ -173,6 +173,60 @@ final class DiagnosticReportTests: XCTestCase {
         XCTAssertTrue(report.contains("AWS_SECRET_ACCESS_KEY=<redacted>"))
     }
 
+    func testDiagnosticReportIncludesRedactedTimeMachineFailureEvidence() {
+        let snapshot = DiagnosticReportSnapshot(
+            generatedAt: Date(timeIntervalSince1970: 0),
+            appVersion: "0.1",
+            buildVersion: "1",
+            bundleIdentifier: "com.delta.backup",
+            bundlePath: "/Applications/Delta.app",
+            executablePath: "/Applications/Delta.app/Contents/MacOS/Delta",
+            applicationSupportPath: "/support",
+            databasePath: "/support/Delta.sqlite",
+            logPath: "/support/Logs",
+            fullDiskAccessStatus: "Ready",
+            backgroundBackupsStatus: "Ready",
+            appLoginItemStatus: "Ready",
+            notificationStatus: "Disabled",
+            menuBarStatus: "Shown",
+            idleSleepProtectionStatus: "Enabled",
+            operationalHistoryRetentionStatus: "Keep 90 days",
+            backupFreshnessStatus: "Warn after 3 days",
+            destinationVerificationStatus: "Warn after 30 days",
+            destinationFreeSpaceStatus: "Warn below 50 GB",
+            restoreDefaultsStatus: "Preview first, verify files, Replace changed",
+            activeOperation: nil,
+            profileCount: 0,
+            destinationCount: 1,
+            restorePointCount: 0,
+            recentJobCount: 0,
+            tools: [],
+            destinations: [
+                DiagnosticDestinationSummary(
+                    name: "Remote Disk",
+                    kind: "S3-compatible",
+                    format: "Time Machine",
+                    timeMachineState: "Failed",
+                    committedGeneration: 3,
+                    cleanCacheBytes: 8,
+                    dirtyCacheBytes: 16,
+                    timeMachineFailureContext: "systemConnection",
+                    timeMachineLastError: "AWS_SECRET_ACCESS_KEY=super-secret at /Users/private-user/Library/Application Support/Delta"
+                )
+            ],
+            profiles: [],
+            recentJobs: []
+        )
+
+        let report = DiagnosticReportBuilder().makeReport(snapshot: snapshot)
+
+        XCTAssertTrue(report.contains("Time Machine Failed; generation 3; cache clean 8 bytes, dirty 16 bytes"))
+        XCTAssertTrue(report.contains("failure context systemConnection"))
+        XCTAssertTrue(report.contains("last error AWS_SECRET_ACCESS_KEY=<redacted> at ~/Library/Application Support/Delta"))
+        XCTAssertFalse(report.contains("super-secret"))
+        XCTAssertFalse(report.contains("private-user"))
+    }
+
     func testDiagnosticReportRedactsPersonalHomePathsAcrossEverySection() {
         let snapshot = DiagnosticReportSnapshot(
             generatedAt: Date(timeIntervalSince1970: 0),

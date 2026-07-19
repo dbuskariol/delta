@@ -105,13 +105,22 @@ public struct DashboardHealthEvaluator: Sendable {
 
     public func destinationWarnings(
         repositories: [BackupRepository],
+        timeMachineStatesByRepository: [UUID: TimeMachineDestinationState] = [:],
         threshold: DestinationVerificationWarningThreshold,
         freeSpaceThreshold: DestinationFreeSpaceWarningThreshold = .off,
         now: Date = Date(),
         limit: Int = 4
     ) -> [DashboardHealthWarning] {
         repositories
-            .compactMap { warning(for: $0, threshold: threshold, freeSpaceThreshold: freeSpaceThreshold, now: now) }
+            .compactMap {
+                warning(
+                    for: $0,
+                    timeMachineState: timeMachineStatesByRepository[$0.id],
+                    threshold: threshold,
+                    freeSpaceThreshold: freeSpaceThreshold,
+                    now: now
+                )
+            }
             .prefix(limit)
             .map { $0 }
     }
@@ -177,10 +186,27 @@ public struct DashboardHealthEvaluator: Sendable {
 
     private func warning(
         for repository: BackupRepository,
+        timeMachineState: TimeMachineDestinationState?,
         threshold: DestinationVerificationWarningThreshold,
         freeSpaceThreshold: DestinationFreeSpaceWarningThreshold,
         now: Date
     ) -> DashboardHealthWarning? {
+        if repository.format == .timeMachine,
+           let warning = timeMachineWarning(
+               for: repository,
+               state: timeMachineState
+           ) {
+            return warning
+        }
+
+        if repository.format == .timeMachine {
+            return verificationWarning(
+                for: repository,
+                threshold: threshold,
+                now: now
+            )
+        }
+
         if repository.backend.kind == .local && !availabilityChecker.isAvailable(repository, allowingCreation: false) {
             return DashboardHealthWarning(
                 id: "\(repository.id.uuidString)-unavailable",
@@ -201,6 +227,60 @@ public struct DashboardHealthEvaluator: Sendable {
             )
         }
 
+        return verificationWarning(for: repository, threshold: threshold, now: now)
+    }
+
+    private func timeMachineWarning(
+        for repository: BackupRepository,
+        state: TimeMachineDestinationState?
+    ) -> DashboardHealthWarning? {
+        let presentation = TimeMachineDestinationPresentation.make(state: state)
+        if let title = presentation.warningTitle,
+           let detail = presentation.warningMessage {
+            return DashboardHealthWarning(
+                id: "\(repository.id.uuidString)-time-machine-failure",
+                title: "\(repository.name): \(title)",
+                detail: detail,
+                isCritical: true
+            )
+        }
+
+        // The missing-state presentation always includes an actionable warning.
+        // Keep this guard as a fail-closed boundary if that contract changes.
+        guard let state else { return nil }
+
+        switch state.lifecycle {
+        case .waitingForPermissions:
+            return DashboardHealthWarning(
+                id: "\(repository.id.uuidString)-time-machine-permissions",
+                title: "\(repository.name) needs system access",
+                detail: "Finish Time Machine setup in Settings, then connect this disk.",
+                isCritical: false
+            )
+        case .ready, .disconnected:
+            return DashboardHealthWarning(
+                id: "\(repository.id.uuidString)-time-machine-disconnected",
+                title: "\(repository.name) is disconnected",
+                detail: "Connect this Time Machine disk before starting or browsing backups.",
+                isCritical: false
+            )
+        case .needsRepair, .failed:
+            return DashboardHealthWarning(
+                id: "\(repository.id.uuidString)-time-machine-repair",
+                title: "\(repository.name) needs repair",
+                detail: "Repair this Time Machine disk's remote setup before connecting it.",
+                isCritical: true
+            )
+        case .preparing, .disconnecting, .mounted:
+            return nil
+        }
+    }
+
+    private func verificationWarning(
+        for repository: BackupRepository,
+        threshold: DestinationVerificationWarningThreshold,
+        now: Date
+    ) -> DashboardHealthWarning? {
         guard let lastVerifiedAt = repository.lastVerifiedAt else {
             return DashboardHealthWarning(
                 id: "\(repository.id.uuidString)-unchecked",
@@ -217,7 +297,7 @@ public struct DashboardHealthEvaluator: Sendable {
         return DashboardHealthWarning(
             id: "\(repository.id.uuidString)-verification-stale",
             title: "\(repository.name) check is stale",
-            detail: "Last destination check was \(relativeTime(from: lastVerifiedAt, to: now)).",
+            detail: "Last successful verification was \(relativeTime(from: lastVerifiedAt, to: now)).",
             isCritical: false
         )
     }

@@ -190,6 +190,36 @@ final class RepositorySecretAccessRepairerTests: XCTestCase {
         XCTAssertEqual(report.failures.map(\.purpose), ["Backend credential AWS_ACCESS_KEY_ID"])
         XCTAssertEqual(recorder.deletedAccounts, ["repo", "secret-key"])
     }
+
+    func testCleanerCanRetainOnlyAppManagedTimeMachineRecoveryPassword() {
+        let settings = TimeMachineRepositorySettings(volumeName: "History")
+        let repository = BackupRepository(
+            name: "History",
+            backend: .s3(endpoint: nil, bucket: "backup", path: nil, region: nil),
+            format: .timeMachine,
+            timeMachineSettings: settings,
+            credentialReferences: [
+                RepositoryCredentialReference(
+                    environmentKey: "AWS_SECRET_ACCESS_KEY",
+                    keychainAccount: "provider-key"
+                )
+            ]
+        )
+        let recorder = SecretCleanupRecorder()
+        let report = RepositorySecretCleaner { recorder.delete(account: $0) }.cleanup(
+            repository: repository,
+            preservingAccounts: [repository.keychainAccount]
+        )
+
+        XCTAssertTrue(report.isFullyCleaned)
+        XCTAssertEqual(report.checkedAccounts, 3)
+        XCTAssertEqual(report.deletedAccounts, 2)
+        XCTAssertEqual(report.retainedAccounts, 1)
+        XCTAssertEqual(
+            recorder.deletedAccounts,
+            [settings.manifestKeychainAccount, "provider-key"]
+        )
+    }
 }
 
 private final class RepairableSecretStore: @unchecked Sendable {

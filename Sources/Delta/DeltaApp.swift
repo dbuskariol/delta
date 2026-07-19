@@ -4,8 +4,8 @@ import SwiftUI
 
 @main
 struct DeltaApp: App {
-    @StateObject private var model = DeltaAppModel()
-    @StateObject private var softwareUpdateController = SoftwareUpdateController()
+    @StateObject private var model: DeltaAppModel
+    @StateObject private var softwareUpdateController: SoftwareUpdateController
     @StateObject private var statusItemController = DeltaStatusItemController()
     @AppStorage(
         DeltaAppPreferenceKeys.showsMenuBarExtra,
@@ -14,6 +14,26 @@ struct DeltaApp: App {
 
     init() {
         Self.runCommandLineModeIfNeeded()
+        let model = DeltaAppModel()
+        let softwareUpdateController = SoftwareUpdateController(
+            readinessProvider: { [weak model] in
+                model?.softwareUpdateReadiness ?? .applicationStateUnavailable
+            },
+            blockedHandler: { [weak model] readiness, message in
+                guard let model else { return }
+                model.alertMessage = message
+                switch readiness {
+                case .timeMachineDestinationsConnected:
+                    model.selectedSection = .destinations
+                case .operationInProgress:
+                    model.selectedSection = .activity
+                case .applicationStateUnavailable, .ready:
+                    model.selectedSection = .settings
+                }
+            }
+        )
+        _model = StateObject(wrappedValue: model)
+        _softwareUpdateController = StateObject(wrappedValue: softwareUpdateController)
     }
 
     var body: some Scene {

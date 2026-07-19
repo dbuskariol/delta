@@ -81,7 +81,8 @@ table_value_for_id() {
 
 canonical_area_for_id() {
   local wanted_id="$1"
-  manual_acceptance_items | /usr/bin/awk -F'\t' -v wanted_id="$wanted_id" '$1 == wanted_id { print $2; exit }'
+  manual_acceptance_items | /usr/bin/awk -F'\t' -v wanted_id="$wanted_id" \
+    '$1 == wanted_id && value == "" { value = $2 } END { print value }'
 }
 
 validate_result() {

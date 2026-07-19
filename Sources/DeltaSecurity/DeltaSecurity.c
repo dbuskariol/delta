@@ -1,5 +1,17 @@
 #include "DeltaSecurity.h"
 
+void DeltaSecureZero(void * bytes, size_t byteCount) {
+    volatile unsigned char * cursor = (volatile unsigned char *)bytes;
+    if (cursor == NULL) {
+        return;
+    }
+    while (byteCount > 0) {
+        *cursor = 0;
+        cursor += 1;
+        byteCount -= 1;
+    }
+}
+
 OSStatus DeltaCreateTrustedApplicationAccess(
     const char * const * paths,
     size_t pathCount,

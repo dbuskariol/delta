@@ -15,15 +15,18 @@ public struct RepositorySecretCleanupFailure: Equatable, Sendable {
 public struct RepositorySecretCleanupReport: Equatable, Sendable {
     public var checkedAccounts: Int
     public var deletedAccounts: Int
+    public var retainedAccounts: Int
     public var failures: [RepositorySecretCleanupFailure]
 
     public init(
         checkedAccounts: Int,
         deletedAccounts: Int,
+        retainedAccounts: Int = 0,
         failures: [RepositorySecretCleanupFailure] = []
     ) {
         self.checkedAccounts = checkedAccounts
         self.deletedAccounts = deletedAccounts
+        self.retainedAccounts = retainedAccounts
         self.failures = failures
     }
 
@@ -45,12 +48,20 @@ public struct RepositorySecretCleaner: Sendable {
         self.deleteSecret = deleteSecret
     }
 
-    public func cleanup(repository: BackupRepository) -> RepositorySecretCleanupReport {
+    public func cleanup(
+        repository: BackupRepository,
+        preservingAccounts: Set<String> = []
+    ) -> RepositorySecretCleanupReport {
         let accounts = uniqueAccounts(for: repository)
         var deletedAccounts = 0
+        var retainedAccounts = 0
         var failures: [RepositorySecretCleanupFailure] = []
 
         for account in accounts {
+            if preservingAccounts.contains(account.account) {
+                retainedAccounts += 1
+                continue
+            }
             do {
                 try deleteSecret(account.account)
                 deletedAccounts += 1
@@ -68,6 +79,7 @@ public struct RepositorySecretCleaner: Sendable {
         return RepositorySecretCleanupReport(
             checkedAccounts: accounts.count,
             deletedAccounts: deletedAccounts,
+            retainedAccounts: retainedAccounts,
             failures: failures
         )
     }
