@@ -72,7 +72,7 @@ A completed backup with unreadable or omitted files remains technically incomple
 
 ## Native Mac controls
 
-![Delta permission settings](Documentation/Screenshots/settings-permissions-0.3.0.jpg)
+![Delta permission settings](Documentation/Screenshots/settings-permissions-0.4.0.jpg)
 
 Delta uses native SwiftUI navigation, toolbars, menus, alerts, file pickers, settings, keyboard focus, and accessibility descriptions. The optional menu-bar control keeps Back Up Now, Run Due Backups, Pause, Resume, Stop, Activity, Updates, and main-window access available while the window is closed.
 
