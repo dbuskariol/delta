@@ -107,6 +107,7 @@ public enum SettingsSurfaceContract {
         "System Settings",
         "Show Delta",
         "Open Login Items",
+        "Open Login Items & Extensions",
         "Refresh Status",
         "Send Test Alert",
         "Restore Recommended",
@@ -139,6 +140,7 @@ public enum SettingsSurfaceContract {
         "Run Due Now scheduled-backup action",
         "Start at Login separate from Scheduled Backups",
         "One Login Items recovery action per settings context",
+        "Category-specific File System Extensions approval guidance",
         "Sparkle automatic check and download controls",
         "Idle-sleep protection",
         "Expandable Scheduled Backups explanation",
@@ -198,12 +200,14 @@ public enum SettingsSurfaceContract {
         require(actionTitles, contains: "Check Now", in: "actions", failures: &failures)
         require(actionTitles, contains: "Send Test Alert", in: "actions", failures: &failures)
         require(actionTitles, contains: "Copy Report", in: "actions", failures: &failures)
+        require(actionTitles, contains: "Open Login Items & Extensions", in: "actions", failures: &failures)
         require(requiredManualAcceptanceCoverage, contains: "Source access warning visibility through dashboard health", in: "manual coverage", failures: &failures)
         require(requiredManualAcceptanceCoverage, contains: "Plain-language scheduled backup explanation", in: "manual coverage", failures: &failures)
         require(requiredManualAcceptanceCoverage, contains: "No raw system service terminology", in: "manual coverage", failures: &failures)
         require(requiredManualAcceptanceCoverage, contains: "Scheduled Backups activity shortcut", in: "manual coverage", failures: &failures)
         require(requiredManualAcceptanceCoverage, contains: "Password access repair", in: "manual coverage", failures: &failures)
         require(requiredManualAcceptanceCoverage, contains: "One Login Items recovery action per settings context", in: "manual coverage", failures: &failures)
+        require(requiredManualAcceptanceCoverage, contains: "Category-specific File System Extensions approval guidance", in: "manual coverage", failures: &failures)
         require(requiredManualAcceptanceCoverage, contains: "Destination free-space warning control", in: "manual coverage", failures: &failures)
         require(requiredManualAcceptanceCoverage, contains: "Configurable new-profile schedule defaults", in: "manual coverage", failures: &failures)
         require(requiredManualAcceptanceCoverage, contains: "Expandable Scheduled Backups explanation", in: "manual coverage", failures: &failures)

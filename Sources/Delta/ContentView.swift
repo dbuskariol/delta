@@ -3763,7 +3763,7 @@ struct SettingsView: View {
     @ViewBuilder
     private var timeMachineFileSystemPermissionActions: some View {
         if hasTimeMachineDestinations, model.timeMachineFileSystemStatus != .enabled {
-            Button("System Settings") {
+            Button("Open Login Items & Extensions") {
                 model.openFileSystemExtensionsSettings()
             }
             .buttonStyle(.borderedProminent)
@@ -3846,19 +3846,9 @@ struct SettingsView: View {
     }
 
     private var timeMachineFileSystemPermissionDescription: String {
-        guard hasTimeMachineDestinations else {
-            return "Only required when a destination uses Time Machine format."
-        }
-        switch model.timeMachineFileSystemStatus {
-        case .enabled:
-            return "Delta's File System Extension is enabled and can present remote sparsebundle files to macOS."
-        case .disabled:
-            return "Open Login Items & Extensions, select File System Extensions, and turn on Delta Time Machine Storage."
-        case .notInstalled:
-            return "The File System Extension is missing from this Delta installation. Reinstall the signed app."
-        case let .unavailable(message):
-            return "macOS could not report File System Extension status: \(message)"
-        }
+        model.timeMachineFileSystemStatus.permissionDescription(
+            hasTimeMachineDestinations: hasTimeMachineDestinations
+        )
     }
 
     private var timeMachineSystemSupportDescription: String {
