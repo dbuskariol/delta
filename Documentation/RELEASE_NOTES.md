@@ -21,6 +21,7 @@ Delta 0.4.0 adds native Time Machine-format destinations:
 - Keeps Time Machine and restic repository semantics separate: macOS remains authoritative for Time Machine history and restores, while restic continues to own Delta-format backup, restore, retention, prune, and check behavior.
 - Keeps automatic Time Machine system-support retries current without adding the same unchanged failure to Activity every minute.
 - Keeps an automatic system-support check from monopolizing the Set Up action, detects a stale Service Management path after the installed app moves, lets an explicit Set Up repair a stale helper or user-service registration, and preserves any component newly registered by that same request instead of forcing a second privileged approval.
+- Keeps release rehearsals and evidence collection from launching or registering Service Management components from a transient build path. Identity-sensitive launch, Login Items, and helper acceptance now require the exact app installed under `/Applications`.
 
 This release also restores live Activity output following:
 

@@ -30,7 +30,7 @@ DELTA_SPARKLE_KEY_ACCOUNT="com.delta.backup.sparkle" \
 Scripts/release.sh prepare
 ```
 
-Rehearsal mode builds and validates the complete artifact graph but does not submit to Apple or mutate GitHub. Its manifest explicitly records that artifacts are not notarized, so rehearsal output cannot be confused with a shipping release.
+Rehearsal mode builds and validates the complete artifact graph but does not submit to Apple, mutate GitHub, launch the transient candidate as the user's app, or register its embedded Service Management components. Identity-sensitive launch, Login Items, and privileged-helper acceptance run only against the exact candidate after it is installed under `/Applications`. The rehearsal manifest explicitly records that artifacts are not notarized, so rehearsal output cannot be confused with a shipping release.
 
 ## Finalize
 
