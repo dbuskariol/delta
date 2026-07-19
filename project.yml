@@ -95,7 +95,7 @@ targets:
     settings:
       base:
         CREATE_INFOPLIST_SECTION_IN_BINARY: YES
-        CURRENT_PROJECT_VERSION: 14
+        CURRENT_PROJECT_VERSION: 15
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: Packaging/DeltaTimeMachineHelper.Info.plist
         MARKETING_VERSION: 0.4.0
@@ -115,7 +115,7 @@ targets:
       base:
         APPLICATION_EXTENSION_API_ONLY: YES
         CODE_SIGN_ENTITLEMENTS: "$(DELTA_FSKIT_CODE_SIGN_ENTITLEMENTS)"
-        CURRENT_PROJECT_VERSION: 14
+        CURRENT_PROJECT_VERSION: 15
         DELTA_FSKIT_CODE_SIGN_ENTITLEMENTS: Packaging/DeltaTimeMachineFS.entitlements
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_FILE: Packaging/DeltaTimeMachineFS.Info.plist
@@ -210,7 +210,7 @@ targets:
     settings:
       base:
         CODE_SIGN_ENTITLEMENTS: Packaging/Delta.entitlements
-        CURRENT_PROJECT_VERSION: 14
+        CURRENT_PROJECT_VERSION: 15
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: Packaging/Delta.app.plist
         LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/../Frameworks"
