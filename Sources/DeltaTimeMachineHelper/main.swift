@@ -114,61 +114,6 @@ private final class SetupWorker: NSObject, TimeMachineSetupHelperXPC {
         }
     }
 
-    func refreshIfOutdated(
-        _ expectedCodeHash: Data,
-        withReply reply: @escaping (Data?, Data?) -> Void
-    ) {
-        guard !expectedCodeHash.isEmpty, expectedCodeHash.count <= 64 else {
-            replyFailure(
-                SetupHelperError.invalidRequest,
-                fileSystemState: .unknown,
-                reply: reply
-            )
-            return
-        }
-        guard Self.operationLock.try() else {
-            replyFailure(
-                SetupHelperError.operationBusy,
-                fileSystemState: .unknown,
-                reply: reply
-            )
-            return
-        }
-        defer { Self.operationLock.unlock() }
-        do {
-            let currentCodeHash = try DeltaCodeSigningIdentity.currentProcessCodeHash()
-            let mountIsActive = currentCodeHash == expectedCodeHash
-                ? false
-                : try hasMountedDeltaFileSystem()
-            let status = TimeMachineSetupHelperRefreshPolicy.status(
-                currentCodeHash: currentCodeHash,
-                expectedCodeHash: expectedCodeHash,
-                hasMountedDeltaFileSystem: mountIsActive
-            )
-            reply(
-                try JSONEncoder().encode(
-                    TimeMachineSetupHelperRefreshResult(status: status)
-                ),
-                nil
-            )
-            if status == .terminating {
-                // Let XPC deliver the authenticated reply before launchd tears
-                // down this old mapped executable. The registration remains in
-                // place, so the next connection starts the helper from the
-                // newly installed app without revoking Login Items approval.
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-                    exit(EXIT_SUCCESS)
-                }
-            }
-        } catch {
-            replyFailure(
-                error,
-                fileSystemState: .unknown,
-                reply: reply
-            )
-        }
-    }
-
     private func replyFailure(
         _ error: Error,
         fileSystemState: TimeMachineFileSystemResidualState,

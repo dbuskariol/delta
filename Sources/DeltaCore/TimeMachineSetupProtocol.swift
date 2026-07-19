@@ -304,40 +304,6 @@ public struct TimeMachineSetupDeadline: Equatable, Sendable {
         _ requestData: Data,
         withReply reply: @escaping (Data?, Data?) -> Void
     )
-
-    func refreshIfOutdated(
-        _ expectedCodeHash: Data,
-        withReply reply: @escaping (Data?, Data?) -> Void
-    )
-}
-
-public enum TimeMachineSetupHelperRefreshStatus: String, Codable, Sendable {
-    case current
-    case terminating
-    case mountedDiskPreventsRefresh
-}
-
-public struct TimeMachineSetupHelperRefreshResult: Codable, Equatable, Sendable {
-    public var status: TimeMachineSetupHelperRefreshStatus
-
-    public init(status: TimeMachineSetupHelperRefreshStatus) {
-        self.status = status
-    }
-}
-
-public enum TimeMachineSetupHelperRefreshPolicy {
-    public static func status(
-        currentCodeHash: Data,
-        expectedCodeHash: Data,
-        hasMountedDeltaFileSystem: Bool
-    ) -> TimeMachineSetupHelperRefreshStatus {
-        if currentCodeHash == expectedCodeHash {
-            return .current
-        }
-        return hasMountedDeltaFileSystem
-            ? .mountedDiskPreventsRefresh
-            : .terminating
-    }
 }
 
 public enum TimeMachineSetupOperation: String, Codable, Sendable {
@@ -565,89 +531,6 @@ public struct TimeMachineSetupHelperClient: Sendable {
 
     public init() {}
 
-    public func refreshIfOutdatedAsync(
-        expectedCodeHash: Data,
-        timeout: TimeInterval = TimeMachineSetupExecutionPolicy.rollbackRuntime
-    ) async throws -> TimeMachineSetupHelperRefreshResult {
-        try await withCheckedThrowingContinuation { continuation in
-            DispatchQueue.global(qos: .utility).async {
-                continuation.resume(
-                    with: Result {
-                        try refreshIfOutdated(
-                            expectedCodeHash: expectedCodeHash,
-                            timeout: timeout
-                        )
-                    }
-                )
-            }
-        }
-    }
-
-    public func refreshIfOutdated(
-        expectedCodeHash: Data,
-        timeout: TimeInterval = TimeMachineSetupExecutionPolicy.rollbackRuntime
-    ) throws -> TimeMachineSetupHelperRefreshResult {
-        guard !expectedCodeHash.isEmpty, expectedCodeHash.count <= 64 else {
-            throw TimeMachineSetupClientError.invalidResponse
-        }
-        let connection = makeConnection()
-        let semaphore = DispatchSemaphore(value: 0)
-        let result = LockedSetupRefreshResult()
-        connection.invalidationHandler = {
-            result.finish(.failure(.unavailable("The helper connection closed.")))
-            semaphore.signal()
-        }
-        connection.interruptionHandler = {
-            result.finish(.failure(.unavailable("The helper connection was interrupted.")))
-            semaphore.signal()
-        }
-        connection.activate()
-
-        guard let proxy = connection.remoteObjectProxyWithErrorHandler({ error in
-            result.finish(.failure(.unavailable(error.localizedDescription)))
-            semaphore.signal()
-        }) as? TimeMachineSetupHelperXPC else {
-            connection.invalidate()
-            throw TimeMachineSetupClientError.unavailable("The helper protocol is unavailable.")
-        }
-        proxy.refreshIfOutdated(expectedCodeHash) { data, failureData in
-            if
-                let failureData,
-                let failure = try? JSONDecoder().decode(
-                    TimeMachineSetupFailure.self,
-                    from: failureData
-                )
-            {
-                result.finish(
-                    .failure(
-                        .operationFailed(
-                            message: failure.message,
-                            fileSystemState: failure.fileSystemState
-                        )
-                    )
-                )
-            } else if
-                let data,
-                let decoded = try? JSONDecoder().decode(
-                    TimeMachineSetupHelperRefreshResult.self,
-                    from: data
-                )
-            {
-                result.finish(.success(decoded))
-            } else {
-                result.finish(.failure(.invalidResponse))
-            }
-            semaphore.signal()
-        }
-
-        guard semaphore.wait(timeout: .now() + timeout) == .success else {
-            connection.invalidate()
-            throw TimeMachineSetupClientError.timedOut
-        }
-        connection.invalidate()
-        return try result.value().get()
-    }
-
     public func execute(
         _ request: TimeMachineSetupRequest,
         timeout: TimeInterval = TimeMachineSetupExecutionPolicy.clientReplyTimeout
@@ -741,27 +624,6 @@ private final class LockedSetupResult: @unchecked Sendable {
     }
 
     func value() -> Result<TimeMachineSetupResult, TimeMachineSetupClientError> {
-        lock.lock()
-        defer { lock.unlock() }
-        return stored ?? .failure(.invalidResponse)
-    }
-}
-
-private final class LockedSetupRefreshResult: @unchecked Sendable {
-    private let lock = NSLock()
-    private var stored: Result<TimeMachineSetupHelperRefreshResult, TimeMachineSetupClientError>?
-
-    func finish(
-        _ result: Result<TimeMachineSetupHelperRefreshResult, TimeMachineSetupClientError>
-    ) {
-        lock.lock()
-        if stored == nil {
-            stored = result
-        }
-        lock.unlock()
-    }
-
-    func value() -> Result<TimeMachineSetupHelperRefreshResult, TimeMachineSetupClientError> {
         lock.lock()
         defer { lock.unlock() }
         return stored ?? .failure(.invalidResponse)
