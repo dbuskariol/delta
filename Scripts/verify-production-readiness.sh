@@ -8,6 +8,7 @@ INSTALLED_APP="${DELTA_PRODUCTION_INSTALLED_APP:-/Applications/Delta.app}"
 MANUAL_REPORT="${DELTA_MANUAL_ACCEPTANCE_REPORT:-$ROOT_DIR/dist/manual-acceptance/latest.md}"
 GATE_STATUS_FILE="$ROOT_DIR/dist/release-evidence/automated-gate-status"
 NOTARY_OUTPUT_DIR="${DELTA_NOTARY_OUTPUT_DIR:-$ROOT_DIR/dist/notarization}"
+TIME_MACHINE_SYSTEM_EVIDENCE="${DELTA_TIME_MACHINE_SYSTEM_ACCEPTANCE_EVIDENCE:-$ROOT_DIR/dist/time-machine-system-support/latest.txt}"
 
 fail() {
   printf "Production readiness failed: %s\n" "$1" >&2
@@ -121,6 +122,10 @@ for NOTARY_ARTIFACT in app dmg; do
     fail "accepted $NOTARY_ARTIFACT notarization evidence is missing or invalid. Expected $SUBMISSION_JSON and $LOG_JSON."
   fi
 done
+
+"$ROOT_DIR/Scripts/verify-time-machine-system-support-evidence.sh" \
+  "$INSTALLED_APP" \
+  "$TIME_MACHINE_SYSTEM_EVIDENCE"
 
 DELTA_VERIFY_INSTALLED_LAUNCH="${DELTA_PRODUCTION_VERIFY_INSTALLED_LAUNCH:-1}" \
   "$ROOT_DIR/Scripts/verify-installed-app.sh" "$INSTALLED_APP"

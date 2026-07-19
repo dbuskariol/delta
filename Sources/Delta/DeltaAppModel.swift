@@ -2411,11 +2411,7 @@ final class DeltaAppModel: ObservableObject {
     private nonisolated static func verifyTimeMachineSetupHelperReadinessSynchronously()
         throws
     {
-        let expectedCodeHash = try TimeMachineSetupHelperController
-            .installedCodeHash()
-        try TimeMachineSetupHelperClient().verifyReadiness(
-            expectedCodeHash: expectedCodeHash
-        )
+        try TimeMachineSetupHelperRuntimeVerifier.verify()
     }
 
     private func verifyTimeMachineSetupHelperReadiness() async throws {

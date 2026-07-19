@@ -11,6 +11,7 @@ MANUAL_REPORT="${DELTA_DOCTOR_MANUAL_ACCEPTANCE_REPORT:-$ROOT_DIR/dist/manual-ac
 RELEASE_EVIDENCE_REPORT="${DELTA_DOCTOR_RELEASE_EVIDENCE_REPORT:-$ROOT_DIR/dist/release-evidence/latest.md}"
 GATE_STATUS_FILE="$ROOT_DIR/dist/release-evidence/automated-gate-status"
 NOTARY_OUTPUT_DIR="${DELTA_NOTARY_OUTPUT_DIR:-$ROOT_DIR/dist/notarization}"
+TIME_MACHINE_SYSTEM_EVIDENCE="${DELTA_DOCTOR_TIME_MACHINE_SYSTEM_EVIDENCE:-$ROOT_DIR/dist/time-machine-system-support/latest.txt}"
 
 blockers=0
 warnings=0
@@ -99,6 +100,7 @@ print_next_actions() {
    DELTA_NOTARY_KEYCHAIN_PROFILE="Reccy Notary" Scripts/release.sh finalize
 3. Install the notarized app and refresh release evidence:
    Scripts/install-app.sh dist/Delta.app
+   Scripts/run-installed-time-machine-system-support-acceptance.sh /Applications/Delta.app
    Scripts/collect-release-evidence.sh dist/Delta.app
 4. Complete the manual acceptance matrix for the current commit:
    Scripts/create-manual-acceptance-report.sh
@@ -259,6 +261,19 @@ else
 fi
 
 printf "\n## Acceptance Evidence\n\n"
+TIME_MACHINE_SYSTEM_DOCTOR_OUTPUT="$(/usr/bin/mktemp -t delta-time-machine-system-evidence-doctor.XXXXXX)"
+if [[ -d "$INSTALLED_APP_PATH" ]] \
+  && "$ROOT_DIR/Scripts/verify-time-machine-system-support-evidence.sh" \
+    "$INSTALLED_APP_PATH" \
+    "$TIME_MACHINE_SYSTEM_EVIDENCE" >"$TIME_MACHINE_SYSTEM_DOCTOR_OUTPUT" 2>&1
+then
+  pass "$(/bin/cat "$TIME_MACHINE_SYSTEM_DOCTOR_OUTPUT")"
+else
+  time_machine_system_output="$(/bin/cat "$TIME_MACHINE_SYSTEM_DOCTOR_OUTPUT" 2>/dev/null || true)"
+  block "Clean-install authenticated Time Machine system-support evidence is incomplete. ${time_machine_system_output}"
+fi
+/bin/rm -f "$TIME_MACHINE_SYSTEM_DOCTOR_OUTPUT"
+
 if [[ -f "$RELEASE_EVIDENCE_REPORT" || -L "$RELEASE_EVIDENCE_REPORT" ]]; then
   release_commit="$(release_evidence_value "Git Commit")"
   release_ready="$(release_evidence_value "Ready for external distribution")"

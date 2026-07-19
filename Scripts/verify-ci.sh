@@ -116,6 +116,14 @@ if [[ ! -x "$ROOT_DIR/Scripts/run-installed-rclone-local-acceptance.sh" ]]; then
   printf "Scripts/run-installed-rclone-local-acceptance.sh must be executable.\n" >&2
   exit 1
 fi
+if [[ ! -x "$ROOT_DIR/Scripts/run-installed-time-machine-system-support-acceptance.sh" ]]; then
+  printf "Scripts/run-installed-time-machine-system-support-acceptance.sh must be executable.\n" >&2
+  exit 1
+fi
+if [[ ! -x "$ROOT_DIR/Scripts/verify-time-machine-system-support-evidence.sh" ]]; then
+  printf "Scripts/verify-time-machine-system-support-evidence.sh must be executable.\n" >&2
+  exit 1
+fi
 
 "$ROOT_DIR/Scripts/bootstrap-tools.sh"
 "$ROOT_DIR/Scripts/verify-tools.sh"

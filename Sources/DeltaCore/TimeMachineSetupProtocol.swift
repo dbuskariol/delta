@@ -552,6 +552,7 @@ public enum TimeMachineSetupClientError: Error, Equatable, LocalizedError {
 }
 
 public enum TimeMachineSetupHelperReadinessError: Error, Equatable, LocalizedError {
+    case noncanonicalInstallation
     case invalidResponse
     case unavailable(String)
     case timedOut
@@ -559,6 +560,8 @@ public enum TimeMachineSetupHelperReadinessError: Error, Equatable, LocalizedErr
 
     public var errorDescription: String? {
         switch self {
+        case .noncanonicalInstallation:
+            TimeMachineInstalledApplicationPolicy.recoveryMessage
         case .invalidResponse:
             "Delta's Time Machine setup helper returned an invalid readiness response."
         case let .unavailable(message):
@@ -724,6 +727,26 @@ public struct TimeMachineSetupHelperClient: Sendable {
             )
         )
         return connection
+    }
+}
+
+/// One authoritative readiness proof is shared by the interactive app and
+/// exact-candidate release acceptance. It never accepts Service Management's
+/// registration status by itself: the running helper must return the Security
+/// code hash that matches the helper embedded in the canonical installed app.
+public enum TimeMachineSetupHelperRuntimeVerifier {
+    public static func verify(bundle: Bundle = .main) throws {
+        guard TimeMachineInstalledApplicationPolicy.isCanonicalInstallation(
+            bundleURL: bundle.bundleURL
+        ) else {
+            throw TimeMachineSetupHelperReadinessError
+                .noncanonicalInstallation
+        }
+        let expectedCodeHash = try TimeMachineSetupHelperController
+            .installedCodeHash(bundle: bundle)
+        try TimeMachineSetupHelperClient().verifyReadiness(
+            expectedCodeHash: expectedCodeHash
+        )
     }
 }
 
