@@ -25,6 +25,24 @@ public enum TimeMachineFileSystemExtensionStatus: Equatable, Sendable {
     public var isReady: Bool {
         self == .enabled
     }
+
+    public func permissionDescription(
+        hasTimeMachineDestinations: Bool
+    ) -> String {
+        guard hasTimeMachineDestinations else {
+            return "Only required when a destination uses Time Machine format."
+        }
+        switch self {
+        case .enabled:
+            return "Delta's File System Extension is enabled and can present remote sparsebundle files to macOS."
+        case .disabled:
+            return "In System Settings, open General → Login Items & Extensions. Under Extensions, choose By Category. Click the info button beside File System Extensions, then turn on Delta Time Machine Storage."
+        case .notInstalled:
+            return "The File System Extension is missing from this Delta installation. Reinstall the signed app."
+        case let .unavailable(message):
+            return "macOS could not report File System Extension status: \(message)"
+        }
+    }
 }
 
 public struct TimeMachineFileSystemModuleObservation: Equatable, Sendable {

@@ -5,6 +5,22 @@ import XCTest
 @testable import DeltaCore
 
 final class TimeMachineSystemControllerTests: XCTestCase {
+    func testFileSystemApprovalGuidanceUsesWorkingCategoryRoute() {
+        XCTAssertEqual(
+            TimeMachineFileSystemExtensionStatus.disabled
+                .permissionDescription(hasTimeMachineDestinations: true),
+            "In System Settings, open General → Login Items & Extensions. Under Extensions, choose By Category. Click the info button beside File System Extensions, then turn on Delta Time Machine Storage."
+        )
+    }
+
+    func testFileSystemApprovalGuidanceExplainsWhenItIsNotNeeded() {
+        XCTAssertEqual(
+            TimeMachineFileSystemExtensionStatus.disabled
+                .permissionDescription(hasTimeMachineDestinations: false),
+            "Only required when a destination uses Time Machine format."
+        )
+    }
+
     func testSetupDeadlinesUseOneMonotonicBudgetAcrossCommands() {
         let deadline = TimeMachineSetupDeadline(
             duration: 10.25,
