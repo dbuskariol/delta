@@ -8,6 +8,10 @@ if [[ ! -d "$APP" ]]; then
   exit 1
 fi
 APP="$(cd "$APP" && pwd -P)"
+IS_INSTALLED_IDENTITY=0
+if [[ "$(dirname "$APP")" == "/Applications" && "$APP" == *.app ]]; then
+  IS_INSTALLED_IDENTITY=1
+fi
 
 /usr/bin/codesign --verify --strict --deep --verbose=2 "$APP"
 
@@ -22,7 +26,7 @@ if /usr/bin/grep -q '^TeamIdentifier=not set$' <<<"$SIGNING_DETAILS"; then
 fi
 
 if [[ "${DELTA_VERIFY_INSTALLED_LAUNCH:-0}" == "1" ]]; then
-  if [[ "$(dirname "$APP")" != "/Applications" || "$APP" != *.app ]]; then
+  if [[ "$IS_INSTALLED_IDENTITY" != "1" ]]; then
     printf "Identity-sensitive launch acceptance requires an app installed directly in /Applications, not %s\n" "$APP" >&2
     exit 64
   fi
@@ -41,8 +45,12 @@ if [[ "${DELTA_VERIFY_INSTALLED_LAUNCH:-0}" == "1" ]]; then
 fi
 
 "$APP/Contents/Resources/DeltaAgent" --status
-DELTA_ENABLE_SERVICE_MANAGEMENT_ACCEPTANCE=1 \
-  "$APP/Contents/MacOS/Delta" --acceptance-scheduled-service status
+if [[ "$IS_INSTALLED_IDENTITY" == "1" ]]; then
+  DELTA_ENABLE_SERVICE_MANAGEMENT_ACCEPTANCE=1 \
+    "$APP/Contents/MacOS/Delta" --acceptance-scheduled-service status
+else
+  printf "Scheduled service status skipped for transient candidate\n"
+fi
 
 AGENT_DRY_RUN_OUTPUT="$("$APP/Contents/Resources/DeltaAgent" --dry-run 2>&1)"
 if [[ "$AGENT_DRY_RUN_OUTPUT" != *"dry run did not start scheduled backups"* ]]; then
