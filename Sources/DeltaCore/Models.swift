@@ -271,6 +271,32 @@ public struct TimeMachineDestinationState: Codable, Identifiable, Equatable, Sen
         }
     }
 
+    /// A mounted FSKit/APFS stack is necessary but is not, by itself, a
+    /// usable Time Machine destination. Starting a backup also requires the
+    /// exact mount instance and the canonical destination identity returned by
+    /// macOS, with no unresolved system or storage failure. Keeping this as a
+    /// domain invariant prevents presentation and alternate command surfaces
+    /// from mistaking a cleanup-only residual mount for a connected disk.
+    public var isReadyForBackup: Bool {
+        guard
+            lifecycle == .mounted,
+            mountSessionID != nil,
+            let mountPoint,
+            !mountPoint.isEmpty,
+            let diskImagePath,
+            !diskImagePath.isEmpty,
+            let deviceIdentifier,
+            !deviceIdentifier.isEmpty,
+            let timeMachineDestinationID,
+            UUID(uuidString: timeMachineDestinationID) != nil,
+            lastError == nil,
+            lastFailureContext == nil
+        else {
+            return false
+        }
+        return true
+    }
+
     public var blocksConfigurationChanges: Bool {
         lifecycle == .preparing || lifecycle == .disconnecting || lifecycle == .mounted
     }

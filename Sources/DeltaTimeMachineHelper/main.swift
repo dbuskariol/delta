@@ -71,6 +71,23 @@ private final class SetupWorker: NSObject, TimeMachineSetupHelperXPC {
         self.callerUserID = callerUserID
     }
 
+    func verifyReadiness(
+        withReply reply: @escaping (Data?, Data?) -> Void
+    ) {
+        do {
+            let readiness = TimeMachineSetupHelperReadiness(
+                codeHash: try DeltaCodeSigningIdentity.currentProcessCodeHash()
+            )
+            reply(try JSONEncoder().encode(readiness), nil)
+        } catch {
+            replyFailure(
+                error,
+                fileSystemState: .unknown,
+                reply: reply
+            )
+        }
+    }
+
     func execute(
         _ requestData: Data,
         withReply reply: @escaping (Data?, Data?) -> Void
