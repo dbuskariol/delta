@@ -4,13 +4,13 @@ Date: 19 July 2026
 
 Host: macOS 26.5.2 (25F84)
 
-Candidate: Delta 0.4.0 (10)
+Candidate: Delta 0.4.0 (11)
 
 Status: exact-candidate verification contract
 
 ## Outcome
 
-Delta's source, deterministic acceptance harnesses, Developer ID build, stable installer, notarization flow, Sparkle packaging, privacy controls, and production-readiness checks are covered by the release contract below. The source identifies the next candidate as `0.4.0` (10).
+Delta's source, deterministic acceptance harnesses, Developer ID build, stable installer, notarization flow, Sparkle packaging, privacy controls, and production-readiness checks are covered by the release contract below. The source identifies the next candidate as `0.4.0` (11).
 
 A release must not be merged, tagged, or published until the complete exact-commit gate, separate app and DMG notarization, stapling, Gatekeeper checks, signed-update installation, manual acceptance matrix, and required genuine external-provider evidence have all passed for this version. Generated evidence under `dist/` is authoritative for the commit, installed path, CDHash, notarization IDs, artifact hashes, command results, and acceptance status; this tracked report deliberately does not duplicate volatile identity values or claim that an unverified source commit has passed.
 
@@ -68,7 +68,7 @@ Finalization requires separate accepted Apple submissions for the app archive an
 
 ## Required release handoff
 
-1. Build, install, and complete all exact-commit automated, signing, Apple notarization, stapling, Gatekeeper, and evidence checks for `0.4.0` (10).
+1. Build, install, and complete all exact-commit automated, signing, Apple notarization, stapling, Gatekeeper, and evidence checks for `0.4.0` (11).
 2. Complete every row of the exact-candidate manual acceptance matrix, including a real signed Sparkle upgrade and system-delivered notifications.
 3. Provide and exercise genuine external mounted SMB or NFS, non-local SFTP, and non-local S3-compatible fixtures, plus any additional backend families intended for this release.
 4. Obtain a fully passing production-readiness result before merging, tagging `v0.4.0`, or publishing.

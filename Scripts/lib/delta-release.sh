@@ -155,6 +155,23 @@ delta_signature_identifier() {
   /usr/bin/awk -F= '/^Identifier=/{print $2; exit}' <<<"$(delta_codesign_details "$1")"
 }
 
+delta_assert_immutable_build_identity() {
+  local installed_version="$1"
+  local installed_build="$2"
+  local installed_cdhash="$3"
+  local candidate_version="$4"
+  local candidate_build="$5"
+  local candidate_cdhash="$6"
+
+  if [[ -n "$installed_version" && -n "$installed_build" \
+    && "$installed_version" == "$candidate_version" \
+    && "$installed_build" == "$candidate_build" \
+    && -n "$installed_cdhash" && -n "$candidate_cdhash" \
+    && "$installed_cdhash" != "$candidate_cdhash" ]]; then
+    delta_fail "refusing to replace Delta $candidate_version ($candidate_build) with different signed bytes; advance CURRENT_PROJECT_VERSION so one build identity always names one immutable app"
+  fi
+}
+
 delta_assert_certificate_free_fskit_extension() {
   local app="$1"
   local extension="$app/Contents/Extensions/DeltaTimeMachineFS.appex"
