@@ -66,6 +66,7 @@ final class SettingsSurfaceContractTests: XCTestCase {
         XCTAssertTrue(SettingsSurfaceContract.actionTitles.contains("Check Now"))
         XCTAssertTrue(SettingsSurfaceContract.actionTitles.contains("Send Test Alert"))
         XCTAssertTrue(SettingsSurfaceContract.actionTitles.contains("Copy Report"))
+        XCTAssertTrue(SettingsSurfaceContract.actionTitles.contains("Open Login Items & Extensions"))
         XCTAssertTrue(SettingsSurfaceContract.capabilityTitles.contains("Approved by macOS"))
     }
 
@@ -90,6 +91,7 @@ final class SettingsSurfaceContractTests: XCTestCase {
         XCTAssertTrue(SettingsSurfaceContract.requiredManualAcceptanceCoverage.contains("Compact status summary"))
         XCTAssertTrue(SettingsSurfaceContract.requiredManualAcceptanceCoverage.contains("Run Due Now scheduled-backup action"))
         XCTAssertTrue(SettingsSurfaceContract.requiredManualAcceptanceCoverage.contains("One Login Items recovery action per settings context"))
+        XCTAssertTrue(SettingsSurfaceContract.requiredManualAcceptanceCoverage.contains("Category-specific File System Extensions approval guidance"))
         XCTAssertTrue(SettingsSurfaceContract.requiredManualAcceptanceCoverage.contains("Expandable Scheduled Backups explanation"))
         XCTAssertTrue(SettingsSurfaceContract.requiredManualAcceptanceCoverage.contains("Sparkle automatic check and download controls"))
         XCTAssertTrue(SettingsSurfaceContract.requiredManualAcceptanceCoverage.contains("Idle-sleep protection"))
