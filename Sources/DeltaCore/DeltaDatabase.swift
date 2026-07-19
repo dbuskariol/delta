@@ -44,6 +44,11 @@ public struct JobLogCursor: Equatable, Sendable {
     }
 }
 
+struct InterruptedTimeMachineConnectionRecovery: Equatable, Sendable {
+    var state: TimeMachineDestinationState
+    var interruptedJobIDs: [UUID]
+}
+
 public struct JobLogPage: Equatable, Sendable {
     public var entries: [JobLogEntry]
     public var totalCount: Int
@@ -102,6 +107,31 @@ public final class DeltaDatabase: @unchecked Sendable {
         try save(repository, id: repository.id.uuidString, table: "repositories")
     }
 
+    public func saveTimeMachineDestinationState(_ state: TimeMachineDestinationState) throws {
+        try save(
+            state,
+            id: state.repositoryID.uuidString,
+            table: "time_machine_states",
+            repositoryID: state.repositoryID.uuidString
+        )
+    }
+
+    public func fetchTimeMachineDestinationStates() throws -> [TimeMachineDestinationState] {
+        try fetchAll(table: "time_machine_states")
+    }
+
+    public func fetchTimeMachineDestinationState(repositoryID: UUID) throws -> TimeMachineDestinationState? {
+        let states: [TimeMachineDestinationState] = try fetchAll(
+            table: "time_machine_states",
+            repositoryID: repositoryID.uuidString
+        )
+        return states.first
+    }
+
+    public func deleteTimeMachineDestinationState(repositoryID: UUID) throws {
+        try delete(id: repositoryID.uuidString, table: "time_machine_states")
+    }
+
     public func fetchRepositories() throws -> [BackupRepository] {
         try fetchAll(table: "repositories")
     }
@@ -110,6 +140,7 @@ public final class DeltaDatabase: @unchecked Sendable {
         try queue.write { db in
             try db.execute(sql: "DELETE FROM repositories WHERE id = ?", arguments: [id.uuidString])
             try db.execute(sql: "DELETE FROM snapshots WHERE repository_id = ?", arguments: [id.uuidString])
+            try db.execute(sql: "DELETE FROM time_machine_states WHERE repository_id = ?", arguments: [id.uuidString])
         }
     }
 
@@ -126,11 +157,145 @@ public final class DeltaDatabase: @unchecked Sendable {
     }
 
     public func saveJobRun(_ run: JobRun) throws {
-        try save(run, id: run.id.uuidString, table: "job_runs")
+        try save(
+            run,
+            id: run.id.uuidString,
+            table: "job_runs",
+            repositoryID: run.repositoryID.uuidString
+        )
     }
 
     public func fetchJobRuns(limit: Int = 100) throws -> [JobRun] {
         try fetchAll(table: "job_runs", limit: limit)
+    }
+
+    /// Atomically reconciles the durable evidence left by an interrupted
+    /// Time Machine connection. The caller must hold the repository's local
+    /// operation lock, which proves that no Delta app or agent still owns the
+    /// connection attempt. The caller supplies a state resolved from public
+    /// FSKit, DiskImages/APFS, and tmutil observations; this transaction binds
+    /// that evidence to the interrupted job, log, and event atomically.
+    func recoverInterruptedTimeMachineSystemOperation(
+        repositoryID: UUID,
+        expectedStoreID: UUID,
+        expectedLifecycle: TimeMachineDestinationLifecycle,
+        now: Date,
+        resolvedState: TimeMachineDestinationState,
+        interruptionMessage: String,
+        eventMessage: String
+    ) throws -> InterruptedTimeMachineConnectionRecovery? {
+        let repositoryIDString = repositoryID.uuidString
+        let timestamp = Self.timestampString(now)
+
+        return try queue.write { db in
+            guard
+                let stateRow = try Row.fetchOne(
+                    db,
+                    sql: "SELECT payload FROM time_machine_states WHERE id = ?",
+                    arguments: [repositoryIDString]
+                )
+            else {
+                return nil
+            }
+            let statePayload: String = stateRow["payload"]
+            guard let stateData = statePayload.data(using: .utf8) else {
+                throw DeltaDatabaseError.invalidPayload("time_machine_states")
+            }
+            var state = try decoder.decode(TimeMachineDestinationState.self, from: stateData)
+            guard
+                state.lifecycle == expectedLifecycle,
+                state.storeID == expectedStoreID,
+                resolvedState.repositoryID == repositoryID,
+                resolvedState.storeID == expectedStoreID
+            else {
+                return nil
+            }
+
+            let jobRows = try Row.fetchAll(
+                db,
+                sql: """
+                SELECT id, payload FROM job_runs
+                WHERE COALESCE(repository_id, json_extract(payload, '$.repositoryID')) = ?
+                  AND json_extract(payload, '$.status') = ?
+                ORDER BY updated_at DESC
+                """,
+                arguments: [repositoryIDString, JobStatus.running.rawValue]
+            )
+            var interruptedJobIDs: [UUID] = []
+            for row in jobRows {
+                let payload: String = row["payload"]
+                guard let data = payload.data(using: .utf8) else {
+                    throw DeltaDatabaseError.invalidPayload("job_runs")
+                }
+                var job = try decoder.decode(JobRun.self, from: data)
+                guard job.kind == .initializeRepository else {
+                    continue
+                }
+                job.status = .cancelled
+                job.finishedAt = now
+                job.message = interruptionMessage
+                let updatedPayload = try encodedPayload(job, table: "job_runs")
+                try db.execute(
+                    sql: """
+                    UPDATE job_runs
+                    SET repository_id = ?, payload = ?, updated_at = ?
+                    WHERE id = ?
+                    """,
+                    arguments: [repositoryIDString, updatedPayload, timestamp, job.id.uuidString]
+                )
+
+                let entry = JobLogEntry(
+                    jobID: job.id,
+                    profileID: job.profileID,
+                    repositoryID: repositoryID,
+                    date: now,
+                    stream: .standardError,
+                    message: interruptionMessage
+                )
+                let logPayload = try encodedPayload(entry, table: "job_logs")
+                try db.execute(
+                    sql: """
+                    INSERT INTO job_logs (id, job_id, repository_id, stream, payload, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    arguments: [
+                        entry.id.uuidString,
+                        entry.jobID.uuidString,
+                        repositoryIDString,
+                        entry.stream.rawValue,
+                        logPayload,
+                        timestamp
+                    ]
+                )
+                interruptedJobIDs.append(job.id)
+            }
+
+            state = resolvedState
+            let updatedStatePayload = try encodedPayload(state, table: "time_machine_states")
+            try db.execute(
+                sql: """
+                UPDATE time_machine_states
+                SET repository_id = ?, payload = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                arguments: [repositoryIDString, updatedStatePayload, timestamp, repositoryIDString]
+            )
+
+            let event = EventLog(level: .warning, message: eventMessage, createdAt: now)
+            let eventPayload = try encodedPayload(event, table: "event_logs")
+            try db.execute(
+                sql: """
+                INSERT INTO event_logs (id, repository_id, payload, created_at, updated_at)
+                VALUES (?, NULL, ?, ?, ?)
+                """,
+                arguments: [event.id.uuidString, eventPayload, timestamp, timestamp]
+            )
+
+            return InterruptedTimeMachineConnectionRecovery(
+                state: state,
+                interruptedJobIDs: interruptedJobIDs
+            )
+        }
     }
 
     public func updateJobRunProgress(id: UUID, progressSnapshot: ResticProgressSnapshot) throws {
@@ -728,6 +893,7 @@ public final class DeltaDatabase: @unchecked Sendable {
 
     private static let genericPayloadTables = [
         "repositories",
+        "time_machine_states",
         "backup_profiles",
         "job_runs",
         "restore_jobs",

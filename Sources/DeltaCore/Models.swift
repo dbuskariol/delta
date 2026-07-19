@@ -10,6 +10,29 @@ public enum BackupSourceMode: String, Codable, CaseIterable, Sendable {
         case .customFolders: "Custom folders"
         }
     }
+
+}
+
+public enum BackupFormat: String, Codable, CaseIterable, Sendable {
+    case delta
+    case timeMachine
+
+    public var displayName: String {
+        switch self {
+        case .delta: "Delta encrypted backup"
+        case .timeMachine: "Time Machine"
+        }
+    }
+
+    public var detail: String {
+        switch self {
+        case .delta:
+            "Encrypted, deduplicated restore points managed by Delta."
+        case .timeMachine:
+            "A native Time Machine disk stored remotely through Delta."
+        }
+    }
+
 }
 
 public enum RepositoryBackendKind: String, Codable, CaseIterable, Sendable {
@@ -37,6 +60,219 @@ public enum RepositoryBackendKind: String, Codable, CaseIterable, Sendable {
         case .rclone: "Cloud remote"
         case .custom: "Custom backup URL"
         }
+    }
+
+    public var supportsTimeMachineObjectStorage: Bool {
+        switch self {
+        case .local, .sftp, .s3, .backblazeB2, .azureBlob, .googleCloudStorage, .swiftObjectStorage, .rclone:
+            true
+        case .rest, .custom:
+            false
+        }
+    }
+}
+
+public struct TimeMachineRepositorySettings: Codable, Equatable, Sendable {
+    public static let defaultImageCapacityBytes: Int64 = 1_099_511_627_776
+    public static let defaultCacheLimitBytes: Int64 = 1_073_741_824
+    public static let minimumImageCapacityBytes: Int64 = 268_435_456
+    public static let maximumImageCapacityBytes: Int64 = 70_368_744_177_664
+    public static let sparsebundleBandSizeBytes = 8_388_608
+    /// One authenticated remote object matches one native sparsebundle band.
+    /// This keeps large-disk manifests bounded without changing the bytes that
+    /// Apple's DiskImages implementation reads and writes.
+    public static let chunkSizeBytes = sparsebundleBandSizeBytes
+    /// Pressure uploads stay fixed-size even when the user selects a larger
+    /// performance cache, so cache configuration cannot create an unbounded
+    /// transport command or alter correctness.
+    public static let remoteSpillBatchBytes: Int64 = 8 * Int64(chunkSizeBytes)
+    public static let minimumCacheLimitBytes = remoteSpillBatchBytes
+    public static let sparsebundleFileSystemName = "Case-sensitive APFS"
+    public static let maximumDiskPasswordBytes = 4_096
+
+    public var storeID: UUID
+    public var volumeName: String
+    public var imageCapacityBytes: Int64
+    public var cacheLimitBytes: Int64
+    public var manifestKeychainAccount: String
+
+    public init(
+        storeID: UUID = UUID(),
+        volumeName: String = "Delta Time Machine",
+        imageCapacityBytes: Int64 = Self.defaultImageCapacityBytes,
+        cacheLimitBytes: Int64 = Self.defaultCacheLimitBytes,
+        manifestKeychainAccount: String? = nil
+    ) {
+        self.storeID = storeID
+        self.volumeName = volumeName
+        self.imageCapacityBytes = imageCapacityBytes
+        self.cacheLimitBytes = cacheLimitBytes
+        self.manifestKeychainAccount = manifestKeychainAccount
+            ?? "time-machine-manifest-\(storeID.uuidString)"
+    }
+
+    public var remoteNamespace: String {
+        "delta-time-machine/v1/\(storeID.uuidString.lowercased())"
+    }
+
+    public var diskPasswordKeychainAccount: String {
+        "time-machine-password-\(storeID.uuidString)"
+    }
+
+    public static func normalizedVolumeName(_ value: String) -> String? {
+        let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard
+            !normalized.isEmpty,
+            normalized != ".",
+            normalized != "..",
+            normalized.count <= 63,
+            !normalized.contains("/"),
+            !normalized.contains(":"),
+            normalized.unicodeScalars.allSatisfy({
+                !CharacterSet.controlCharacters.contains($0)
+            })
+        else {
+            return nil
+        }
+        return normalized
+    }
+}
+
+public enum TimeMachineRemotePathPolicy {
+    public static let maximumPathBytes = 4_096
+    public static let maximumComponentBytes = 255
+
+    public static func isValid(_ path: String) -> Bool {
+        guard
+            !path.isEmpty,
+            path.utf8.count <= maximumPathBytes,
+            !path.hasPrefix("/"),
+            !path.contains("\\"),
+            !path.utf8.contains(0)
+        else {
+            return false
+        }
+        let components = path.split(
+            separator: "/",
+            omittingEmptySubsequences: false
+        )
+        return !components.isEmpty && components.allSatisfy {
+            !$0.isEmpty
+                && $0.utf8.count <= maximumComponentBytes
+                && $0 != "."
+                && $0 != ".."
+                && !$0.hasPrefix(".delta-")
+        }
+    }
+}
+
+public enum TimeMachineDestinationLifecycle: String, Codable, CaseIterable, Sendable {
+    case waitingForPermissions
+    case preparing
+    case disconnecting
+    case ready
+    case mounted
+    case disconnected
+    case needsRepair
+    case failed
+
+    public var displayName: String {
+        switch self {
+        case .waitingForPermissions: "Needs Permission"
+        case .preparing: "Preparing"
+        case .disconnecting: "Disconnecting"
+        case .ready: "Ready"
+        case .mounted: "Connected"
+        case .disconnected: "Disconnected"
+        case .needsRepair: "Needs Repair"
+        case .failed: "Failed"
+        }
+    }
+
+}
+
+public enum TimeMachineDestinationFailureContext: String, Codable, Sendable {
+    case remotePreparation
+    case remoteVerification
+    case remoteAvailability
+    case systemConnection
+    case systemDisconnection
+    case systemStatePersistence
+    case systemDestinationCleanup
+    case remoteSynchronization
+    case storageService
+}
+
+public struct TimeMachineDestinationState: Codable, Identifiable, Equatable, Sendable {
+    public var id: UUID { repositoryID }
+    public var repositoryID: UUID
+    public var storeID: UUID
+    public var lifecycle: TimeMachineDestinationLifecycle
+    public var mountSessionID: UUID?
+    public var mountPoint: String?
+    public var diskImagePath: String?
+    public var deviceIdentifier: String?
+    public var timeMachineDestinationID: String?
+    public var committedGeneration: UInt64
+    /// Authenticated digest for `committedGeneration`. Older saved states do
+    /// not contain this optional rollback witness and establish it during the
+    /// next successful remote verification.
+    public var committedManifestDigest: String?
+    public var cleanCacheBytes: Int64
+    public var dirtyCacheBytes: Int64
+    public var lastError: String?
+    public var lastFailureContext: TimeMachineDestinationFailureContext?
+    public var updatedAt: Date
+
+    public init(
+        repositoryID: UUID,
+        storeID: UUID,
+        lifecycle: TimeMachineDestinationLifecycle = .waitingForPermissions,
+        mountSessionID: UUID? = nil,
+        mountPoint: String? = nil,
+        diskImagePath: String? = nil,
+        deviceIdentifier: String? = nil,
+        timeMachineDestinationID: String? = nil,
+        committedGeneration: UInt64 = 0,
+        committedManifestDigest: String? = nil,
+        cleanCacheBytes: Int64 = 0,
+        dirtyCacheBytes: Int64 = 0,
+        lastError: String? = nil,
+        lastFailureContext: TimeMachineDestinationFailureContext? = nil,
+        updatedAt: Date = Date()
+    ) {
+        self.repositoryID = repositoryID
+        self.storeID = storeID
+        self.lifecycle = lifecycle
+        self.mountSessionID = mountSessionID
+        self.mountPoint = mountPoint
+        self.diskImagePath = diskImagePath
+        self.deviceIdentifier = deviceIdentifier
+        self.timeMachineDestinationID = timeMachineDestinationID
+        self.committedGeneration = committedGeneration
+        self.committedManifestDigest = committedManifestDigest
+        self.cleanCacheBytes = cleanCacheBytes
+        self.dirtyCacheBytes = dirtyCacheBytes
+        self.lastError = lastError
+        self.lastFailureContext = lastFailureContext
+        self.updatedAt = updatedAt
+    }
+
+    public var allowsSystemConnection: Bool {
+        switch lifecycle {
+        case .waitingForPermissions, .ready, .disconnected:
+            true
+        case .failed:
+            lastFailureContext == .systemConnection
+                || lastFailureContext == .systemDestinationCleanup
+                || lastFailureContext == .storageService
+        case .preparing, .disconnecting, .mounted, .needsRepair:
+            false
+        }
+    }
+
+    public var blocksConfigurationChanges: Bool {
+        lifecycle == .preparing || lifecycle == .disconnecting || lifecycle == .mounted
     }
 }
 
@@ -265,6 +501,8 @@ public struct BackupRepository: Codable, Identifiable, Equatable, Sendable {
     public var id: UUID
     public var name: String
     public var backend: RepositoryBackend
+    public var format: BackupFormat
+    public var timeMachineSettings: TimeMachineRepositorySettings?
     public var secretStorageMode: SecretStorageMode
     public var keychainAccount: String
     public var credentialReferences: [RepositoryCredentialReference]
@@ -275,6 +513,8 @@ public struct BackupRepository: Codable, Identifiable, Equatable, Sendable {
         id: UUID = UUID(),
         name: String,
         backend: RepositoryBackend,
+        format: BackupFormat = .delta,
+        timeMachineSettings: TimeMachineRepositorySettings? = nil,
         secretStorageMode: SecretStorageMode = .appManagedKeychain,
         keychainAccount: String? = nil,
         credentialReferences: [RepositoryCredentialReference] = [],
@@ -284,8 +524,14 @@ public struct BackupRepository: Codable, Identifiable, Equatable, Sendable {
         self.id = id
         self.name = name
         self.backend = backend
+        self.format = format
+        self.timeMachineSettings = format == .timeMachine
+            ? (timeMachineSettings ?? TimeMachineRepositorySettings(volumeName: name))
+            : nil
         self.secretStorageMode = secretStorageMode
-        self.keychainAccount = keychainAccount ?? "repository-\(id.uuidString)"
+        self.keychainAccount = keychainAccount
+            ?? self.timeMachineSettings?.diskPasswordKeychainAccount
+            ?? "repository-\(id.uuidString)"
         self.credentialReferences = credentialReferences
         self.createdAt = createdAt
         self.lastVerifiedAt = lastVerifiedAt
@@ -295,11 +541,31 @@ public struct BackupRepository: Codable, Identifiable, Equatable, Sendable {
         case id
         case name
         case backend
+        case format
+        case timeMachineSettings
         case secretStorageMode
         case keychainAccount
         case credentialReferences
         case createdAt
         case lastVerifiedAt
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        backend = try container.decode(RepositoryBackend.self, forKey: .backend)
+        format = try container.decodeIfPresent(BackupFormat.self, forKey: .format) ?? .delta
+        timeMachineSettings = try container.decodeIfPresent(TimeMachineRepositorySettings.self, forKey: .timeMachineSettings)
+        if format == .timeMachine, timeMachineSettings == nil {
+            timeMachineSettings = TimeMachineRepositorySettings(volumeName: name)
+        }
+        secretStorageMode = try container.decodeIfPresent(SecretStorageMode.self, forKey: .secretStorageMode) ?? .appManagedKeychain
+        keychainAccount = try container.decodeIfPresent(String.self, forKey: .keychainAccount)
+            ?? "repository-\(id.uuidString)"
+        credentialReferences = try container.decodeIfPresent([RepositoryCredentialReference].self, forKey: .credentialReferences) ?? []
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        lastVerifiedAt = try container.decodeIfPresent(Date.self, forKey: .lastVerifiedAt)
     }
 }
 

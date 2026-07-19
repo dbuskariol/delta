@@ -71,6 +71,56 @@ final class BackupCoordinatorPolicyTests: XCTestCase {
         XCTAssertTrue(try fixture.database.fetchJobLogs(jobID: run.id).contains { $0.message.contains("profile is invalid") })
     }
 
+    func testResticCoordinatorRejectsEveryTimeMachineEntryPointWithoutRunningRestic() throws {
+        let fixture = try Fixture()
+        let runner = MockResticRunner(results: [.success])
+        let coordinator = fixture.makeCoordinator(runner: runner)
+        let repository = fixture.timeMachineRepository()
+        let profile = fixture.profile()
+        let restoreRequest = RestoreRequest(
+            repositoryID: repository.id,
+            snapshotID: "latest",
+            destination: .chosenFolder(fixture.root.appendingPathComponent("restore").path)
+        )
+
+        let initialize = try coordinator.initializeRepository(repository)
+        let backup = try coordinator.runBackup(profile: profile, repository: repository)
+        let maintenance = try coordinator.runRetentionMaintenance(
+            profile: profile,
+            repository: repository
+        )
+        let check = try coordinator.check(repository: repository)
+        let restore = try coordinator.restore(request: restoreRequest, repository: repository)
+
+        XCTAssertEqual(initialize.status, .failed)
+        XCTAssertEqual(backup.status, .failed)
+        XCTAssertEqual(maintenance.map(\.status), [.failed])
+        XCTAssertEqual(check.status, .failed)
+        XCTAssertEqual(restore.status, .failed)
+        XCTAssertTrue(
+            [initialize, backup, maintenance[0], check, restore].allSatisfy {
+                $0.message?.localizedCaseInsensitiveContains("Time Machine") == true
+            }
+        )
+        XCTAssertThrowsError(try coordinator.refreshSnapshots(repository: repository)) { error in
+            guard case BackupCoordinatorError.unsupportedRepositoryFormat = error else {
+                return XCTFail("Unexpected error: \(error)")
+            }
+        }
+        XCTAssertThrowsError(
+            try coordinator.listSnapshotEntries(
+                repository: repository,
+                snapshotID: "latest"
+            )
+        ) { error in
+            guard case BackupCoordinatorError.unsupportedRepositoryFormat = error else {
+                return XCTFail("Unexpected error: \(error)")
+            }
+        }
+        XCTAssertTrue(runner.commands.isEmpty)
+        XCTAssertTrue(try fixture.database.fetchRestoreRequests(limit: 10).isEmpty)
+    }
+
     func testPruneRunsRepositoryCheckWhenRetentionRequestsIt() throws {
         let fixture = try Fixture()
         let runner = MockResticRunner(results: [.success, .success, .emptySnapshotList])
@@ -1395,6 +1445,16 @@ private struct Fixture {
             id: repository.id,
             name: "Unavailable",
             backend: .local(path: root.appendingPathComponent("missing-destination", isDirectory: true).path)
+        )
+    }
+
+    func timeMachineRepository() -> BackupRepository {
+        BackupRepository(
+            id: repository.id,
+            name: "Time Machine",
+            backend: repository.backend,
+            format: .timeMachine,
+            timeMachineSettings: TimeMachineRepositorySettings()
         )
     }
 

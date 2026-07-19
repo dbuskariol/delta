@@ -11,7 +11,32 @@ done < <(/usr/bin/find "$ROOT_DIR/Scripts" -type f -name '*.sh' -print0)
 /usr/bin/xcrun swiftc -typecheck "$ROOT_DIR/Scripts/sparkle-public-key.swift"
 /usr/bin/plutil -lint "$ROOT_DIR/Packaging/Delta.app.plist" >/dev/null
 /usr/bin/plutil -lint "$ROOT_DIR/Packaging/Delta.entitlements" >/dev/null
+/usr/bin/plutil -lint "$ROOT_DIR/Packaging/DeltaTimeMachineService.entitlements" >/dev/null
 /usr/bin/plutil -lint "$ROOT_DIR/Packaging/com.delta.backup.agent.plist" >/dev/null
+/usr/bin/plutil -lint "$ROOT_DIR/Packaging/DeltaTimeMachineFS.Info.plist" >/dev/null
+/usr/bin/plutil -lint "$ROOT_DIR/Packaging/DeltaTimeMachineFS.entitlements" >/dev/null
+if [[ "$(delta_plist_value 'com.apple.security.app-sandbox' "$ROOT_DIR/Packaging/DeltaTimeMachineFS.entitlements")" != "true" ]]; then
+  delta_fail 'the Time Machine extension must declare the App Sandbox entitlement'
+fi
+for entitlement_file in \
+  "$ROOT_DIR/Packaging/Delta.entitlements" \
+  "$ROOT_DIR/Packaging/DeltaTimeMachineService.entitlements" \
+  "$ROOT_DIR/Packaging/DeltaTimeMachineFS.entitlements"
+do
+  [[ "$(/usr/libexec/PlistBuddy -c 'Print :com.apple.security.application-groups:0' "$entitlement_file")" == "BJCVJ5G7MJ.deltatm" ]]
+  if /usr/libexec/PlistBuddy -c 'Print :com.apple.security.application-groups:1' "$entitlement_file" >/dev/null 2>&1; then
+    printf "A Time Machine component declares an unexpected additional App Group: %s\n" "$entitlement_file" >&2
+    exit 1
+  fi
+done
+if /usr/bin/grep -Eq 'com\.apple\.security\.(network\.(client|server)|temporary-exception)' \
+    "$ROOT_DIR/Packaging/DeltaTimeMachineFS.entitlements"; then
+  printf "The Time Machine extension entitlements exceed its local App Group IPC boundary.\n" >&2
+  exit 1
+fi
+/usr/bin/plutil -lint "$ROOT_DIR/Packaging/DeltaTimeMachineHelper.Info.plist" >/dev/null
+/usr/bin/plutil -lint "$ROOT_DIR/Packaging/com.delta.backup.timemachine.service.plist" >/dev/null
+/usr/bin/plutil -lint "$ROOT_DIR/Packaging/com.delta.backup.timemachine.helper.plist" >/dev/null
 /usr/bin/plutil -lint "$ROOT_DIR/Resources/PrivacyInfo.xcprivacy" >/dev/null
 /usr/bin/git -C "$ROOT_DIR" diff --check
 IFS=$'\t' read -r VERSION BUILD < <(delta_assert_release_metadata "$ROOT_DIR")
@@ -99,6 +124,10 @@ DELTA_RESTIC_INTEGRATION=1 \
 RESTIC_BINARY="$ROOT_DIR/Resources/Tools/bin/restic" \
 /usr/bin/swift test --filter ResticIntegrationTests
 
+DELTA_RCLONE_INTEGRATION=1 \
+RCLONE_BINARY="$ROOT_DIR/Resources/Tools/bin/rclone" \
+/usr/bin/swift test --filter TimeMachineRcloneIntegrationTests
+
 BUILD_LOG="$(/usr/bin/mktemp -t delta-ci-build-app.XXXXXX)"
 if ! DELTA_CODESIGN_IDENTITY="-" "$ROOT_DIR/Scripts/build-app.sh" 2>&1 | /usr/bin/tee "$BUILD_LOG"; then
   /bin/rm -f "$BUILD_LOG"
@@ -113,6 +142,8 @@ fi
 /bin/rm -f "$BUILD_LOG"
 
 /usr/bin/codesign --verify --strict --deep --verbose=2 "$ROOT_DIR/dist/Delta.app"
+delta_assert_certificate_free_fskit_extension "$ROOT_DIR/dist/Delta.app"
+"$ROOT_DIR/Scripts/certificate-free-fskit-contract-self-test.sh" "$ROOT_DIR/dist/Delta.app"
 delta_record_automated_gate_status "$ROOT_DIR" "$ROOT_DIR/dist/Delta.app" "ci-self-test"
 GATE_STATUS_FILE="$ROOT_DIR/dist/release-evidence/automated-gate-status"
 GATE_APP_CDHASH="$(delta_signature_cdhash "$ROOT_DIR/dist/Delta.app")"
@@ -149,6 +180,9 @@ for EXECUTABLE_PATH in \
   "$ROOT_DIR/dist/Delta.app/Contents/MacOS/Delta" \
   "$ROOT_DIR/dist/Delta.app/Contents/Resources/DeltaAgent" \
   "$ROOT_DIR/dist/Delta.app/Contents/MacOS/DeltaSecretBridge" \
+  "$ROOT_DIR/dist/Delta.app/Contents/Resources/DeltaTimeMachineService" \
+  "$ROOT_DIR/dist/Delta.app/Contents/Library/LaunchServices/DeltaTimeMachineHelper" \
+  "$ROOT_DIR/dist/Delta.app/Contents/Extensions/DeltaTimeMachineFS.appex/Contents/MacOS/DeltaTimeMachineFS" \
   "$ROOT_DIR/dist/Delta.app/Contents/MacOS/restic" \
   "$ROOT_DIR/dist/Delta.app/Contents/MacOS/rclone"
 do

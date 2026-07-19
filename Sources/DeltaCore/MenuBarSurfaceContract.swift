@@ -4,7 +4,8 @@ public enum MenuBarSurfaceContract {
     public static let headerTitles = [
         "Delta",
         "Last Backup",
-        "Backup"
+        "Backup",
+        "Time Machine"
     ]
 
     public static let actionTitles = [
@@ -15,6 +16,8 @@ public enum MenuBarSurfaceContract {
         "Stop",
         "Open Delta",
         "Open Activity",
+        "Open Time Machine",
+        "Add a backup destination",
         "Refresh",
         "Check for Updates",
         "Quit Delta"
@@ -28,6 +31,7 @@ public enum MenuBarSurfaceContract {
         "Last backup failed",
         "Last backup completed with warnings",
         "Last backup stopped",
+        "Destination needs attention",
         "Storage unavailable"
     ]
 
@@ -65,10 +69,12 @@ public enum MenuBarSurfaceContract {
         require(actionTitles, contains: "Pause", in: "actions", failures: &failures)
         require(actionTitles, contains: "Stop", in: "actions", failures: &failures)
         require(actionTitles, contains: "Open Activity", in: "actions", failures: &failures)
+        require(actionTitles, contains: "Open Time Machine", in: "actions", failures: &failures)
         require(actionTitles, contains: "Check for Updates", in: "actions", failures: &failures)
         require(actionTitles, contains: "Quit Delta", in: "actions", failures: &failures)
         require(statusTexts, contains: "Last backup completed", in: "statuses", failures: &failures)
         require(statusTexts, contains: "Last backup completed with warnings", in: "statuses", failures: &failures)
+        require(statusTexts, contains: "Destination needs attention", in: "statuses", failures: &failures)
         require(progressTexts, contains: "Pausing safely...", in: "progress", failures: &failures)
         require(progressTexts, contains: "Stopping safely...", in: "progress", failures: &failures)
 

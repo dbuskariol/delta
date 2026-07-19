@@ -448,9 +448,15 @@ public enum SensitiveLogRedactor {
             with: "$1<redacted>@"
         )
         redacted = replace(
-            pattern: #"\b(AWS_SECRET_ACCESS_KEY|AWS_SESSION_TOKEN|B2_ACCOUNT_KEY|AZURE_ACCOUNT_KEY|AZURE_ACCOUNT_SAS|GOOGLE_ACCESS_TOKEN|OS_PASSWORD|OS_APPLICATION_CREDENTIAL_SECRET|OS_AUTH_TOKEN|ST_KEY|RESTIC_REST_PASSWORD|RCLONE_CONFIG_PASS)\s*([=:])\s*([^,\s;]+)"#,
+            pattern: #"\b(AWS_SECRET_ACCESS_KEY|AWS_SESSION_TOKEN|B2_ACCOUNT_KEY|AZURE_ACCOUNT_KEY|AZURE_ACCOUNT_SAS|GOOGLE_ACCESS_TOKEN|OS_PASSWORD|OS_APPLICATION_CREDENTIAL_SECRET|OS_AUTH_TOKEN|ST_KEY|RESTIC_REST_PASSWORD|RCLONE_CONFIG_PASS|RCLONE_CONFIG_[A-Z0-9_]+_(?:KEY|PASS|PASSWORD|TOKEN|SECRET|SAS_URL|ACCESS_TOKEN))\s*([=:])\s*([^,\s;]+)"#,
             in: redacted,
             with: "$1$2<redacted>",
+            options: [.caseInsensitive]
+        )
+        redacted = replace(
+            pattern: #"([?&](?:sig|signature|token|access_token|sas_token)=)[^&\s]+"#,
+            in: redacted,
+            with: "$1<redacted>",
             options: [.caseInsensitive]
         )
         return redacted

@@ -4,6 +4,31 @@ import XCTest
 @testable import DeltaCore
 
 final class KeychainSecretStoreTests: XCTestCase {
+    func testTrustedApplicationPathsFollowInstalledBundleLayout() {
+        let paths = KeychainSecretStore.trustedApplicationPaths(
+            executablePath: "/Applications/Delta.app/Contents/MacOS/Delta"
+        )
+
+        XCTAssertEqual(
+            paths,
+            [
+                "/Applications/Delta.app/Contents/MacOS/Delta",
+                "/Applications/Delta.app/Contents/Resources/DeltaAgent",
+                "/Applications/Delta.app/Contents/MacOS/DeltaSecretBridge",
+                "/Applications/Delta.app/Contents/Resources/DeltaTimeMachineService"
+            ]
+        )
+    }
+
+    func testTrustedApplicationPathsKeepCurrentPackagedHelperExecutable() {
+        let paths = KeychainSecretStore.trustedApplicationPaths(
+            executablePath: "/Applications/Delta.app/Contents/Resources/DeltaTimeMachineService"
+        )
+
+        XCTAssertEqual(paths.first, "/Applications/Delta.app/Contents/Resources/DeltaTimeMachineService")
+        XCTAssertTrue(paths.contains("/Applications/Delta.app/Contents/MacOS/Delta"))
+    }
+
     func testDefaultServiceUsesDestinationLanguage() {
         XCTAssertEqual(KeychainSecretStore.defaultService, "com.delta.backup.destination-secrets")
         XCTAssertEqual(KeychainSecretStore.accessPromptName, "Delta destination secrets")

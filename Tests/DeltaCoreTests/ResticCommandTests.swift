@@ -2,6 +2,49 @@ import XCTest
 @testable import DeltaCore
 
 final class ResticCommandTests: XCTestCase {
+    func testEveryResticCommandRejectsTimeMachineDestinationBeforeCommandConstruction() {
+        let repository = BackupRepository(
+            name: "Remote Time Machine",
+            backend: .local(path: "/tmp/time-machine-store"),
+            format: .timeMachine,
+            timeMachineSettings: TimeMachineRepositorySettings()
+        )
+        let profile = BackupProfile(
+            name: "Invalid restic profile",
+            sourceMode: .customFolders,
+            sources: [BackupSource(path: "/Users/example/Documents")],
+            repositoryID: repository.id
+        )
+        let restore = RestoreRequest(
+            repositoryID: repository.id,
+            snapshotID: "latest",
+            destination: .chosenFolder("/tmp/restore")
+        )
+        let builder = makeBuilder()
+        let attempts: [() throws -> Void] = [
+            { _ = try builder.initializeRepository(repository: repository) },
+            { _ = try builder.backup(profile: profile, repository: repository) },
+            { _ = try builder.snapshots(repository: repository) },
+            { _ = try builder.repositoryKeys(repository: repository) },
+            { _ = try builder.addRepositoryKey(repository: repository, password: "unused") },
+            { _ = try builder.removeRepositoryKey(repository: repository, keyID: "key") },
+            { _ = try builder.validateRepositoryPassword(repository: repository, password: "unused") },
+            { _ = try builder.listSnapshotEntries(repository: repository, snapshotID: "latest") },
+            { _ = try builder.restore(request: restore, repository: repository) },
+            { _ = try builder.forgetAndPrune(profile: profile, repository: repository) },
+            { _ = try builder.check(repository: repository) }
+        ]
+
+        for attempt in attempts {
+            XCTAssertThrowsError(try attempt()) { error in
+                XCTAssertEqual(
+                    error as? ResticCommandValidationError,
+                    .unsupportedRepositoryFormat
+                )
+            }
+        }
+    }
+
     func testRedactedDescriptionHidesPasswordCommandValue() {
         let command = ResticCommand(
             executableURL: URL(fileURLWithPath: "/Applications/Delta.app/Contents/MacOS/restic"),
@@ -460,9 +503,9 @@ final class ResticCommandTests: XCTestCase {
         XCTAssertTrue(optionValue.contains("BatchMode=yes"))
     }
 
-    func testRcloneCommandPinsBundledRcloneExecutableWhenAvailable() throws {
+    func testRcloneCommandPinsBundledRcloneExecutableWhenAppPathContainsSpaces() throws {
         let directory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("delta-rclone-test-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("delta rclone test \(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
 
@@ -481,7 +524,9 @@ final class ResticCommandTests: XCTestCase {
         let command = try builder.snapshots(repository: repository)
 
         XCTAssertTrue(command.arguments.contains("-o"))
-        XCTAssertTrue(command.arguments.contains("rclone.program=\(rclone.path)"))
+        XCTAssertTrue(command.arguments.contains("rclone.program=rclone"))
+        XCTAssertTrue(command.environment["PATH"]?.hasPrefix("\(directory.path):") == true)
+        XCTAssertFalse(command.arguments.contains { $0.contains(directory.path) })
     }
 
     func testCredentialEnvironmentIsLoadedFromKeychainReferences() throws {
@@ -716,6 +761,89 @@ final class ResticCommandTests: XCTestCase {
         XCTAssertThrowsError(try secrets.load(account: newAccount))
         let originalReference = try XCTUnwrap(existing.first)
         XCTAssertEqual(try secrets.load(account: originalReference.keychainAccount), "old-a")
+    }
+
+    func testCredentialUpdateRestoresKeychainWhenDurableConfigurationCommitFails() throws {
+        enum TestError: Error, Equatable {
+            case databaseFailed
+        }
+
+        let secrets = InMemorySecretStore()
+        let repositoryID = UUID()
+        let resolver = secrets.resolver
+        let existing = try resolver.saveCredentials(
+            ["A_KEY": "old-a", "OLD_KEY": "old-removed"],
+            repositoryID: repositoryID
+        )
+        let newAccount = "repository-\(repositoryID.uuidString)-env-B_KEY"
+
+        XCTAssertThrowsError(
+            try resolver.withUpdatedCredentials(
+                ["A_KEY": "new-a", "B_KEY": "new-b"],
+                existingReferences: existing,
+                repositoryID: repositoryID,
+                allowedKeys: ["A_KEY", "B_KEY"]
+            ) { _ in
+                throw TestError.databaseFailed
+            }
+        ) { error in
+            XCTAssertEqual(error as? TestError, .databaseFailed)
+        }
+
+        let originalByKey = Dictionary(uniqueKeysWithValues: existing.map { ($0.environmentKey, $0) })
+        XCTAssertEqual(
+            try secrets.load(account: try XCTUnwrap(originalByKey["A_KEY"]?.keychainAccount)),
+            "old-a"
+        )
+        XCTAssertEqual(
+            try secrets.load(account: try XCTUnwrap(originalByKey["OLD_KEY"]?.keychainAccount)),
+            "old-removed"
+        )
+        XCTAssertThrowsError(try secrets.load(account: newAccount))
+    }
+
+    func testCredentialUpdateReportsIncompleteRollbackAfterCommitFailure() throws {
+        enum TestError: Error, Equatable {
+            case databaseFailed
+            case rollbackFailed
+        }
+
+        let secrets = InMemorySecretStore()
+        let repositoryID = UUID()
+        let existing = try secrets.resolver.saveCredentials(
+            ["A_KEY": "old-a"],
+            repositoryID: repositoryID
+        )
+        let originalAccount = try XCTUnwrap(existing.first?.keychainAccount)
+        let resolver = RepositoryCredentialResolver(
+            loadSecret: { account in try secrets.load(account: account) },
+            saveSecret: { secret, account in
+                if account == originalAccount, secret == "old-a" {
+                    throw TestError.rollbackFailed
+                }
+                try secrets.save(secret: secret, account: account)
+            },
+            deleteSecret: { account in try secrets.delete(account: account) }
+        )
+
+        XCTAssertThrowsError(
+            try resolver.withUpdatedCredentials(
+                ["A_KEY": "new-a"],
+                existingReferences: existing,
+                repositoryID: repositoryID,
+                allowedKeys: ["A_KEY"]
+            ) { _ in
+                throw TestError.databaseFailed
+            }
+        ) { error in
+            XCTAssertEqual(
+                error as? RepositoryCredentialUpdateError,
+                .rollbackIncomplete(
+                    originalMessage: TestError.databaseFailed.localizedDescription,
+                    failureCount: 1
+                )
+            )
+        }
     }
 
     func testCredentialTemplatesExposeDocumentedResticEnvironmentKeys() {

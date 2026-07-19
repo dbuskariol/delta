@@ -33,7 +33,8 @@ public struct MenuBarStatusPresentation: Equatable, Sendable {
         isWorking: Bool,
         activeJobKind: JobKind?,
         latestBackupStatus: JobStatus?,
-        acknowledgedOmissionCount: Int? = nil
+        acknowledgedOmissionCount: Int? = nil,
+        hasDestinationAttention: Bool = false
     ) -> MenuBarStatusPresentation {
         guard isPersistentStoreAvailable else {
             return MenuBarStatusPresentation(
@@ -61,6 +62,29 @@ public struct MenuBarStatusPresentation: Equatable, Sendable {
             )
         }
 
+        let latestOutcome = latestBackupStatus.map {
+            JobOutcomePresentation(
+                status: $0,
+                acknowledgedOmissionCount: acknowledgedOmissionCount
+            )
+        }
+        let latestBackupHasPriority: Bool
+        switch latestBackupStatus {
+        case .failed, .warning, .cancelled, .queued, .running:
+            latestBackupHasPriority = latestOutcome?.hasKnownOmissions != true
+        case .succeeded, nil:
+            latestBackupHasPriority = false
+        }
+        if hasDestinationAttention, !latestBackupHasPriority {
+            return MenuBarStatusPresentation(
+                symbolName: "externaldrive.badge.exclamationmark",
+                headerText: "Destination needs attention",
+                badgeText: "Attention",
+                accessibilityLabel: "Delta, destination needs attention",
+                tone: .attention
+            )
+        }
+
         guard let latestBackupStatus else {
             return MenuBarStatusPresentation(
                 symbolName: "externaldrive.badge.checkmark",
@@ -71,10 +95,7 @@ public struct MenuBarStatusPresentation: Equatable, Sendable {
             )
         }
 
-        let outcome = JobOutcomePresentation(
-            status: latestBackupStatus,
-            acknowledgedOmissionCount: acknowledgedOmissionCount
-        )
+        let outcome = latestOutcome ?? JobOutcomePresentation(status: latestBackupStatus)
         if outcome.hasKnownOmissions {
             return MenuBarStatusPresentation(
                 symbolName: "externaldrive.badge.checkmark",

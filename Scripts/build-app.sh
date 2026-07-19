@@ -18,7 +18,11 @@ fi
 # applies an ad-hoc seal because its acceptance evidence is bound to the app's
 # CDHash. Without a stable team identity, Hardened Runtime library validation
 # would reject Sparkle before launch, so it is disabled only for this explicitly
-# non-shipping build. Developer ID archives always use build-release.sh instead.
+# non-shipping build. FSKit's restricted entitlement also requires Apple-issued
+# provisioning, so this build compiles and embeds an intentionally inert copy of
+# the extension without that entitlement. Developer ID archives always use
+# build-release.sh and fail closed unless the entitlement and matching profile
+# are present.
 DERIVED_DATA="${DELTA_DERIVED_DATA:-$(delta_default_derived_data CI)}"
 OUTPUT_APP="$ROOT_DIR/dist/Delta.app"
 HOST_ARCH="$(/usr/bin/uname -m)"
@@ -38,6 +42,7 @@ HOST_ARCH="$(/usr/bin/uname -m)"
   CODE_SIGN_STYLE=Manual \
   CODE_SIGN_IDENTITY=- \
   DEVELOPMENT_TEAM= \
+  DELTA_FSKIT_CODE_SIGN_ENTITLEMENTS= \
   ENABLE_HARDENED_RUNTIME=NO \
   build
 
@@ -48,6 +53,7 @@ BUILT_APP="$DERIVED_DATA/Build/Products/Release/Delta.app"
 /usr/bin/ditto "$BUILT_APP" "$OUTPUT_APP"
 /usr/bin/codesign --verify --strict --deep --verbose=2 "$OUTPUT_APP" \
   || delta_fail 'the ad-hoc CI app failed strict signature verification'
+delta_assert_certificate_free_fskit_extension "$OUTPUT_APP"
 DELTA_ENABLE_MENU_BAR_ACCEPTANCE=1 \
   "$OUTPUT_APP/Contents/MacOS/Delta" --acceptance-menu-bar-surface >/dev/null \
   || delta_fail 'the ad-hoc CI app failed to launch and load its embedded frameworks'

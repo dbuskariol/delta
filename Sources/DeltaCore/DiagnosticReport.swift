@@ -16,11 +16,36 @@ public struct DiagnosticDestinationSummary: Equatable, Sendable {
     public var name: String
     public var kind: String
     public var lastVerifiedAt: Date?
+    public var format: String?
+    public var timeMachineState: String?
+    public var committedGeneration: UInt64?
+    public var cleanCacheBytes: Int64?
+    public var dirtyCacheBytes: Int64?
+    public var timeMachineFailureContext: String?
+    public var timeMachineLastError: String?
 
-    public init(name: String, kind: String, lastVerifiedAt: Date? = nil) {
+    public init(
+        name: String,
+        kind: String,
+        lastVerifiedAt: Date? = nil,
+        format: String? = nil,
+        timeMachineState: String? = nil,
+        committedGeneration: UInt64? = nil,
+        cleanCacheBytes: Int64? = nil,
+        dirtyCacheBytes: Int64? = nil,
+        timeMachineFailureContext: String? = nil,
+        timeMachineLastError: String? = nil
+    ) {
         self.name = name
         self.kind = kind
         self.lastVerifiedAt = lastVerifiedAt
+        self.format = format
+        self.timeMachineState = timeMachineState
+        self.committedGeneration = committedGeneration
+        self.cleanCacheBytes = cleanCacheBytes
+        self.dirtyCacheBytes = dirtyCacheBytes
+        self.timeMachineFailureContext = timeMachineFailureContext
+        self.timeMachineLastError = timeMachineLastError
     }
 }
 
@@ -220,7 +245,24 @@ public struct DiagnosticReportBuilder: Sendable {
         lines += ["", "## Destinations"]
         lines += listOrEmpty(snapshot.destinations) { destination in
             let verified = destination.lastVerifiedAt.map { "; verified \(timestamp($0))" } ?? ""
-            return "- \(diagnosticText(destination.name)): \(destination.kind)\(verified)"
+            let format = destination.format.map { "; format \(diagnosticText($0))" } ?? ""
+            let timeMachine = destination.timeMachineState.map { state in
+                let generation = destination.committedGeneration.map { "; generation \($0)" } ?? ""
+                let cache: String
+                if let clean = destination.cleanCacheBytes, let dirty = destination.dirtyCacheBytes {
+                    cache = "; cache clean \(clean) bytes, dirty \(dirty) bytes"
+                } else {
+                    cache = ""
+                }
+                let failureContext = destination.timeMachineFailureContext.map {
+                    "; failure context \(diagnosticText($0))"
+                } ?? ""
+                let lastError = destination.timeMachineLastError.map {
+                    "; last error \(diagnosticText($0))"
+                } ?? ""
+                return "; Time Machine \(diagnosticText(state))\(generation)\(cache)\(failureContext)\(lastError)"
+            } ?? ""
+            return "- \(diagnosticText(destination.name)): \(destination.kind)\(format)\(timeMachine)\(verified)"
         }
 
         lines += ["", "## Profiles"]

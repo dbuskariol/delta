@@ -7,25 +7,39 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		04B79BADB8835A3B949AC3DC /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 15A7EE11B4F68F429B02D4E5 /* GRDB */; };
 		097A404E4414515E28E764D6 /* SecurityScopedBookmarkStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9665691705094DCCCCB0B6C5 /* SecurityScopedBookmarkStoreTests.swift */; };
 		0ABD788A6172D098AA38F81D /* AcceptancePreferencesCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE6A815EB59DE930FD35BD00 /* AcceptancePreferencesCommand.swift */; };
+		0C0B3C4C6A95D0A54437C961 /* TimeMachineObjectStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42C94431EB6785F6DF076B38 /* TimeMachineObjectStoreTests.swift */; };
+		1010E77376AD7E9446B0D889 /* TimeMachineSparseFileSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51B17C943FFC19F3609A24A6 /* TimeMachineSparseFileSessionTests.swift */; };
 		1328BD13947B4A7BB630D181 /* com.delta.backup.agent.plist in CopyFiles */ = {isa = PBXBuildFile; fileRef = 0ADB0DD0967BA62D3FC96293 /* com.delta.backup.agent.plist */; };
+		18235B69F4930A2716436777 /* PassthroughFSItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9984386210742AF4962D03A /* PassthroughFSItem.swift */; };
 		18ACB2ECC45697909B9B2529 /* ExternalBackendAcceptanceContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27C19FB33A107F678CEFAAF8 /* ExternalBackendAcceptanceContractTests.swift */; };
+		19C61705D8624321BC231400 /* PassthroughFSVolume.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A83E0172B49C4020A27FB07 /* PassthroughFSVolume.swift */; };
+		1D1324392579C9D64EC83188 /* com.delta.backup.timemachine.service.plist in CopyFiles */ = {isa = PBXBuildFile; fileRef = BD12745B0EB8EAF4DFB972B8 /* com.delta.backup.timemachine.service.plist */; };
 		1ED629821224952E3276E050 /* AcceptanceScheduledAgentCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 105B76879B8FC480030A19BE /* AcceptanceScheduledAgentCommand.swift */; };
 		2027C3FB1098F3492B00283A /* AcceptanceRunControlCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA64B4A668B87F7512220A9B /* AcceptanceRunControlCommand.swift */; };
 		2578751D52B2A1C0927C8DFE /* DeltaSecretBridge in Embed Dependencies */ = {isa = PBXBuildFile; fileRef = C187F0FAE587A5D82E7F5656 /* DeltaSecretBridge */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		296E057C3131AECB52519BA9 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = AAD90650D816CFE15D833746 /* Sparkle */; };
 		2B04F4FC01267432E7A14C57 /* JobOutcomePresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 736F93E2BF229347BFCBE2F8 /* JobOutcomePresentationTests.swift */; };
 		2C1208B9F3521C0AFB39D194 /* DeltaAgentInvocationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2385CFCBB16BD1494ACA33CF /* DeltaAgentInvocationTests.swift */; };
 		2C7D0974CD35C41AA5095594 /* JobNotificationPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19D887B1ACEDE2D6C09C8000 /* JobNotificationPolicyTests.swift */; };
 		3121D73BF95E13F619702FE9 /* ResticRunnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C78E6D327A9AF1BFC1D9D415 /* ResticRunnerTests.swift */; };
+		334C913F4C33809DFC63F93D /* DeltaCore in Frameworks */ = {isa = PBXBuildFile; productRef = B70C0E1DA5913C11E33D3DB3 /* DeltaCore */; };
 		35BC803C15D7A9E52CE023D3 /* ResticIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB6AC70C7ED86BC4D033C111 /* ResticIntegrationTests.swift */; };
 		39FDF2E5C9CB29118E006EA5 /* MenuBarStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D64AAF0246FEBF54B67CBDA /* MenuBarStatusView.swift */; };
+		3A6CAA4DC0006E9EFDFB2C92 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = F511A4B48ED27DAFC1159C9A /* main.swift */; };
 		3D2FF8C37FCA8C0076780DAD /* KeychainSecretStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7346DAB2492303B2A5B3CE07 /* KeychainSecretStoreTests.swift */; };
+		3E7969288112374048C7FF7F /* PassthroughFSVolume+Operations.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC0827343F78B6EDA4394173 /* PassthroughFSVolume+Operations.swift */; };
+		40C27F74B34ED62E9767EBF1 /* DeltaCore in Frameworks */ = {isa = PBXBuildFile; productRef = F7D80717532F9662C11EDEAD /* DeltaCore */; };
+		40E65388FB91C66C66D3953B /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = B45E62126F25F6AC3A5F7216 /* main.swift */; };
 		43ABEBB2D6173FC5C6C90757 /* DeltaAppPreferencesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB51075B150C5939DB1710E6 /* DeltaAppPreferencesTests.swift */; };
 		4962F97FD0FB6AC0CF6DCCD0 /* DeltaSecretBridgeInvocationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0C2927B1805F99361D0CF8C /* DeltaSecretBridgeInvocationTests.swift */; };
 		5B70F7C869E45340A16F320C /* DeltaAppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C689DD8002FF144F0BBDFA0 /* DeltaAppModel.swift */; };
 		5CA7A8F074245167F537EC33 /* DeltaStatusItemController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C8EBC5743918653A990E127 /* DeltaStatusItemController.swift */; };
+		5DD0CCE7BF121A443112B0F7 /* TimeMachineSystemControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D0958C764A3580F2B7B3BF3 /* TimeMachineSystemControllerTests.swift */; };
 		5E74A2864D611C95D4B16C53 /* BackupRepositoryValidatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60662F8E292C6D0E19930606 /* BackupRepositoryValidatorTests.swift */; };
+		618FE8B9EEFF4D0443C907FA /* DeltaTimeMachineIPC in Frameworks */ = {isa = PBXBuildFile; productRef = E7B19E529E32B79E5EF52176 /* DeltaTimeMachineIPC */; };
 		621397CD4E56E214C4DDB87A /* LocalResticRepositoryStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C4A667E9E42243147C08811 /* LocalResticRepositoryStateTests.swift */; };
 		64141E1D0FB14802AB8BC078 /* DeltaAgent in Embed Dependencies */ = {isa = PBXBuildFile; fileRef = 90C05D1A78563BC85C480E22 /* DeltaAgent */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		65B9CD4B618F79AFEE926EFB /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = BF978C7761D75EFC2838CBFB /* PrivacyInfo.xcprivacy */; };
@@ -34,40 +48,56 @@
 		66BB43D03ECF6E37BBB88024 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21481C079AB6867C30A4F3FD /* main.swift */; };
 		693D234D9E946657B9F130A6 /* AcceptanceMenuBarSurfaceCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = B999257F396A0F64F0398EED /* AcceptanceMenuBarSurfaceCommand.swift */; };
 		718D7BA0F53FD16A248A29F6 /* MenuBarActionAvailabilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D46869C8CBD03EC85C534F3 /* MenuBarActionAvailabilityTests.swift */; };
+		779C55FFC9CDD76CFC9512AE /* com.delta.backup.timemachine.helper.plist in CopyFiles */ = {isa = PBXBuildFile; fileRef = 1D725DB5ED6A63AE23A629F2 /* com.delta.backup.timemachine.helper.plist */; };
 		7B695AD87646FFE3B689FEAD /* restic in CopyFiles */ = {isa = PBXBuildFile; fileRef = 94F7A5586AACBFE334A09F59 /* restic */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		826BE6760F669CA08894D664 /* Delta.icns in Resources */ = {isa = PBXBuildFile; fileRef = 6997F645BACBEC9B5B9E0413 /* Delta.icns */; };
+		83383FE15278F226791008F8 /* TimeMachineRepositoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00632DC27CA31A89C062893D /* TimeMachineRepositoryTests.swift */; };
+		87EF065D9A9B2A5639F527C1 /* DeltaTimeMachineFS.appex in Embed Dependencies */ = {isa = PBXBuildFile; fileRef = A045881670B17700F62B0BD4 /* DeltaTimeMachineFS.appex */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		88932C250CE8317D3B56613D /* RepositoryAvailabilityCheckerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87245FFEC494241E1D9B99E6 /* RepositoryAvailabilityCheckerTests.swift */; };
 		8B514413D4D6E93D14CB5A20 /* AcceptanceExternalLifecycleCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3842119C6B1424E3BFCA0FE3 /* AcceptanceExternalLifecycleCommand.swift */; };
+		90573DDCFADE1233371B6E69 /* TimeMachineRuntimePathsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FB0D8338D45ACE56A5108A2 /* TimeMachineRuntimePathsTests.swift */; };
 		9095749E315C736B88E47D59 /* DeltaCore in Frameworks */ = {isa = PBXBuildFile; productRef = 918C73C6E40AF62A197A38F2 /* DeltaCore */; };
 		93AA657C2700E460B497B600 /* DeltaCore in Frameworks */ = {isa = PBXBuildFile; productRef = 875302222B948F9EFF66A576 /* DeltaCore */; };
 		93FB219683BAD3F579598B93 /* BackupIssueTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FA439C7D5363A04D7F1A12A /* BackupIssueTests.swift */; };
-		94C36C73CBAFBB503D39CE79 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 15A7EE11B4F68F429B02D4E5 /* GRDB */; };
+		94C36C73CBAFBB503D39CE79 /* DeltaTimeMachineIPC in Frameworks */ = {isa = PBXBuildFile; productRef = 4E61F0A7ADAFE98E83BC27B5 /* DeltaTimeMachineIPC */; };
+		97F0B424B51A73F204EE2824 /* DeltaTimeMachineHelper in Embed Dependencies */ = {isa = PBXBuildFile; fileRef = 86C56F83E409633F5A23C81B /* DeltaTimeMachineHelper */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		99FA22EB79350F602FA9282A /* ModelDisplayNameTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EEDDA234F5F66B29F47427B /* ModelDisplayNameTests.swift */; };
 		9C0B85D88F5122E1BE31BB38 /* DeltaCore in Frameworks */ = {isa = PBXBuildFile; productRef = B0A7C44860E1D7AFDB407D74 /* DeltaCore */; };
 		9CC7D9A3105FC793C30D908F /* DatabaseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2473445B9D9A9D881B483BC /* DatabaseTests.swift */; };
 		9E2C0447088C8FC630633F5F /* SettingsSurfaceContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6BF102EB1BD98E5D5657FFF /* SettingsSurfaceContractTests.swift */; };
 		A16862EEE844387DE467AE1E /* MenuBarSurfaceContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13B30181189C15B52C4319A1 /* MenuBarSurfaceContractTests.swift */; };
+		A51D3491AFA4BB45BF7F717F /* PassthroughFileSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10196CAA6E6DA4D415D44884 /* PassthroughFileSystem.swift */; };
 		A58CA0BFC077F1A0A4929204 /* RepositoryPasswordManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD662A2D16D0727151CA40FF /* RepositoryPasswordManagerTests.swift */; };
-		A5AD5E1873CEC9AEE66D3B8C /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = AAD90650D816CFE15D833746 /* Sparkle */; };
+		A5AD5E1873CEC9AEE66D3B8C /* DeltaTimeMachineIPC in Frameworks */ = {isa = PBXBuildFile; productRef = 1148BD9565EAD9427CB24168 /* DeltaTimeMachineIPC */; };
+		A6269E794D752FD3D71BD8E1 /* TimeMachineRcloneTransportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9572C86550CD0EE0457E3A2D /* TimeMachineRcloneTransportTests.swift */; };
 		A75662335E4E43BBF9D94D6E /* BackupExcludePatternParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AC7E62B0B40B2E457A5EF13 /* BackupExcludePatternParserTests.swift */; };
+		A98E22B8FD33BCC2525064DD /* TimeMachineRecoveryKeyRetentionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88D34DF5B9046FC3496F4324 /* TimeMachineRecoveryKeyRetentionTests.swift */; };
 		AA07C1A4FA04DD7B0948A1E5 /* BackupSourceAccessCheckerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2D20B1B7700FF8516BD2AD6 /* BackupSourceAccessCheckerTests.swift */; };
+		AC6CD51F2737E3A0515DC177 /* DeltaTimeMachineIPC in Frameworks */ = {isa = PBXBuildFile; productRef = 970FBF88E9F3DB7DBF6059D2 /* DeltaTimeMachineIPC */; };
 		AE0B72E51C791D06EBEE26B3 /* BackupProgressEstimatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3D4771174A3C1D3954A2208 /* BackupProgressEstimatorTests.swift */; };
 		B0A5501150894AA490522AAA /* RestorePointSelectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32B059142DCC54DC33391574 /* RestorePointSelectionTests.swift */; };
 		BB1F237EECF13DBF7BA3B2E9 /* SoftwareUpdateController.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF15AA707E58E0D6314C6448 /* SoftwareUpdateController.swift */; };
 		C2E6FAD3D446EC722568209C /* DeltaApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 408CAF3A34551DD8211A0E5D /* DeltaApp.swift */; };
+		CCFA980714E8C8E5E657E30D /* DeltaTimeMachineFSExtension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9375DA963512344855C6BCA5 /* DeltaTimeMachineFSExtension.swift */; };
+		CF19A0A67A1BDBAD14A3DBC5 /* TimeMachineStoreBootstrapTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 513C89046C7907E7437F4087 /* TimeMachineStoreBootstrapTests.swift */; };
 		CF98F7E1409F4EC0AA417050 /* ResticCommandTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFB74FA5A66EF2594ABA0131 /* ResticCommandTests.swift */; };
+		CFD6BC39A169A4767E1E3D76 /* LICENSE.txt in Resources */ = {isa = PBXBuildFile; fileRef = 7923DADC73DB0DB4165455D2 /* LICENSE.txt */; };
+		D52CDAFAD3A445CD709D1A0F /* RepositoryJobLockTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3D03D0FB969E904DEA90EB3 /* RepositoryJobLockTests.swift */; };
 		D606EFCA12C9B5F6EED023D9 /* LaunchAgentRegistrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F16DA68894561686DEA8769C /* LaunchAgentRegistrationTests.swift */; };
+		D7D2A52B85011BC5696B75D9 /* TimeMachineRcloneIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9BB344F642B48EBF85A0250 /* TimeMachineRcloneIntegrationTests.swift */; };
 		D8044B2C97B8EAEB75A3698E /* ScheduleAndParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28211A66D1218CE1E78AC0EA /* ScheduleAndParserTests.swift */; };
 		D932DBDE6F71FAF49F884AE3 /* DashboardHealthEvaluatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA5F9026EDD0D3D67DDAD5A9 /* DashboardHealthEvaluatorTests.swift */; };
 		D959DF644B5D3331BFB08057 /* AcceptanceLocalLifecycleCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0A24E43E6682CB42F5393F /* AcceptanceLocalLifecycleCommand.swift */; };
 		D977E864445CEFDAC3002C52 /* DiagnosticReportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F62B404376AE1D1BCDCC2C0 /* DiagnosticReportTests.swift */; };
 		D9FA9D63A1F7A0E8FB50B7CF /* DeltaCore in Frameworks */ = {isa = PBXBuildFile; productRef = 7BDCDF2D53DC627A5FD4D8A1 /* DeltaCore */; };
+		E0263CD9239CF4A2BF03D2D8 /* DeltaRemoteFileClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00896BE7169CA901E1776D7 /* DeltaRemoteFileClient.swift */; };
 		EB5B4083BB8AC105DB6993E7 /* BackupCoordinatorPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A8390A42C8E8A373ADA3D68 /* BackupCoordinatorPolicyTests.swift */; };
 		F3203DFD59DC7F4FFE02D71D /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8BB4195C935BC82AE2E2E32 /* ContentView.swift */; };
 		F8EABC77914D984C2C033FE8 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A858D46FB140BF355087590 /* main.swift */; };
 		F9EE161871FAC8D71CD58822 /* BackupProfileValidatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 087E559C37295F9E4361047A /* BackupProfileValidatorTests.swift */; };
 		FD49626B62BA9BCD2F8044A7 /* AppDirectoriesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10ED99C37CABF597A584C91 /* AppDirectoriesTests.swift */; };
 		FDBDB2DB4F064758B6487E1C /* rclone in CopyFiles */ = {isa = PBXBuildFile; fileRef = CDB65970E85BEF26A0DDCE11 /* rclone */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		FE2FAA75A3DC4A24885543CE /* DeltaTimeMachineService in Embed Dependencies */ = {isa = PBXBuildFile; fileRef = 92E49036B033AD7B16A42F00 /* DeltaTimeMachineService */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -78,6 +108,20 @@
 			remoteGlobalIDString = 7D412528A7F8A2AD1EEC8AD0;
 			remoteInfo = DeltaSecretBridge;
 		};
+		68B6AC61FBC28274A9B322B7 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 8E818563DD40DA0B0CF5E3E0 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = FAE7A767C977D8ABC5533E19;
+			remoteInfo = DeltaTimeMachineService;
+		};
+		7B9C84BE382BEA0795C1BB87 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 8E818563DD40DA0B0CF5E3E0 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = F78A6EC8191EC7A96366BAD5;
+			remoteInfo = DeltaTimeMachineFS;
+		};
 		80D2076EB3061FE80A3A39B1 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 8E818563DD40DA0B0CF5E3E0 /* Project object */;
@@ -85,16 +129,34 @@
 			remoteGlobalIDString = C4C1BF76E0B079D197966A16;
 			remoteInfo = DeltaAgent;
 		};
+		D2D84002E64910C90FECBB9D /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 8E818563DD40DA0B0CF5E3E0 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = E9F7A76ED8BB9B3C99AD5526;
+			remoteInfo = DeltaTimeMachineHelper;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
 		0099D421A81B6A085DCE7444 /* Embed Dependencies */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
-			dstPath = "";
-			dstSubfolderSpec = 6;
+			dstPath = Contents/Library/LaunchServices;
+			dstSubfolderSpec = 1;
 			files = (
-				2578751D52B2A1C0927C8DFE /* DeltaSecretBridge in Embed Dependencies */,
+				97F0B424B51A73F204EE2824 /* DeltaTimeMachineHelper in Embed Dependencies */,
+			);
+			name = "Embed Dependencies";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		03BC6546FE6E922316349347 /* Embed Dependencies */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = Contents/Extensions;
+			dstSubfolderSpec = 1;
+			files = (
+				87EF065D9A9B2A5639F527C1 /* DeltaTimeMachineFS.appex in Embed Dependencies */,
 			);
 			name = "Embed Dependencies";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -106,7 +168,30 @@
 			dstSubfolderSpec = 1;
 			files = (
 				1328BD13947B4A7BB630D181 /* com.delta.backup.agent.plist in CopyFiles */,
+				1D1324392579C9D64EC83188 /* com.delta.backup.timemachine.service.plist in CopyFiles */,
 			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4EBDA5373A2DC6BF8F2D0665 /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = Contents/Library/LaunchDaemons;
+			dstSubfolderSpec = 1;
+			files = (
+				779C55FFC9CDD76CFC9512AE /* com.delta.backup.timemachine.helper.plist in CopyFiles */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		66D5B566A50B1DFC1A656269 /* Embed Dependencies */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 7;
+			files = (
+				64141E1D0FB14802AB8BC078 /* DeltaAgent in Embed Dependencies */,
+				FE2FAA75A3DC4A24885543CE /* DeltaTimeMachineService in Embed Dependencies */,
+			);
+			name = "Embed Dependencies";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		85D30A7382F344B7165CA6F4 /* CopyFiles */ = {
@@ -124,9 +209,9 @@
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
 			dstPath = "";
-			dstSubfolderSpec = 7;
+			dstSubfolderSpec = 6;
 			files = (
-				64141E1D0FB14802AB8BC078 /* DeltaAgent in Embed Dependencies */,
+				2578751D52B2A1C0927C8DFE /* DeltaSecretBridge in Embed Dependencies */,
 			);
 			name = "Embed Dependencies";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -134,13 +219,16 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		00632DC27CA31A89C062893D /* TimeMachineRepositoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeMachineRepositoryTests.swift; sourceTree = "<group>"; };
 		087E559C37295F9E4361047A /* BackupProfileValidatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupProfileValidatorTests.swift; sourceTree = "<group>"; };
 		0AC7E62B0B40B2E457A5EF13 /* BackupExcludePatternParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupExcludePatternParserTests.swift; sourceTree = "<group>"; };
 		0ADB0DD0967BA62D3FC96293 /* com.delta.backup.agent.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = com.delta.backup.agent.plist; sourceTree = "<group>"; };
 		0C689DD8002FF144F0BBDFA0 /* DeltaAppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeltaAppModel.swift; sourceTree = "<group>"; };
+		10196CAA6E6DA4D415D44884 /* PassthroughFileSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PassthroughFileSystem.swift; sourceTree = "<group>"; };
 		105B76879B8FC480030A19BE /* AcceptanceScheduledAgentCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AcceptanceScheduledAgentCommand.swift; sourceTree = "<group>"; };
 		13B30181189C15B52C4319A1 /* MenuBarSurfaceContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarSurfaceContractTests.swift; sourceTree = "<group>"; };
 		19D887B1ACEDE2D6C09C8000 /* JobNotificationPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JobNotificationPolicyTests.swift; sourceTree = "<group>"; };
+		1D725DB5ED6A63AE23A629F2 /* com.delta.backup.timemachine.helper.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = com.delta.backup.timemachine.helper.plist; sourceTree = "<group>"; };
 		21481C079AB6867C30A4F3FD /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		2385CFCBB16BD1494ACA33CF /* DeltaAgentInvocationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeltaAgentInvocationTests.swift; sourceTree = "<group>"; };
 		27C19FB33A107F678CEFAAF8 /* ExternalBackendAcceptanceContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExternalBackendAcceptanceContractTests.swift; sourceTree = "<group>"; };
@@ -151,30 +239,48 @@
 		31631FB1119CA423C2316D3D /* RepositorySecretAccessRepairerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepositorySecretAccessRepairerTests.swift; sourceTree = "<group>"; };
 		32B059142DCC54DC33391574 /* RestorePointSelectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestorePointSelectionTests.swift; sourceTree = "<group>"; };
 		3842119C6B1424E3BFCA0FE3 /* AcceptanceExternalLifecycleCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AcceptanceExternalLifecycleCommand.swift; sourceTree = "<group>"; };
+		3D0958C764A3580F2B7B3BF3 /* TimeMachineSystemControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeMachineSystemControllerTests.swift; sourceTree = "<group>"; };
 		3EEDDA234F5F66B29F47427B /* ModelDisplayNameTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelDisplayNameTests.swift; sourceTree = "<group>"; };
 		408CAF3A34551DD8211A0E5D /* DeltaApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeltaApp.swift; sourceTree = "<group>"; };
 		4284CEB88D9D4AC95B4881C9 /* Delta.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Delta.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		42C94431EB6785F6DF076B38 /* TimeMachineObjectStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeMachineObjectStoreTests.swift; sourceTree = "<group>"; };
 		4A858D46FB140BF355087590 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		513C89046C7907E7437F4087 /* TimeMachineStoreBootstrapTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeMachineStoreBootstrapTests.swift; sourceTree = "<group>"; };
+		51B17C943FFC19F3609A24A6 /* TimeMachineSparseFileSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeMachineSparseFileSessionTests.swift; sourceTree = "<group>"; };
 		53841A1CBB1F03F83015D7D4 /* DeltaCoreTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DeltaCoreTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		5A8390A42C8E8A373ADA3D68 /* BackupCoordinatorPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupCoordinatorPolicyTests.swift; sourceTree = "<group>"; };
 		60662F8E292C6D0E19930606 /* BackupRepositoryValidatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupRepositoryValidatorTests.swift; sourceTree = "<group>"; };
 		6997F645BACBEC9B5B9E0413 /* Delta.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = Delta.icns; sourceTree = "<group>"; };
 		7346DAB2492303B2A5B3CE07 /* KeychainSecretStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainSecretStoreTests.swift; sourceTree = "<group>"; };
 		736F93E2BF229347BFCBE2F8 /* JobOutcomePresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JobOutcomePresentationTests.swift; sourceTree = "<group>"; };
+		7923DADC73DB0DB4165455D2 /* LICENSE.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = LICENSE.txt; sourceTree = "<group>"; };
 		7C8EBC5743918653A990E127 /* DeltaStatusItemController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeltaStatusItemController.swift; sourceTree = "<group>"; };
+		86C56F83E409633F5A23C81B /* DeltaTimeMachineHelper */ = {isa = PBXFileReference; includeInIndex = 0; path = DeltaTimeMachineHelper; sourceTree = BUILT_PRODUCTS_DIR; };
 		87245FFEC494241E1D9B99E6 /* RepositoryAvailabilityCheckerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepositoryAvailabilityCheckerTests.swift; sourceTree = "<group>"; };
+		88D34DF5B9046FC3496F4324 /* TimeMachineRecoveryKeyRetentionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeMachineRecoveryKeyRetentionTests.swift; sourceTree = "<group>"; };
 		8C4A667E9E42243147C08811 /* LocalResticRepositoryStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalResticRepositoryStateTests.swift; sourceTree = "<group>"; };
 		8D64AAF0246FEBF54B67CBDA /* MenuBarStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarStatusView.swift; sourceTree = "<group>"; };
 		90C05D1A78563BC85C480E22 /* DeltaAgent */ = {isa = PBXFileReference; includeInIndex = 0; path = DeltaAgent; sourceTree = BUILT_PRODUCTS_DIR; };
+		92E49036B033AD7B16A42F00 /* DeltaTimeMachineService */ = {isa = PBXFileReference; includeInIndex = 0; path = DeltaTimeMachineService; sourceTree = BUILT_PRODUCTS_DIR; };
+		9375DA963512344855C6BCA5 /* DeltaTimeMachineFSExtension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeltaTimeMachineFSExtension.swift; sourceTree = "<group>"; };
 		94F7A5586AACBFE334A09F59 /* restic */ = {isa = PBXFileReference; path = restic; sourceTree = "<group>"; };
+		9572C86550CD0EE0457E3A2D /* TimeMachineRcloneTransportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeMachineRcloneTransportTests.swift; sourceTree = "<group>"; };
 		9665691705094DCCCCB0B6C5 /* SecurityScopedBookmarkStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecurityScopedBookmarkStoreTests.swift; sourceTree = "<group>"; };
+		9A83E0172B49C4020A27FB07 /* PassthroughFSVolume.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PassthroughFSVolume.swift; sourceTree = "<group>"; };
+		9FB0D8338D45ACE56A5108A2 /* TimeMachineRuntimePathsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeMachineRuntimePathsTests.swift; sourceTree = "<group>"; };
+		A00896BE7169CA901E1776D7 /* DeltaRemoteFileClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeltaRemoteFileClient.swift; sourceTree = "<group>"; };
+		A045881670B17700F62B0BD4 /* DeltaTimeMachineFS.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.extensionkit-extension"; includeInIndex = 0; path = DeltaTimeMachineFS.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		A2473445B9D9A9D881B483BC /* DatabaseTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseTests.swift; sourceTree = "<group>"; };
 		A8BB4195C935BC82AE2E2E32 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		AC0827343F78B6EDA4394173 /* PassthroughFSVolume+Operations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PassthroughFSVolume+Operations.swift"; sourceTree = "<group>"; };
 		AFB74FA5A66EF2594ABA0131 /* ResticCommandTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResticCommandTests.swift; sourceTree = "<group>"; };
 		B10ED99C37CABF597A584C91 /* AppDirectoriesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDirectoriesTests.swift; sourceTree = "<group>"; };
 		B2D20B1B7700FF8516BD2AD6 /* BackupSourceAccessCheckerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupSourceAccessCheckerTests.swift; sourceTree = "<group>"; };
+		B45E62126F25F6AC3A5F7216 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		B9984386210742AF4962D03A /* PassthroughFSItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PassthroughFSItem.swift; sourceTree = "<group>"; };
 		B999257F396A0F64F0398EED /* AcceptanceMenuBarSurfaceCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AcceptanceMenuBarSurfaceCommand.swift; sourceTree = "<group>"; };
 		BC0A24E43E6682CB42F5393F /* AcceptanceLocalLifecycleCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AcceptanceLocalLifecycleCommand.swift; sourceTree = "<group>"; };
+		BD12745B0EB8EAF4DFB972B8 /* com.delta.backup.timemachine.service.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = com.delta.backup.timemachine.service.plist; sourceTree = "<group>"; };
 		BD662A2D16D0727151CA40FF /* RepositoryPasswordManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepositoryPasswordManagerTests.swift; sourceTree = "<group>"; };
 		BE6A815EB59DE930FD35BD00 /* AcceptancePreferencesCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AcceptancePreferencesCommand.swift; sourceTree = "<group>"; };
 		BF978C7761D75EFC2838CBFB /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
@@ -183,24 +289,45 @@
 		CA5F9026EDD0D3D67DDAD5A9 /* DashboardHealthEvaluatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardHealthEvaluatorTests.swift; sourceTree = "<group>"; };
 		CDB65970E85BEF26A0DDCE11 /* rclone */ = {isa = PBXFileReference; path = rclone; sourceTree = "<group>"; };
 		D0C2927B1805F99361D0CF8C /* DeltaSecretBridgeInvocationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeltaSecretBridgeInvocationTests.swift; sourceTree = "<group>"; };
+		D3D03D0FB969E904DEA90EB3 /* RepositoryJobLockTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepositoryJobLockTests.swift; sourceTree = "<group>"; };
 		D3D4771174A3C1D3954A2208 /* BackupProgressEstimatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupProgressEstimatorTests.swift; sourceTree = "<group>"; };
 		D6BF102EB1BD98E5D5657FFF /* SettingsSurfaceContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsSurfaceContractTests.swift; sourceTree = "<group>"; };
 		DB51075B150C5939DB1710E6 /* DeltaAppPreferencesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeltaAppPreferencesTests.swift; sourceTree = "<group>"; };
+		E9BB344F642B48EBF85A0250 /* TimeMachineRcloneIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeMachineRcloneIntegrationTests.swift; sourceTree = "<group>"; };
 		EF15AA707E58E0D6314C6448 /* SoftwareUpdateController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoftwareUpdateController.swift; sourceTree = "<group>"; };
 		F16DA68894561686DEA8769C /* LaunchAgentRegistrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchAgentRegistrationTests.swift; sourceTree = "<group>"; };
 		F2113C926A61F09E32502FA4 /* delta */ = {isa = PBXFileReference; lastKnownFileType = folder; name = delta; path = .; sourceTree = SOURCE_ROOT; };
 		F39618B1197A8C91626F6FFF /* MenuBarStatusPresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarStatusPresentationTests.swift; sourceTree = "<group>"; };
+		F511A4B48ED27DAFC1159C9A /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		FA64B4A668B87F7512220A9B /* AcceptanceRunControlCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AcceptanceRunControlCommand.swift; sourceTree = "<group>"; };
 		FB6AC70C7ED86BC4D033C111 /* ResticIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResticIntegrationTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		0831967283355C9A1E687DF8 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				40C27F74B34ED62E9767EBF1 /* DeltaCore in Frameworks */,
+				AC6CD51F2737E3A0515DC177 /* DeltaTimeMachineIPC in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		138EE254F7E7EB3B12E48D5E /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				334C913F4C33809DFC63F93D /* DeltaCore in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		4023B13D3F1AA84FDA15C1B7 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 				9095749E315C736B88E47D59 /* DeltaCore in Frameworks */,
-				94C36C73CBAFBB503D39CE79 /* GRDB in Frameworks */,
+				94C36C73CBAFBB503D39CE79 /* DeltaTimeMachineIPC in Frameworks */,
+				04B79BADB8835A3B949AC3DC /* GRDB in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -217,7 +344,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				9C0B85D88F5122E1BE31BB38 /* DeltaCore in Frameworks */,
-				A5AD5E1873CEC9AEE66D3B8C /* Sparkle in Frameworks */,
+				A5AD5E1873CEC9AEE66D3B8C /* DeltaTimeMachineIPC in Frameworks */,
+				296E057C3131AECB52519BA9 /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -226,6 +354,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				93AA657C2700E460B497B600 /* DeltaCore in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F9B9C74E54095DA2B7A3FC28 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				618FE8B9EEFF4D0443C907FA /* DeltaTimeMachineIPC in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -238,6 +374,9 @@
 				C4BDEB8E9C4882295A7017D8 /* Delta */,
 				EB77DF2AC31E3A7B35F864FC /* DeltaAgent */,
 				3B2BACDFB8D3FE693ED836A9 /* DeltaSecretBridge */,
+				EE81B8FC57C7F53EC0BE16AC /* DeltaTimeMachineFS */,
+				95FF7F19087499E2BB7FAC45 /* DeltaTimeMachineHelper */,
+				D317DD2F576D99E697CACA41 /* DeltaTimeMachineService */,
 			);
 			path = Sources;
 			sourceTree = "<group>";
@@ -270,6 +409,7 @@
 				13B30181189C15B52C4319A1 /* MenuBarSurfaceContractTests.swift */,
 				3EEDDA234F5F66B29F47427B /* ModelDisplayNameTests.swift */,
 				87245FFEC494241E1D9B99E6 /* RepositoryAvailabilityCheckerTests.swift */,
+				D3D03D0FB969E904DEA90EB3 /* RepositoryJobLockTests.swift */,
 				BD662A2D16D0727151CA40FF /* RepositoryPasswordManagerTests.swift */,
 				31631FB1119CA423C2316D3D /* RepositorySecretAccessRepairerTests.swift */,
 				AFB74FA5A66EF2594ABA0131 /* ResticCommandTests.swift */,
@@ -279,6 +419,15 @@
 				28211A66D1218CE1E78AC0EA /* ScheduleAndParserTests.swift */,
 				9665691705094DCCCCB0B6C5 /* SecurityScopedBookmarkStoreTests.swift */,
 				D6BF102EB1BD98E5D5657FFF /* SettingsSurfaceContractTests.swift */,
+				42C94431EB6785F6DF076B38 /* TimeMachineObjectStoreTests.swift */,
+				E9BB344F642B48EBF85A0250 /* TimeMachineRcloneIntegrationTests.swift */,
+				9572C86550CD0EE0457E3A2D /* TimeMachineRcloneTransportTests.swift */,
+				88D34DF5B9046FC3496F4324 /* TimeMachineRecoveryKeyRetentionTests.swift */,
+				00632DC27CA31A89C062893D /* TimeMachineRepositoryTests.swift */,
+				9FB0D8338D45ACE56A5108A2 /* TimeMachineRuntimePathsTests.swift */,
+				51B17C943FFC19F3609A24A6 /* TimeMachineSparseFileSessionTests.swift */,
+				513C89046C7907E7437F4087 /* TimeMachineStoreBootstrapTests.swift */,
+				3D0958C764A3580F2B7B3BF3 /* TimeMachineSystemControllerTests.swift */,
 			);
 			path = DeltaCoreTests;
 			sourceTree = "<group>";
@@ -326,6 +475,9 @@
 				90C05D1A78563BC85C480E22 /* DeltaAgent */,
 				53841A1CBB1F03F83015D7D4 /* DeltaCoreTests.xctest */,
 				C187F0FAE587A5D82E7F5656 /* DeltaSecretBridge */,
+				A045881670B17700F62B0BD4 /* DeltaTimeMachineFS.appex */,
+				86C56F83E409633F5A23C81B /* DeltaTimeMachineHelper */,
+				92E49036B033AD7B16A42F00 /* DeltaTimeMachineService */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -349,10 +501,20 @@
 			path = bin;
 			sourceTree = "<group>";
 		};
+		95FF7F19087499E2BB7FAC45 /* DeltaTimeMachineHelper */ = {
+			isa = PBXGroup;
+			children = (
+				F511A4B48ED27DAFC1159C9A /* main.swift */,
+			);
+			path = DeltaTimeMachineHelper;
+			sourceTree = "<group>";
+		};
 		B06D6152C710D88AA1901951 /* Packaging */ = {
 			isa = PBXGroup;
 			children = (
 				0ADB0DD0967BA62D3FC96293 /* com.delta.backup.agent.plist */,
+				1D725DB5ED6A63AE23A629F2 /* com.delta.backup.timemachine.helper.plist */,
+				BD12745B0EB8EAF4DFB972B8 /* com.delta.backup.timemachine.service.plist */,
 			);
 			path = Packaging;
 			sourceTree = "<group>";
@@ -374,6 +536,14 @@
 				EF15AA707E58E0D6314C6448 /* SoftwareUpdateController.swift */,
 			);
 			path = Delta;
+			sourceTree = "<group>";
+		};
+		D317DD2F576D99E697CACA41 /* DeltaTimeMachineService */ = {
+			isa = PBXGroup;
+			children = (
+				B45E62126F25F6AC3A5F7216 /* main.swift */,
+			);
+			path = DeltaTimeMachineService;
 			sourceTree = "<group>";
 		};
 		E1749EB5F9217FCF23823BE5 /* Tools */ = {
@@ -400,6 +570,20 @@
 			path = Tests;
 			sourceTree = "<group>";
 		};
+		EE81B8FC57C7F53EC0BE16AC /* DeltaTimeMachineFS */ = {
+			isa = PBXGroup;
+			children = (
+				A00896BE7169CA901E1776D7 /* DeltaRemoteFileClient.swift */,
+				9375DA963512344855C6BCA5 /* DeltaTimeMachineFSExtension.swift */,
+				7923DADC73DB0DB4165455D2 /* LICENSE.txt */,
+				10196CAA6E6DA4D415D44884 /* PassthroughFileSystem.swift */,
+				B9984386210742AF4962D03A /* PassthroughFSItem.swift */,
+				9A83E0172B49C4020A27FB07 /* PassthroughFSVolume.swift */,
+				AC0827343F78B6EDA4394173 /* PassthroughFSVolume+Operations.swift */,
+			);
+			path = DeltaTimeMachineFS;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -417,6 +601,7 @@
 			name = DeltaCoreTests;
 			packageProductDependencies = (
 				918C73C6E40AF62A197A38F2 /* DeltaCore */,
+				4E61F0A7ADAFE98E83BC27B5 /* DeltaTimeMachineIPC */,
 				15A7EE11B4F68F429B02D4E5 /* GRDB */,
 			);
 			productName = DeltaCoreTests;
@@ -451,19 +636,26 @@
 				ADFA8E94CE8B119F675D7D04 /* Resources */,
 				244BD7518ACCA23E79B5CF22 /* CopyFiles */,
 				85D30A7382F344B7165CA6F4 /* CopyFiles */,
+				4EBDA5373A2DC6BF8F2D0665 /* CopyFiles */,
 				64957B0D598C282DDE90B500 /* Frameworks */,
 				9A72168F974738C92F8D1A57 /* Embed Dependencies */,
 				0099D421A81B6A085DCE7444 /* Embed Dependencies */,
+				66D5B566A50B1DFC1A656269 /* Embed Dependencies */,
+				03BC6546FE6E922316349347 /* Embed Dependencies */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 				BC58E4371C80411C28E74120 /* PBXTargetDependency */,
 				E83996600C429B062CB59054 /* PBXTargetDependency */,
+				D6B72DF893FB0E11596E5696 /* PBXTargetDependency */,
+				154101C35C78125199430C6A /* PBXTargetDependency */,
+				F6296F47D59304A1B351969A /* PBXTargetDependency */,
 			);
 			name = Delta;
 			packageProductDependencies = (
 				B0A7C44860E1D7AFDB407D74 /* DeltaCore */,
+				1148BD9565EAD9427CB24168 /* DeltaTimeMachineIPC */,
 				AAD90650D816CFE15D833746 /* Sparkle */,
 			);
 			productName = Delta;
@@ -487,6 +679,65 @@
 			);
 			productName = DeltaAgent;
 			productReference = 90C05D1A78563BC85C480E22 /* DeltaAgent */;
+			productType = "com.apple.product-type.tool";
+		};
+		E9F7A76ED8BB9B3C99AD5526 /* DeltaTimeMachineHelper */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8F4629FA3966920A63EC2551 /* Build configuration list for PBXNativeTarget "DeltaTimeMachineHelper" */;
+			buildPhases = (
+				B2BC8C3816BB7B4D26133031 /* Sources */,
+				138EE254F7E7EB3B12E48D5E /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = DeltaTimeMachineHelper;
+			packageProductDependencies = (
+				B70C0E1DA5913C11E33D3DB3 /* DeltaCore */,
+			);
+			productName = DeltaTimeMachineHelper;
+			productReference = 86C56F83E409633F5A23C81B /* DeltaTimeMachineHelper */;
+			productType = "com.apple.product-type.tool";
+		};
+		F78A6EC8191EC7A96366BAD5 /* DeltaTimeMachineFS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C7271BE68AC8ED7CD74D8C79 /* Build configuration list for PBXNativeTarget "DeltaTimeMachineFS" */;
+			buildPhases = (
+				EC089A69FD5BFDD40F60AF6F /* Sources */,
+				0AEF96026E47A6BC7D21DC1C /* Resources */,
+				F9B9C74E54095DA2B7A3FC28 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = DeltaTimeMachineFS;
+			packageProductDependencies = (
+				E7B19E529E32B79E5EF52176 /* DeltaTimeMachineIPC */,
+			);
+			productName = DeltaTimeMachineFS;
+			productReference = A045881670B17700F62B0BD4 /* DeltaTimeMachineFS.appex */;
+			productType = "com.apple.product-type.extensionkit-extension";
+		};
+		FAE7A767C977D8ABC5533E19 /* DeltaTimeMachineService */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = DEA416BECFD356F1480A8173 /* Build configuration list for PBXNativeTarget "DeltaTimeMachineService" */;
+			buildPhases = (
+				82E9A23CABA51CD11C2AA33B /* Sources */,
+				0831967283355C9A1E687DF8 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = DeltaTimeMachineService;
+			packageProductDependencies = (
+				F7D80717532F9662C11EDEAD /* DeltaCore */,
+				970FBF88E9F3DB7DBF6059D2 /* DeltaTimeMachineIPC */,
+			);
+			productName = DeltaTimeMachineService;
+			productReference = 92E49036B033AD7B16A42F00 /* DeltaTimeMachineService */;
 			productType = "com.apple.product-type.tool";
 		};
 /* End PBXNativeTarget section */
@@ -523,11 +774,22 @@
 				C4C1BF76E0B079D197966A16 /* DeltaAgent */,
 				0E6A7F6501ADF3615A0814B3 /* DeltaCoreTests */,
 				7D412528A7F8A2AD1EEC8AD0 /* DeltaSecretBridge */,
+				F78A6EC8191EC7A96366BAD5 /* DeltaTimeMachineFS */,
+				E9F7A76ED8BB9B3C99AD5526 /* DeltaTimeMachineHelper */,
+				FAE7A767C977D8ABC5533E19 /* DeltaTimeMachineService */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		0AEF96026E47A6BC7D21DC1C /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CFD6BC39A169A4767E1E3D76 /* LICENSE.txt in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		ADFA8E94CE8B119F675D7D04 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -611,6 +873,7 @@
 				A16862EEE844387DE467AE1E /* MenuBarSurfaceContractTests.swift in Sources */,
 				99FA22EB79350F602FA9282A /* ModelDisplayNameTests.swift in Sources */,
 				88932C250CE8317D3B56613D /* RepositoryAvailabilityCheckerTests.swift in Sources */,
+				D52CDAFAD3A445CD709D1A0F /* RepositoryJobLockTests.swift in Sources */,
 				A58CA0BFC077F1A0A4929204 /* RepositoryPasswordManagerTests.swift in Sources */,
 				66092FAE699D90AE8BD1849D /* RepositorySecretAccessRepairerTests.swift in Sources */,
 				CF98F7E1409F4EC0AA417050 /* ResticCommandTests.swift in Sources */,
@@ -620,6 +883,23 @@
 				D8044B2C97B8EAEB75A3698E /* ScheduleAndParserTests.swift in Sources */,
 				097A404E4414515E28E764D6 /* SecurityScopedBookmarkStoreTests.swift in Sources */,
 				9E2C0447088C8FC630633F5F /* SettingsSurfaceContractTests.swift in Sources */,
+				0C0B3C4C6A95D0A54437C961 /* TimeMachineObjectStoreTests.swift in Sources */,
+				D7D2A52B85011BC5696B75D9 /* TimeMachineRcloneIntegrationTests.swift in Sources */,
+				A6269E794D752FD3D71BD8E1 /* TimeMachineRcloneTransportTests.swift in Sources */,
+				A98E22B8FD33BCC2525064DD /* TimeMachineRecoveryKeyRetentionTests.swift in Sources */,
+				83383FE15278F226791008F8 /* TimeMachineRepositoryTests.swift in Sources */,
+				90573DDCFADE1233371B6E69 /* TimeMachineRuntimePathsTests.swift in Sources */,
+				1010E77376AD7E9446B0D889 /* TimeMachineSparseFileSessionTests.swift in Sources */,
+				CF19A0A67A1BDBAD14A3DBC5 /* TimeMachineStoreBootstrapTests.swift in Sources */,
+				5DD0CCE7BF121A443112B0F7 /* TimeMachineSystemControllerTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		82E9A23CABA51CD11C2AA33B /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				40E65388FB91C66C66D3953B /* main.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -639,18 +919,54 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		B2BC8C3816BB7B4D26133031 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3A6CAA4DC0006E9EFDFB2C92 /* main.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		EC089A69FD5BFDD40F60AF6F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E0263CD9239CF4A2BF03D2D8 /* DeltaRemoteFileClient.swift in Sources */,
+				CCFA980714E8C8E5E657E30D /* DeltaTimeMachineFSExtension.swift in Sources */,
+				18235B69F4930A2716436777 /* PassthroughFSItem.swift in Sources */,
+				3E7969288112374048C7FF7F /* PassthroughFSVolume+Operations.swift in Sources */,
+				19C61705D8624321BC231400 /* PassthroughFSVolume.swift in Sources */,
+				A51D3491AFA4BB45BF7F717F /* PassthroughFileSystem.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		154101C35C78125199430C6A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = E9F7A76ED8BB9B3C99AD5526 /* DeltaTimeMachineHelper */;
+			targetProxy = D2D84002E64910C90FECBB9D /* PBXContainerItemProxy */;
+		};
 		BC58E4371C80411C28E74120 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = C4C1BF76E0B079D197966A16 /* DeltaAgent */;
 			targetProxy = 80D2076EB3061FE80A3A39B1 /* PBXContainerItemProxy */;
 		};
+		D6B72DF893FB0E11596E5696 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = F78A6EC8191EC7A96366BAD5 /* DeltaTimeMachineFS */;
+			targetProxy = 7B9C84BE382BEA0795C1BB87 /* PBXContainerItemProxy */;
+		};
 		E83996600C429B062CB59054 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 7D412528A7F8A2AD1EEC8AD0 /* DeltaSecretBridge */;
 			targetProxy = 37FC0DBD789D9888B0A64730 /* PBXContainerItemProxy */;
+		};
+		F6296F47D59304A1B351969A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = FAE7A767C977D8ABC5533E19 /* DeltaTimeMachineService */;
+			targetProxy = 68B6AC61FBC28274A9B322B7 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -742,6 +1058,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				APP_SHORTCUTS_ENABLE_FLEXIBLE_MATCHING = NO;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
@@ -799,6 +1116,26 @@
 			};
 			name = Release;
 		};
+		7FFCED7C1E2EAEEEF1B8D6A2 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = "$(DELTA_FSKIT_CODE_SIGN_ENTITLEMENTS)";
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 9;
+				DELTA_FSKIT_CODE_SIGN_ENTITLEMENTS = Packaging/DeltaTimeMachineFS.entitlements;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Packaging/DeltaTimeMachineFS.Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Delta Time Machine Storage";
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks @executable_path/../../../../Frameworks";
+				MARKETING_VERSION = 0.3.3;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.delta.backup.timemachine-filesystem";
+				PRODUCT_NAME = DeltaTimeMachineFS;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+			};
+			name = Release;
+		};
 		802D68DB61D84FA48CB868DF /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -818,6 +1155,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				APP_SHORTCUTS_ENABLE_FLEXIBLE_MATCHING = NO;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
@@ -895,6 +1233,26 @@
 			};
 			name = Debug;
 		};
+		B1DA0EB132AB2CA157DD1F4C /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COMBINE_HIDPI_IMAGES = YES;
+				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
+				CURRENT_PROJECT_VERSION = 9;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Packaging/DeltaTimeMachineHelper.Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 0.3.3;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.delta.backup.timemachine-helper";
+				PRODUCT_NAME = DeltaTimeMachineHelper;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+			};
+			name = Debug;
+		};
 		BD1468DC1F1D2AABD6E3045D /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -905,6 +1263,78 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.delta.DeltaSecretBridge;
 				PRODUCT_NAME = DeltaSecretBridge;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+			};
+			name = Release;
+		};
+		CFE215B8FFC3B26B9BDC9CA7 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = "$(DELTA_FSKIT_CODE_SIGN_ENTITLEMENTS)";
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 9;
+				DELTA_FSKIT_CODE_SIGN_ENTITLEMENTS = Packaging/DeltaTimeMachineFS.entitlements;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Packaging/DeltaTimeMachineFS.Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Delta Time Machine Storage";
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks @executable_path/../../../../Frameworks";
+				MARKETING_VERSION = 0.3.3;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.delta.backup.timemachine-filesystem";
+				PRODUCT_NAME = DeltaTimeMachineFS;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+			};
+			name = Debug;
+		};
+		D899CB79B86E3E560956E9D7 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Packaging/DeltaTimeMachineService.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.delta.DeltaTimeMachineService;
+				PRODUCT_NAME = DeltaTimeMachineService;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+			};
+			name = Debug;
+		};
+		DDBBECE47F3B64521C144490 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COMBINE_HIDPI_IMAGES = YES;
+				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
+				CURRENT_PROJECT_VERSION = 9;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Packaging/DeltaTimeMachineHelper.Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 0.3.3;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.delta.backup.timemachine-helper";
+				PRODUCT_NAME = DeltaTimeMachineHelper;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+			};
+			name = Release;
+		};
+		E9EA5B1BDE9A76995A57CBDA /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Packaging/DeltaTimeMachineService.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.delta.DeltaTimeMachineService;
+				PRODUCT_NAME = DeltaTimeMachineService;
 				SDKROOT = macosx;
 				SKIP_INSTALL = YES;
 			};
@@ -949,6 +1379,33 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		8F4629FA3966920A63EC2551 /* Build configuration list for PBXNativeTarget "DeltaTimeMachineHelper" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B1DA0EB132AB2CA157DD1F4C /* Debug */,
+				DDBBECE47F3B64521C144490 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		C7271BE68AC8ED7CD74D8C79 /* Build configuration list for PBXNativeTarget "DeltaTimeMachineFS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				CFE215B8FFC3B26B9BDC9CA7 /* Debug */,
+				7FFCED7C1E2EAEEEF1B8D6A2 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		DEA416BECFD356F1480A8173 /* Build configuration list for PBXNativeTarget "DeltaTimeMachineService" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D899CB79B86E3E560956E9D7 /* Debug */,
+				E9EA5B1BDE9A76995A57CBDA /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		F145E8B54408A0E77F3F6F16 /* Build configuration list for PBXNativeTarget "DeltaCoreTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -987,10 +1444,18 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		1148BD9565EAD9427CB24168 /* DeltaTimeMachineIPC */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = DeltaTimeMachineIPC;
+		};
 		15A7EE11B4F68F429B02D4E5 /* GRDB */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = DE79CC692ED5C1E1BF44F11E /* XCRemoteSwiftPackageReference "GRDB.swift" */;
 			productName = GRDB;
+		};
+		4E61F0A7ADAFE98E83BC27B5 /* DeltaTimeMachineIPC */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = DeltaTimeMachineIPC;
 		};
 		7BDCDF2D53DC627A5FD4D8A1 /* DeltaCore */ = {
 			isa = XCSwiftPackageProductDependency;
@@ -1004,12 +1469,28 @@
 			isa = XCSwiftPackageProductDependency;
 			productName = DeltaCore;
 		};
+		970FBF88E9F3DB7DBF6059D2 /* DeltaTimeMachineIPC */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = DeltaTimeMachineIPC;
+		};
 		AAD90650D816CFE15D833746 /* Sparkle */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 2267A7E02D10755137F964ED /* XCRemoteSwiftPackageReference "Sparkle" */;
 			productName = Sparkle;
 		};
 		B0A7C44860E1D7AFDB407D74 /* DeltaCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = DeltaCore;
+		};
+		B70C0E1DA5913C11E33D3DB3 /* DeltaCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = DeltaCore;
+		};
+		E7B19E529E32B79E5EF52176 /* DeltaTimeMachineIPC */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = DeltaTimeMachineIPC;
+		};
+		F7D80717532F9662C11EDEAD /* DeltaCore */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = DeltaCore;
 		};

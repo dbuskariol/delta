@@ -202,7 +202,7 @@ else
   fi
 
   if [[ "$language_status" -eq 0 && "$installed_diagnostics_status" -eq 0 && "$installed_preferences_status" -eq 0 ]]; then
-    append_row "settings_surface" "$(item_area settings_surface)" "Partial" "Product-language verifier passed; raw restic repository and LaunchAgent terminology is blocked from user-facing strings. Installed diagnostics reported Password Access as Ready and Full Disk Access as $installed_full_disk_access_status. Installed preferences acceptance proved the shared Settings surface contract, required categories, compact status summary, scheduler/update/power/defaults/diagnostics controls, and preference behavior. $installed_preferences_evidence" "Open Settings and confirm visual grouping, status summary, Password Access status/refresh/repair controls, Run Due Now behavior, Sparkle automatic check/download controls, idle-sleep protection, reset controls, new-profile schedule defaults, backup freshness warnings, source-access warnings, destination-check warning controls, local/mounted destination free-space warnings, and activity history retention in the running app."
+    append_row "settings_surface" "$(item_area settings_surface)" "Partial" "Product-language verifier passed; raw restic repository and LaunchAgent terminology is blocked from user-facing strings. Installed diagnostics reported Password Access as Ready. Its command-line process observed Full Disk Access as $installed_full_disk_access_status, but that launcher-scoped result is deliberately not treated as GUI authorization evidence. Installed preferences acceptance proved the shared Settings surface contract, required categories, compact status summary, scheduler/update/power/defaults/diagnostics controls, and preference behavior. $installed_preferences_evidence" "Open Settings and confirm visual grouping, status summary, Full Disk Access, Password Access status/refresh/repair controls, Run Due Now behavior, Sparkle automatic check/download controls, idle-sleep protection, reset controls, new-profile schedule defaults, backup freshness warnings, source-access warnings, destination-check warning controls, local/mounted destination free-space warnings, and activity history retention in the running app."
   elif [[ "$language_status" -eq 0 && "$installed_diagnostics_status" -eq 0 ]]; then
     append_row "settings_surface" "$(item_area settings_surface)" "Failed" "Product-language verifier and installed diagnostics passed, but installed preferences did not: $installed_preferences_evidence" "Fix installed preferences/defaults behavior before manual Settings acceptance."
   elif [[ "$language_status" -eq 0 ]]; then
@@ -211,10 +211,8 @@ else
     append_row "settings_surface" "$(item_area settings_surface)" "Failed" "Product-language verifier failed: $language_output" "Fix user-facing terminology and rerun."
   fi
 
-  if [[ "$installed_diagnostics_status" -eq 0 && "$installed_full_disk_access_status" == "Ready" ]]; then
-    append_row "full_disk_access" "$(item_area full_disk_access)" "Partial" "Installed Delta diagnostic report from the signed app process reported Full Disk Access as Ready." "Open Settings, recheck access, and confirm the dashboard only shows Readiness when action is needed."
-  elif [[ "$installed_diagnostics_status" -eq 0 ]]; then
-    append_row "full_disk_access" "$(item_area full_disk_access)" "Manual Required" "Installed Delta diagnostic report from the signed app process reported Full Disk Access as $installed_full_disk_access_status." "Use Settings > Full Disk Access, add Delta manually if needed, recheck access, and confirm dashboard readiness behavior."
+  if [[ "$installed_diagnostics_status" -eq 0 ]]; then
+    append_row "full_disk_access" "$(item_area full_disk_access)" "Manual Required" "The installed diagnostic command process observed Full Disk Access as $installed_full_disk_access_status. A process launched from this shell can inherit the launcher's macOS privacy responsibility, so this result is not evidence for the normally launched GUI app." "Use Delta Settings > Permissions and macOS Privacy & Security to verify the exact normally launched app. Test both denied and allowed states, then confirm Dashboard and Time Machine add/remove behavior."
   else
     append_row "full_disk_access" "$(item_area full_disk_access)" "Failed" "Installed Delta diagnostics could not verify Full Disk Access: $installed_diagnostics_evidence" "Fix installed diagnostics, then use Settings > Full Disk Access and rerun."
   fi
@@ -559,6 +557,14 @@ else
     append_row "remote_first_backup_preparation" "$(item_area remote_first_backup_preparation)" "Partial" "${remote_evidence_parts[*]}" "Repeat through the installed app UI with a new unprepared remote and an existing remote; confirm init happens only when needed."
   else
     append_row "remote_first_backup_preparation" "$(item_area remote_first_backup_preparation)" "Manual Required" "Remote destination preparation needs a real unprepared remote and an existing remote to avoid false confidence. Configure external backend acceptance to automate the backend lifecycle." "Start backup on new unprepared remote and existing remote; confirm init happens only when needed."
+  fi
+  if [[ "$automated_gate_status" == "Passed" && "$automated_gate_commit" == "$git_commit" ]] \
+    && grep -Fq "TimeMachineObjectStoreTests" "$ROOT_DIR/Tests/DeltaCoreTests/TimeMachineObjectStoreTests.swift" \
+    && grep -Fq "TimeMachineSystemControllerTests" "$ROOT_DIR/Tests/DeltaCoreTests/TimeMachineSystemControllerTests.swift"
+  then
+    append_row "time_machine_format" "$(item_area time_machine_format)" "Partial" "The automated gate passed the certificate-free Time Machine object, cache, lease, recovery, transport, IPC, controller, packaging, and real local-rclone regression suites for commit $git_commit. It did not activate FSKit, complete a macOS Time Machine backup, restore user data, or exercise a genuine remote provider." "Install the exact stable-signed candidate and complete the full permission, mount, backup, restore, fault, resource, reconnect, update, accessibility, and genuine-provider matrix."
+  else
+    append_row "time_machine_format" "$(item_area time_machine_format)" "Manual Required" "Certificate-free tests cannot activate the provisioned FSKit extension or prove a completed macOS Time Machine backup and restore." "Install the exact stable-signed candidate and complete the full permission, mount, backup, restore, fault, resource, reconnect, update, accessibility, and genuine-provider matrix."
   fi
   if [[ "$installed_menu_bar_status" -eq 0 ]]
   then

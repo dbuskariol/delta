@@ -25,6 +25,7 @@ packages:
 
 settings:
   base:
+    APP_SHORTCUTS_ENABLE_FLEXIBLE_MATCHING: NO
     CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO
     ENABLE_HARDENED_RUNTIME: YES
     MACOSX_DEPLOYMENT_TARGET: "26.0"
@@ -67,6 +68,64 @@ targets:
         PRODUCT_NAME: DeltaSecretBridge
         SKIP_INSTALL: YES
 
+  DeltaTimeMachineService:
+    type: tool
+    platform: macOS
+    sources:
+      - Sources/DeltaTimeMachineService
+    dependencies:
+      - package: DeltaPackage
+        product: DeltaCore
+      - package: DeltaPackage
+        product: DeltaTimeMachineIPC
+    settings:
+      base:
+        CODE_SIGN_ENTITLEMENTS: Packaging/DeltaTimeMachineService.entitlements
+        PRODUCT_NAME: DeltaTimeMachineService
+        SKIP_INSTALL: YES
+
+  DeltaTimeMachineHelper:
+    type: tool
+    platform: macOS
+    sources:
+      - Sources/DeltaTimeMachineHelper
+    dependencies:
+      - package: DeltaPackage
+        product: DeltaCore
+    settings:
+      base:
+        CREATE_INFOPLIST_SECTION_IN_BINARY: YES
+        CURRENT_PROJECT_VERSION: 9
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: Packaging/DeltaTimeMachineHelper.Info.plist
+        MARKETING_VERSION: 0.3.3
+        PRODUCT_BUNDLE_IDENTIFIER: com.delta.backup.timemachine-helper
+        PRODUCT_NAME: DeltaTimeMachineHelper
+        SKIP_INSTALL: YES
+
+  DeltaTimeMachineFS:
+    type: extensionkit-extension
+    platform: macOS
+    sources:
+      - Sources/DeltaTimeMachineFS
+    dependencies:
+      - package: DeltaPackage
+        product: DeltaTimeMachineIPC
+    settings:
+      base:
+        APPLICATION_EXTENSION_API_ONLY: YES
+        CODE_SIGN_ENTITLEMENTS: "$(DELTA_FSKIT_CODE_SIGN_ENTITLEMENTS)"
+        CURRENT_PROJECT_VERSION: 9
+        DELTA_FSKIT_CODE_SIGN_ENTITLEMENTS: Packaging/DeltaTimeMachineFS.entitlements
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_FILE: Packaging/DeltaTimeMachineFS.Info.plist
+        INFOPLIST_KEY_CFBundleDisplayName: Delta Time Machine Storage
+        LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/../Frameworks @executable_path/../../../../Frameworks"
+        MARKETING_VERSION: 0.3.3
+        PRODUCT_BUNDLE_IDENTIFIER: com.delta.backup.timemachine-filesystem
+        PRODUCT_NAME: DeltaTimeMachineFS
+        SKIP_INSTALL: YES
+
   Delta:
     type: application
     platform: macOS
@@ -82,6 +141,16 @@ targets:
           copyFiles:
             destination: wrapper
             subpath: Contents/Library/LaunchAgents
+      - path: Packaging/com.delta.backup.timemachine.service.plist
+        buildPhase:
+          copyFiles:
+            destination: wrapper
+            subpath: Contents/Library/LaunchAgents
+      - path: Packaging/com.delta.backup.timemachine.helper.plist
+        buildPhase:
+          copyFiles:
+            destination: wrapper
+            subpath: Contents/Library/LaunchDaemons
       - path: Resources/Tools/bin/restic
         optional: true
         attributes:
@@ -111,6 +180,26 @@ targets:
         codeSign: true
         copy:
           destination: executables
+      - target: DeltaTimeMachineService
+        embed: true
+        link: false
+        codeSign: true
+        copy:
+          destination: resources
+      - target: DeltaTimeMachineHelper
+        embed: true
+        link: false
+        codeSign: true
+        copy:
+          destination: wrapper
+          subpath: Contents/Library/LaunchServices
+      - target: DeltaTimeMachineFS
+        embed: true
+        link: false
+        codeSign: true
+        copy:
+          destination: wrapper
+          subpath: Contents/Extensions
       - package: Sparkle
         product: Sparkle
     preBuildScripts:
@@ -138,6 +227,8 @@ targets:
     dependencies:
       - package: DeltaPackage
         product: DeltaCore
+      - package: DeltaPackage
+        product: DeltaTimeMachineIPC
       - package: GRDB
         product: GRDB
     settings:
@@ -150,6 +241,7 @@ schemes:
     build:
       targets:
         Delta: all
+        DeltaTimeMachineFS: all
         DeltaCoreTests: [test]
     run:
       config: Debug

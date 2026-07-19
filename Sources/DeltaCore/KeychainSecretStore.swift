@@ -86,6 +86,20 @@ public struct KeychainSecretStore: Sendable {
         account: String,
         authenticationPolicy: KeychainAuthenticationPolicy = .allowUserInteraction
     ) throws -> String {
+        let data = try loadData(
+            account: account,
+            authenticationPolicy: authenticationPolicy
+        )
+        guard let secret = String(data: data, encoding: .utf8) else {
+            throw KeychainSecretError.invalidData
+        }
+        return secret
+    }
+
+    public func loadData(
+        account: String,
+        authenticationPolicy: KeychainAuthenticationPolicy = .allowUserInteraction
+    ) throws -> Data {
         let query = loadQuery(account: account, authenticationPolicy: authenticationPolicy)
 
         var result: CFTypeRef?
@@ -93,13 +107,10 @@ public struct KeychainSecretStore: Sendable {
         guard status == errSecSuccess else {
             throw keychainError(for: status)
         }
-        guard
-            let data = result as? Data,
-            let secret = String(data: data, encoding: .utf8)
-        else {
+        guard let data = result as? Data else {
             throw KeychainSecretError.invalidData
         }
-        return secret
+        return data
     }
 
     public func delete(
@@ -228,10 +239,28 @@ public struct KeychainSecretStore: Sendable {
     }
 
     private static func defaultTrustedApplicationPaths() -> [String] {
-        let executable = URL(fileURLWithPath: CommandLine.arguments.first ?? "")
-        let directory = executable.deletingLastPathComponent()
-        return ["Delta", "DeltaAgent", "DeltaSecretBridge"]
-            .map { directory.appendingPathComponent($0).path }
+        trustedApplicationPaths(executablePath: CommandLine.arguments.first ?? "")
+    }
+
+    static func trustedApplicationPaths(executablePath: String) -> [String] {
+        let executable = URL(fileURLWithPath: executablePath).standardizedFileURL
+        var candidates = [executable.path]
+        if let contentsRange = executable.path.range(of: "/Contents/") {
+            let appPath = String(executable.path[..<contentsRange.lowerBound])
+            let appURL = URL(fileURLWithPath: appPath, isDirectory: true)
+            candidates.append(contentsOf: [
+                appURL.appendingPathComponent("Contents/MacOS/Delta").path,
+                appURL.appendingPathComponent("Contents/Resources/DeltaAgent").path,
+                appURL.appendingPathComponent("Contents/MacOS/DeltaSecretBridge").path,
+                appURL.appendingPathComponent("Contents/Resources/DeltaTimeMachineService").path
+            ])
+        } else {
+            let directory = executable.deletingLastPathComponent()
+            candidates.append(contentsOf: ["Delta", "DeltaAgent", "DeltaSecretBridge", "DeltaTimeMachineService"]
+                .map { directory.appendingPathComponent($0).path })
+        }
+        var seen = Set<String>()
+        return candidates.filter { seen.insert($0).inserted }
     }
 
 }
