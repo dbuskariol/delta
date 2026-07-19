@@ -11,10 +11,11 @@ if [[ ! -d "$APP_PATH" ]]; then
   printf "Delta app bundle not found at %s\n" "$APP_PATH" >&2
   exit 1
 fi
-APP_PATH="$(cd "$(dirname "$APP_PATH")" && pwd -P)/$(basename "$APP_PATH")"
+APP_PATH="$(cd "$APP_PATH" && pwd -P)"
 EXTERNAL_ACCEPTANCE_APP_PATH="$APP_PATH"
+IDENTITY_ACCEPTANCE_APP_PATH=""
 if [[ -d "$INSTALLED_APP_PATH" ]]; then
-  INSTALLED_APP_PATH="$(cd "$(dirname "$INSTALLED_APP_PATH")" && pwd -P)/$(basename "$INSTALLED_APP_PATH")"
+  INSTALLED_APP_PATH="$(cd "$INSTALLED_APP_PATH" && pwd -P)"
 fi
 
 mkdir -p "$OUTPUT_DIR"
@@ -42,6 +43,11 @@ append_command() {
   } >>"$OUTPUT"
 }
 
+missing_installed_identity() {
+  printf "Identity-sensitive acceptance requires the exact candidate installed under /Applications.\n"
+  return 1
+}
+
 SHORT_VERSION="$(plist_value CFBundleShortVersionString)"
 BUILD_VERSION="$(plist_value CFBundleVersion)"
 BUNDLE_ID="$(plist_value CFBundleIdentifier)"
@@ -64,6 +70,12 @@ manual_report_value() {
 }
 
 APP_CDHASH="$(signature_value "$APP_PATH" CDHash)"
+if [[ -d "$INSTALLED_APP_PATH" \
+  && -n "$APP_CDHASH" \
+  && "$(signature_value "$INSTALLED_APP_PATH" CDHash)" == "$APP_CDHASH" ]]
+then
+  IDENTITY_ACCEPTANCE_APP_PATH="$INSTALLED_APP_PATH"
+fi
 AUTOMATED_GATE_STATUS="${DELTA_AUTOMATED_GATE_STATUS:-}"
 AUTOMATED_GATE_APP_HASH_MATCH="No"
 if [[ -z "$AUTOMATED_GATE_STATUS" && -f "$GATE_STATUS_FILE" ]]; then
@@ -124,12 +136,16 @@ append_command "Scheduled Backups Helper Dry Run" "$APP_PATH/Contents/Resources/
 ISOLATED_AGENT_SUPPORT="$(/usr/bin/mktemp -d -t delta-agent-support.XXXXXX)"
 append_command "Scheduled Backups Isolated Due-Run" /bin/sh -c "DELTA_APP_SUPPORT_DIR='$ISOLATED_AGENT_SUPPORT' '$APP_PATH/Contents/Resources/DeltaAgent' && test -f '$ISOLATED_AGENT_SUPPORT/Delta.sqlite'"
 /bin/rm -rf "$ISOLATED_AGENT_SUPPORT"
-append_command "Scheduled Backups Acceptance" "$ROOT_DIR/Scripts/run-installed-scheduled-agent-acceptance.sh" "$APP_PATH"
-append_command "Service Management Lifecycle Acceptance" "$ROOT_DIR/Scripts/run-installed-service-management-acceptance.sh" "$APP_PATH"
-append_command "Installed Preferences Acceptance" "$ROOT_DIR/Scripts/run-installed-preferences-acceptance.sh" "$APP_PATH"
-if [[ -d "$INSTALLED_APP_PATH" ]]; then
+if [[ -n "$IDENTITY_ACCEPTANCE_APP_PATH" ]]; then
+  append_command "Scheduled Backups Acceptance" "$ROOT_DIR/Scripts/run-installed-scheduled-agent-acceptance.sh" "$IDENTITY_ACCEPTANCE_APP_PATH"
+  append_command "Service Management Lifecycle Acceptance" "$ROOT_DIR/Scripts/run-installed-service-management-acceptance.sh" "$IDENTITY_ACCEPTANCE_APP_PATH"
+  append_command "Installed Preferences Acceptance" "$ROOT_DIR/Scripts/run-installed-preferences-acceptance.sh" "$IDENTITY_ACCEPTANCE_APP_PATH"
   append_command "Installed App Smoke Verification" "$ROOT_DIR/Scripts/verify-installed-app.sh" "$INSTALLED_APP_PATH"
   EXTERNAL_ACCEPTANCE_APP_PATH="$INSTALLED_APP_PATH"
+else
+  append_command "Scheduled Backups Acceptance" missing_installed_identity
+  append_command "Service Management Lifecycle Acceptance" missing_installed_identity
+  append_command "Installed Preferences Acceptance" missing_installed_identity
 fi
 append_command "Bundled Backup Engine" "$APP_PATH/Contents/MacOS/restic" version
 append_command "Bundled Cloud Helper" "$APP_PATH/Contents/MacOS/rclone" version
@@ -145,7 +161,11 @@ if [[ -f "$GATE_STATUS_FILE" ]]; then
 fi
 
 if [[ -x "$ROOT_DIR/Scripts/run-local-acceptance-probe.sh" ]]; then
-  append_command "Local Acceptance Probe" "$ROOT_DIR/Scripts/run-local-acceptance-probe.sh" "$APP_PATH"
+  if [[ -n "$IDENTITY_ACCEPTANCE_APP_PATH" ]]; then
+    append_command "Local Acceptance Probe" "$ROOT_DIR/Scripts/run-local-acceptance-probe.sh" "$IDENTITY_ACCEPTANCE_APP_PATH"
+  else
+    append_command "Local Acceptance Probe" missing_installed_identity
+  fi
   if [[ -f "$ROOT_DIR/dist/local-acceptance/latest.md" ]]; then
     append_command "Local Acceptance Probe Report" /bin/cat "$ROOT_DIR/dist/local-acceptance/latest.md"
   fi

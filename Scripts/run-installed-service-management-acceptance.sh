@@ -11,6 +11,12 @@ PAUSE_KEY="Delta.pausesScheduledBackups"
   printf 'Installed Delta executable is missing: %s\n' "$DELTA_EXECUTABLE" >&2
   exit 1
 }
+APP_PATH="$(cd "$APP_PATH" && pwd -P)"
+DELTA_EXECUTABLE="$APP_PATH/Contents/MacOS/Delta"
+if [[ "$(dirname "$APP_PATH")" != "/Applications" || "$APP_PATH" != *.app ]]; then
+  printf 'Service Management acceptance requires an app installed directly in /Applications, not %s\n' "$APP_PATH" >&2
+  exit 64
+fi
 
 service_action() {
   DELTA_ENABLE_SERVICE_MANAGEMENT_ACCEPTANCE=1 \
