@@ -7,7 +7,7 @@ source "$ROOT_DIR/Scripts/lib/delta-release.sh"
 # Keep the audit terms out of tracked content while assembling the exact
 # case-insensitive pattern at runtime.
 FORBIDDEN='deco''der-developer|deco''der-dev|deco''derdev|dan''buskariol|nft''dannyboy'
-EXPECTED_IDENTITY='dbuskariol|32349796+dbuskariol@users.noreply.github.com'
+EXPECTED_IDENTITIES=$'Daniel Buskariol|32349796+dbuskariol@users.noreply.github.com\nGitHub|noreply@github.com\ndbuskariol|32349796+dbuskariol@users.noreply.github.com'
 
 cd "$ROOT_DIR"
 [[ "$(/usr/bin/git config --local user.name)" == "dbuskariol" ]] || delta_fail 'repository Git user.name is incorrect'
@@ -21,7 +21,7 @@ if /usr/bin/git for-each-ref --format='%(refname)' \
 fi
 
 IDENTITIES="$(/usr/bin/git log --all --format='%an|%ae%n%cn|%ce' | /usr/bin/sort -u)"
-[[ "$IDENTITIES" == "$EXPECTED_IDENTITY" ]] || delta_fail "reachable commit identities are not unique and expected: $IDENTITIES"
+[[ "$IDENTITIES" == "$EXPECTED_IDENTITIES" ]] || delta_fail "reachable commit identities are not the exact approved account and GitHub service identities: $IDENTITIES"
 
 while IFS='|' read -r ref object_type tagger_name tagger_email; do
   [[ -n "$ref" ]] || continue
