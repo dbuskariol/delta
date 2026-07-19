@@ -1,6 +1,6 @@
-# Delta 0.3.3
+# Delta 0.4.0
 
-Delta 0.3.3 adds native Time Machine-format destinations:
+Delta 0.4.0 adds native Time Machine-format destinations:
 
 - Presents a Delta-managed encrypted APFS sparsebundle to macOS Time Machine without first staging the complete disk locally.
 - Stores changed 8 MiB bands as immutable remote objects behind a strictly bounded cache, and acknowledges synchronization only after remote verification and authenticated generation publication.
