@@ -2198,6 +2198,7 @@ final class DeltaAppModel: ObservableObject {
            let currentFingerprint = currentTimeMachineSystemFingerprint {
             repairTimeMachineSystemAccess(
                 currentFingerprint: currentFingerprint,
+                scope: .all,
                 showsResultAlert: showsResultAlert
             )
             return
@@ -2231,13 +2232,6 @@ final class DeltaAppModel: ObservableObject {
         if let helperRegistrationFailure, !helperAccepted {
             failures.append("setup helper: \(helperRegistrationFailure)")
         }
-        let registeredSomething = (
-            !TimeMachineSystemAccessRegistrationPolicy.accepted(status: priorServiceStatus)
-                && serviceAccepted
-        ) || (
-            !TimeMachineSystemAccessRegistrationPolicy.accepted(status: priorHelperStatus)
-                && helperAccepted
-        )
         timeMachineSystemRegistrationError = failures.isEmpty
             ? nil
             : "Delta could not request all Time Machine system access: \(failures.joined(separator: "; "))"
@@ -2248,23 +2242,31 @@ final class DeltaAppModel: ObservableObject {
                 || timeMachineSetupHelperStatus == .requiresApproval),
            let fingerprint = currentTimeMachineSystemFingerprint
         {
-            let storedFingerprint = registeredFingerprint
-            if (registeredSomething && storedFingerprint.isEmpty)
-                || storedFingerprint == fingerprint
-            {
+            switch TimeMachineSystemAccessPostRegistrationPolicy.action(
+                priorServiceStatus: priorServiceStatus,
+                priorHelperStatus: priorHelperStatus,
+                serviceStatus: timeMachineServiceStatus,
+                helperStatus: timeMachineSetupHelperStatus,
+                registeredFingerprint: registeredFingerprint.isEmpty
+                    ? nil
+                    : registeredFingerprint,
+                currentFingerprint: fingerprint
+            ) {
+            case .recordCurrentFingerprint:
                 DeltaAppPreferences.sharedStore().set(
                     fingerprint,
                     forKey: DeltaAppPreferenceKeys.timeMachineSystemFingerprint
                 )
                 refreshTimeMachineSystemSupportCurrency()
-            } else if timeMachineServiceStatus == .enabled,
-                      timeMachineSetupHelperStatus == .enabled
-            {
+            case let .repair(scope):
                 repairTimeMachineSystemAccess(
                     currentFingerprint: fingerprint,
+                    scope: scope,
                     showsResultAlert: showsResultAlert
                 )
                 return
+            case .none:
+                break
             }
         }
         refreshTimeMachineSystemSupportCurrency()
@@ -2279,6 +2281,7 @@ final class DeltaAppModel: ObservableObject {
 
     private func repairTimeMachineSystemAccess(
         currentFingerprint: String,
+        scope: TimeMachineSystemAccessRepairScope,
         showsResultAlert: Bool
     ) {
         guard softwareUpdateReadiness == .ready else {
@@ -2298,8 +2301,12 @@ final class DeltaAppModel: ObservableObject {
                 // through Service Management replaces a stale helper or agent
                 // path without private launchd state changes. macOS remains
                 // authoritative and may require renewed Login Items approval.
-                try await TimeMachineSetupHelperController.reregister()
-                try await TimeMachineServiceController.reregister()
+                if scope.contains(.setupHelper) {
+                    try await TimeMachineSetupHelperController.reregister()
+                }
+                if scope.contains(.backgroundService) {
+                    try await TimeMachineServiceController.reregister()
+                }
 
                 let serviceStatus = TimeMachineServiceController.status()
                 let helperStatus = TimeMachineSetupHelperController.status()

@@ -239,6 +239,12 @@ public enum TimeMachineSystemRegistrationFingerprint {
     static func current(bundleURL: URL) -> String? {
         do {
             var hasher = SHA256()
+            update(
+                &hasher,
+                with: Data(
+                    bundleURL.standardizedFileURL.resolvingSymlinksInPath().path.utf8
+                )
+            )
             for relativePath in artifactRelativePaths {
                 try update(
                     &hasher,
@@ -256,9 +262,16 @@ public enum TimeMachineSystemRegistrationFingerprint {
     public static func fingerprint(artifacts: [Data]) -> String {
         var hasher = SHA256()
         for artifact in artifacts {
-            var length = UInt64(artifact.count).bigEndian
-            withUnsafeBytes(of: &length) { hasher.update(bufferPointer: $0) }
-            hasher.update(data: artifact)
+            update(&hasher, with: artifact)
+        }
+        return hasher.finalize().map { String(format: "%02x", $0) }.joined()
+    }
+
+    static func fingerprint(bundlePath: String, artifacts: [Data]) -> String {
+        var hasher = SHA256()
+        update(&hasher, with: Data(bundlePath.utf8))
+        for artifact in artifacts {
+            update(&hasher, with: artifact)
         }
         return hasher.finalize().map { String(format: "%02x", $0) }.joined()
     }
@@ -291,6 +304,12 @@ public enum TimeMachineSystemRegistrationFingerprint {
         guard observedLength == expectedLength else {
             throw CocoaError(.fileReadCorruptFile)
         }
+    }
+
+    private static func update(_ hasher: inout SHA256, with data: Data) {
+        var length = UInt64(data.count).bigEndian
+        withUnsafeBytes(of: &length) { hasher.update(bufferPointer: $0) }
+        hasher.update(data: data)
     }
 }
 
@@ -328,6 +347,24 @@ public enum TimeMachineSystemAccessRequestAction: Equatable, Sendable {
     case reregister
 }
 
+public struct TimeMachineSystemAccessRepairScope: OptionSet, Sendable {
+    public let rawValue: UInt8
+
+    public init(rawValue: UInt8) {
+        self.rawValue = rawValue
+    }
+
+    public static let backgroundService = Self(rawValue: 1 << 0)
+    public static let setupHelper = Self(rawValue: 1 << 1)
+    public static let all: Self = [.backgroundService, .setupHelper]
+}
+
+public enum TimeMachineSystemAccessPostRegistrationAction: Equatable, Sendable {
+    case none
+    case recordCurrentFingerprint
+    case repair(TimeMachineSystemAccessRepairScope)
+}
+
 public enum TimeMachineSystemAccessRequestPolicy {
     /// An explicit user request may repair an enabled registration that still
     /// points at an older or moved app. Automatic update reconciliation avoids
@@ -353,6 +390,62 @@ public enum TimeMachineSystemAccessRequestPolicy {
             return .none
         }
         return registeredFingerprint == currentFingerprint ? .none : .reregister
+    }
+}
+
+public enum TimeMachineSystemAccessPostRegistrationPolicy {
+    /// A successful registration is already bound to the component in the
+    /// calling app. When a mixed old/new registration is repaired, refresh
+    /// only components that were accepted before this request. Tearing down a
+    /// component that was just registered can discard its privileged approval
+    /// and force a second, unnecessary authorization cycle.
+    public static func action(
+        priorServiceStatus: LaunchAgentRegistrationStatus,
+        priorHelperStatus: LaunchAgentRegistrationStatus,
+        serviceStatus: LaunchAgentRegistrationStatus,
+        helperStatus: LaunchAgentRegistrationStatus,
+        registeredFingerprint: String?,
+        currentFingerprint: String?
+    ) -> TimeMachineSystemAccessPostRegistrationAction {
+        guard
+            TimeMachineSystemAccessRegistrationPolicy.accepted(status: serviceStatus),
+            TimeMachineSystemAccessRegistrationPolicy.accepted(status: helperStatus),
+            let currentFingerprint
+        else {
+            return .none
+        }
+        if registeredFingerprint == currentFingerprint {
+            return .recordCurrentFingerprint
+        }
+
+        let serviceWasRegistered =
+            !TimeMachineSystemAccessRegistrationPolicy.accepted(status: priorServiceStatus)
+                && TimeMachineSystemAccessRegistrationPolicy.accepted(status: serviceStatus)
+        let helperWasRegistered =
+            !TimeMachineSystemAccessRegistrationPolicy.accepted(status: priorHelperStatus)
+                && TimeMachineSystemAccessRegistrationPolicy.accepted(status: helperStatus)
+
+        guard serviceWasRegistered || serviceStatus == .enabled else {
+            return .none
+        }
+        guard helperWasRegistered || helperStatus == .enabled else {
+            return .none
+        }
+
+        var scope: TimeMachineSystemAccessRepairScope = []
+        if !serviceWasRegistered, serviceStatus == .enabled {
+            scope.insert(.backgroundService)
+        }
+        if !helperWasRegistered, helperStatus == .enabled {
+            scope.insert(.setupHelper)
+        }
+        if !scope.isEmpty {
+            return .repair(scope)
+        }
+        if serviceWasRegistered, helperWasRegistered {
+            return .recordCurrentFingerprint
+        }
+        return .none
     }
 }
 
