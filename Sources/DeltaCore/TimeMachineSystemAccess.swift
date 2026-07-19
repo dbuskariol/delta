@@ -190,11 +190,6 @@ public enum TimeMachineSetupHelperController {
         #endif
     }
 
-    public static func installedCodeHash(bundle: Bundle = .main) throws -> Data {
-        try DeltaCodeSigningIdentity.staticCodeHash(
-            at: bundle.bundleURL.appendingPathComponent(executableRelativePath)
-        )
-    }
 }
 
 public enum TimeMachineSystemRegistrationFingerprint {
@@ -294,13 +289,10 @@ public enum TimeMachineSystemRegistrationMaintenanceAction: Equatable, Sendable 
 }
 
 public enum TimeMachineSystemRegistrationRefreshError: Error, LocalizedError {
-    case mountedDiskPreventsRefresh
     case installedComponentsChanged
 
     public var errorDescription: String? {
         switch self {
-        case .mountedDiskPreventsRefresh:
-            "Disconnect every Delta Time Machine disk before refreshing system support."
         case .installedComponentsChanged:
             "Delta's installed Time Machine components changed before the disk connection began. Wait for system support to refresh, then try again."
         }
