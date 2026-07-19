@@ -61,6 +61,8 @@ for script in \
   create-release-manifest.sh generate-appcast.sh notarize-release.sh \
   package-update.sh publish-release.sh release.sh verify-release-assets.sh \
   run-installed-service-management-acceptance.sh \
+  run-installed-time-machine-system-support-acceptance.sh \
+  verify-time-machine-system-support-evidence.sh \
   verify-release-candidate.sh verify-production-readiness.sh \
   verify-sparkle-update.sh
 do
@@ -81,6 +83,20 @@ fi
 if ! /usr/bin/grep -Fq 'Service Management acceptance requires an app installed directly in /Applications' \
   "$ROOT_DIR/Scripts/run-installed-service-management-acceptance.sh"; then
   printf "Service Management acceptance is missing its installed-identity guard.\n" >&2
+  exit 1
+fi
+if ! /usr/bin/grep -Fq 'requires the exact canonical app at /Applications/Delta.app' \
+  "$ROOT_DIR/Scripts/run-installed-time-machine-system-support-acceptance.sh" \
+  || ! /usr/bin/grep -Fq 'TimeMachineSetupHelperRuntimeVerifier.verify' \
+    "$ROOT_DIR/Sources/Delta/DeltaApp.swift" \
+  || ! /usr/bin/grep -Fq 'verify-time-machine-system-support-evidence.sh' \
+    "$ROOT_DIR/Scripts/verify-production-readiness.sh"; then
+  printf "Time Machine system-support release acceptance is missing its canonical-path, authenticated-helper, or publishing gate.\n" >&2
+  exit 1
+fi
+if /usr/bin/grep -Fq 'run-installed-time-machine-system-support-acceptance.sh' \
+  "$RELEASE_WORKFLOW"; then
+  printf "Headless release automation must not pretend it can grant administrator approval to a Time Machine launch daemon.\n" >&2
   exit 1
 fi
 if ! /usr/bin/grep -Fq 'run-local-acceptance-probe.sh" "$IDENTITY_ACCEPTANCE_APP_PATH"' \
