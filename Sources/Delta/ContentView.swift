@@ -4740,7 +4740,7 @@ struct DestinationRow: View {
         guard let state = model.timeMachineStatesByRepository[destination.id] else {
             return .orange
         }
-        if state.lastError != nil {
+        if timeMachinePresentation.warningMessage != nil {
             return .orange
         }
         switch state.lifecycle {

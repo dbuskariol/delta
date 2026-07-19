@@ -35,6 +35,10 @@ final class TimeMachineSystemControllerTests: XCTestCase {
             TimeMachineSetupExecutionPolicy.operationRuntime
                 + TimeMachineSetupExecutionPolicy.rollbackRuntime
         )
+        XCTAssertEqual(
+            TimeMachineSetupExecutionPolicy.helperReadinessTimeout,
+            15
+        )
         XCTAssertEqual(TimeMachineSetupExecutionPolicy.maximumRequestBytes, 65_536)
         XCTAssertEqual(TimeMachineSetupExecutionPolicy.maximumPasswordBytes, 4_096)
     }
@@ -233,6 +237,7 @@ final class TimeMachineSystemControllerTests: XCTestCase {
             repositoryID: repositoryID,
             storeID: settings.storeID,
             lifecycle: .mounted,
+            mountSessionID: UUID(),
             mountPoint: "/Volumes/Stale",
             diskImagePath: "History.sparsebundle",
             deviceIdentifier: "disk90s1",
@@ -260,6 +265,7 @@ final class TimeMachineSystemControllerTests: XCTestCase {
         XCTAssertEqual(connected.mountPoint, "/Volumes/History")
         XCTAssertEqual(connected.deviceIdentifier, "disk42s1")
         XCTAssertNil(connected.lastError)
+        XCTAssertTrue(connected.isReadyForBackup)
         XCTAssertEqual(connected.updatedAt, now)
 
         let missingBackupRole = TimeMachineSystemStateReconciliationPolicy.reconcile(
@@ -474,6 +480,63 @@ final class TimeMachineSystemControllerTests: XCTestCase {
         )
     }
 
+    func testTimeMachineSystemMutationsRequireCanonicalInstalledApp() {
+        XCTAssertTrue(
+            TimeMachineInstalledApplicationPolicy.isCanonicalInstallation(
+                bundleURL: URL(
+                    fileURLWithPath: "/Applications/Delta.app",
+                    isDirectory: true
+                )
+            )
+        )
+        for path in [
+            "/Applications/Delta 0.4.0 Acceptance.app",
+            "/Users/test/Applications/Delta.app",
+            "/tmp/Delta.app",
+            "/Users/test/project/dist/Delta.app",
+            "/Users/test/Library/Developer/Xcode/DerivedData/Delta/Build/Products/Release/Delta.app"
+        ] {
+            XCTAssertFalse(
+                TimeMachineInstalledApplicationPolicy.isCanonicalInstallation(
+                    bundleURL: URL(fileURLWithPath: path, isDirectory: true)
+                ),
+                path
+            )
+        }
+    }
+
+    func testTimeMachineSystemMutationsRejectSymlinkAtCanonicalPath() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "delta-canonical-install-policy-\(UUID().uuidString)",
+            isDirectory: true
+        )
+        let realApp = root.appendingPathComponent("Build/Delta.app", isDirectory: true)
+        let canonicalApp = root.appendingPathComponent(
+            "Applications/Delta.app",
+            isDirectory: true
+        )
+        try FileManager.default.createDirectory(
+            at: realApp,
+            withIntermediateDirectories: true
+        )
+        try FileManager.default.createDirectory(
+            at: canonicalApp.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try FileManager.default.createSymbolicLink(
+            at: canonicalApp,
+            withDestinationURL: realApp
+        )
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        XCTAssertFalse(
+            TimeMachineInstalledApplicationPolicy.isCanonicalInstallation(
+                bundleURL: canonicalApp,
+                canonicalBundleURL: canonicalApp
+            )
+        )
+    }
+
     func testTimeMachineSystemRegistrationRefreshRequiresIdleEnabledDestinations() {
         XCTAssertTrue(
             TimeMachineSystemRegistrationMaintenancePolicy.isCurrent(
@@ -577,6 +640,36 @@ final class TimeMachineSystemControllerTests: XCTestCase {
                 expectedCodeHash: Data(),
                 observedCodeHash: Data()
             )
+        )
+    }
+
+    func testSetupHelperReadinessRequiresExactNonemptyCodeHash() {
+        let expected = Data(repeating: 0x11, count: 20)
+        XCTAssertTrue(
+            TimeMachineSetupHelperReadinessPolicy.isCurrent(
+                expectedCodeHash: expected,
+                observedCodeHash: expected
+            )
+        )
+        XCTAssertFalse(
+            TimeMachineSetupHelperReadinessPolicy.isCurrent(
+                expectedCodeHash: expected,
+                observedCodeHash: Data(repeating: 0x22, count: 20)
+            )
+        )
+        XCTAssertFalse(
+            TimeMachineSetupHelperReadinessPolicy.isCurrent(
+                expectedCodeHash: Data(),
+                observedCodeHash: Data()
+            )
+        )
+        let roundTrip = TimeMachineSetupHelperReadiness(codeHash: expected)
+        XCTAssertEqual(
+            try? JSONDecoder().decode(
+                TimeMachineSetupHelperReadiness.self,
+                from: JSONEncoder().encode(roundTrip)
+            ),
+            roundTrip
         )
     }
 
@@ -858,37 +951,23 @@ final class TimeMachineSystemControllerTests: XCTestCase {
         )
     }
 
-    func testTimeMachineSystemRegistrationRetryUsesBoundedMonotonicBackoff() {
+    func testTimeMachineSystemRegistrationAttemptsOncePerInstalledFingerprint() {
         XCTAssertTrue(
             TimeMachineSystemRegistrationRetryPolicy.shouldAttempt(
                 currentFingerprint: "new",
-                lastAttemptFingerprint: "old",
-                lastAttemptUptime: 500,
-                currentUptime: 501
+                lastAttemptFingerprint: "old"
             )
         )
         XCTAssertFalse(
             TimeMachineSystemRegistrationRetryPolicy.shouldAttempt(
                 currentFingerprint: "new",
-                lastAttemptFingerprint: "new",
-                lastAttemptUptime: 500,
-                currentUptime: 559
+                lastAttemptFingerprint: "new"
             )
         )
         XCTAssertTrue(
             TimeMachineSystemRegistrationRetryPolicy.shouldAttempt(
                 currentFingerprint: "new",
-                lastAttemptFingerprint: "new",
-                lastAttemptUptime: 500,
-                currentUptime: 560
-            )
-        )
-        XCTAssertTrue(
-            TimeMachineSystemRegistrationRetryPolicy.shouldAttempt(
-                currentFingerprint: "new",
-                lastAttemptFingerprint: "new",
-                lastAttemptUptime: 500,
-                currentUptime: 1
+                lastAttemptFingerprint: nil
             )
         )
     }

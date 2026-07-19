@@ -190,6 +190,45 @@ public enum TimeMachineSetupHelperController {
         #endif
     }
 
+    public static func installedCodeHash(bundle: Bundle = .main) throws -> Data {
+        try DeltaCodeSigningIdentity.staticCodeHash(
+            at: bundle.bundleURL.appendingPathComponent(executableRelativePath)
+        )
+    }
+}
+
+/// Service Management and FSKit registrations are bound to an installed app
+/// URL. Requiring Delta's canonical production location prevents a renamed
+/// acceptance copy, DerivedData product, `dist` artifact, or worktree build
+/// from replacing the production helper/service records. A noncanonical app
+/// may still inspect state and safely disconnect an existing user-space mount,
+/// but it cannot register components or begin a privileged mutation.
+public enum TimeMachineInstalledApplicationPolicy {
+    public static let canonicalBundleURL = URL(
+        fileURLWithPath: "/Applications/Delta.app",
+        isDirectory: true
+    )
+
+    public static func isCanonicalInstallation(bundleURL: URL) -> Bool {
+        isCanonicalInstallation(
+            bundleURL: bundleURL,
+            canonicalBundleURL: canonicalBundleURL
+        )
+    }
+
+    static func isCanonicalInstallation(
+        bundleURL: URL,
+        canonicalBundleURL: URL
+    ) -> Bool {
+        let candidate = bundleURL.standardizedFileURL
+        let canonical = canonicalBundleURL.standardizedFileURL
+        return candidate.path == canonical.path
+            && candidate.resolvingSymlinksInPath().path == canonical.path
+    }
+
+    public static var recoveryMessage: String {
+        "Move Delta to /Applications with the name Delta.app, then reopen it before setting up or connecting a Time Machine disk."
+    }
 }
 
 public enum TimeMachineSystemRegistrationFingerprint {
@@ -334,10 +373,10 @@ public enum TimeMachineSystemAccessPostRegistrationAction: Equatable, Sendable {
 
 public enum TimeMachineSystemAccessRequestPolicy {
     /// An explicit user request may repair an enabled registration that still
-    /// points at an older or moved app. Automatic update reconciliation avoids
-    /// unregistering the privileged helper because that can require renewed
-    /// Login Items approval; the explicit Set Up action is the supported
-    /// recovery boundary for that Service Management transition.
+    /// points at an older or moved app. Automatic update reconciliation makes
+    /// one supported Service Management replacement attempt per installed
+    /// component fingerprint; Set Up remains the user-controlled recovery
+    /// boundary if macOS cannot launch the replacement.
     public static func action(
         serviceStatus: LaunchAgentRegistrationStatus,
         helperStatus: LaunchAgentRegistrationStatus,
@@ -463,31 +502,17 @@ public enum TimeMachineSystemRegistrationMaintenancePolicy {
 }
 
 public enum TimeMachineSystemRegistrationRetryPolicy {
-    public static let retryInterval: TimeInterval = 60
-
     public static func shouldAttempt(
         currentFingerprint: String,
-        lastAttemptFingerprint: String?,
-        lastAttemptUptime: TimeInterval?,
-        currentUptime: TimeInterval
+        lastAttemptFingerprint: String?
     ) -> Bool {
-        guard lastAttemptFingerprint == currentFingerprint else {
-            return true
-        }
-        guard let lastAttemptUptime else {
-            return false
-        }
-        guard currentUptime >= lastAttemptUptime else {
-            return true
-        }
-        return currentUptime - lastAttemptUptime >= retryInterval
+        lastAttemptFingerprint != currentFingerprint
     }
 }
 
 public enum TimeMachineSystemRegistrationEventPolicy {
-    /// Automatic retries keep the system-support status current, but Activity
-    /// should only gain evidence when the observed failure changes. The live
-    /// permission status remains authoritative on every attempt.
+    /// Activity should only gain evidence when the observed failure changes.
+    /// The live permission status remains authoritative on every check.
     public static func shouldRecordFailure(
         previousMessage: String?,
         currentMessage: String

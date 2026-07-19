@@ -232,7 +232,11 @@ final class DashboardHealthEvaluatorTests: XCTestCase {
                 repositoryID: healthy.id,
                 storeID: healthy.timeMachineSettings!.storeID,
                 lifecycle: .mounted,
-                mountPoint: "/Volumes/Connected"
+                mountSessionID: UUID(),
+                mountPoint: "/Volumes/Connected",
+                diskImagePath: "Connected.sparsebundle",
+                deviceIdentifier: "disk42s1",
+                timeMachineDestinationID: UUID().uuidString
             )
         ]
 
