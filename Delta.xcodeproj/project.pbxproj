@@ -142,49 +142,6 @@
 		0099D421A81B6A085DCE7444 /* Embed Dependencies */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
-			dstPath = Contents/MacOS;
-			dstSubfolderSpec = 1;
-			files = (
-				97F0B424B51A73F204EE2824 /* DeltaTimeMachineHelper in Embed Dependencies */,
-			);
-			name = "Embed Dependencies";
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		03BC6546FE6E922316349347 /* Embed Dependencies */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = Contents/Extensions;
-			dstSubfolderSpec = 1;
-			files = (
-				87EF065D9A9B2A5639F527C1 /* DeltaTimeMachineFS.appex in Embed Dependencies */,
-			);
-			name = "Embed Dependencies";
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		244BD7518ACCA23E79B5CF22 /* CopyFiles */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = Contents/Library/LaunchAgents;
-			dstSubfolderSpec = 1;
-			files = (
-				1328BD13947B4A7BB630D181 /* com.delta.backup.agent.plist in CopyFiles */,
-				1D1324392579C9D64EC83188 /* com.delta.backup.timemachine.service.plist in CopyFiles */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		4EBDA5373A2DC6BF8F2D0665 /* CopyFiles */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = Contents/Library/LaunchDaemons;
-			dstSubfolderSpec = 1;
-			files = (
-				779C55FFC9CDD76CFC9512AE /* com.delta.backup.timemachine.helper.plist in CopyFiles */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		66D5B566A50B1DFC1A656269 /* Embed Dependencies */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
 			dstPath = "";
 			dstSubfolderSpec = 7;
 			files = (
@@ -194,7 +151,7 @@
 			name = "Embed Dependencies";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		85D30A7382F344B7165CA6F4 /* CopyFiles */ = {
+		244BD7518ACCA23E79B5CF22 /* CopyFiles */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
 			dstPath = "";
@@ -205,13 +162,46 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		9A72168F974738C92F8D1A57 /* Embed Dependencies */ = {
+		4EBDA5373A2DC6BF8F2D0665 /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = Contents/Library/LaunchAgents;
+			dstSubfolderSpec = 1;
+			files = (
+				1328BD13947B4A7BB630D181 /* com.delta.backup.agent.plist in CopyFiles */,
+				1D1324392579C9D64EC83188 /* com.delta.backup.timemachine.service.plist in CopyFiles */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		66D5B566A50B1DFC1A656269 /* Embed Dependencies */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
 			dstPath = "";
 			dstSubfolderSpec = 6;
 			files = (
 				2578751D52B2A1C0927C8DFE /* DeltaSecretBridge in Embed Dependencies */,
+				97F0B424B51A73F204EE2824 /* DeltaTimeMachineHelper in Embed Dependencies */,
+			);
+			name = "Embed Dependencies";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		85D30A7382F344B7165CA6F4 /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = Contents/Library/LaunchDaemons;
+			dstSubfolderSpec = 1;
+			files = (
+				779C55FFC9CDD76CFC9512AE /* com.delta.backup.timemachine.helper.plist in CopyFiles */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9A72168F974738C92F8D1A57 /* Embed Dependencies */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = Contents/Extensions;
+			dstSubfolderSpec = 1;
+			files = (
+				87EF065D9A9B2A5639F527C1 /* DeltaTimeMachineFS.appex in Embed Dependencies */,
 			);
 			name = "Embed Dependencies";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -641,7 +631,6 @@
 				9A72168F974738C92F8D1A57 /* Embed Dependencies */,
 				0099D421A81B6A085DCE7444 /* Embed Dependencies */,
 				66D5B566A50B1DFC1A656269 /* Embed Dependencies */,
-				03BC6546FE6E922316349347 /* Embed Dependencies */,
 			);
 			buildRules = (
 			);

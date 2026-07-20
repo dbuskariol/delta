@@ -37,6 +37,9 @@ fi
 /usr/bin/plutil -lint "$ROOT_DIR/Packaging/DeltaTimeMachineHelper.Info.plist" >/dev/null
 /usr/bin/plutil -lint "$ROOT_DIR/Packaging/com.delta.backup.timemachine.service.plist" >/dev/null
 /usr/bin/plutil -lint "$ROOT_DIR/Packaging/com.delta.backup.timemachine.helper.plist" >/dev/null
+if /usr/bin/grep -Fq 'Contents/Library/LaunchServices' "$ROOT_DIR/project.yml"; then
+  delta_fail 'project.yml still embeds the Time Machine helper in the obsolete SMJobBless location'
+fi
 /usr/bin/plutil -lint "$ROOT_DIR/Resources/PrivacyInfo.xcprivacy" >/dev/null
 /usr/bin/git -C "$ROOT_DIR" diff --check
 IFS=$'\t' read -r VERSION BUILD < <(delta_assert_release_metadata "$ROOT_DIR")
