@@ -81,7 +81,7 @@ BAD_HOME_BLOBS="$(while IFS= read -r blob; do
       if /usr/bin/git cat-file blob "$blob" \
         | USER_HOME_PREFIX="$USER_HOME_PREFIX" GENERIC_FIXTURE_USERS="$GENERIC_FIXTURE_USERS" \
           /usr/bin/perl -pe 's#\Q$ENV{USER_HOME_PREFIX}\E(?:$ENV{GENERIC_FIXTURE_USERS})(?=/|\b)#~#g' \
-        | /usr/bin/grep -a -E "${USER_HOME_PREFIX}[^/[:space:]]+" >/dev/null; then
+        | /usr/bin/grep -a -E "${USER_HOME_PREFIX}[[:alnum:]_.-][^/[:space:]]*" >/dev/null; then
         printf '%s\n' "$blob"
       fi
     done <<<"$RELEASE_AUDIT_BLOBS")"
