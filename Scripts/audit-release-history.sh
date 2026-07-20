@@ -76,10 +76,11 @@ RELEASE_AUDIT_BLOBS="$({
 
 # Generic test-fixture home paths are intentional. Real user-home paths are not.
 USER_HOME_PREFIX='/''Users/'
-GENERIC_FIXTURE_HOME="${USER_HOME_PREFIX}me"
+GENERIC_FIXTURE_USERS='me|test|tester|example|private-user'
 BAD_HOME_BLOBS="$(while IFS= read -r blob; do
       if /usr/bin/git cat-file blob "$blob" \
-        | GENERIC_FIXTURE_HOME="$GENERIC_FIXTURE_HOME" /usr/bin/perl -pe 's#\Q$ENV{GENERIC_FIXTURE_HOME}\E(?=/|\b)#~#g' \
+        | USER_HOME_PREFIX="$USER_HOME_PREFIX" GENERIC_FIXTURE_USERS="$GENERIC_FIXTURE_USERS" \
+          /usr/bin/perl -pe 's#\Q$ENV{USER_HOME_PREFIX}\E(?:$ENV{GENERIC_FIXTURE_USERS})(?=/|\b)#~#g' \
         | /usr/bin/grep -a -E "${USER_HOME_PREFIX}[^/[:space:]]+" >/dev/null; then
         printf '%s\n' "$blob"
       fi
