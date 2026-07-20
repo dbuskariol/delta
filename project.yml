@@ -191,8 +191,7 @@ targets:
         link: false
         codeSign: true
         copy:
-          destination: wrapper
-          subpath: Contents/Library/LaunchServices
+          destination: executables
       - target: DeltaTimeMachineFS
         embed: true
         link: false
