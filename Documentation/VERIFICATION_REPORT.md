@@ -38,7 +38,7 @@ A release must not be merged, tagged, or published until the complete exact-comm
 - Kept the Permissions surface to one authoritative Review Login Items action when Time Machine system support and scheduled backups both need attention, and bound the generated Xcode project and its source specification to the same immutable build identity.
 - Refreshed the README Permissions image to show the current Time Machine File System and Time Machine System Support rows and the single shared Login Items recovery action.
 - Replaced ambiguous per-app FSKit approval guidance with the working macOS By Category → File System Extensions route everywhere Delta presents or verifies setup instructions.
-- Kept the release-history audit fail closed while allowing the repository account's approved GitHub noreply display name and GitHub's service committer on GitHub-created commits.
+- Kept the release-history audit fail closed while allowing the repository account's approved GitHub noreply display name and GitHub's service committer on GitHub-created commits, and treating the previous public tag as the immutable baseline for historical machine-home-path findings while scanning the full current tree and every newly introduced object.
 
 ## Automated verification contract
 
