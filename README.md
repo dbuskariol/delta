@@ -202,4 +202,4 @@ Use **Settings → Updates** or **Updates** in the menu-bar panel. Delta checks 
 
 ## Status
 
-Delta is in active development at version 0.4.0. The Time Machine architecture and recovery workflow are implemented on `main` but are not yet production-accepted or shipped. Deterministic and localhost evidence remains regression evidence, not a substitute for a complete installed Time Machine backup/restore, genuine external-provider acceptance, Intel runtime coverage, or the exact notarized release candidate. Public production readiness still depends on those runtime results plus all signing, Apple-service, notarization, stapling, Gatekeeper, Sparkle, and release-history gates.
+Delta 0.4.1 is the current release. Time Machine-format destinations use macOS's native Time Machine disk format while Delta streams the sparsebundle's bands to the user's selected remote destination through a bounded local cache. Deterministic and localhost evidence remains regression evidence, not a substitute for complete installed-app, genuine external-provider, Intel runtime, signing, notarization, stapling, Gatekeeper, and Sparkle release validation.
